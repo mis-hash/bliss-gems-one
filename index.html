@@ -166,8 +166,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <p>Upload, publish, update and open your internal business apps from a single dashboard. GitHub + Firebase deployment can be connected behind this portal.</p>
     </div>
     <div class="heroStats">
-      <div class="stat"><b>4</b><small>Live Apps</small></div>
-      <div class="stat"><b>2</b><small>Updates</small></div>
+      <div class="stat"><b>0</b><small>Live Apps</small></div>
+      <div class="stat"><b>0</b><small>Updates</small></div>
       <div class="stat"><b>100%</b><small>Online</small></div>
     </div>
   </section>
@@ -186,32 +186,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
 
   <div class="sectionTitle"><h3>My Apps</h3><small style="color:var(--muted)">Mobile + Desktop ready</small></div>
   <section class="grid" id="appsGrid">
-    <div class="appCard" data-name="parcel dispatch" data-status="Live">
-      <div class="appHead"><div class="appIcon">📦</div><div><h4>Parcel Dispatch</h4><small>Dispatch + Return workflow</small></div></div>
-      <div><span class="badge"><span class="dot"></span> Live</span></div>
-      <div class="meta"><div><small>Version</small><b>v2.4</b></div><div><small>Updated</small><b>Today</b></div></div>
-      <div class="cardActions"><button class="btn primary" onclick="openDemo('Parcel Dispatch')">Open App</button><button class="btn superAdminOnly hidden" onclick="showUpdate(\'Parcel Dispatch\')">Update ZIP</button></div>
-    </div>
-
-    <div class="appCard" data-name="leave management" data-status="Live">
-      <div class="appHead"><div class="appIcon">🗓️</div><div><h4>Leave Management</h4><small>Employee leave & approvals</small></div></div>
-      <div><span class="badge"><span class="dot"></span> Live</span></div>
-      <div class="meta"><div><small>Version</small><b>v1.8</b></div><div><small>Updated</small><b>2 days ago</b></div></div>
-      <div class="cardActions"><button class="btn primary" onclick="openDemo('Leave Management')">Open App</button><button class="btn superAdminOnly hidden" onclick="showUpdate(\'Leave Management\')">Update ZIP</button></div>
-    </div>
-
-    <div class="appCard" data-name="inventory gemstone" data-status="Live">
-      <div class="appHead"><div class="appIcon">💎</div><div><h4>Gemstone Inventory</h4><small>Packets, split, merge, approval</small></div></div>
-      <div><span class="badge"><span class="dot"></span> Live</span></div>
-      <div class="meta"><div><small>Version</small><b>v1.1</b></div><div><small>Updated</small><b>5 days ago</b></div></div>
-      <div class="cardActions"><button class="btn primary" onclick="openDemo('Gemstone Inventory')">Open App</button><button class="btn superAdminOnly hidden" onclick="showUpdate(\'Gemstone Inventory\')">Update ZIP</button></div>
-    </div>
-
-    <div class="appCard" data-name="crm sales" data-status="Live">
-      <div class="appHead"><div class="appIcon">👥</div><div><h4>CRM</h4><small>Clients, follow-ups & tasks</small></div></div>
-      <div><span class="badge"><span class="dot"></span> Live</span></div>
-      <div class="meta"><div><small>Version</small><b>v1.0</b></div><div><small>Updated</small><b>1 week ago</b></div></div>
-      <div class="cardActions"><button class="btn primary" onclick="openDemo('CRM')">Open App</button><button class="btn superAdminOnly hidden" onclick="showUpdate(\'CRM\')">Update ZIP</button></div>
+    <div id="noAppsMsg" style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px 10px">
+      No apps yet. Upload a ZIP below to publish your first app.
     </div>
   </section>
 
@@ -254,8 +230,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <table>
         <thead><tr><th>App</th><th>Version</th><th>Source</th><th>Status</th><th>Deployed</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td>Parcel Dispatch</td><td>v2.4</td><td>GitHub</td><td><span class="badge"><span class="dot"></span> Live</span></td><td>Today, 11:42 AM</td><td><button class="btn">Rollback</button></td></tr>
-          <tr><td>Leave Management</td><td>v1.8</td><td>GitHub</td><td><span class="badge"><span class="dot"></span> Live</span></td><td>2 days ago</td><td><button class="btn">Rollback</button></td></tr>
+          <tr><td colspan="6" style="text-align:center;color:var(--muted)">No deployments yet</td></tr>
         </tbody>
       </table>
     </div>
