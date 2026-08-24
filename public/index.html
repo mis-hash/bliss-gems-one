@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bliss Gems One</title>
+<style>
+:root{
+  --bg:#f5f7f6;
+  --card:#ffffff;
+  --text:#173124;
+  --muted:#6b7b71;
+  --line:#dfe7e2;
+  --green:#14532d;
+  --green2:#1f7a45;
+  --soft:#eaf4ee;
+  --warn:#fff7dd;
+  --shadow:0 10px 30px rgba(21,83,45,.08);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
+header{
+  position:sticky;top:0;z-index:20;background:rgba(255,255,255,.95);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--line)
+}
+.topbar{
+  max-width:1400px;margin:auto;padding:14px 18px;display:flex;gap:12px;
+  align-items:center;justify-content:space-between
+}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{
+  width:44px;height:44px;border-radius:12px;background:var(--green);color:white;
+  display:grid;place-items:center;font-size:22px;font-weight:800;box-shadow:var(--shadow)
+}
+.brand h1{font-size:20px;margin:0}.brand small{color:var(--muted)}
+.actions{display:flex;gap:8px;align-items:center}
+.btn{
+  border:1px solid var(--line);background:white;color:var(--text);
+  padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer
+}
+.btn.primary{background:var(--green);color:white;border-color:var(--green)}
+.btn.soft{background:var(--soft);color:var(--green);border-color:#cce0d3}
+.page{max-width:1400px;margin:auto;padding:22px 18px 40px}
+.hero{
+  background:linear-gradient(135deg,#163e29,#1d6b3b);color:white;
+  border-radius:20px;padding:26px;display:grid;grid-template-columns:1.7fr 1fr;
+  gap:20px;box-shadow:var(--shadow)
+}
+.hero h2{font-size:30px;margin:0 0 8px}.hero p{margin:0;color:#dbe9df;line-height:1.5}
+.heroStats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:rgba(255,255,255,.12);padding:14px;border-radius:14px}
+.stat b{display:block;font-size:22px}.stat small{color:#dbe9df}
+.toolbar{
+  display:flex;gap:10px;align-items:center;justify-content:space-between;
+  margin:20px 0 12px
+}
+.search{flex:1;max-width:520px;display:flex;gap:8px}
+input,select{
+  width:100%;padding:12px 13px;border:1px solid var(--line);
+  border-radius:10px;background:white;font-size:14px
+}
+.sectionTitle{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px}
+.sectionTitle h3{margin:0;font-size:18px}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.appCard{
+  background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;
+  box-shadow:0 4px 16px rgba(0,0,0,.035);display:flex;flex-direction:column;gap:12px
+}
+.appHead{display:flex;gap:12px;align-items:center}
+.appIcon{
+  width:46px;height:46px;border-radius:12px;background:var(--soft);display:grid;
+  place-items:center;font-size:23px
+}
+.appHead h4{margin:0 0 4px;font-size:16px}.appHead small{color:var(--muted)}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;border-radius:999px;
+  padding:5px 8px;font-size:11px;font-weight:800;background:#eaf8ef;color:#176236
+}
+.dot{width:7px;height:7px;border-radius:50%;background:#27a85b}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.meta div{background:#fafcfb;border:1px solid #edf1ef;border-radius:10px;padding:9px}
+.meta small{display:block;color:var(--muted);font-size:10px}.meta b{font-size:12px}
+.cardActions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cardActions .btn{padding:9px 10px}
+.panel{
+  margin-top:22px;background:white;border:1px solid var(--line);border-radius:18px;
+  box-shadow:var(--shadow);overflow:hidden
+}
+.panelHead{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.panelHead h3{margin:0;font-size:17px}
+.panelBody{padding:18px}
+.uploadGrid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px}
+.drop{
+  grid-column:1/-1;border:2px dashed #b9c9bf;border-radius:14px;padding:26px;
+  text-align:center;background:#fbfdfb;color:var(--muted)
+}
+.drop strong{display:block;color:var(--green);margin-bottom:5px}
+.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px}
+.step{padding:11px;border-radius:10px;background:#f8faf9;border:1px solid var(--line);font-size:12px;text-align:center}
+.step.done{background:#eaf8ef;border-color:#cfe8d7;color:#176236}
+.deployBox{margin-top:14px;padding:12px;border:1px solid #f0df9e;background:var(--warn);border-radius:12px;font-size:12px}
+.tableWrap{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th,td{padding:12px;border-bottom:1px solid var(--line);text-align:left;font-size:12px}
+th{color:var(--muted);font-size:11px}
+footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
+.hidden{display:none!important}
+@media(max-width:1100px){.grid{grid-template-columns:repeat(2,1fr)}.hero{grid-template-columns:1fr}.uploadGrid{grid-template-columns:1fr 1fr}.steps{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px){
+  .topbar{padding:10px}.brand small{display:none}.actions .btn:nth-child(1){display:none}
+  .page{padding:12px 8px 28px}.hero{padding:18px;border-radius:14px}.hero h2{font-size:23px}
+  .heroStats{grid-template-columns:1fr 1fr 1fr}.stat{padding:10px}.stat b{font-size:18px}
+  .toolbar{align-items:stretch;flex-direction:column}.search{max-width:none}
+  .grid{grid-template-columns:1fr}.appCard{border-radius:14px}
+  .uploadGrid{grid-template-columns:1fr}.steps{grid-template-columns:1fr 1fr}
+  .panelBody{padding:12px}.drop{padding:20px 10px}
+  .btn{min-height:44px} input,select{min-height:46px;font-size:16px}
+}
+</style>
+
+<style id="hidden-admin-style">
+.adminModal{
+  position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);
+  display:grid;place-items:center;padding:14px
+}
+.adminBox{
+  width:min(420px,100%);background:#fff;border-radius:16px;
+  border:1px solid var(--line);box-shadow:0 24px 70px rgba(0,0,0,.22);overflow:hidden
+}
+.adminHead{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:14px 16px;border-bottom:1px solid var(--line)
+}
+.adminBody{padding:16px}
+#secretBlissOneLogo{cursor:default;user-select:none;-webkit-user-select:none}
+</style>
+
+
+<style id="card-action-hidden-update-fix">
+.cardActions:has(.superAdminOnly.hidden) .btn:not(.hidden){
+  grid-column:1/-1;
+}
+</style>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14532d">
+</head>
+<body>
+<header>
+  <div class="topbar">
+    <div class="brand" id="secretBlissOneLogo" title="Bliss Gems One">
+      <div class="logo">BG1</div>
+      <div><h1>Bliss Gems One</h1><small>Internal App Hub</small></div>
+    </div>
+    <div class="actions">
+      <button class="btn soft superAdminOnly hidden">⚙ Manage</button>
+      <button class="btn primary superAdminOnly hidden" onclick="document.getElementById('uploadPanel').scrollIntoView({behavior:'smooth'})">＋ Add App</button>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <section class="hero">
+    <div>
+      <h2>All Bliss apps. One place.</h2>
+      <p>Upload, publish, update and open your internal business apps from a single dashboard. GitHub + Firebase deployment can be connected behind this portal.</p>
+    </div>
+    <div class="heroStats">
+      <div class="stat"><b>4</b><small>Live Apps</small></div>
+      <div class="stat"><b>2</b><small>Updates</small></div>
+      <div class="stat"><b>100%</b><small>Online</small></div>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <div class="search">
+      <input id="appSearch" placeholder="Search apps..." oninput="filterApps()">
+      <select id="statusFilter" onchange="filterApps()" style="max-width:180px">
+        <option value="">All Status</option>
+        <option>Live</option>
+        <option>Draft</option>
+      </select>
+    </div>
+    <button class="btn" onclick="alert('Recent activity panel can be added here.')">Recent Activity</button>
+  </div>
+
+  <div class="sectionTitle"><h3>My Apps</h3><small style="color:var(--muted)">Mobile + Desktop ready</small></div>
+  <section class="grid" id="appsGrid">
+    <div class="appCard" data-name="parcel dispatch" data-status="Live">
+      <div class="appHead"><div class="appIcon">📦</div><div><h4>Parcel Dispatch</h4><small>Dispatch + Return workflow</small></div></div>
+      <div><span class="badge"><span class="dot"></span> Live</span></div>
+      <div class="meta"><div><small>Version</small><b>v2.4</b></div><div><small>Updated</small><b>Today</b></div></div>
+      <div class="cardActions"><button class="btn primary" onclick="openDemo('Parcel Dispatch')">Open App</button><button class="btn superAdminOnly hidden" onclick="showUpdate(\'Parcel Dispatch\')">Update ZIP</button></div>
+    </div>
+
+    <div class="appCard" data-name="leave management" data-status="Live">
+      <div class="appHead"><div class="appIcon">🗓️</div><div><h4>Leave Management</h4><small>Employee leave & approvals</small></div></div>
+      <div><span class="badge"><span class="dot"></span> Live</span></div>
+      <div class="meta"><div><small>Version</small><b>v1.8</b></div><div><small>Updated</small><b>2 days ago</b></div></div>
+      <div class="cardActions"><button class="btn primary" onclick="openDemo('Leave Management')">Open App</button><button class="btn superAdminOnly hidden" onclick="showUpdate(\'Leave Management\')">Update ZIP</button></div>
+    </div>
+
+    <div class="appCard" data-name="inventory gemstone" data-status="Live">
+      <div class="appHead"><div class="appIcon">💎</div><div><h4>Gemstone Inventory</h4><small>Packets, split, merge, approval</small></div></div>
+      <div><span class="badge"><span class="dot"></span> Live</span></div>
+      <div class="meta"><div><small>Version</small><b>v1.1</b></div><div><small>Updated</small><b>5 days ago</b></div></div>
+      <div class="cardActions"><button class="btn primary" onclick="openDemo('Gemstone Inventory')">Open App</button><button class="btn superAdminOnly hidden" onclick="showUpdate(\'Gemstone Inventory\')">Update ZIP</button></div>
+    </div>
+
+    <div class="appCard" data-name="crm sales" data-status="Live">
+      <div class="appHead"><div class="appIcon">👥</div><div><h4>CRM</h4><small>Clients, follow-ups & tasks</small></div></div>
+      <div><span class="badge"><span class="dot"></span> Live</span></div>
+      <div class="meta"><div><small>Version</small><b>v1.0</b></div><div><small>Updated</small><b>1 week ago</b></div></div>
+      <div class="cardActions"><button class="btn primary" onclick="openDemo('CRM')">Open App</button><button class="btn superAdminOnly hidden" onclick="showUpdate(\'CRM\')">Update ZIP</button></div>
+    </div>
+  </section>
+
+  <section class="panel superAdminOnly hidden" id="uploadPanel">
+    <div class="panelHead"><h3>＋ Add / Update App</h3><span class="badge">Super Admin</span></div>
+    <div class="panelBody">
+      <div class="uploadGrid">
+        <div><label>App Name</label><input id="newAppName" placeholder="e.g. Parcel Dispatch"></div>
+        <div><label>App Slug</label><input id="newAppSlug" placeholder="parcel-dispatch"></div>
+        <div><label>Version</label><input id="newVersion" value="v1.0"></div>
+        <div class="drop" id="dropZone">
+          <strong>Drop ZIP file here</strong>
+          or click to select app ZIP
+          <input id="zipFile" type="file" accept=".zip" style="margin-top:12px;max-width:320px">
+        </div>
+      </div>
+
+      <div class="steps">
+        <div class="step done">1. ZIP Selected</div>
+        <div class="step">2. Validate</div>
+        <div class="step">3. GitHub Commit</div>
+        <div class="step">4. Firebase Deploy</div>
+        <div class="step">5. Live</div>
+      </div>
+
+      <div class="deployBox">
+        Preview only: actual GitHub/Firebase deployment credentials are not connected in this HTML demo.
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button class="btn">Save Draft</button>
+        <button class="btn primary" onclick="simulatePublish()">Publish App</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panelHead"><h3>Deployment History</h3><button class="btn">View All</button></div>
+    <div class="panelBody tableWrap">
+      <table>
+        <thead><tr><th>App</th><th>Version</th><th>Source</th><th>Status</th><th>Deployed</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>Parcel Dispatch</td><td>v2.4</td><td>GitHub</td><td><span class="badge"><span class="dot"></span> Live</span></td><td>Today, 11:42 AM</td><td><button class="btn">Rollback</button></td></tr>
+          <tr><td>Leave Management</td><td>v1.8</td><td>GitHub</td><td><span class="badge"><span class="dot"></span> Live</span></td><td>2 days ago</td><td><button class="btn">Rollback</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  
+<div class="adminModal hidden" id="superAdminModal">
+  <div class="adminBox">
+    <div class="adminHead">
+      <b>Super Admin Access</b>
+      <button class="btn" type="button" onclick="closeSuperAdminModal()">✕</button>
+    </div>
+    <div class="adminBody">
+      <label>Password</label>
+      <input type="password" id="superAdminPassword" placeholder="Enter Super Admin password"
+             onkeydown="if(event.key==='Enter')unlockSuperAdmin()">
+      <button class="btn primary" type="button" onclick="unlockSuperAdmin()" style="width:100%;margin-top:10px">
+        Unlock Backend
+      </button>
+      <div id="superAdminError" style="display:none;color:#a12222;font-size:12px;margin-top:8px">
+        Incorrect password.
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>Bliss Gems One • Private Internal App Store</footer>
+</main>
+
+<script>
+function filterApps(){
+  const q=(document.getElementById('appSearch').value||'').toLowerCase();
+  const s=document.getElementById('statusFilter').value;
+  document.querySelectorAll('.appCard').forEach(c=>{
+    const okName=c.dataset.name.includes(q);
+    const okStatus=!s||c.dataset.status===s;
+    c.style.display=(okName&&okStatus)?'flex':'none';
+  });
+}
+function openDemo(name){alert(name+' would open from its live Bliss Gems One URL.');}
+function showUpdate(name){
+  document.getElementById('newAppName').value=name;
+  document.getElementById('uploadPanel').scrollIntoView({behavior:'smooth'});
+}
+function simulatePublish(){
+  const name=document.getElementById('newAppName').value.trim();
+  const zip=document.getElementById('zipFile').files[0];
+  if(!name){alert('Enter App Name');return}
+  if(!zip){alert('Select ZIP file');return}
+  const steps=[...document.querySelectorAll('.step')];
+  steps.forEach((s,i)=>s.classList.remove('done'));
+  let i=0;
+  const t=setInterval(()=>{
+    steps[i].classList.add('done');i++;
+    if(i>=steps.length){clearInterval(t);alert(name+' preview deployment completed.')}
+  },450);
+}
+
+/* ===== Hidden Super Admin Backend ===== */
+let superAdminUnlocked=false;
+let secretTapCount=0;
+let secretTapTimer=null;
+let adminIdleTimer=null;
+const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
+
+function openSuperAdminModal(){
+  document.getElementById('superAdminModal')?.classList.remove('hidden');
+  const p=document.getElementById('superAdminPassword');
+  if(p){p.value='';setTimeout(()=>p.focus(),50);}
+  const e=document.getElementById('superAdminError');
+  if(e)e.style.display='none';
+}
+function closeSuperAdminModal(){
+  document.getElementById('superAdminModal')?.classList.add('hidden');
+}
+function showSuperAdminControls(){
+  document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.remove('hidden'));
+}
+function hideSuperAdminControls(){
+  superAdminUnlocked=false;
+  document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.add('hidden'));
+  closeSuperAdminModal();
+}
+function resetAdminIdleTimer(){
+  if(!superAdminUnlocked)return;
+  clearTimeout(adminIdleTimer);
+  adminIdleTimer=setTimeout(()=>{
+    hideSuperAdminControls();
+    alert('Super Admin backend locked due to inactivity.');
+  },4*60*1000);
+}
+function unlockSuperAdmin(){
+  const value=document.getElementById('superAdminPassword')?.value||'';
+  if(value!==SUPER_ADMIN_PASSWORD){
+    const e=document.getElementById('superAdminError');
+    if(e)e.style.display='block';
+    return;
+  }
+  superAdminUnlocked=true;
+  showSuperAdminControls();
+  closeSuperAdminModal();
+  resetAdminIdleTimer();
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const logo=document.getElementById('secretBlissOneLogo');
+  if(logo){
+    const secretTap=()=>{
+      secretTapCount++;
+      clearTimeout(secretTapTimer);
+      secretTapTimer=setTimeout(()=>secretTapCount=0,1100);
+      if(secretTapCount>=3){
+        secretTapCount=0;
+        clearTimeout(secretTapTimer);
+        openSuperAdminModal();
+      }
+    };
+    logo.addEventListener('click',secretTap);
+    logo.addEventListener('touchend',secretTap,{passive:true});
+  }
+  ['click','keydown','touchstart','mousemove'].forEach(evt=>{
+    document.addEventListener(evt,()=>{if(superAdminUnlocked)resetAdminIdleTimer();},{passive:true});
+  });
+});
+
+</script>
+<script>
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+</script>
+</body>
+</html>
