@@ -11,9 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          channelId: live
-          projectId: bliss-gems-one
+      - run: npm install -g firebase-tools
+      - run: firebase deploy --only hosting --project bliss-gems-one --token "$FIREBASE_TOKEN"
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
