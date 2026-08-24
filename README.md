@@ -1,22 +1,20 @@
 # Bliss Gems One
 
-Static website deployed to **Firebase Hosting** (Spark / Free plan) with automatic deploys from GitHub Actions.
+Static website hosted for free on **GitHub Pages** (no billing, no service account keys needed).
 
-## Project structure
+## Files
 
-- `public/` — your website files. `public/index.html` is the homepage.
-- `firebase.json` — Firebase Hosting configuration.
-- `.firebaserc` — Firebase project alias (set your real project ID here).
-- `.github/workflows/firebase-hosting-merge.yml` — deploys to the **live** site on every push to `main`.
-- `.github/workflows/firebase-hosting-pull-request.yml` — deploys a **preview** channel for every pull request.
+- `index.html` — the website (homepage)
+- `manifest.json`, `sw.js`, `icon-192.png`, `icon-512.png` — PWA support files
+- `.nojekyll` — tells GitHub Pages not to run Jekyll processing on these files
 
-## One-time setup (Firebase Spark / Free plan — no billing needed)
+## One-time setup
 
-1. Go to https://console.firebase.google.com and create a project (or use an existing one). Do **not** upgrade to Blaze — Hosting works on the free Spark plan.
-2. In the project, open **Build → Hosting** and click **Get started** (you can skip the CLI steps shown there).
-3. Open **Project settings → Service accounts → Generate new private key**. This downloads a JSON file — keep it safe, it is a credential.
-4. In your GitHub repo, go to **Settings → Secrets and variables → Actions → New repository secret** and add:
-   - `FIREBASE_SERVICE_ACCOUNT` — paste the **entire contents** of the JSON file from step 3.
-   - `FIREBASE_PROJECT_ID` — your Firebase project ID (found in Project settings → General).
-5. Replace `REPLACE_WITH_YOUR_FIREBASE_PROJECT_ID` in `.firebaserc` with the same project ID (optional, only needed for local `firebase deploy`).
-6. Merge/push this branch into `main`. Every push to `main` will deploy automatically; every pull request gets its own preview URL.
+1. Upload all these files to the **root** of your GitHub repository (not inside any subfolder).
+2. In the repo, go to **Settings → Pages**.
+3. Under "Build and deployment" → Source, choose **Deploy from a branch**.
+4. Branch: `main`, Folder: `/ (root)`. Click **Save**.
+5. Wait 1–2 minutes. Your site will be live at:
+   `https://<your-github-username>.github.io/<repo-name>/`
+
+Every time you push/update files on the `main` branch, the site updates automatically within a minute or two — no extra setup required.
