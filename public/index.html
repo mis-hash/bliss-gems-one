@@ -249,6 +249,23 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
     </div>
   </section>
 
+  <section class="panel superAdminOnly hidden" id="githubTokenPanel">
+    <div class="panelHead"><h3>🐙 GitHub Push (Direct Deploy)</h3><span class="badge">Super Admin</span></div>
+    <div class="panelBody">
+      <div class="uploadGrid">
+        <div style="grid-column:1/-1"><label>GitHub Personal Access Token (repo scope)</label><input id="githubToken" type="password" placeholder="ghp_..."></div>
+      </div>
+      <div class="deployBox">
+        यह token सिर्फ़ इस browser में save होता है और सीधे GitHub को भेजा जाता है (किसी और server से नहीं गुज़रता)। Repo: <b>mis-hash/bliss-gems-one</b>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button class="btn" type="button" onclick="clearGithubToken()">Clear</button>
+        <button class="btn primary" type="button" onclick="saveGithubToken()">Save</button>
+      </div>
+      <div id="githubTokenSaved" style="display:none;color:#14532d;font-size:12px;margin-top:8px">Saved to this browser.</div>
+    </div>
+  </section>
+
   <section class="panel superAdminOnly hidden" id="userManagePanel">
     <div class="panelHead"><h3>⚙ Manage — Users</h3><span class="badge">Super Admin</span></div>
     <div class="panelBody">
@@ -680,11 +697,12 @@ async function renderSavedApps(){
     card.querySelector('small').textContent='slug: '+r.slug;
     card.querySelector('.meta b').textContent=r.version;
     const actions=card.querySelector('.cardActions');
-    const btnView=document.createElement('button');btnView.className='btn primary';btnView.textContent='Open Files';btnView.onclick=()=>openZipViewer(r.slug);
+    const btnPush=document.createElement('button');btnPush.className='btn primary';btnPush.textContent='🚀 Push to GitHub';btnPush.onclick=()=>pushAppToGitHub(r.slug);
+    const btnView=document.createElement('button');btnView.className='btn';btnView.textContent='Open Files';btnView.onclick=()=>openZipViewer(r.slug);
     const btnUpdate=document.createElement('button');btnUpdate.className='btn';btnUpdate.textContent='Update ZIP';btnUpdate.onclick=()=>showUpdate(r.slug,r.name);
     const btnDl=document.createElement('button');btnDl.className='btn';btnDl.textContent='Download ZIP';btnDl.onclick=()=>downloadAppZip(r.slug);
     const btnDel=document.createElement('button');btnDel.className='btn';btnDel.textContent='Delete';btnDel.onclick=()=>deleteApp(r.slug);
-    actions.append(btnView,btnUpdate,btnDl,btnDel);
+    actions.append(btnPush,btnView,btnUpdate,btnDl,btnDel);
     grid.appendChild(card);
   });
 }
@@ -693,6 +711,66 @@ async function deleteApp(slug){
   if(!confirm('Is app ki saved ZIP ko is browser se delete kar dein? Yeh undo nahi ho sakta.'))return;
   await deleteAppRecord(slug);
   await renderSavedApps();
+}
+
+/* ===== GitHub token (for direct push-to-deploy) ===== */
+const GH_OWNER='mis-hash', GH_REPO='bliss-gems-one', GH_BRANCH='main';
+function saveGithubToken(){
+  const t=document.getElementById('githubToken').value.trim();
+  localStorage.setItem('ghToken',t);
+  const s=document.getElementById('githubTokenSaved');
+  if(s){s.style.display='block';setTimeout(()=>s.style.display='none',2000);}
+}
+function loadGithubToken(){
+  const el=document.getElementById('githubToken');
+  if(el)el.value=localStorage.getItem('ghToken')||'';
+}
+function clearGithubToken(){
+  localStorage.removeItem('ghToken');
+  const el=document.getElementById('githubToken');
+  if(el)el.value='';
+}
+
+async function pushAppToGitHub(slug){
+  const token=localStorage.getItem('ghToken')||'';
+  if(!token){alert('पहले "🐙 GitHub Push" panel में अपना GitHub token save करें।');return;}
+  const r=await getAppRecord(slug);
+  if(!r)return;
+  if(!confirm('"'+r.name+'" को GitHub पर push करके live करें?'))return;
+  const zip=await JSZip.loadAsync(r.zipBlob);
+  const names=Object.keys(zip.files).filter(n=>!zip.files[n].dir);
+  if(!names.length){alert('इस ZIP में कोई file नहीं है।');return;}
+  const headers={Authorization:'token '+token,Accept:'application/vnd.github+json'};
+  let done=0;
+  for(const name of names){
+    done++;
+    try{
+      const base64=await zip.file(name).async('base64');
+      const path='public/'+slug+'/'+name;
+      const apiUrl='https://api.github.com/repos/'+GH_OWNER+'/'+GH_REPO+'/contents/'+encodeURI(path);
+      let sha=undefined;
+      const getRes=await fetch(apiUrl+'?ref='+GH_BRANCH,{headers});
+      if(getRes.ok){ const j=await getRes.json(); sha=j.sha; }
+      const putRes=await fetch(apiUrl,{
+        method:'PUT',
+        headers:{...headers,'Content-Type':'application/json'},
+        body:JSON.stringify({
+          message:'Deploy app "'+r.name+'" ('+name+') via admin panel',
+          content:base64,
+          branch:GH_BRANCH,
+          ...(sha?{sha}:{})
+        })
+      });
+      if(!putRes.ok){
+        const err=await putRes.json().catch(()=>({}));
+        throw new Error((err.message||putRes.status)+' — '+name);
+      }
+    }catch(err){
+      alert('Push रुक गया ('+done+'/'+names.length+' files) — गलती: '+err.message);
+      return;
+    }
+  }
+  alert('"'+r.name+'" की सभी '+names.length+' files GitHub पर push हो गईं।\n\nकुछ ही मिनट में यहाँ live होगी:\nhttps://bliss-gems-one.web.app/'+slug+'/');
 }
 
 async function downloadAppZip(slug){
@@ -788,6 +866,7 @@ function closeSuperAdminModal(){
 function showSuperAdminControls(){
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.remove('hidden'));
   loadGreenApiCreds();
+  loadGithubToken();
   refreshAdminAuthStatus();
 }
 function saveGreenApiCreds(){
