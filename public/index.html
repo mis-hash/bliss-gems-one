@@ -132,7 +132,14 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
   padding:14px 16px;border-bottom:1px solid var(--line)
 }
 .adminBody{padding:16px}
+.adminBox.wide{width:min(760px,100%)}
 #secretBlissOneLogo{cursor:default;user-select:none;-webkit-user-select:none}
+.zipViewerLayout{display:grid;grid-template-columns:220px 1fr;gap:0;min-height:360px;max-height:70vh}
+.zipFileList{border-right:1px solid var(--line);overflow:auto;padding:8px}
+.zipFileItem{padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;word-break:break-all}
+.zipFileItem:hover{background:#f1f4f2}
+.zipEditorPane{padding:12px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+.zipEditorPane textarea{width:100%;flex:1;min-height:280px;font-family:ui-monospace,Consolas,monospace;font-size:13px;padding:10px;border:1px solid var(--line);border-radius:10px;resize:vertical}
 </style>
 
 
@@ -166,8 +173,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <p>Upload, publish, update and open your internal business apps from a single dashboard. GitHub + Firebase deployment can be connected behind this portal.</p>
     </div>
     <div class="heroStats">
-      <div class="stat"><b>4</b><small>Live Apps</small></div>
-      <div class="stat"><b>2</b><small>Updates</small></div>
+      <div class="stat"><b id="heroLiveApps">0</b><small>Saved Apps</small></div>
+      <div class="stat"><b>0</b><small>Updates</small></div>
       <div class="stat"><b>100%</b><small>Online</small></div>
     </div>
   </section>
@@ -186,32 +193,10 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
 
   <div class="sectionTitle"><h3>My Apps</h3><small style="color:var(--muted)">Mobile + Desktop ready</small></div>
   <section class="grid" id="appsGrid">
-    <div class="appCard" data-name="parcel dispatch" data-status="Live">
-      <div class="appHead"><div class="appIcon">📦</div><div><h4>Parcel Dispatch</h4><small>Dispatch + Return workflow</small></div></div>
-      <div><span class="badge"><span class="dot"></span> Live</span></div>
-      <div class="meta"><div><small>Version</small><b>v2.4</b></div><div><small>Updated</small><b>Today</b></div></div>
-      <div class="cardActions"><button class="btn primary" onclick="openDemo('Parcel Dispatch')">Open App</button><button class="btn superAdminOnly hidden" onclick="showUpdate(\'Parcel Dispatch\')">Update ZIP</button></div>
-    </div>
-
-    <div class="appCard" data-name="leave management" data-status="Live">
-      <div class="appHead"><div class="appIcon">🗓️</div><div><h4>Leave Management</h4><small>Employee leave & approvals</small></div></div>
-      <div><span class="badge"><span class="dot"></span> Live</span></div>
-      <div class="meta"><div><small>Version</small><b>v1.8</b></div><div><small>Updated</small><b>2 days ago</b></div></div>
-      <div class="cardActions"><button class="btn primary" onclick="openDemo('Leave Management')">Open App</button><button class="btn superAdminOnly hidden" onclick="showUpdate(\'Leave Management\')">Update ZIP</button></div>
-    </div>
-
-    <div class="appCard" data-name="inventory gemstone" data-status="Live">
-      <div class="appHead"><div class="appIcon">💎</div><div><h4>Gemstone Inventory</h4><small>Packets, split, merge, approval</small></div></div>
-      <div><span class="badge"><span class="dot"></span> Live</span></div>
-      <div class="meta"><div><small>Version</small><b>v1.1</b></div><div><small>Updated</small><b>5 days ago</b></div></div>
-      <div class="cardActions"><button class="btn primary" onclick="openDemo('Gemstone Inventory')">Open App</button><button class="btn superAdminOnly hidden" onclick="showUpdate(\'Gemstone Inventory\')">Update ZIP</button></div>
-    </div>
-
-    <div class="appCard" data-name="crm sales" data-status="Live">
-      <div class="appHead"><div class="appIcon">👥</div><div><h4>CRM</h4><small>Clients, follow-ups & tasks</small></div></div>
-      <div><span class="badge"><span class="dot"></span> Live</span></div>
-      <div class="meta"><div><small>Version</small><b>v1.0</b></div><div><small>Updated</small><b>1 week ago</b></div></div>
-      <div class="cardActions"><button class="btn primary" onclick="openDemo('CRM')">Open App</button><button class="btn superAdminOnly hidden" onclick="showUpdate(\'CRM\')">Update ZIP</button></div>
+    <div id="emptyAppsState" style="grid-column:1/-1;text-align:center;padding:40px 16px;color:var(--muted)">
+      <div style="font-size:32px;margin-bottom:8px">📭</div>
+      <b>No apps added yet</b>
+      <div style="margin-top:4px">Unlock Super Admin (tap the logo 3×) and use "Add / Update App" to publish your first app.</div>
     </div>
   </section>
 
@@ -230,21 +215,36 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       </div>
 
       <div class="steps">
-        <div class="step done">1. ZIP Selected</div>
+        <div class="step">1. ZIP Selected</div>
         <div class="step">2. Validate</div>
-        <div class="step">3. GitHub Commit</div>
-        <div class="step">4. Firebase Deploy</div>
-        <div class="step">5. Live</div>
+        <div class="step">3. Saved in browser</div>
       </div>
 
       <div class="deployBox">
-        Preview only: actual GitHub/Firebase deployment credentials are not connected in this HTML demo.
+        यह ZIP सिर्फ़ इसी browser में (अलग-अलग app के नाम से, बिना मिले-जुले) save होता है। इसे असल में <b>live</b> करने के लिए नीचे "Download ZIP" करके GitHub पर upload करें — Firebase अपने-आप deploy कर देगा।
       </div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-        <button class="btn">Save Draft</button>
-        <button class="btn primary" onclick="simulatePublish()">Publish App</button>
+        <button class="btn primary" onclick="publishApp()">Save App ZIP</button>
       </div>
+    </div>
+  </section>
+
+  <section class="panel superAdminOnly hidden" id="greenApiPanel">
+    <div class="panelHead"><h3>🔗 Green API Integration</h3><span class="badge">Super Admin</span></div>
+    <div class="panelBody">
+      <div class="uploadGrid">
+        <div><label>Green API Instance ID</label><input id="greenApiInstance" placeholder="e.g. 1101123456"></div>
+        <div><label>Green API Token</label><input id="greenApiToken" type="password" placeholder="Enter Green API token"></div>
+      </div>
+      <div class="deployBox">
+        यह token अभी सिर्फ़ इस browser में (locally) save होता है — किसी server पर नहीं जाता। पूरी तरह secure रखने के लिए बाद में backend चाहिए होगा।
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button class="btn" type="button" onclick="clearGreenApiCreds()">Clear</button>
+        <button class="btn primary" type="button" onclick="saveGreenApiCreds()">Save</button>
+      </div>
+      <div id="greenApiSaved" style="display:none;color:#14532d;font-size:12px;margin-top:8px">Saved to this browser.</div>
     </div>
   </section>
 
@@ -254,8 +254,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <table>
         <thead><tr><th>App</th><th>Version</th><th>Source</th><th>Status</th><th>Deployed</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td>Parcel Dispatch</td><td>v2.4</td><td>GitHub</td><td><span class="badge"><span class="dot"></span> Live</span></td><td>Today, 11:42 AM</td><td><button class="btn">Rollback</button></td></tr>
-          <tr><td>Leave Management</td><td>v1.8</td><td>GitHub</td><td><span class="badge"><span class="dot"></span> Live</span></td><td>2 days ago</td><td><button class="btn">Rollback</button></td></tr>
+          <tr><td colspan="6" style="text-align:center;color:var(--muted)">No deployments yet</td></tr>
         </tbody>
       </table>
     </div>
@@ -282,9 +281,35 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
   </div>
 </div>
 
+<div class="adminModal hidden" id="zipViewerModal">
+  <div class="adminBox wide">
+    <div class="adminHead">
+      <b id="zipViewerTitle">App files</b>
+      <button class="btn" type="button" onclick="closeZipViewer()">✕</button>
+    </div>
+    <div class="zipViewerLayout">
+      <div class="zipFileList" id="zipFileList"></div>
+      <div class="zipEditorPane" id="zipEditorHint" style="color:var(--muted);justify-content:center;align-items:center;text-align:center">
+        बाईं तरफ़ किसी text/code file पर click करें उसे देखने/edit करने के लिए। Image/binary files सिर्फ़ ZIP download करके ही edit हो सकती हैं।
+      </div>
+      <div class="zipEditorPane hidden" id="zipEditorWrap">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <b id="zipEditorFileName" style="font-size:13px"></b>
+          <div style="display:flex;gap:8px">
+            <button class="btn" type="button" onclick="cancelZipFileEdit()">Cancel</button>
+            <button class="btn primary" type="button" onclick="saveZipFileEdit()">Save</button>
+          </div>
+        </div>
+        <textarea id="zipEditorTextarea" spellcheck="false"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
 <footer>Bliss Gems One • Private Internal App Store</footer>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
 function filterApps(){
   const q=(document.getElementById('appSearch').value||'').toLowerCase();
@@ -296,22 +321,200 @@ function filterApps(){
   });
 }
 function openDemo(name){alert(name+' would open from its live Bliss Gems One URL.');}
-function showUpdate(name){
+function showUpdate(slug,name){
   document.getElementById('newAppName').value=name;
+  document.getElementById('newAppSlug').value=slug;
   document.getElementById('uploadPanel').scrollIntoView({behavior:'smooth'});
 }
-function simulatePublish(){
+
+/* ===== Saved Apps: each app's ZIP stored separately in this browser (IndexedDB), keyed by slug so they never clash ===== */
+const APPS_DB_NAME='blissAppsDB';
+const APPS_STORE='apps';
+function openAppsDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(APPS_DB_NAME,1);
+    req.onupgradeneeded=()=>{ req.result.createObjectStore(APPS_STORE,{keyPath:'slug'}); };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function saveAppRecord(record){
+  const db=await openAppsDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(APPS_STORE,'readwrite');
+    tx.objectStore(APPS_STORE).put(record);
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+async function getAllAppRecords(){
+  const db=await openAppsDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(APPS_STORE,'readonly');
+    const req=tx.objectStore(APPS_STORE).getAll();
+    req.onsuccess=()=>resolve(req.result||[]);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function getAppRecord(slug){
+  const db=await openAppsDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(APPS_STORE,'readonly');
+    const req=tx.objectStore(APPS_STORE).get(slug);
+    req.onsuccess=()=>resolve(req.result||null);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function deleteAppRecord(slug){
+  const db=await openAppsDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(APPS_STORE,'readwrite');
+    tx.objectStore(APPS_STORE).delete(slug);
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+function slugify(s){
+  return (s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/(^-+|-+$)/g,'')||('app-'+Date.now());
+}
+async function publishApp(){
   const name=document.getElementById('newAppName').value.trim();
-  const zip=document.getElementById('zipFile').files[0];
+  const slugRaw=document.getElementById('newAppSlug').value.trim();
+  const version=document.getElementById('newVersion').value.trim()||'v1.0';
+  const zipFile=document.getElementById('zipFile').files[0];
   if(!name){alert('Enter App Name');return}
-  if(!zip){alert('Select ZIP file');return}
+  if(!zipFile){alert('Select ZIP file');return}
+  const slug=slugify(slugRaw||name);
   const steps=[...document.querySelectorAll('.step')];
-  steps.forEach((s,i)=>s.classList.remove('done'));
+  steps.forEach(s=>s.classList.remove('done'));
   let i=0;
-  const t=setInterval(()=>{
-    steps[i].classList.add('done');i++;
-    if(i>=steps.length){clearInterval(t);alert(name+' preview deployment completed.')}
-  },450);
+  const t=setInterval(async ()=>{
+    steps[i]?.classList.add('done');i++;
+    if(i>=steps.length){
+      clearInterval(t);
+      await saveAppRecord({slug,name,version,zipBlob:zipFile,savedAt:Date.now()});
+      document.getElementById('newAppName').value='';
+      document.getElementById('newAppSlug').value='';
+      document.getElementById('zipFile').value='';
+      await renderSavedApps();
+      alert('"'+name+'" ka ZIP is browser mein slug "'+slug+'" ke naam se alag save ho gaya (koi doosri app se clash nahi hoga).\n\nLIVE karne ke liye: neeche is app ke card par "Download ZIP" dabaakar GitHub par upload karein — Firebase apne-aap deploy kar dega.');
+    }
+  },300);
+}
+
+async function renderSavedApps(){
+  const records=await getAllAppRecords();
+  document.querySelectorAll('#appsGrid .appCard[data-dynamic]').forEach(el=>el.remove());
+  const empty=document.getElementById('emptyAppsState');
+  const grid=document.getElementById('appsGrid');
+  const heroCount=document.getElementById('heroLiveApps');
+  if(heroCount)heroCount.textContent=String(records.length);
+  if(!records.length){
+    if(empty)empty.style.display='block';
+    return;
+  }
+  if(empty)empty.style.display='none';
+  records.sort((a,b)=>b.savedAt-a.savedAt).forEach(r=>{
+    const card=document.createElement('div');
+    card.className='appCard';
+    card.dataset.dynamic='1';
+    card.dataset.name=r.name.toLowerCase();
+    card.dataset.status='Draft';
+    const sizeKb=Math.max(1,Math.round(r.zipBlob.size/1024));
+    card.innerHTML='<div class="appHead"><div class="appIcon">📦</div><div><h4></h4><small></small></div></div>'+
+      '<div><span class="badge"><span class="dot"></span> Saved (this browser)</span></div>'+
+      '<div class="meta"><div><small>Version</small><b></b></div><div><small>Size</small><b>'+sizeKb+' KB</b></div></div>'+
+      '<div class="cardActions superAdminOnly'+(superAdminUnlocked?'':' hidden')+'"></div>';
+    card.querySelector('h4').textContent=r.name;
+    card.querySelector('small').textContent='slug: '+r.slug;
+    card.querySelector('.meta b').textContent=r.version;
+    const actions=card.querySelector('.cardActions');
+    const btnView=document.createElement('button');btnView.className='btn primary';btnView.textContent='Open Files';btnView.onclick=()=>openZipViewer(r.slug);
+    const btnUpdate=document.createElement('button');btnUpdate.className='btn';btnUpdate.textContent='Update ZIP';btnUpdate.onclick=()=>showUpdate(r.slug,r.name);
+    const btnDl=document.createElement('button');btnDl.className='btn';btnDl.textContent='Download ZIP';btnDl.onclick=()=>downloadAppZip(r.slug);
+    const btnDel=document.createElement('button');btnDel.className='btn';btnDel.textContent='Delete';btnDel.onclick=()=>deleteApp(r.slug);
+    actions.append(btnView,btnUpdate,btnDl,btnDel);
+    grid.appendChild(card);
+  });
+}
+
+async function deleteApp(slug){
+  if(!confirm('Is app ki saved ZIP ko is browser se delete kar dein? Yeh undo nahi ho sakta.'))return;
+  await deleteAppRecord(slug);
+  await renderSavedApps();
+}
+
+async function downloadAppZip(slug){
+  const r=await getAppRecord(slug);
+  if(!r)return;
+  const url=URL.createObjectURL(r.zipBlob);
+  const a=document.createElement('a');
+  a.href=url;a.download=r.slug+'.zip';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+
+let currentZip=null, currentZipSlug=null, currentZipFileName=null;
+const ZIP_TEXT_EXT=['html','htm','css','js','json','md','txt','svg','xml','yml','yaml'];
+async function openZipViewer(slug){
+  const r=await getAppRecord(slug);
+  if(!r)return;
+  currentZipSlug=slug;
+  currentZip=await JSZip.loadAsync(r.zipBlob);
+  const list=document.getElementById('zipFileList');
+  list.innerHTML='';
+  const names=Object.keys(currentZip.files).filter(n=>!currentZip.files[n].dir).sort();
+  if(!names.length){
+    list.innerHTML='<div style="color:var(--muted);padding:8px">This ZIP has no files.</div>';
+  }
+  names.forEach(n=>{
+    const item=document.createElement('div');
+    item.className='zipFileItem';
+    item.textContent=n;
+    item.onclick=()=>openZipFile(n);
+    list.appendChild(item);
+  });
+  document.getElementById('zipViewerTitle').textContent=r.name+' — files';
+  document.getElementById('zipEditorWrap').classList.add('hidden');
+  document.getElementById('zipEditorHint').classList.remove('hidden');
+  document.getElementById('zipViewerModal').classList.remove('hidden');
+}
+function closeZipViewer(){
+  document.getElementById('zipViewerModal').classList.add('hidden');
+  currentZip=null;currentZipSlug=null;currentZipFileName=null;
+}
+async function openZipFile(name){
+  const ext=(name.split('.').pop()||'').toLowerCase();
+  if(!ZIP_TEXT_EXT.includes(ext)){
+    alert('Yeh file type (.'+ext+') yahan edit nahi ho sakti — ZIP download karke kisi code editor mein edit karein.');
+    return;
+  }
+  const content=await currentZip.file(name).async('string');
+  currentZipFileName=name;
+  document.getElementById('zipEditorFileName').textContent=name;
+  document.getElementById('zipEditorTextarea').value=content;
+  document.getElementById('zipEditorHint').classList.add('hidden');
+  document.getElementById('zipEditorWrap').classList.remove('hidden');
+}
+async function saveZipFileEdit(){
+  if(!currentZip||!currentZipFileName)return;
+  const newContent=document.getElementById('zipEditorTextarea').value;
+  currentZip.file(currentZipFileName,newContent);
+  const blob=await currentZip.generateAsync({type:'blob'});
+  const r=await getAppRecord(currentZipSlug);
+  if(!r)return;
+  r.zipBlob=blob;
+  r.savedAt=Date.now();
+  await saveAppRecord(r);
+  alert('"'+currentZipFileName+'" save ho gaya — "'+r.name+'" ki updated ZIP is browser mein store ho gayi hai. GitHub par change bhejne ke liye "Download ZIP" karein.');
+  document.getElementById('zipEditorWrap').classList.add('hidden');
+  document.getElementById('zipEditorHint').classList.remove('hidden');
+  await renderSavedApps();
+}
+function cancelZipFileEdit(){
+  document.getElementById('zipEditorWrap').classList.add('hidden');
+  document.getElementById('zipEditorHint').classList.remove('hidden');
+  currentZipFileName=null;
 }
 
 /* ===== Hidden Super Admin Backend ===== */
@@ -333,6 +536,29 @@ function closeSuperAdminModal(){
 }
 function showSuperAdminControls(){
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.remove('hidden'));
+  loadGreenApiCreds();
+}
+function saveGreenApiCreds(){
+  const instance=document.getElementById('greenApiInstance')?.value||'';
+  const token=document.getElementById('greenApiToken')?.value||'';
+  localStorage.setItem('greenApiInstance',instance);
+  localStorage.setItem('greenApiToken',token);
+  const s=document.getElementById('greenApiSaved');
+  if(s){s.style.display='block';setTimeout(()=>s.style.display='none',2000);}
+}
+function loadGreenApiCreds(){
+  const instance=document.getElementById('greenApiInstance');
+  const token=document.getElementById('greenApiToken');
+  if(instance)instance.value=localStorage.getItem('greenApiInstance')||'';
+  if(token)token.value=localStorage.getItem('greenApiToken')||'';
+}
+function clearGreenApiCreds(){
+  localStorage.removeItem('greenApiInstance');
+  localStorage.removeItem('greenApiToken');
+  const instance=document.getElementById('greenApiInstance');
+  const token=document.getElementById('greenApiToken');
+  if(instance)instance.value='';
+  if(token)token.value='';
 }
 function hideSuperAdminControls(){
   superAdminUnlocked=false;
@@ -361,6 +587,7 @@ function unlockSuperAdmin(){
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
+  renderSavedApps();
   const logo=document.getElementById('secretBlissOneLogo');
   if(logo){
     const secretTap=()=>{
