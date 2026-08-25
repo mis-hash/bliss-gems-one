@@ -198,7 +198,12 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
     <button class="btn" onclick="alert('Recent activity panel can be added here.')">Recent Activity</button>
   </div>
 
-  <div class="sectionTitle"><h3>My Apps</h3><small style="color:var(--muted)">Mobile + Desktop ready</small></div>
+  <div class="hidden" id="liveAppsSection">
+    <div class="sectionTitle"><h3>🌐 Live Apps</h3><small style="color:var(--muted)">सबको हर browser/device में दिखती हैं</small></div>
+    <section class="grid" id="liveAppsGrid"></section>
+  </div>
+
+  <div class="sectionTitle"><h3>My Apps (drafts, इसी browser में)</h3><small style="color:var(--muted)">Mobile + Desktop ready</small></div>
   <section class="grid" id="appsGrid">
     <div id="emptyAppsState" style="grid-column:1/-1;text-align:center;padding:40px 16px;color:var(--muted)">
       <div style="font-size:32px;margin-bottom:8px">📭</div>
@@ -823,7 +828,59 @@ async function pushAppToGitHub(slug){
       return;
     }
   }
+  try{
+    await updateAppsRegistry(headers,slug,r.name);
+  }catch(err){
+    alert('App live हो गई, लेकिन "Live Apps" list update करने में गलती हुई: '+err.message);
+  }
   alert('"'+r.name+'" की सभी '+names.length+' files GitHub पर push हो गईं।\n\nकुछ ही मिनट में यहाँ live होगी:\nhttps://bliss-gems-one.web.app/'+slug+'/');
+}
+
+async function updateAppsRegistry(headers,slug,name){
+  const apiUrl='https://api.github.com/repos/'+GH_OWNER+'/'+GH_REPO+'/contents/public/apps.json';
+  let list=[],sha=undefined;
+  const getRes=await fetch(apiUrl+'?ref='+GH_BRANCH,{headers});
+  if(getRes.ok){
+    const j=await getRes.json();
+    sha=j.sha;
+    try{ list=JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\n/g,''))))); }catch(e){ list=[]; }
+  }
+  list=list.filter(a=>a.slug!==slug);
+  list.push({slug,name,pushedAt:Date.now()});
+  const jsonStr=JSON.stringify(list,null,2);
+  const base64=btoa(unescape(encodeURIComponent(jsonStr)));
+  const putRes=await fetch(apiUrl,{
+    method:'PUT',
+    headers:{...headers,'Content-Type':'application/json'},
+    body:JSON.stringify({
+      message:'Update live apps registry ('+slug+')',
+      content:base64,
+      branch:GH_BRANCH,
+      ...(sha?{sha}:{})
+    })
+  });
+  if(!putRes.ok){ const err=await putRes.json().catch(()=>({})); throw new Error(err.message||putRes.status); }
+}
+
+async function loadLiveAppsRegistry(){
+  try{
+    const res=await fetch('/apps.json',{cache:'no-store'});
+    if(!res.ok)return;
+    const list=await res.json();
+    const wrap=document.getElementById('liveAppsGrid');
+    if(!wrap||!Array.isArray(list)||!list.length)return;
+    wrap.innerHTML='';
+    list.sort((a,b)=>b.pushedAt-a.pushedAt).forEach(a=>{
+      const card=document.createElement('div');
+      card.className='appCard';
+      card.innerHTML='<div class="appHead"><div class="appIcon">🌐</div><div><h4></h4><small>/'+a.slug+'/</small></div></div>'+
+        '<div><span class="badge"><span class="dot"></span> Live</span></div>'+
+        '<div class="cardActions"><a class="btn primary" style="grid-column:1/-1;text-align:center;text-decoration:none" href="/'+a.slug+'/" target="_blank" rel="noopener">🔗 Open App</a></div>';
+      card.querySelector('h4').textContent=a.name;
+      wrap.appendChild(card);
+    });
+    document.getElementById('liveAppsSection')?.classList.remove('hidden');
+  }catch(e){}
 }
 
 async function downloadAppZip(slug){
@@ -972,6 +1029,7 @@ function unlockSuperAdmin(){
 
 document.addEventListener('DOMContentLoaded',()=>{
   renderSavedApps();
+  loadLiveAppsRegistry();
   const logo=document.getElementById('secretBlissOneLogo');
   if(logo){
     const secretTap=()=>{
