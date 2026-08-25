@@ -160,7 +160,13 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <div><h1>Bliss Gems One</h1><small>Internal App Hub</small></div>
     </div>
     <div class="actions">
-      <button class="btn soft" onclick="openStaffLoginModal()">👤 Staff Login</button>
+      <div style="position:relative">
+        <button class="btn soft" id="staffLoginBtn" onclick="openStaffLoginModal()">👤 Staff Login</button>
+        <div class="hidden" id="staffUserMenu" style="position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.15);min-width:180px;overflow:hidden;z-index:50">
+          <div id="staffUserMenuName" style="padding:10px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)"></div>
+          <button class="btn" style="width:100%;border:none;border-radius:0;text-align:left" onclick="staffLogout()">Logout</button>
+        </div>
+      </div>
       <button class="btn soft superAdminOnly hidden" onclick="document.getElementById('userManagePanel').scrollIntoView({behavior:'smooth'})">⚙ Manage</button>
       <button class="btn primary superAdminOnly hidden" onclick="document.getElementById('uploadPanel').scrollIntoView({behavior:'smooth'})">＋ Add App</button>
     </div>
@@ -445,14 +451,46 @@ function staffLogin(){
   const msg=document.getElementById('staffLoginMsg');
   msg.style.color='';msg.textContent='Logging in…';
   fbAuth.signInWithEmailAndPassword(email,pass).then(()=>{
-    msg.style.color='#176236';msg.textContent='Login successful.';
-    openStaffLoginModal();
+    closeStaffLoginModal();
+    updateStaffHeaderLabel();
   }).catch(err=>{
     msg.style.color='#a12222';msg.textContent=err.message;
   });
 }
+function toggleStaffUserMenu(){
+  document.getElementById('staffUserMenu')?.classList.toggle('hidden');
+}
+async function updateStaffHeaderLabel(){
+  const btn=document.getElementById('staffLoginBtn');
+  const menu=document.getElementById('staffUserMenu');
+  if(!btn)return;
+  const user=fbAuth.currentUser;
+  if(!user){
+    btn.textContent='👤 Staff Login';
+    btn.onclick=openStaffLoginModal;
+    menu?.classList.add('hidden');
+    return;
+  }
+  let name=user.email;
+  try{
+    const doc=await fbDb.collection('users').doc(user.uid).get();
+    if(doc.exists && doc.data().name) name=doc.data().name;
+  }catch(e){}
+  btn.textContent='👤 '+name+' ▾';
+  btn.onclick=toggleStaffUserMenu;
+  const nameBox=document.getElementById('staffUserMenuName');
+  if(nameBox)nameBox.textContent='Logged in: '+name;
+}
+fbAuth.onAuthStateChanged(()=>updateStaffHeaderLabel());
+document.addEventListener('click',(e)=>{
+  const menu=document.getElementById('staffUserMenu');
+  const btn=document.getElementById('staffLoginBtn');
+  if(menu && !menu.classList.contains('hidden') && !menu.contains(e.target) && e.target!==btn){
+    menu.classList.add('hidden');
+  }
+});
 function staffLogout(){
-  fbAuth.signOut().then(()=>openStaffLoginModal());
+  fbAuth.signOut().then(()=>updateStaffHeaderLabel());
 }
 
 /* ===== Admin Firebase auth (separate from the local Super Admin password) ===== */
