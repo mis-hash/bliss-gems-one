@@ -373,8 +373,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <button class="btn" type="button" onclick="closeStaffLoginModal()">✕</button>
     </div>
     <div class="adminBody">
-      <label>Email</label>
-      <input type="email" id="staffLoginEmail" placeholder="you@example.com">
+      <label>Username</label>
+      <input type="text" id="staffLoginUsername" placeholder="e.g. Ramesh" autocomplete="off">
       <div style="height:8px"></div>
       <label>Password</label>
       <input type="password" id="staffLoginPassword" placeholder="Password"
@@ -460,16 +460,21 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const fbAuth = firebase.auth();
 const fbDb = firebase.firestore();
+const UU_COLLECTION='universal_users';
 
-/* ===== Staff (public) login ===== */
+/* ===== Staff (public) login — shared Universal Users, same session key as Parcel Dispatch (same origin, so one login works everywhere) ===== */
+const PD_SESSION_KEY='pd_logged_user_v1';
+function pdLoggedUserId(){
+  return localStorage.getItem(PD_SESSION_KEY)||null;
+}
 function openStaffLoginModal(){
   document.getElementById('staffLoginModal')?.classList.remove('hidden');
   document.getElementById('staffLoginMsg').textContent='';
   const box=document.getElementById('staffLoggedInBox');
-  const cur=fbAuth.currentUser;
+  const cur=pdLoggedUserId();
   if(cur){
     box.classList.remove('hidden');
-    box.innerHTML='Logged in as <b>'+(cur.email||'')+'</b> &nbsp; <button class="btn" type="button" onclick="staffLogout()">Logout</button>';
+    box.innerHTML='Logged in as <b>'+cur+'</b> &nbsp; <button class="btn" type="button" onclick="staffLogout()">Logout</button>';
   } else {
     box.classList.add('hidden');
   }
@@ -477,17 +482,28 @@ function openStaffLoginModal(){
 function closeStaffLoginModal(){
   document.getElementById('staffLoginModal')?.classList.add('hidden');
 }
-function staffLogin(){
-  const email=document.getElementById('staffLoginEmail').value.trim();
+async function staffLogin(){
+  const uname=document.getElementById('staffLoginUsername').value.trim();
   const pass=document.getElementById('staffLoginPassword').value;
   const msg=document.getElementById('staffLoginMsg');
   msg.style.color='';msg.textContent='Logging in…';
-  fbAuth.signInWithEmailAndPassword(email,pass).then(()=>{
+  if(!uname||!pass){msg.style.color='#a12222';msg.textContent='Username aur Password dono bharein.';return;}
+  try{
+    const snap=await fbDb.collection(UU_COLLECTION).get();
+    const match=snap.docs.find(d=>{
+      const u=d.data();
+      return String(u.username||d.id).toLowerCase()===uname.toLowerCase() && u.active!==false;
+    });
+    if(!match || pass!==String(match.data().password||'1234')){
+      msg.style.color='#a12222';msg.textContent='Invalid Username / Password';
+      return;
+    }
+    localStorage.setItem(PD_SESSION_KEY,match.id);
     closeStaffLoginModal();
     updateStaffHeaderLabel();
-  }).catch(err=>{
-    msg.style.color='#a12222';msg.textContent=err.message;
-  });
+  }catch(e){
+    msg.style.color='#a12222';msg.textContent='Error: '+e.message;
+  }
 }
 function toggleStaffUserMenu(){
   document.getElementById('staffUserMenu')?.classList.toggle('hidden');
@@ -496,16 +512,16 @@ async function updateStaffHeaderLabel(){
   const btn=document.getElementById('staffLoginBtn');
   const menu=document.getElementById('staffUserMenu');
   if(!btn)return;
-  const user=fbAuth.currentUser;
-  if(!user){
+  const id=pdLoggedUserId();
+  if(!id){
     btn.textContent='👤 Staff Login';
     btn.onclick=openStaffLoginModal;
     menu?.classList.add('hidden');
     return;
   }
-  let name=user.email;
+  let name=id;
   try{
-    const doc=await fbDb.collection('users').doc(user.uid).get();
+    const doc=await fbDb.collection(UU_COLLECTION).doc(id).get();
     if(doc.exists && doc.data().name) name=doc.data().name;
   }catch(e){}
   btn.textContent='👤 '+name+' ▾';
@@ -513,7 +529,7 @@ async function updateStaffHeaderLabel(){
   const nameBox=document.getElementById('staffUserMenuName');
   if(nameBox)nameBox.textContent='Logged in: '+name;
 }
-fbAuth.onAuthStateChanged(()=>updateStaffHeaderLabel());
+updateStaffHeaderLabel();
 document.addEventListener('click',(e)=>{
   const menu=document.getElementById('staffUserMenu');
   const btn=document.getElementById('staffLoginBtn');
@@ -522,7 +538,8 @@ document.addEventListener('click',(e)=>{
   }
 });
 function staffLogout(){
-  fbAuth.signOut().then(()=>updateStaffHeaderLabel());
+  localStorage.removeItem(PD_SESSION_KEY);
+  updateStaffHeaderLabel();
 }
 
 /* ===== Admin Firebase auth (separate from the local Super Admin password) ===== */
@@ -660,7 +677,6 @@ async function removeUser(uid){
 }
 
 /* ===== Universal Users (shared doer list across all apps, e.g. Parcel Dispatch) ===== */
-const UU_COLLECTION='universal_users';
 let uuAppList=[];
 async function uuLoadAppList(){
   try{
