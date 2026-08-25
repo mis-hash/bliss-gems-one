@@ -369,6 +369,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
         <button class="btn" type="button" onclick="adminFirebaseSignUp()" style="flex:1">Create Admin Account</button>
         <button class="btn primary" type="button" onclick="adminFirebaseSignIn()" style="flex:1">Login</button>
       </div>
+      <button class="btn" type="button" onclick="adminFirebaseForgotPassword()" style="width:100%;margin-top:8px">Forgot Password?</button>
       <div id="adminFbMsg" style="font-size:12px;margin-top:8px"></div>
       <div class="deployBox" style="margin-top:12px">
         पहली बार account बनाने के बाद, Firebase Console → Firestore Database → <code>users</code> collection → अपने account वाले document में जाकर <code>role</code> field को <code>"doer"</code> से <code>"admin"</code> कर दें (सिर्फ़ एक बार करना है)।
@@ -486,6 +487,15 @@ function adminFirebaseSignIn(){
     msg.style.color='#176236';msg.textContent='Login successful.';
     closeAdminFirebaseModal();
     refreshAdminAuthStatus();
+  }).catch(err=>{msg.style.color='#a12222';msg.textContent=err.message;});
+}
+function adminFirebaseForgotPassword(){
+  const email=document.getElementById('adminFbEmail').value.trim();
+  const msg=document.getElementById('adminFbMsg');
+  if(!email){msg.style.color='#a12222';msg.textContent='पहले ऊपर Email भरें, फिर "Forgot Password?" दबाएँ।';return;}
+  msg.style.color='';msg.textContent='Reset email भेज रहे हैं…';
+  fbAuth.sendPasswordResetEmail(email).then(()=>{
+    msg.style.color='#176236';msg.textContent='"'+email+'" पर password reset link भेज दिया गया है — inbox check करें।';
   }).catch(err=>{msg.style.color='#a12222';msg.textContent=err.message;});
 }
 async function refreshAdminAuthStatus(){
