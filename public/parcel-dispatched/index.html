@@ -406,31 +406,41 @@ if(!firebase.apps.length)firebase.initializeApp(pdFirebaseConfig);
 const pdDb=firebase.firestore();
 let pdUsersSyncStarted=false,pdRecordsSyncStarted=false,pdReturnsSyncStarted=false,pdUsersSeedChecked=false;
 
+const PD_APP_SLUG='parcel-dispatched';
 async function pdSeedCloudUsersIfEmpty(){
   if(pdUsersSeedChecked)return;pdUsersSeedChecked=true;
   try{
-    const snap=await pdDb.collection('pd_users_cloud').limit(1).get();
+    const snap=await pdDb.collection('universal_users').limit(1).get();
     if(snap.empty){
       const batch=pdDb.batch();
-      DEFAULT_DOERS.forEach(u=>batch.set(pdDb.collection('pd_users_cloud').doc(String(u.id)),u));
+      const legacy=await pdDb.collection('pd_users_cloud').get();
+      if(!legacy.empty){
+        // One-time migration from the old parcel-dispatched-only user list.
+        legacy.forEach(d=>{
+          const u=d.data();
+          batch.set(pdDb.collection('universal_users').doc(d.id),{...u,appAccess:{[PD_APP_SLUG]:true}});
+        });
+      }else{
+        DEFAULT_DOERS.forEach(u=>batch.set(pdDb.collection('universal_users').doc(String(u.id)),{...u,appAccess:{[PD_APP_SLUG]:true}}));
+      }
       await batch.commit();
     }
   }catch(e){console.error('pd seed cloud users failed',e);}
 }
 async function pdSyncUsersToCloud(){
   try{
-    const snap=await pdDb.collection('pd_users_cloud').get();
+    const snap=await pdDb.collection('universal_users').get();
     const existingIds=new Set(snap.docs.map(d=>d.id));
     const currentIds=new Set(users.map(u=>String(u.id||u.username)));
     const batch=pdDb.batch();
-    users.forEach(u=>batch.set(pdDb.collection('pd_users_cloud').doc(String(u.id||u.username)),u));
-    existingIds.forEach(id=>{if(!currentIds.has(id))batch.delete(pdDb.collection('pd_users_cloud').doc(id));});
+    users.forEach(u=>batch.set(pdDb.collection('universal_users').doc(String(u.id||u.username)),u,{merge:true}));
+    existingIds.forEach(id=>{if(!currentIds.has(id))batch.delete(pdDb.collection('universal_users').doc(id));});
     await batch.commit();
   }catch(e){console.error('pd users cloud sync failed',e);}
 }
 function pdStartUsersSync(){
   if(pdUsersSyncStarted)return;pdUsersSyncStarted=true;
-  pdDb.collection('pd_users_cloud').onSnapshot(snap=>{
+  pdDb.collection('universal_users').onSnapshot(snap=>{
     pdSetFirebaseStatus('ok');
     const arr=[];snap.forEach(d=>arr.push(d.data()));
     if(!arr.length)return;
@@ -1599,6 +1609,7 @@ function doLogin(){
   let un=$('loginUsername').value.trim().toLowerCase(),pw=$('loginPassword').value;
   let u=users.find(x=>String(x.username||x.id).toLowerCase()===un && x.active!==false);
   if(!u||pw!==String(u.password||'1234')){alert('Invalid Username / Password');return}
+  if(u.appAccess && u.appAccess[PD_APP_SLUG]===false){alert('Aapko is app ka access nahi hai. Bliss One admin se contact karein.');return}
   localStorage.setItem(SESSION_KEY,u.id);
   $('loginPassword').value='';
   closeLogin();

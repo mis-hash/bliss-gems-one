@@ -304,6 +304,35 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
     </div>
   </section>
 
+  <section class="panel superAdminOnly hidden" id="universalUsersPanel">
+    <div class="panelHead"><h3>🌐 Universal Users (Doers — All Apps)</h3><span class="badge">Super Admin</span></div>
+    <div class="panelBody">
+      <div class="deployBox">Yeh ek hi shared user list hai jo Parcel Dispatch aur future ki har app use karegi (username/password se login — yeh upar wale Firebase Staff Accounts se alag hai). Yahan se decide karein ki kaun-sa doer kaun-si app khol sakta hai.</div>
+      <div id="uuCreateBox" style="margin-top:14px">
+        <div class="uploadGrid">
+          <div><label>Name</label><input id="uuName" placeholder="e.g. Ramesh Kumar"></div>
+          <div><label>Username</label><input id="uuUsername" placeholder="e.g. Ramesh"></div>
+          <div><label>Mobile Number</label><input id="uuPhone" placeholder="10 digit or 91..."></div>
+          <div><label>Department</label><input id="uuDepartment" placeholder="optional"></div>
+          <div><label>Password</label><input id="uuPassword" type="password" placeholder="default 1234"></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+          <button class="btn primary" type="button" onclick="uuAddUser()">Add Universal User</button>
+        </div>
+        <div id="uuCreateMsg" style="font-size:12px;margin-top:8px"></div>
+      </div>
+      <div style="margin-top:18px">
+        <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">All Doers</h3><button class="btn" onclick="uuLoadList()">Refresh</button></div>
+        <div class="tableWrap">
+          <table>
+            <thead><tr><th>Name</th><th>Username</th><th>Status</th><th>App Access</th><th>Action</th></tr></thead>
+            <tbody id="uuTableBody"><tr><td colspan="5" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="panel">
     <div class="panelHead"><h3>Deployment History</h3><button class="btn">View All</button></div>
     <div class="panelBody tableWrap">
@@ -628,6 +657,97 @@ async function removeUser(uid){
   if(!confirm('Is staff account ki profile hata dein? (Login khud alag se Firebase console se hataana hoga)'))return;
   await fbDb.collection('users').doc(uid).delete();
   loadUsersList();
+}
+
+/* ===== Universal Users (shared doer list across all apps, e.g. Parcel Dispatch) ===== */
+const UU_COLLECTION='universal_users';
+let uuAppList=[];
+async function uuLoadAppList(){
+  try{
+    const res=await fetch('/apps.json',{cache:'no-store'});
+    if(!res.ok){uuAppList=[];return;}
+    const list=await res.json();
+    uuAppList=Array.isArray(list)?list.map(a=>a.slug):[];
+  }catch(e){uuAppList=[];}
+}
+async function uuAddUser(){
+  const name=document.getElementById('uuName').value.trim();
+  const username=document.getElementById('uuUsername').value.trim();
+  const phone=document.getElementById('uuPhone').value.trim();
+  const department=document.getElementById('uuDepartment').value.trim();
+  const password=document.getElementById('uuPassword').value.trim()||'1234';
+  const msg=document.getElementById('uuCreateMsg');
+  msg.style.color='#b3261e';
+  if(!name||!username){msg.textContent='Name aur Username dono zaroori hain.';return;}
+  if(username.includes('/')){msg.textContent='Username me / (slash) nahi ho sakta.';return;}
+  try{
+    const ref=fbDb.collection(UU_COLLECTION).doc(username);
+    const existing=await ref.get();
+    if(existing.exists){msg.textContent='Yeh username pehle se maujood hai.';return;}
+    await uuLoadAppList();
+    const appAccess={};uuAppList.forEach(slug=>appAccess[slug]=true);
+    await ref.set({id:username,username,name,phone,department,password,role:'Doer',active:true,appAccess});
+    msg.style.color='#14532d';msg.textContent='User added.';
+    ['uuName','uuUsername','uuPhone','uuDepartment','uuPassword'].forEach(id=>document.getElementById(id).value='');
+    uuLoadList();
+  }catch(e){msg.textContent='Error: '+e.message;}
+}
+async function uuLoadList(){
+  await uuLoadAppList();
+  const body=document.getElementById('uuTableBody');
+  if(!body)return;
+  body.innerHTML='';
+  try{
+    const snap=await fbDb.collection(UU_COLLECTION).get();
+    if(snap.empty){
+      body.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted)">Koi user nahi hai</td></tr>';
+      return;
+    }
+    snap.forEach(doc=>{
+      const u=doc.data(), id=doc.id;
+      const tr=document.createElement('tr');
+      const tdName=document.createElement('td');tdName.textContent=u.name||'';
+      const tdUser=document.createElement('td');tdUser.textContent=u.username||id;
+      const tdStatus=document.createElement('td');tdStatus.textContent=u.active===false?'INACTIVE':'ACTIVE';
+      const tdApps=document.createElement('td');
+      if(!uuAppList.length){
+        tdApps.innerHTML='<small style="color:var(--muted)">No apps live yet</small>';
+      }else{
+        uuAppList.forEach(slug=>{
+          const lbl=document.createElement('label');
+          lbl.style.cssText='display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:12px';
+          const cb=document.createElement('input');cb.type='checkbox';cb.checked=(u.appAccess&&u.appAccess[slug])!==false;
+          cb.onchange=()=>uuToggleAppAccess(id,slug,cb.checked);
+          lbl.appendChild(cb);lbl.appendChild(document.createTextNode(' '+slug));
+          tdApps.appendChild(lbl);
+        });
+      }
+      const tdAction=document.createElement('td');
+      const btnToggle=document.createElement('button');btnToggle.className='btn small secondary';btnToggle.textContent=u.active===false?'Activate':'Disable';
+      btnToggle.onclick=()=>uuToggleActive(id,u.active===false);
+      const btnDel=document.createElement('button');btnDel.className='btn small danger';btnDel.style.marginLeft='6px';btnDel.textContent='Delete';
+      btnDel.onclick=()=>uuDeleteUser(id);
+      tdAction.appendChild(btnToggle);tdAction.appendChild(btnDel);
+      tr.appendChild(tdName);tr.appendChild(tdUser);tr.appendChild(tdStatus);tr.appendChild(tdApps);tr.appendChild(tdAction);
+      body.appendChild(tr);
+    });
+  }catch(e){
+    body.innerHTML='';
+    const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=5;td.style.color='#b3261e';td.style.textAlign='center';td.textContent='Error: '+e.message;
+    tr.appendChild(td);body.appendChild(tr);
+  }
+}
+async function uuToggleActive(id,makeActive){
+  await fbDb.collection(UU_COLLECTION).doc(id).update({active:makeActive});
+  uuLoadList();
+}
+async function uuToggleAppAccess(id,slug,allowed){
+  await fbDb.collection(UU_COLLECTION).doc(id).update({['appAccess.'+slug]:allowed});
+}
+async function uuDeleteUser(id){
+  if(!confirm('Delete this user? This cannot be undone.'))return;
+  await fbDb.collection(UU_COLLECTION).doc(id).delete();
+  uuLoadList();
 }
 
 function filterApps(){
@@ -997,6 +1117,7 @@ function showSuperAdminControls(){
   loadGreenApiCreds();
   loadGithubToken();
   refreshAdminAuthStatus();
+  uuLoadList();
 }
 function saveGreenApiCreds(){
   const instance=document.getElementById('greenApiInstance')?.value||'';
