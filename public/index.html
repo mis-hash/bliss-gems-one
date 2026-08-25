@@ -265,7 +265,9 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <div class="deployBox">
         यह token सिर्फ़ इस browser में save होता है और सीधे GitHub को भेजा जाता है (किसी और server से नहीं गुज़रता)। Repo: <b>mis-hash/bliss-gems-one</b>
       </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <div style="display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:14px">
+        <span id="githubTokenStatus" style="font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:#eef4f0">🐙 GitHub: Not Configured</span>
+        <button class="btn" type="button" onclick="ghCheckStatus()">🔄 Check</button>
         <button class="btn" type="button" onclick="clearGithubToken()">Clear</button>
         <button class="btn primary" type="button" onclick="saveGithubToken()">Save</button>
       </div>
@@ -770,15 +772,36 @@ function saveGithubToken(){
   localStorage.setItem('ghToken',t);
   const s=document.getElementById('githubTokenSaved');
   if(s){s.style.display='block';setTimeout(()=>s.style.display='none',2000);}
+  ghCheckStatus();
 }
 function loadGithubToken(){
   const el=document.getElementById('githubToken');
   if(el)el.value=localStorage.getItem('ghToken')||'';
+  ghCheckStatus();
 }
 function clearGithubToken(){
   localStorage.removeItem('ghToken');
   const el=document.getElementById('githubToken');
   if(el)el.value='';
+  ghCheckStatus();
+}
+async function ghCheckStatus(){
+  const el=document.getElementById('githubTokenStatus');
+  const token=localStorage.getItem('ghToken')||'';
+  if(!token){if(el){el.textContent='🐙 GitHub: Not Configured';el.style.color='#8a6d00';}return;}
+  if(el){el.textContent='🐙 GitHub: Checking…';el.style.color='#8a6d00';}
+  try{
+    const res=await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}`,{headers:{Authorization:'token '+token}});
+    if(!res.ok){if(el){el.textContent='🐙 GitHub: Invalid Token';el.style.color='#b3261e';}return;}
+    const data=await res.json();
+    if(data.permissions&&data.permissions.push){
+      if(el){el.textContent='🐙 GitHub: Connected';el.style.color='#0a7a3d';}
+    }else{
+      if(el){el.textContent='🐙 GitHub: No Push Access';el.style.color='#b3261e';}
+    }
+  }catch(e){
+    if(el){el.textContent='🐙 GitHub: Connection Failed';el.style.color='#b3261e';}
+  }
 }
 
 async function pushAppToGitHub(slug){
