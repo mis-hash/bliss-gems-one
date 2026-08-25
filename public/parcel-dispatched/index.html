@@ -404,8 +404,10 @@ let currentParcelId=null;
 const pdFirebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
 if(!firebase.apps.length)firebase.initializeApp(pdFirebaseConfig);
 const pdDb=firebase.firestore();
+let pdUsersSyncStarted=false,pdRecordsSyncStarted=false,pdReturnsSyncStarted=false,pdUsersSeedChecked=false;
 
 async function pdSeedCloudUsersIfEmpty(){
+  if(pdUsersSeedChecked)return;pdUsersSeedChecked=true;
   try{
     const snap=await pdDb.collection('pd_users_cloud').limit(1).get();
     if(snap.empty){
@@ -427,6 +429,7 @@ async function pdSyncUsersToCloud(){
   }catch(e){console.error('pd users cloud sync failed',e);}
 }
 function pdStartUsersSync(){
+  if(pdUsersSyncStarted)return;pdUsersSyncStarted=true;
   pdDb.collection('pd_users_cloud').onSnapshot(snap=>{
     pdSetFirebaseStatus('ok');
     const arr=[];snap.forEach(d=>arr.push(d.data()));
@@ -474,6 +477,7 @@ async function pdPushRecordToCloud(record){
   catch(e){console.error('pd record cloud push failed',e);}
 }
 function pdStartRecordsSync(){
+  if(pdRecordsSyncStarted)return;pdRecordsSyncStarted=true;
   pdDb.collection('pd_records_cloud').onSnapshot(snap=>{
     pdSetFirebaseStatus('ok');
     const arr=[];snap.forEach(d=>arr.push(d.data()));
@@ -486,6 +490,7 @@ async function pdPushReturnToCloud(record){
   catch(e){console.error('pd return cloud push failed',e);}
 }
 function pdStartReturnsSync(){
+  if(pdReturnsSyncStarted)return;pdReturnsSyncStarted=true;
   pdDb.collection('pd_returns_cloud').onSnapshot(snap=>{
     pdSetFirebaseStatus('ok');
     const arr=[];snap.forEach(d=>arr.push(d.data()));
@@ -1249,8 +1254,32 @@ function makeSingleSearchCombos(){
  });
  applyWorkerPermissions();
   applySequenceAndLocks();
+  makeReturnFromCombo();
 }
 
+function makeReturnFromCombo(){
+  const s=$('returnFrom');
+  if(!s)return;
+  let wrap=s.previousElementSibling;
+  if(!(wrap&&wrap.classList&&wrap.classList.contains('comboBox'))){
+    wrap=document.createElement('div');wrap.className='comboBox';
+    let inp=document.createElement('input');inp.type='text';inp.placeholder='Type / Search Party Name';inp.autocomplete='off';
+    let menu=document.createElement('div');menu.className='comboMenu';
+    s.parentNode.insertBefore(wrap,s);wrap.appendChild(inp);wrap.appendChild(menu);s.style.display='none';
+  }
+  let inp=wrap.querySelector('input'),menu=wrap.querySelector('.comboMenu');
+  if(document.activeElement!==inp)inp.value=s.value||'';
+  function draw(){
+    let q=inp.value.trim().toLowerCase();
+    let list=shipTo.filter(p=>!q||p.toLowerCase().includes(q));
+    menu.innerHTML=list.length?list.map(p=>`<div class="comboOption" data-v="${esc(p)}"><b>${esc(p)}</b></div>`).join(''):'<div class="comboOption">No match</div>';
+    forceVisibleComboMenu(inp,menu);
+    menu.classList.add('show');
+  }
+  inp.onfocus=draw;inp.oninput=draw;
+  menu.onmousedown=e=>{let o=e.target.closest('[data-v]');if(!o)return;s.value=o.dataset.v;inp.value=o.dataset.v;menu.classList.remove('show');s.dispatchEvent(new Event('change',{bubbles:true}))};
+  inp.onblur=()=>setTimeout(()=>menu.classList.remove('show'),120);
+}
 
 function forceVisibleComboMenu(inp,menu){
   const r=inp.getBoundingClientRect();
