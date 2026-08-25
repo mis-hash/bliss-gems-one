@@ -160,7 +160,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <div><h1>Bliss Gems One</h1><small>Internal App Hub</small></div>
     </div>
     <div class="actions">
-      <button class="btn soft superAdminOnly hidden">⚙ Manage</button>
+      <button class="btn soft" onclick="openStaffLoginModal()">👤 Staff Login</button>
+      <button class="btn soft superAdminOnly hidden" onclick="document.getElementById('userManagePanel').scrollIntoView({behavior:'smooth'})">⚙ Manage</button>
       <button class="btn primary superAdminOnly hidden" onclick="document.getElementById('uploadPanel').scrollIntoView({behavior:'smooth'})">＋ Add App</button>
     </div>
   </div>
@@ -248,6 +249,35 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
     </div>
   </section>
 
+  <section class="panel superAdminOnly hidden" id="userManagePanel">
+    <div class="panelHead"><h3>⚙ Manage — Users</h3><span class="badge">Super Admin</span></div>
+    <div class="panelBody">
+      <div id="adminAuthStatus" class="deployBox">Checking admin login…</div>
+
+      <div id="createUserBox" style="margin-top:14px">
+        <div class="uploadGrid">
+          <div><label>Name</label><input id="newUserName" placeholder="e.g. Ramesh Kumar"></div>
+          <div><label>Email</label><input id="newUserEmail" type="email" placeholder="staff@example.com"></div>
+          <div><label>Password</label><input id="newUserPassword" type="password" placeholder="min 6 characters"></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+          <button class="btn primary" type="button" onclick="createStaffUser()">Create Doer Account</button>
+        </div>
+        <div id="createUserMsg" style="font-size:12px;margin-top:8px"></div>
+      </div>
+
+      <div style="margin-top:18px">
+        <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">Staff Accounts</h3><button class="btn" onclick="loadUsersList()">Refresh</button></div>
+        <div class="tableWrap">
+          <table>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
+            <tbody id="usersTableBody"><tr><td colspan="4" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="panel">
     <div class="panelHead"><h3>Deployment History</h3><button class="btn">View All</button></div>
     <div class="panelBody tableWrap">
@@ -276,6 +306,55 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       </button>
       <div id="superAdminError" style="display:none;color:#a12222;font-size:12px;margin-top:8px">
         Incorrect password.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="adminModal hidden" id="staffLoginModal">
+  <div class="adminBox">
+    <div class="adminHead">
+      <b>Staff Login</b>
+      <button class="btn" type="button" onclick="closeStaffLoginModal()">✕</button>
+    </div>
+    <div class="adminBody">
+      <label>Email</label>
+      <input type="email" id="staffLoginEmail" placeholder="you@example.com">
+      <div style="height:8px"></div>
+      <label>Password</label>
+      <input type="password" id="staffLoginPassword" placeholder="Password"
+             onkeydown="if(event.key==='Enter')staffLogin()">
+      <button class="btn primary" type="button" onclick="staffLogin()" style="width:100%;margin-top:10px">
+        Login
+      </button>
+      <div id="staffLoginMsg" style="font-size:12px;margin-top:8px"></div>
+      <div id="staffLoggedInBox" class="hidden" style="margin-top:8px;font-size:13px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="adminModal hidden" id="adminFirebaseModal">
+  <div class="adminBox">
+    <div class="adminHead">
+      <b>Admin Firebase Login</b>
+      <button class="btn" type="button" onclick="closeAdminFirebaseModal()">✕</button>
+    </div>
+    <div class="adminBody">
+      <div class="deployBox" style="margin-bottom:12px">
+        User-management सुरक्षित रखने के लिए admin को भी एक बार Firebase से login करना होगा। पहली बार इस्तेमाल कर रहे हैं तो नीचे "Create Admin Account" पर click करें।
+      </div>
+      <label>Email</label>
+      <input type="email" id="adminFbEmail" placeholder="admin@example.com">
+      <div style="height:8px"></div>
+      <label>Password</label>
+      <input type="password" id="adminFbPassword" placeholder="min 6 characters">
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn" type="button" onclick="adminFirebaseSignUp()" style="flex:1">Create Admin Account</button>
+        <button class="btn primary" type="button" onclick="adminFirebaseSignIn()" style="flex:1">Login</button>
+      </div>
+      <div id="adminFbMsg" style="font-size:12px;margin-top:8px"></div>
+      <div class="deployBox" style="margin-top:12px">
+        पहली बार account बनाने के बाद, Firebase Console → Firestore Database → <code>users</code> collection → अपने account वाले document में जाकर <code>role</code> field को <code>"doer"</code> से <code>"admin"</code> कर दें (सिर्फ़ एक बार करना है)।
       </div>
     </div>
   </div>
@@ -310,7 +389,179 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",
+  authDomain: "bliss-gems-one.firebaseapp.com",
+  projectId: "bliss-gems-one",
+  storageBucket: "bliss-gems-one.firebasestorage.app",
+  messagingSenderId: "702608135517",
+  appId: "1:702608135517:web:d848197040efb3be5f04b4"
+};
+firebase.initializeApp(firebaseConfig);
+const fbAuth = firebase.auth();
+const fbDb = firebase.firestore();
+
+/* ===== Staff (public) login ===== */
+function openStaffLoginModal(){
+  document.getElementById('staffLoginModal')?.classList.remove('hidden');
+  document.getElementById('staffLoginMsg').textContent='';
+  const box=document.getElementById('staffLoggedInBox');
+  const cur=fbAuth.currentUser;
+  if(cur){
+    box.classList.remove('hidden');
+    box.innerHTML='Logged in as <b>'+(cur.email||'')+'</b> &nbsp; <button class="btn" type="button" onclick="staffLogout()">Logout</button>';
+  } else {
+    box.classList.add('hidden');
+  }
+}
+function closeStaffLoginModal(){
+  document.getElementById('staffLoginModal')?.classList.add('hidden');
+}
+function staffLogin(){
+  const email=document.getElementById('staffLoginEmail').value.trim();
+  const pass=document.getElementById('staffLoginPassword').value;
+  const msg=document.getElementById('staffLoginMsg');
+  msg.style.color='';msg.textContent='Logging in…';
+  fbAuth.signInWithEmailAndPassword(email,pass).then(()=>{
+    msg.style.color='#176236';msg.textContent='Login successful.';
+    openStaffLoginModal();
+  }).catch(err=>{
+    msg.style.color='#a12222';msg.textContent=err.message;
+  });
+}
+function staffLogout(){
+  fbAuth.signOut().then(()=>openStaffLoginModal());
+}
+
+/* ===== Admin Firebase auth (separate from the local Super Admin password) ===== */
+function openAdminFirebaseModal(){
+  document.getElementById('adminFirebaseModal')?.classList.remove('hidden');
+  document.getElementById('adminFbMsg').textContent='';
+}
+function closeAdminFirebaseModal(){
+  document.getElementById('adminFirebaseModal')?.classList.add('hidden');
+}
+function adminFirebaseSignUp(){
+  const email=document.getElementById('adminFbEmail').value.trim();
+  const pass=document.getElementById('adminFbPassword').value;
+  const msg=document.getElementById('adminFbMsg');
+  if(!email||pass.length<6){msg.style.color='#a12222';msg.textContent='Valid email aur kam se kam 6 character ka password daalein.';return;}
+  msg.style.color='';msg.textContent='Creating account…';
+  fbAuth.createUserWithEmailAndPassword(email,pass).then(async cred=>{
+    await fbDb.collection('users').doc(cred.user.uid).set({
+      name:email.split('@')[0],email,role:'doer',createdAt:Date.now()
+    });
+    msg.style.color='#176236';
+    msg.textContent='Account ban gaya. Ab Firestore console me is account ka role "doer" se "admin" karein, phir dobara login karein.';
+    refreshAdminAuthStatus();
+  }).catch(err=>{msg.style.color='#a12222';msg.textContent=err.message;});
+}
+function adminFirebaseSignIn(){
+  const email=document.getElementById('adminFbEmail').value.trim();
+  const pass=document.getElementById('adminFbPassword').value;
+  const msg=document.getElementById('adminFbMsg');
+  msg.style.color='';msg.textContent='Logging in…';
+  fbAuth.signInWithEmailAndPassword(email,pass).then(()=>{
+    msg.style.color='#176236';msg.textContent='Login successful.';
+    closeAdminFirebaseModal();
+    refreshAdminAuthStatus();
+  }).catch(err=>{msg.style.color='#a12222';msg.textContent=err.message;});
+}
+async function refreshAdminAuthStatus(){
+  const box=document.getElementById('adminAuthStatus');
+  if(!box)return;
+  const user=fbAuth.currentUser;
+  if(!user){
+    box.innerHTML='आप अभी Firebase से admin login नहीं हैं। <button class="btn primary" type="button" onclick="openAdminFirebaseModal()">Admin Firebase Login</button>';
+    document.getElementById('createUserBox').classList.add('hidden');
+    document.getElementById('usersTableBody').innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted)">Admin login karein pehle</td></tr>';
+    return;
+  }
+  const doc=await fbDb.collection('users').doc(user.uid).get();
+  const role=doc.exists?doc.data().role:'(no profile)';
+  if(role==='admin'){
+    box.innerHTML='Firebase Admin: <b>'+user.email+'</b> (role: admin) &nbsp; <button class="btn" type="button" onclick="fbAuth.signOut().then(refreshAdminAuthStatus)">Sign out</button>';
+    document.getElementById('createUserBox').classList.remove('hidden');
+    loadUsersList();
+  } else {
+    box.innerHTML='Signed in as <b>'+user.email+'</b> लेकिन role "admin" नहीं है (अभी: '+role+')। Firestore console में role बदलें, फिर page reload करें।';
+    document.getElementById('createUserBox').classList.add('hidden');
+    document.getElementById('usersTableBody').innerHTML='';
+  }
+}
+
+async function createStaffUser(){
+  const name=document.getElementById('newUserName').value.trim();
+  const email=document.getElementById('newUserEmail').value.trim();
+  const pass=document.getElementById('newUserPassword').value;
+  const msg=document.getElementById('createUserMsg');
+  if(!name||!email||pass.length<6){msg.style.color='#a12222';msg.textContent='Naam, email aur kam se kam 6-character password bharein.';return;}
+  msg.style.color='';msg.textContent='Creating…';
+  const secondaryApp=firebase.initializeApp(firebaseConfig,'Secondary-'+Date.now());
+  try{
+    const cred=await secondaryApp.auth().createUserWithEmailAndPassword(email,pass);
+    await secondaryApp.firestore().collection('users').doc(cred.user.uid).set({
+      name,email,role:'doer',createdAt:Date.now()
+    });
+    await secondaryApp.auth().signOut();
+    msg.style.color='#176236';msg.textContent='"'+name+'" ka Doer account ban gaya.';
+    document.getElementById('newUserName').value='';
+    document.getElementById('newUserEmail').value='';
+    document.getElementById('newUserPassword').value='';
+    loadUsersList();
+  }catch(err){
+    msg.style.color='#a12222';msg.textContent=err.message;
+  }finally{
+    secondaryApp.delete();
+  }
+}
+
+async function loadUsersList(){
+  const tbody=document.getElementById('usersTableBody');
+  if(!tbody)return;
+  tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted)">Loading…</td></tr>';
+  try{
+    const snap=await fbDb.collection('users').get();
+    if(snap.empty){
+      tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted)">Koi staff account nahi hai</td></tr>';
+      return;
+    }
+    tbody.innerHTML='';
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const tr=document.createElement('tr');
+      const otherRole=d.role==='admin'?'doer':'admin';
+      tr.innerHTML='<td></td><td></td><td></td><td></td>';
+      tr.children[0].textContent=d.name||'';
+      tr.children[1].textContent=d.email||'';
+      tr.children[2].textContent=d.role||'';
+      const btnRole=document.createElement('button');
+      btnRole.className='btn';btnRole.textContent='Make '+otherRole;
+      btnRole.onclick=()=>setUserRole(doc.id,otherRole);
+      const btnDel=document.createElement('button');
+      btnDel.className='btn';btnDel.style.marginLeft='6px';btnDel.textContent='Remove';
+      btnDel.onclick=()=>removeUser(doc.id);
+      tr.children[3].append(btnRole,btnDel);
+      tbody.appendChild(tr);
+    });
+  }catch(err){
+    tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:#a12222">'+err.message+'</td></tr>';
+  }
+}
+async function setUserRole(uid,role){
+  await fbDb.collection('users').doc(uid).update({role});
+  loadUsersList();
+}
+async function removeUser(uid){
+  if(!confirm('Is staff account ki profile hata dein? (Login khud alag se Firebase console se hataana hoga)'))return;
+  await fbDb.collection('users').doc(uid).delete();
+  loadUsersList();
+}
+
 function filterApps(){
   const q=(document.getElementById('appSearch').value||'').toLowerCase();
   const s=document.getElementById('statusFilter').value;
@@ -537,6 +788,7 @@ function closeSuperAdminModal(){
 function showSuperAdminControls(){
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.remove('hidden'));
   loadGreenApiCreds();
+  refreshAdminAuthStatus();
 }
 function saveGreenApiCreds(){
   const instance=document.getElementById('greenApiInstance')?.value||'';
