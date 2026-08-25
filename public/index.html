@@ -692,11 +692,12 @@ async function renderSavedApps(){
     card.innerHTML='<div class="appHead"><div class="appIcon">📦</div><div><h4></h4><small></small></div></div>'+
       '<div><span class="badge"><span class="dot"></span> Saved (this browser)</span></div>'+
       '<div class="meta"><div><small>Version</small><b></b></div><div><small>Size</small><b>'+sizeKb+' KB</b></div></div>'+
+      '<div class="cardActions"><a class="btn primary" style="grid-column:1/-1;text-align:center;text-decoration:none" href="/'+r.slug+'/" target="_blank" rel="noopener">🔗 Open App</a></div>'+
       '<div class="cardActions superAdminOnly'+(superAdminUnlocked?'':' hidden')+'"></div>';
     card.querySelector('h4').textContent=r.name;
     card.querySelector('small').textContent='slug: '+r.slug;
     card.querySelector('.meta b').textContent=r.version;
-    const actions=card.querySelector('.cardActions');
+    const actions=card.querySelectorAll('.cardActions')[1];
     const btnPush=document.createElement('button');btnPush.className='btn primary';btnPush.textContent='🚀 Push to GitHub';btnPush.onclick=()=>pushAppToGitHub(r.slug);
     const btnView=document.createElement('button');btnView.className='btn';btnView.textContent='Open Files';btnView.onclick=()=>openZipViewer(r.slug);
     const btnUpdate=document.createElement('button');btnUpdate.className='btn';btnUpdate.textContent='Update ZIP';btnUpdate.onclick=()=>showUpdate(r.slug,r.name);
