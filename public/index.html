@@ -325,8 +325,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
         <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">All Doers</h3><button class="btn" onclick="uuLoadList()">Refresh</button></div>
         <div class="tableWrap">
           <table>
-            <thead><tr><th>Name</th><th>Username</th><th>Status</th><th>App Access</th><th>Action</th></tr></thead>
-            <tbody id="uuTableBody"><tr><td colspan="5" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
+            <thead><tr><th>Name</th><th>Username</th><th>Password</th><th>Status</th><th>App Access</th><th>Action</th></tr></thead>
+            <tbody id="uuTableBody"><tr><td colspan="6" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -799,7 +799,7 @@ async function uuLoadList(){
   try{
     const snap=await fbDb.collection(UU_COLLECTION).get();
     if(snap.empty){
-      body.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted)">Koi user nahi hai</td></tr>';
+      body.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted)">Koi user nahi hai</td></tr>';
       return;
     }
     snap.forEach(doc=>{
@@ -807,6 +807,7 @@ async function uuLoadList(){
       const tr=document.createElement('tr');
       const tdName=document.createElement('td');tdName.textContent=u.name||'';
       const tdUser=document.createElement('td');tdUser.textContent=u.username||id;
+      const tdPw=document.createElement('td');tdPw.textContent=u.password||'1234';tdPw.style.fontFamily='monospace';
       const tdStatus=document.createElement('td');tdStatus.textContent=u.active===false?'INACTIVE':'ACTIVE';
       const tdApps=document.createElement('td');
       if(!uuAppList.length){
@@ -829,12 +830,12 @@ async function uuLoadList(){
       const btnDel=document.createElement('button');btnDel.className='btn small danger';btnDel.style.marginLeft='6px';btnDel.textContent='Delete';
       btnDel.onclick=()=>uuDeleteUser(id);
       tdAction.appendChild(btnPw);tdAction.appendChild(btnToggle);tdAction.appendChild(btnDel);
-      tr.appendChild(tdName);tr.appendChild(tdUser);tr.appendChild(tdStatus);tr.appendChild(tdApps);tr.appendChild(tdAction);
+      tr.appendChild(tdName);tr.appendChild(tdUser);tr.appendChild(tdPw);tr.appendChild(tdStatus);tr.appendChild(tdApps);tr.appendChild(tdAction);
       body.appendChild(tr);
     });
   }catch(e){
     body.innerHTML='';
-    const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=5;td.style.color='#b3261e';td.style.textAlign='center';td.textContent='Error: '+e.message;
+    const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=6;td.style.color='#b3261e';td.style.textAlign='center';td.textContent='Error: '+e.message;
     tr.appendChild(td);body.appendChild(tr);
   }
 }
