@@ -739,11 +739,13 @@ async function uuLoadList(){
         });
       }
       const tdAction=document.createElement('td');
-      const btnToggle=document.createElement('button');btnToggle.className='btn small secondary';btnToggle.textContent=u.active===false?'Activate':'Disable';
+      const btnPw=document.createElement('button');btnPw.className='btn small secondary';btnPw.textContent='🔑 Password';
+      btnPw.onclick=()=>uuResetPassword(id,u.name||id);
+      const btnToggle=document.createElement('button');btnToggle.className='btn small secondary';btnToggle.style.marginLeft='6px';btnToggle.textContent=u.active===false?'Activate':'Disable';
       btnToggle.onclick=()=>uuToggleActive(id,u.active===false);
       const btnDel=document.createElement('button');btnDel.className='btn small danger';btnDel.style.marginLeft='6px';btnDel.textContent='Delete';
       btnDel.onclick=()=>uuDeleteUser(id);
-      tdAction.appendChild(btnToggle);tdAction.appendChild(btnDel);
+      tdAction.appendChild(btnPw);tdAction.appendChild(btnToggle);tdAction.appendChild(btnDel);
       tr.appendChild(tdName);tr.appendChild(tdUser);tr.appendChild(tdStatus);tr.appendChild(tdApps);tr.appendChild(tdAction);
       body.appendChild(tr);
     });
@@ -752,6 +754,13 @@ async function uuLoadList(){
     const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=5;td.style.color='#b3261e';td.style.textAlign='center';td.textContent='Error: '+e.message;
     tr.appendChild(td);body.appendChild(tr);
   }
+}
+async function uuResetPassword(id,name){
+  const pw=prompt('Naya password set karein ('+name+'):');
+  if(pw===null)return;
+  if(!pw.trim()){alert('Password khali nahi ho sakta.');return;}
+  await fbDb.collection(UU_COLLECTION).doc(id).update({password:pw.trim()});
+  alert('Password update ho gaya.');
 }
 async function uuToggleActive(id,makeActive){
   await fbDb.collection(UU_COLLECTION).doc(id).update({active:makeActive});
