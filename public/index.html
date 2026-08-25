@@ -373,15 +373,29 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <button class="btn" type="button" onclick="closeStaffLoginModal()">✕</button>
     </div>
     <div class="adminBody">
-      <label>Username</label>
-      <input type="text" id="staffLoginUsername" placeholder="e.g. Ramesh" autocomplete="off">
-      <div style="height:8px"></div>
-      <label>Password</label>
-      <input type="password" id="staffLoginPassword" placeholder="Password"
-             onkeydown="if(event.key==='Enter')staffLogin()">
-      <button class="btn primary" type="button" onclick="staffLogin()" style="width:100%;margin-top:10px">
-        Login
-      </button>
+      <div id="staffLoginStep1">
+        <label>Username</label>
+        <input type="text" id="staffLoginUsername" placeholder="e.g. Ramesh" autocomplete="off">
+        <div style="height:8px"></div>
+        <label>Password</label>
+        <input type="password" id="staffLoginPassword" placeholder="Password"
+               onkeydown="if(event.key==='Enter')staffLogin()">
+        <button class="btn primary" type="button" onclick="staffLogin()" style="width:100%;margin-top:10px">
+          Login
+        </button>
+      </div>
+      <div id="staffLoginStep2" class="hidden">
+        <div class="deployBox" id="staffOtpInfo" style="margin-bottom:10px"></div>
+        <label>WhatsApp OTP</label>
+        <input type="text" id="staffLoginOtp" placeholder="6-digit code" autocomplete="off" inputmode="numeric"
+               onkeydown="if(event.key==='Enter')staffVerifyOtp()">
+        <button class="btn primary" type="button" onclick="staffVerifyOtp()" style="width:100%;margin-top:10px">
+          Verify &amp; Login
+        </button>
+        <button class="btn" type="button" onclick="staffLoginBackToStep1()" style="width:100%;margin-top:8px">
+          ← Back
+        </button>
+      </div>
       <div id="staffLoginMsg" style="font-size:12px;margin-top:8px"></div>
       <div id="staffLoggedInBox" class="hidden" style="margin-top:8px;font-size:13px"></div>
     </div>
@@ -470,6 +484,7 @@ function pdLoggedUserId(){
 function openStaffLoginModal(){
   document.getElementById('staffLoginModal')?.classList.remove('hidden');
   document.getElementById('staffLoginMsg').textContent='';
+  staffLoginBackToStep1();
   const box=document.getElementById('staffLoggedInBox');
   const cur=pdLoggedUserId();
   if(cur){
@@ -481,6 +496,39 @@ function openStaffLoginModal(){
 }
 function closeStaffLoginModal(){
   document.getElementById('staffLoginModal')?.classList.add('hidden');
+}
+function staffLoginBackToStep1(){
+  document.getElementById('staffLoginStep1')?.classList.remove('hidden');
+  document.getElementById('staffLoginStep2')?.classList.add('hidden');
+  document.getElementById('staffLoginMsg').textContent='';
+  pendingOtpUser=null;
+}
+
+/* ===== WhatsApp OTP (via GREEN-API, shared config so any browser can send/verify) ===== */
+const OTP_COLLECTION='login_otps';
+let pendingOtpUser=null;
+async function getGreenApiCreds(){
+  try{
+    const doc=await fbDb.collection('app_config').doc('greenapi').get();
+    if(doc.exists){
+      const d=doc.data();
+      if(d.idInstance && d.apiToken)return d;
+    }
+  }catch(e){}
+  return {idInstance:localStorage.getItem('greenApiInstance')||'',apiToken:localStorage.getItem('greenApiToken')||'',baseUrl:'https://api.green-api.com'};
+}
+async function sendWhatsAppOtp(phone,code){
+  const creds=await getGreenApiCreds();
+  const id=String(creds.idInstance||'').trim(),token=String(creds.apiToken||'').trim(),base=String(creds.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token)throw new Error('GREEN-API configured nahi hai. Super Admin se GREEN-API panel me settings save karwayein.');
+  let chatId=String(phone||'').replace(/\D/g,'');
+  if(chatId.length===10)chatId='91'+chatId;
+  chatId+='@c.us';
+  const res=await fetch(`${base}/waInstance${id}/sendMessage/${token}`,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({chatId,message:'Aapka Bliss One login OTP hai: '+code+'\nYeh 5 minute mein expire ho jayega.'})
+  });
+  if(!res.ok)throw new Error('WhatsApp OTP bhejne mein error aaya.');
 }
 async function staffLogin(){
   const uname=document.getElementById('staffLoginUsername').value.trim();
@@ -498,7 +546,42 @@ async function staffLogin(){
       msg.style.color='#a12222';msg.textContent='Invalid Username / Password';
       return;
     }
-    localStorage.setItem(PD_SESSION_KEY,match.id);
+    const u=match.data();
+    if(!u.phone){msg.style.color='#a12222';msg.textContent='Is user ka mobile number saved nahi hai, OTP nahi bhej sakte.';return;}
+    msg.style.color='';msg.textContent='OTP bhej rahe hain…';
+    const code=String(Math.floor(100000+Math.random()*900000));
+    await fbDb.collection(OTP_COLLECTION).doc(match.id).set({code,expiresAt:Date.now()+5*60*1000});
+    await sendWhatsAppOtp(u.phone,code);
+    pendingOtpUser=match.id;
+    document.getElementById('staffLoginStep1').classList.add('hidden');
+    document.getElementById('staffLoginStep2').classList.remove('hidden');
+    document.getElementById('staffOtpInfo').textContent='OTP '+u.phone+' par WhatsApp se bheja gaya hai.';
+    document.getElementById('staffLoginOtp').value='';
+    msg.textContent='';
+    setTimeout(()=>document.getElementById('staffLoginOtp')?.focus(),30);
+  }catch(e){
+    msg.style.color='#a12222';msg.textContent='Error: '+e.message;
+  }
+}
+async function staffVerifyOtp(){
+  const msg=document.getElementById('staffLoginMsg');
+  const entered=document.getElementById('staffLoginOtp').value.trim();
+  if(!pendingOtpUser){staffLoginBackToStep1();return;}
+  if(!entered){msg.style.color='#a12222';msg.textContent='OTP daalein.';return;}
+  msg.style.color='';msg.textContent='Verify ho raha hai…';
+  try{
+    const doc=await fbDb.collection(OTP_COLLECTION).doc(pendingOtpUser).get();
+    if(!doc.exists || doc.data().expiresAt<Date.now()){
+      msg.style.color='#a12222';msg.textContent='OTP expire ho gaya, dobara Login try karein.';
+      return;
+    }
+    if(String(doc.data().code)!==entered){
+      msg.style.color='#a12222';msg.textContent='Galat OTP.';
+      return;
+    }
+    await fbDb.collection(OTP_COLLECTION).doc(pendingOtpUser).delete();
+    localStorage.setItem(PD_SESSION_KEY,pendingOtpUser);
+    pendingOtpUser=null;
     closeStaffLoginModal();
     updateStaffHeaderLabel();
   }catch(e){
@@ -1149,6 +1232,7 @@ function saveGreenApiCreds(){
   const token=document.getElementById('greenApiToken')?.value||'';
   localStorage.setItem('greenApiInstance',instance);
   localStorage.setItem('greenApiToken',token);
+  fbDb.collection('app_config').doc('greenapi').set({idInstance:instance,apiToken:token,baseUrl:'https://api.green-api.com'}).catch(e=>console.error('greenapi cloud save failed',e));
   const s=document.getElementById('greenApiSaved');
   if(s){s.style.display='block';setTimeout(()=>s.style.display='none',2000);}
 }
