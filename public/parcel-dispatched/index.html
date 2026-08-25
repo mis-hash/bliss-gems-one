@@ -1641,6 +1641,7 @@ function changeMyPassword(){
   if(newPw!==confirmPw){alert('New password aur Confirm password match nahi karte.');return}
   u.password=newPw;
   localStorage.setItem(K.users,JSON.stringify(users));
+  pdSyncUsersToCloud();
   closeChangePassword();
   toast('Password changed successfully');
 }
