@@ -1675,6 +1675,12 @@ function applyWorkerPermissions(){
       inp.readOnly=!actor;
       inp.placeholder=actor ? 'Only: '+actor.name : 'Login required';
       inp.title=actor ? 'Verified field: only your own name can be entered.' : 'Please login first.';
+      if(actor && !s.value && (typeof canEditField!=='function' || canEditField(s))){
+        s.value=actor.id;
+        inp.value=actor.name;
+        let t=$(s.dataset.time);
+        if(t)t.value=now();
+      }
     }
   });
 }
