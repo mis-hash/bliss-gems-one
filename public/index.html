@@ -740,13 +740,17 @@ async function pushAppToGitHub(slug){
   const zip=await JSZip.loadAsync(r.zipBlob);
   const names=Object.keys(zip.files).filter(n=>!zip.files[n].dir);
   if(!names.length){alert('इस ZIP में कोई file नहीं है।');return;}
+  const htmlFiles=names.filter(n=>n.toLowerCase().endsWith('.html'));
+  const hasIndex=names.some(n=>n.toLowerCase()==='index.html');
+  const autoIndexFrom=(!hasIndex && htmlFiles.length===1)?htmlFiles[0]:null;
   const headers={Authorization:'token '+token,Accept:'application/vnd.github+json'};
   let done=0;
   for(const name of names){
     done++;
     try{
       const base64=await zip.file(name).async('base64');
-      const path='public/'+slug+'/'+name;
+      const outName=(name===autoIndexFrom)?'index.html':name;
+      const path='public/'+slug+'/'+outName;
       const apiUrl='https://api.github.com/repos/'+GH_OWNER+'/'+GH_REPO+'/contents/'+encodeURI(path);
       let sha=undefined;
       const getRes=await fetch(apiUrl+'?ref='+GH_BRANCH,{headers});
