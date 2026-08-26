@@ -824,13 +824,15 @@ async function uuLoadList(){
         });
       }
       const tdAction=document.createElement('td');
-      const btnPw=document.createElement('button');btnPw.className='btn small secondary';btnPw.textContent='🔑 Password';
+      const btnEdit=document.createElement('button');btnEdit.className='btn small secondary';btnEdit.textContent='✏️ Edit';
+      btnEdit.onclick=()=>uuEditUser(id,u);
+      const btnPw=document.createElement('button');btnPw.className='btn small secondary';btnPw.style.marginLeft='6px';btnPw.textContent='🔑 Password';
       btnPw.onclick=()=>uuResetPassword(id,u.name||id);
       const btnToggle=document.createElement('button');btnToggle.className='btn small secondary';btnToggle.style.marginLeft='6px';btnToggle.textContent=u.active===false?'Activate':'Disable';
       btnToggle.onclick=()=>uuToggleActive(id,u.active===false);
       const btnDel=document.createElement('button');btnDel.className='btn small danger';btnDel.style.marginLeft='6px';btnDel.textContent='Delete';
       btnDel.onclick=()=>uuDeleteUser(id);
-      tdAction.appendChild(btnPw);tdAction.appendChild(btnToggle);tdAction.appendChild(btnDel);
+      tdAction.appendChild(btnEdit);tdAction.appendChild(btnPw);tdAction.appendChild(btnToggle);tdAction.appendChild(btnDel);
       tr.appendChild(tdName);tr.appendChild(tdUser);tr.appendChild(tdPhone);tr.appendChild(tdPw);tr.appendChild(tdStatus);tr.appendChild(tdApps);tr.appendChild(tdAction);
       body.appendChild(tr);
     });
@@ -839,6 +841,17 @@ async function uuLoadList(){
     const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=7;td.style.color='#b3261e';td.style.textAlign='center';td.textContent='Error: '+e.message;
     tr.appendChild(td);body.appendChild(tr);
   }
+}
+async function uuEditUser(id,u){
+  const name=prompt('Name',u.name||''); if(name===null)return;
+  const phone=prompt('Mobile Number',u.phone||''); if(phone===null)return;
+  const department=prompt('Department',u.department||''); if(department===null)return;
+  await fbDb.collection(UU_COLLECTION).doc(id).update({
+    name:name.trim()||u.name||id,
+    phone:phone.trim(),
+    department:department.trim()
+  });
+  uuLoadList();
 }
 async function uuResetPassword(id,name){
   const pw=prompt('Naya password set karein ('+name+'):');
