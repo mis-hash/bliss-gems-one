@@ -160,6 +160,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <div><h1>Bliss Gems One</h1><small>Internal App Hub</small></div>
     </div>
     <div class="actions">
+      <button class="btn soft" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button>
       <div style="position:relative">
         <button class="btn soft" id="staffLoginBtn" onclick="openStaffLoginModal()">👤 Staff Login</button>
         <div class="hidden" id="staffUserMenu" style="position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.15);min-width:180px;overflow:hidden;z-index:50">
@@ -480,6 +481,18 @@ const UU_COLLECTION='universal_users';
 const PD_SESSION_KEY='pd_logged_user_v1';
 function pdLoggedUserId(){
   return localStorage.getItem(PD_SESSION_KEY)||null;
+}
+function hardRefreshApp(){
+  var btn=document.getElementById('hardRefreshBtn');
+  if(btn)btn.textContent='⏳';
+  var done=function(){location.reload(true)};
+  if('caches' in window){
+    caches.keys().then(function(names){
+      return Promise.all(names.map(function(n){return caches.delete(n)}));
+    }).then(done).catch(done);
+  } else {
+    done();
+  }
 }
 function openStaffLoginModal(){
   document.getElementById('staffLoginModal')?.classList.remove('hidden');

@@ -121,7 +121,7 @@ header{background:var(--p);color:#fff;padding:15px;position:sticky;top:0;z-index
 
 </head>
 <body>
-<header><div class="head"><div id="secretAdminLogo" title=""><h2>📦 Parcel Dispatch Slip</h2><small>Simple one-page dispatch app</small></div><div class="row"><span id="loginBadge" class="pill">Not Logged In</span><button class="btn secondary" id="loginBtn" onclick="openLogin()">👤 Login</button><button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button><button class="btn secondary hidden" id="logoutBtn" onclick="doLogout()">↪ Logout</button><button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button><button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button><button class="btn secondary" onclick="newParcel()">＋ New</button></div></div></header>
+<header><div class="head"><div id="secretAdminLogo" title=""><h2>📦 Parcel Dispatch Slip</h2><small>Simple one-page dispatch app</small></div><div class="row"><button class="btn secondary" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button><span id="loginBadge" class="pill">Not Logged In</span><button class="btn secondary" id="loginBtn" onclick="openLogin()">👤 Login</button><button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button><button class="btn secondary hidden" id="logoutBtn" onclick="doLogout()">↪ Logout</button><button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button><button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button><button class="btn secondary" onclick="newParcel()">＋ New</button></div></div></header>
 <div class="row superAdminOnly hidden" id="pdStatusBar" style="padding:6px 14px;background:#f4f7f5;border-bottom:1px solid #e2e8e4;font-size:12px;font-weight:600">
 <span id="pdFirebaseStatusBadge" style="padding:3px 9px;border-radius:999px;background:#eef4f0">☁️ Firebase: Connecting…</span>
 <span id="pdGreenApiStatusBadge" style="padding:3px 9px;border-radius:999px;background:#eef4f0">💬 WhatsApp: Checking…</span>
@@ -1601,6 +1601,18 @@ function refreshLoginBadge(){
   if($('logoutBtn'))$('logoutBtn').classList.toggle('hidden',!u);
   if($('changePasswordBtn'))$('changePasswordBtn').classList.toggle('hidden',!u);
   applyWorkerPermissions();
+}
+function hardRefreshApp(){
+  var btn=document.getElementById('hardRefreshBtn');
+  if(btn)btn.textContent='⏳';
+  var done=function(){location.reload(true)};
+  if('caches' in window){
+    caches.keys().then(function(names){
+      return Promise.all(names.map(function(n){return caches.delete(n)}));
+    }).then(done).catch(done);
+  } else {
+    done();
+  }
 }
 function openLogin(){$('loginModal').classList.remove('hidden')}
 function closeLogin(){$('loginModal').classList.add('hidden')}
