@@ -3,5 +3,10 @@
     "slug": "parcel-dispatched",
     "name": "Parcel dispatched",
     "pushedAt": 0
+  },
+  {
+    "slug": "trip-expense-app",
+    "name": "Trip Expense app",
+    "pushedAt": 0
   }
 ]

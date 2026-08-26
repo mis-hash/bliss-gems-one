@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bliss Gems & Minerals - Trip Expense</title>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<style>
+:root{--g:#176b4a;--g2:#26936c;--mint:#edf8f3;--bg:#f4f7f5;--line:#dce8e1;--txt:#17221c;--muted:#728078;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--txt)}button,input,select,textarea{font:inherit}
+header{height:64px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}.head{height:100%;max-width:1250px;margin:auto;padding:0 18px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;gap:10px;align-items:center}.logo{width:41px;height:41px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:24px;font-weight:900;color:var(--g2)}.brand b{color:var(--g);font-size:17px}.brand small{display:block;font-size:9px;color:var(--muted);margin-top:2px}.live{font-size:10px;font-weight:800;color:var(--g2)}
+.headRight{display:flex;align-items:center;gap:10px}.pill{font-size:10px;font-weight:700;background:var(--mint);color:var(--g);padding:6px 10px;border-radius:999px}
+.shell{max-width:1250px;margin:auto;display:grid;grid-template-columns:210px 1fr;gap:16px;padding:17px 18px 60px}nav{background:#fff;border:1px solid var(--line);border-radius:14px;padding:9px;height:max-content;position:sticky;top:81px}nav button{width:100%;border:0;background:transparent;text-align:left;padding:10px;border-radius:8px;font-size:10px;font-weight:750;cursor:pointer;margin:2px 0}nav button.on{background:var(--mint);color:var(--g)}nav button.hidden{display:none}
+.page{display:none}.page.on{display:block}.hero{background:linear-gradient(135deg,#15583f,#21815d);color:#fff;border-radius:17px;padding:21px;display:flex;justify-content:space-between;gap:12px}.hero h1{font-size:22px;margin:0 0 5px}.hero p{font-size:10px;margin:0;opacity:.84}.hero small{display:block;text-align:right;font-size:8px;opacity:.8}.hero strong{font-size:25px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:11px 0}.card,.panel{background:#fff;border:1px solid var(--line);border-radius:13px}.card{padding:13px}.card small{font-size:8px;color:var(--muted)}.card b{display:block;font-size:18px;margin-top:6px}.red{background:var(--redbg)!important;color:var(--red)!important}.panel{overflow:hidden;margin-top:10px}.ph{padding:12px 14px;border-bottom:1px solid var(--line);font-size:11px;font-weight:800;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}.pb{padding:13px}.btn{border:0;border-radius:8px;padding:8px 10px;font-size:9px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer}.primary{background:var(--g);color:#fff}.btn.danger{background:var(--redbg);color:var(--red)}
+.person{border:1px solid var(--line);border-radius:11px;padding:11px;margin-bottom:8px}.pt{display:flex;justify-content:space-between;gap:8px}.person h3{font-size:11px;margin:0}.person p{font-size:8px;color:var(--muted);margin:3px 0}.tag{font-size:8px;font-weight:bold;background:var(--mint);color:var(--g);padding:5px 7px;border-radius:99px;height:max-content}.amber{background:var(--amberbg);color:var(--amber)}.money{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:9px}.m{background:#f7faf8;padding:7px;border-radius:7px}.m small{display:block;font-size:7px;color:var(--muted)}.m b{font-size:10px}
+.timeline{position:relative;padding-left:18px}.event{position:relative;padding:0 0 16px 13px;border-left:2px solid #dfe9e3}.event:last-child{padding-bottom:0}.event:before{content:"";position:absolute;width:9px;height:9px;border-radius:50%;background:var(--g2);left:-5.5px;top:1px}.event b{font-size:10px}.event small{display:block;font-size:8px;color:var(--muted);margin-top:3px}.event strong{font-size:10px;float:right}
+.filters{display:flex;gap:6px;flex-wrap:wrap}.filters select{padding:7px;border:1px solid var(--line);border-radius:7px;font-size:9px;background:#fff}.analytics{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.metric{background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px}.metric h3{font-size:10px;margin:0 0 10px}.bar{margin:8px 0}.bar label{font-size:8px;display:flex;justify-content:space-between}.bar div{height:5px;background:#edf1ee;border-radius:9px;margin-top:4px}.bar i{display:block;height:100%;background:var(--g2);border-radius:9px}
+.salesWrap{max-width:610px;margin:auto}.trip{background:linear-gradient(135deg,#15583f,#21815d);color:#fff;border-radius:18px;padding:19px}.trip h1{font-size:19px;margin:0 0 4px}.trip p{font-size:9px;margin:0;opacity:.8}.tripMoney{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:16px}.tm{background:#ffffff12;border:1px solid #ffffff25;border-radius:9px;padding:10px}.tm small{font-size:7px;display:block;opacity:.8}.tm b{font-size:16px;display:block;margin-top:4px}.salesActions{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:9px 0}.big{min-height:70px;border:1px solid var(--line);background:#fff;border-radius:12px;font-size:10px;font-weight:bold;cursor:pointer}.big span{font-size:20px;display:block;margin-bottom:4px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #edf1ee;font-size:9px;gap:8px}.row:last-child{border:0}.row small{color:var(--muted)}.notice{background:var(--redbg);border:1px solid #efcbc8;border-radius:9px;padding:10px;font-size:9px;line-height:1.5;margin-bottom:7px}
+.toggle{width:36px;height:20px;background:#cbd5cf;border-radius:20px;position:relative;cursor:pointer;flex:none}.toggle.on{background:var(--g2)}.toggle:after{content:"";position:absolute;width:14px;height:14px;top:3px;left:3px;background:#fff;border-radius:50%;transition:.2s}.toggle.on:after{left:19px}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:50}.modal.show{display:flex}.box{width:min(500px,100%);background:#fff;border-radius:14px;padding:17px;max-height:90vh;overflow:auto}.box h3{margin:0 0 12px;font-size:15px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}.field label{display:block;font-size:8px;font-weight:bold;margin-bottom:4px}.field input,.field select,.field textarea{width:100%;padding:9px;border:1px solid var(--line);border-radius:7px;font-size:10px}.span2{grid-column:1/-1}.actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}.bottomNav{display:none}
+.msg{font-size:9px;margin-top:6px}.gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px}
+@media(max-width:720px){header{height:57px}.head{padding:0 11px}.logo{width:35px;height:35px}.brand b{font-size:13px}.brand small,.live{display:none}.shell{display:block;padding:11px 10px 76px}nav{display:none}.hero{padding:16px}.hero h1{font-size:17px}.hero strong{font-size:19px}.cards{grid-template-columns:1fr 1fr}.money{grid-template-columns:1fr 1fr}.money .m:last-child{grid-column:1/-1}.analytics{grid-template-columns:1fr}.tripMoney{grid-template-columns:1fr 1fr}.tripMoney .tm:last-child{grid-column:1/-1}.salesActions{grid-template-columns:1fr}.big{min-height:55px;display:flex;align-items:center;gap:10px;padding:0 13px;text-align:left}.big span{margin:0}.fields{grid-template-columns:1fr}.span2{grid-column:auto}.bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;justify-content:space-around;padding:5px}.bottomNav button{border:0;background:transparent;font-size:7px;color:var(--muted);font-weight:bold}.bottomNav button.hidden{display:none}.bottomNav span{display:block;font-size:17px}.bottomNav button.on{color:var(--g)}}
+</style></head>
+<body>
+<header><div class="head"><div class="brand"><div class="logo" id="secretLogo" onclick="tapLogo()">b</div><div><b>Bliss Gems & Minerals</b><small>Employee Advance & Trip Settlement</small></div></div>
+<div class="headRight">
+<span class="pill" id="loginBadge">Not Logged In</span>
+<button class="btn" id="loginBtn" onclick="openLogin()">Login</button>
+<button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
+</div></div></header>
+
+<div id="gateWrap" class="shell" style="display:none"><div class="gate" id="gateBox"></div></div>
+
+<div class="shell" id="appWrap" style="display:none"><nav>
+<button class="on" data-role="admin,director" onclick="go('admin',this)">▦ Admin Control</button>
+<button data-role="director" onclick="go('director',this)">★ Super Admin / Directors</button>
+<button data-role="sales" onclick="go('sales',this)">👤 My Trip</button>
+<button data-role="admin,director,accounts" onclick="go('ledger',this)">₹ Advance Ledger</button>
+<button data-role="admin,director" onclick="go('pending',this)">⏱ Pending Hisaab</button>
+<button data-role="director" onclick="go('analytics',this)">📊 Analytics</button>
+<button data-role="accounts,director" onclick="go('accounts',this)">📚 Bookkeeping</button>
+<button data-role="director" onclick="go('notify',this)">💬 Notifications</button>
+</nav><main>
+
+<section id="admin" class="page on">
+<div class="hero"><div><h1>Admin Trip Control</h1><p>Issue → Live Expense → Hisaab → Verify → Close → NOC</p></div><div><small>EMPLOYEE ADVANCE OUTSTANDING</small><strong id="admOutstanding">₹0</strong></div></div>
+<div class="cards"><div class="card"><small>ACTIVE TRIPS</small><b id="admActive">0</b></div><div class="card"><small>TOTAL ISSUED</small><b id="admIssued">₹0</b></div><div class="card"><small>HISAAB TO VERIFY</small><b id="admToVerify">0</b></div><div class="card red"><small>OVERDUE</small><b id="admOverdue">0</b></div></div>
+<div class="panel"><div class="ph"><span>Live Sales Person Trips</span><button class="btn primary" onclick="openIssueModal()">＋ Issue Amount</button></div><div class="pb" id="admTripsList"><div class="row"><small>Loading…</small></div></div></div>
+</section>
+
+<section id="director" class="page">
+<div class="hero"><div><h1>Management Intelligence</h1><p>Company-wide trip expense • live data</p></div><div><small>TOTAL EXPENSE (ALL TIME)</small><strong id="dirTotalExpense">₹0</strong></div></div>
+<div class="cards">
+<div class="card"><small>ACTIVE TRIPS</small><b id="dirActive">0</b></div>
+<div class="card"><small>ADVANCE OUTSTANDING</small><b id="dirOutstanding">₹0</b></div>
+<div class="card red"><small>OVERDUE HISAAB</small><b id="dirOverdue">0</b></div>
+<div class="card"><small>AVG COST / CLOSED TRIP</small><b id="dirAvg">₹0</b></div>
+</div>
+<div class="panel"><div class="ph"><span>Executive Attention</span></div><div class="pb" id="dirAttention"></div></div>
+<div class="panel"><div class="ph"><span>Team Roles</span><span class="tag">DIRECTORS ONLY</span></div><div class="pb"><div class="note" style="font-size:9px;color:var(--muted);margin-bottom:8px">Universal Users list se yahan role assign karein — Admin / Director / Sales / Accounts.</div><div id="rolesList"><div class="row"><small>Loading…</small></div></div></div></div>
+</section>
+
+<section id="sales" class="page"><div class="salesWrap" id="salesWrap"><div class="row"><small>Loading…</small></div></div></section>
+
+<section id="ledger" class="page"><div class="panel"><div class="ph"><span>Complete Money Timeline</span><select id="ledgerTripPicker" onchange="renderLedgerPage()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:9px"></select></div><div class="pb"><div class="timeline" id="ledgerTimeline"></div></div></div></section>
+
+<section id="pending" class="page"><div class="panel"><div class="ph">Overdue Hisaab</div><div class="pb" id="pendingList"></div></div></section>
+
+<section id="analytics" class="page"><div class="ph" style="padding-left:0">Expense Intelligence (Live)</div><div class="analytics">
+<div class="metric"><h3>📍 Location Expense</h3><div id="anaLocation"></div></div>
+<div class="metric"><h3>👤 Sales Person Spend</h3><div id="anaPerson"></div></div>
+<div class="metric"><h3>💰 Expense Heads</h3><div id="anaCategory"></div></div>
+<div class="metric"><h3>🧠 Smart Flag</h3><p style="font-size:9px;color:var(--muted);line-height:1.5" id="anaFlag">-</p></div>
+<div class="metric"><h3>🧾 Proof Rate</h3><b style="font-size:23px" id="anaProof">-</b></div>
+<div class="metric"><h3>📈 Closed Trips</h3><b style="font-size:23px" id="anaClosed">0</b></div>
+</div></section>
+
+<section id="accounts" class="page">
+<div class="hero"><div><h1>Accounts Expense View</h1><p>Full financial visibility • Bookkeeping only</p></div><div><small>ALL-TIME EXPENSE</small><strong id="accTotal">₹0</strong></div></div>
+<div class="cards"><div class="card"><small>TRIPS TO BOOK</small><b id="accToBook">0</b></div><div class="card"><small>TOTAL ISSUED</small><b id="accIssued">₹0</b></div><div class="card"><small>TOTAL EXPENSE</small><b id="accExpense">₹0</b></div><div class="card"><small>NO BILL EXPENSES</small><b id="accNoBill">0</b></div></div>
+<div class="panel"><div class="ph"><span>Sales Person Expense Summary</span></div><div class="pb" id="accList"></div></div>
+</section>
+
+<section id="notify" class="page"><div class="panel"><div class="ph">WhatsApp Notification Control</div><div class="pb" id="notifyRows"></div></div></section>
+</main></div>
+
+<div class="bottomNav" id="bottomNav">
+<button class="on" data-role="admin,director" onclick="mgo('admin',this)"><span>▦</span>Admin</button>
+<button data-role="director" onclick="mgo('director',this)"><span>★</span>Director</button>
+<button data-role="sales" onclick="mgo('sales',this)"><span>👤</span>My Trip</button>
+<button data-role="admin,director" onclick="mgo('pending',this)"><span>⏱</span>Pending</button>
+</div>
+
+<div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
+<h3>Login</h3>
+<div class="field"><label>Username</label><input id="loginUsername" autocomplete="off"></div>
+<div class="field" style="margin-top:8px"><label>Password</label><input id="loginPassword" type="password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<div class="actions"><button class="btn" onclick="closeLogin()">Cancel</button><button class="btn primary" onclick="doLogin()">Login</button></div>
+<div class="msg" id="loginMsg"></div>
+</div></div>
+
+<div class="modal" id="issue"><div class="box"><h3>Issue Trip Amount</h3><div class="fields">
+<div class="field span2"><label>Sales Person *</label><select id="issueSales"></select></div>
+<div class="field"><label>Location *</label><input id="issueLocation" placeholder="Mumbai"></div>
+<div class="field"><label>Start Date *</label><input type="date" id="issueStart"></div>
+<div class="field"><label>Hisaab Due *</label><input type="date" id="issueDue"></div>
+<div class="field span2"><label>Amount *</label><input type="number" id="issueAmount" placeholder="₹ 0"></div>
+</div><div class="actions"><button class="btn" onclick="hide('issue')">Cancel</button><button class="btn primary" onclick="submitIssue()">Issue & Start Trip</button></div><div class="msg" id="issueMsg"></div></div></div>
+
+<div class="modal" id="extra"><div class="box"><h3>Additional Advance</h3>
+<div class="field"><label>Amount *</label><input type="number" id="extraAmount" placeholder="₹ 0"></div>
+<div class="field" style="margin-top:8px"><label>Payment Mode</label><select id="extraMode"><option>Cash</option><option>Bank</option><option>UPI</option></select></div>
+<div class="field" style="margin-top:8px"><label>Reference / Remark</label><input id="extraRemark"></div>
+<div class="actions"><button class="btn" onclick="hide('extra')">Cancel</button><button class="btn primary" onclick="submitExtra()">Issue Additional Advance</button></div><div class="msg" id="extraMsg"></div></div></div>
+
+<div class="modal" id="expense"><div class="box"><h3>Add Expense</h3><div class="fields">
+<div class="field"><label>Category *</label><select id="expCategory"><option>Hotel</option><option>Food</option><option>Taxi / Cab</option><option>Flight</option><option>Train</option><option>Fuel</option><option>Other</option></select></div>
+<div class="field"><label>Amount *</label><input type="number" id="expAmount"></div>
+<div class="field span2"><label>Paid To *</label><input id="expPaidTo"></div>
+<div class="field span2"><label>Bill / Proof (photo)</label><input type="file" id="expProof" accept="image/*" capture="environment"></div>
+<div class="field span2"><label>Remark / No Bill Reason</label><textarea id="expRemark"></textarea></div>
+</div><div class="actions"><button class="btn" onclick="hide('expense')">Cancel</button><button class="btn primary" onclick="submitExpense()">Save Expense</button></div><div class="msg" id="expMsg"></div></div></div>
+
+<div class="modal" id="proofView"><div class="box"><h3>Bill / Proof</h3><img id="proofImg" style="max-width:100%;border-radius:8px"><div class="actions"><button class="btn" onclick="hide('proofView')">Close</button></div></div></div>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
+if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+const APP_SLUG='trip-expense-app';
+const UU_COLLECTION='universal_users';
+const SESSION_KEY='pd_logged_user_v1';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const money=n=>'₹'+Math.round(n||0).toLocaleString('en-IN');
+const todayISO=()=>new Date().toISOString().slice(0,10);
+function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;return `TRP-${ds}-${String(Date.now()).slice(-4)}`}
+function genLedgerId(){return 'LG-'+Date.now()+'-'+Math.floor(Math.random()*1000)}
+
+let users=[],trips=[],ledger=[],notifySettings={issued:true,additional:true,overdue:true,submitted:true,closed:true,booked:true};
+let currentUser=null;
+let usersStarted=false,tripsStarted=false,ledgerStarted=false,settingsStarted=false;
+
+/* ===== Users (shared Universal Users list) ===== */
+function startUsersSync(){
+  if(usersStarted)return;usersStarted=true;
+  db.collection(UU_COLLECTION).onSnapshot(snap=>{
+    users=[];snap.forEach(d=>users.push(d.data()));
+    renderAll();
+  },err=>console.error('users sync error',err));
+}
+function myRole(){
+  if(!currentUser)return null;
+  const u=users.find(x=>x.id===currentUser);
+  if(!u)return null;
+  return (u.appRoles && u.appRoles[APP_SLUG]) || null;
+}
+function myUserObj(){return users.find(x=>x.id===currentUser)||null}
+
+/* ===== Super Admin escape hatch (same shared password used across all Bliss apps) — lets a logged-in user reach the Director/Team Roles panel even before any role is assigned, so the first role can be bootstrapped. ===== */
+const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
+let superAdminUnlocked=false;
+let secretTapCount=0,secretTapTimer=null;
+function tapLogo(){
+  secretTapCount++;
+  clearTimeout(secretTapTimer);
+  secretTapTimer=setTimeout(()=>secretTapCount=0,1100);
+  if(secretTapCount>=3){
+    secretTapCount=0;
+    if(superAdminUnlocked){renderAll();return}
+    const pw=prompt('Super Admin Password:');
+    if(pw===SUPER_ADMIN_PASSWORD){superAdminUnlocked=true;renderAll();}
+    else if(pw!==null)alert('Galat password.');
+  }
+}
+function effectiveRole(){return superAdminUnlocked?'director':myRole()}
+
+/* ===== Login (shared session key — same login as Bliss One hub / Parcel Dispatch) ===== */
+function openLogin(){$('loginModal').classList.add('show');$('loginMsg').textContent='';}
+function closeLogin(){$('loginModal').classList.remove('show')}
+async function doLogin(){
+  const uname=$('loginUsername').value.trim(),pass=$('loginPassword').value;
+  const msg=$('loginMsg');
+  if(!uname||!pass){msg.style.color='#b43a35';msg.textContent='Username aur Password dono bharein.';return}
+  const u=users.find(x=>String(x.username||x.id).toLowerCase()===uname.toLowerCase() && x.active!==false);
+  if(!u||pass!==String(u.password||'1234')){msg.style.color='#b43a35';msg.textContent='Invalid Username / Password';return}
+  if(u.appAccess && u.appAccess[APP_SLUG]===false){msg.style.color='#b43a35';msg.textContent='Aapko is app ka access nahi hai.';return}
+  localStorage.setItem(SESSION_KEY,u.id);
+  currentUser=u.id;
+  closeLogin();
+  renderAll();
+}
+function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
+function refreshLoginBadge(){
+  const badge=$('loginBadge'),loginBtn=$('loginBtn'),logoutBtn=$('logoutBtn');
+  const u=myUserObj();
+  if(u){badge.textContent='👤 '+u.name;loginBtn.classList.add('hidden');logoutBtn.classList.remove('hidden');}
+  else{badge.textContent='Not Logged In';loginBtn.classList.remove('hidden');logoutBtn.classList.add('hidden');}
+}
+
+/* ===== Trips + Ledger sync ===== */
+function startTripsSync(){
+  if(tripsStarted)return;tripsStarted=true;
+  db.collection('te_trips').onSnapshot(snap=>{
+    trips=[];snap.forEach(d=>trips.push(d.data()));
+    renderAll();
+  },err=>console.error('trips sync error',err));
+}
+function startLedgerSync(){
+  if(ledgerStarted)return;ledgerStarted=true;
+  db.collection('te_ledger').onSnapshot(snap=>{
+    ledger=[];snap.forEach(d=>ledger.push(d.data()));
+    renderAll();
+  },err=>console.error('ledger sync error',err));
+}
+function startSettingsSync(){
+  if(settingsStarted)return;settingsStarted=true;
+  db.collection('te_settings').doc('notify').onSnapshot(doc=>{
+    if(doc.exists)notifySettings=Object.assign(notifySettings,doc.data());
+    renderNotifyPage();
+  },err=>console.error('settings sync error',err));
+}
+
+/* ===== WhatsApp via shared GREEN-API config ===== */
+async function getGreenApiCreds(){
+  try{
+    const doc=await db.collection('app_config').doc('greenapi').get();
+    if(doc.exists){const d=doc.data();if(d.idInstance&&d.apiToken)return d;}
+  }catch(e){}
+  return null;
+}
+async function sendWA(phone,message){
+  if(!phone)return;
+  const creds=await getGreenApiCreds();
+  if(!creds)return;
+  const id=String(creds.idInstance||'').trim(),token=String(creds.apiToken||'').trim(),base=String(creds.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token)return;
+  let chatId=String(phone).replace(/\D/g,'');if(chatId.length===10)chatId='91'+chatId;chatId+='@c.us';
+  try{
+    await fetch(`${base}/waInstance${id}/sendMessage/${token}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId,message})});
+  }catch(e){console.error('WA send failed',e);}
+}
+function usersWithRole(role){return users.filter(u=>u.appRoles && u.appRoles[APP_SLUG]===role && u.active!==false)}
+async function notifyRole(role,message){
+  if(!notifySettings.issued && role)return; // placeholder guard unused; per-event checks done at call sites
+  usersWithRole(role).forEach(u=>sendWA(u.phone,message));
+}
+
+/* ===== Derived helpers ===== */
+function tripLedger(tripId){return ledger.filter(l=>l.tripId===tripId)}
+function tripIssued(tripId){return tripLedger(tripId).filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0)}
+function tripExpense(tripId){return tripLedger(tripId).filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0)}
+function tripBalance(tripId){return tripIssued(tripId)-tripExpense(tripId)}
+function isOverdue(t){return t.status!=='closed' && t.dueDate && t.dueDate<todayISO()}
+
+/* ===== Issue / Extra / Expense / Hisaab / Close / Book ===== */
+function openIssueModal(){
+  $('issueSales').innerHTML=users.filter(u=>u.appRoles&&u.appRoles[APP_SLUG]==='sales'&&u.active!==false).map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('')||'<option value="">No sales users. Director se role assign karwayein.</option>';
+  $('issueStart').value=todayISO();
+  $('issueDue').value='';$('issueAmount').value='';$('issueLocation').value='';
+  $('issueMsg').textContent='';
+  show('issue');
+}
+async function submitIssue(){
+  const salesId=$('issueSales').value,location=$('issueLocation').value.trim(),start=$('issueStart').value,due=$('issueDue').value,amount=Number($('issueAmount').value);
+  const msg=$('issueMsg');
+  if(!salesId||!location||!start||!due||!amount){msg.style.color='#b43a35';msg.textContent='Sabhi fields bharein.';return}
+  const sales=users.find(u=>u.id===salesId);
+  const tripId=genId();
+  const trip={id:tripId,salesId,salesName:sales?sales.name:salesId,location,startDate:start,dueDate:due,status:'running',bookedByAccounts:false,createdAt:new Date().toISOString(),createdBy:currentUser};
+  await db.collection('te_trips').doc(tripId).set(trip);
+  const lg={id:genLedgerId(),tripId,type:'advance',amount,category:'',location,paidTo:'',proofDataUri:'',remark:'Initial Advance',byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
+  await db.collection('te_ledger').doc(lg.id).set(lg);
+  hide('issue');
+  if(notifySettings.issued && sales)sendWA(sales.phone,`💰 Trip Advance Issued\nAmount: ${money(amount)}\nLocation: ${location}\nHisaab Due: ${due}\nTrip: ${tripId}`);
+}
+let extraForTrip=null;
+function openExtraModal(tripId){extraForTrip=tripId;$('extraAmount').value='';$('extraMode').value='Cash';$('extraRemark').value='';$('extraMsg').textContent='';show('extra')}
+async function submitExtra(){
+  const amount=Number($('extraAmount').value),mode=$('extraMode').value,remark=$('extraRemark').value.trim();
+  const msg=$('extraMsg');
+  if(!extraForTrip||!amount){msg.style.color='#b43a35';msg.textContent='Amount bharein.';return}
+  const trip=trips.find(t=>t.id===extraForTrip);
+  const lg={id:genLedgerId(),tripId:extraForTrip,type:'additional_advance',amount,category:'',location:trip?trip.location:'',paidTo:'',proofDataUri:'',remark:mode+(remark?(' • '+remark):''),byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
+  await db.collection('te_ledger').doc(lg.id).set(lg);
+  hide('extra');
+  if(notifySettings.additional && trip){
+    const sales=users.find(u=>u.id===trip.salesId);
+    if(sales)sendWA(sales.phone,`💰 Additional Advance Issued\nAmount: ${money(amount)}\nTrip: ${extraForTrip}`);
+  }
+}
+function fileToCompressedDataUri(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        const maxW=700;const scale=Math.min(1,maxW/img.width);
+        const canvas=document.createElement('canvas');
+        canvas.width=img.width*scale;canvas.height=img.height*scale;
+        canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL('image/jpeg',0.6));
+      };
+      img.onerror=reject;
+      img.src=reader.result;
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+function mySalesTrip(){
+  return trips.filter(t=>t.salesId===currentUser && t.status!=='closed').sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))[0]||null;
+}
+function openExpenseModal(){
+  const trip=mySalesTrip();
+  if(!trip){alert('Koi active trip nahi hai.');return}
+  $('expCategory').value='Hotel';$('expAmount').value='';$('expPaidTo').value='';$('expProof').value='';$('expRemark').value='';$('expMsg').textContent='';
+  show('expense');
+}
+async function submitExpense(){
+  const trip=mySalesTrip();
+  const msg=$('expMsg');
+  if(!trip){msg.style.color='#b43a35';msg.textContent='Koi active trip nahi hai.';return}
+  const category=$('expCategory').value,amount=Number($('expAmount').value),paidTo=$('expPaidTo').value.trim(),remark=$('expRemark').value.trim();
+  if(!amount||!paidTo){msg.style.color='#b43a35';msg.textContent='Amount aur Paid To zaroori hain.';return}
+  if(!remark && !$('expProof').files[0]){msg.style.color='#b43a35';msg.textContent='Bill photo lagayein ya No-Bill reason likhein.';return}
+  let proofDataUri='';
+  const file=$('expProof').files[0];
+  if(file){
+    try{proofDataUri=await fileToCompressedDataUri(file);}catch(e){}
+  }
+  const lg={id:genLedgerId(),tripId:trip.id,type:'expense',amount,category,location:trip.location,paidTo,proofDataUri,remark,byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
+  await db.collection('te_ledger').doc(lg.id).set(lg);
+  hide('expense');
+}
+async function submitHisaab(){
+  const trip=mySalesTrip();
+  if(!trip){alert('Koi active trip nahi hai.');return}
+  if(!confirm('Hisaab submit karein? Iske baad Admin verify karega.'))return;
+  await db.collection('te_trips').doc(trip.id).update({status:'hisaab_submitted'});
+  if(notifySettings.submitted){
+    usersWithRole('admin').concat(usersWithRole('director')).forEach(u=>sendWA(u.phone,`🧾 Hisaab Submitted\n${trip.salesName} • ${trip.location} • ${trip.id}\nVerify karke Close/NOC karein.`));
+  }
+}
+async function closeTrip(tripId){
+  const trip=trips.find(t=>t.id===tripId);
+  if(!trip)return;
+  const issued=tripIssued(tripId),expense=tripExpense(tripId),balance=issued-expense;
+  if(!confirm(`Trip close karein?\nIssued: ${money(issued)}\nExpense: ${money(expense)}\nReturn/Balance: ${money(balance)}`))return;
+  const nocNumber='NOC-'+tripId;
+  await db.collection('te_trips').doc(tripId).update({status:'closed',closedAt:new Date().toISOString(),nocNumber,finalBalance:balance});
+  if(notifySettings.closed){
+    const sales=users.find(u=>u.id===trip.salesId);
+    const msg=`✅ Trip Closed — ${nocNumber}\n${trip.salesName} • ${trip.location} • ${tripId}\nFinal Balance: ${money(balance)}`;
+    if(sales)sendWA(sales.phone,msg);
+    usersWithRole('admin').concat(usersWithRole('accounts')).forEach(u=>sendWA(u.phone,msg));
+  }
+}
+async function markBooked(tripId){
+  await db.collection('te_trips').doc(tripId).update({bookedByAccounts:true});
+  if(notifySettings.booked){
+    const trip=trips.find(t=>t.id===tripId);
+    if(trip){usersWithRole('director').forEach(u=>sendWA(u.phone,`📚 Trip Booked by Accounts\n${trip.id}`));}
+  }
+}
+function sendOverdueReminder(tripId){
+  const trip=trips.find(t=>t.id===tripId);if(!trip)return;
+  const sales=users.find(u=>u.id===trip.salesId);
+  const bal=tripBalance(tripId);
+  const msg=`⏰ Hisaab Reminder\n${trip.location} trip ka hisaab pending hai.\nDue: ${trip.dueDate}\nOutstanding: ${money(bal)}`;
+  if(sales)sendWA(sales.phone,msg);
+  usersWithRole('admin').forEach(u=>sendWA(u.phone,msg));
+  toast('Reminder bhej diya.');
+}
+function toast(t){const b=$('loginBadge');const old=b.textContent;b.textContent=t;setTimeout(()=>refreshLoginBadge(),1500);}
+
+/* ===== Team Roles (Director) ===== */
+async function setUserAppRole(userId,role){
+  const patch={};patch['appRoles.'+APP_SLUG]=role||firebase.firestore.FieldValue.delete();
+  await db.collection(UU_COLLECTION).doc(userId).update(patch);
+}
+function renderRolesList(){
+  const wrap=$('rolesList');if(!wrap)return;
+  if(!users.length){wrap.innerHTML='<div class="row"><small>Koi user nahi hai.</small></div>';return}
+  wrap.innerHTML=users.map(u=>{
+    const role=(u.appRoles&&u.appRoles[APP_SLUG])||'';
+    return `<div class="row"><span>${esc(u.name)}<br><small>${esc(u.username||u.id)}</small></span>
+    <select style="padding:6px;border:1px solid var(--line);border-radius:6px;font-size:9px" onchange="setUserAppRole('${esc(u.id)}',this.value)">
+      <option value=""${role===''?' selected':''}>No Access</option>
+      <option value="sales"${role==='sales'?' selected':''}>Sales Person</option>
+      <option value="admin"${role==='admin'?' selected':''}>Admin</option>
+      <option value="director"${role==='director'?' selected':''}>Director</option>
+      <option value="accounts"${role==='accounts'?' selected':''}>Accounts</option>
+    </select></div>`;
+  }).join('');
+}
+
+/* ===== Page renderers ===== */
+function renderAdminPage(){
+  const active=trips.filter(t=>t.status!=='closed');
+  const totalIssued=trips.reduce((s,t)=>s+tripIssued(t.id),0);
+  const totalExpense=trips.reduce((s,t)=>s+tripExpense(t.id),0);
+  $('admOutstanding').textContent=money(totalIssued-totalExpense);
+  $('admActive').textContent=active.length;
+  $('admIssued').textContent=money(totalIssued);
+  $('admToVerify').textContent=trips.filter(t=>t.status==='hisaab_submitted').length;
+  $('admOverdue').textContent=trips.filter(isOverdue).length;
+  const list=$('admTripsList');
+  if(!active.length){list.innerHTML='<div class="row"><small>Koi live trip nahi hai.</small></div>';return}
+  list.innerHTML=active.map(t=>{
+    const issued=tripIssued(t.id),expense=tripExpense(t.id),balance=issued-expense;
+    const noBill=tripLedger(t.id).filter(l=>l.type==='expense'&&!l.proofDataUri).length;
+    const tag=t.status==='hisaab_submitted'?'<span class="tag amber">VERIFY</span>':(isOverdue(t)?'<span class="tag" style="background:var(--redbg);color:var(--red)">OVERDUE</span>':'<span class="tag">RUNNING</span>');
+    return `<div class="person"><div class="pt"><div><h3>${esc(t.salesName)} • ${esc(t.location)} • ${esc(t.id)}</h3><p>Due ${esc(t.dueDate)}</p></div>${tag}</div>
+    <div class="money"><div class="m"><small>ISSUED</small><b>${money(issued)}</b></div><div class="m"><small>SPENT</small><b>${money(expense)}</b></div><div class="m"><small>BALANCE</small><b>${money(balance)}</b></div><div class="m"><small>NO BILL</small><b>${noBill}</b></div>
+    <div class="m"><small>ACTION</small>${t.status==='hisaab_submitted'?`<button class="btn primary" onclick="closeTrip('${esc(t.id)}')">Close/NOC</button>`:`<button class="btn" onclick="openExtraModal('${esc(t.id)}')">+ Advance</button>`}</div></div></div>`;
+  }).join('');
+}
+function renderDirectorPage(){
+  const totalExpense=ledger.filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0);
+  const totalIssued=ledger.filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0);
+  const active=trips.filter(t=>t.status!=='closed');
+  const closed=trips.filter(t=>t.status==='closed');
+  const overdue=trips.filter(isOverdue);
+  $('dirTotalExpense').textContent=money(totalExpense);
+  $('dirActive').textContent=active.length;
+  $('dirOutstanding').textContent=money(totalIssued-totalExpense);
+  $('dirOverdue').textContent=overdue.length;
+  $('dirAvg').textContent=closed.length?money(closed.reduce((s,t)=>s+tripExpense(t.id),0)/closed.length):'₹0';
+  const noBill=ledger.filter(l=>l.type==='expense'&&!l.proofDataUri).length;
+  const awaitingBook=trips.filter(t=>t.status==='closed'&&!t.bookedByAccounts).reduce((s,t)=>s+tripExpense(t.id),0);
+  $('dirAttention').innerHTML=`
+    <div class="row"><span><b>🔴 ${overdue.length} Hisaab Overdue</b><br><small>${money(overdue.reduce((s,t)=>s+tripBalance(t.id),0))} advance abhi unsettled</small></span><button class="btn" onclick="go('pending')">View</button></div>
+    <div class="row"><span><b>🧾 ${noBill} No-Bill Expenses</b></span></div>
+    <div class="row"><span><b>📚 ${money(awaitingBook)} Awaiting Bookkeeping</b></span><button class="btn" onclick="go('accounts')">View</button></div>`;
+  renderRolesList();
+}
+function renderSalesPage(){
+  const wrap=$('salesWrap');
+  const trip=mySalesTrip();
+  if(!trip){wrap.innerHTML='<div class="panel"><div class="pb"><small>Abhi koi active trip nahi hai. Admin se advance issue karwayein.</small></div></div>';return}
+  const issued=tripIssued(trip.id),expense=tripExpense(trip.id),balance=issued-expense;
+  const rows=tripLedger(trip.id).filter(l=>l.type==='expense').sort((a,b)=>b.at.localeCompare(a.at)).map(l=>`<div class="row"><span>${esc(l.category)}<br><small>${esc(l.at.slice(0,10))} • ${l.proofDataUri?'Proof attached':'No Bill'}</small></span><b>${money(l.amount)}</b></div>`).join('')||'<div class="row"><small>Koi expense abhi tak nahi.</small></div>';
+  wrap.innerHTML=`<div class="trip"><h1>My ${esc(trip.location)} Trip</h1><p>${esc(trip.id)} • ${esc(trip.salesName)} • Hisaab Due ${esc(trip.dueDate)}</p>
+  <div class="tripMoney"><div class="tm"><small>TOTAL ADVANCE</small><b>${money(issued)}</b></div><div class="tm"><small>MY EXPENSE</small><b>${money(expense)}</b></div><div class="tm"><small>BALANCE</small><b>${money(balance)}</b></div></div></div>
+  <div class="salesActions"><button class="big" onclick="openExpenseModal()"><span>＋</span>Add Expense</button><button class="big" onclick="go('ledger')"><span>📋</span>My Expenses</button><button class="big" onclick="submitHisaab()"><span>✓</span>Submit Hisaab</button></div>
+  <div class="panel"><div class="ph">Recent Expenses</div><div class="pb">${rows}</div></div>`;
+}
+function renderLedgerPage(){
+  const picker=$('ledgerTripPicker');
+  const role=myRole();
+  let visibleTrips=trips;
+  if(role==='sales'){const t=mySalesTrip();visibleTrips=t?[t]:[];}
+  if(picker.dataset.filled!=='1'||picker.options.length!==visibleTrips.length){
+    picker.innerHTML=visibleTrips.map(t=>`<option value="${esc(t.id)}">${esc(t.salesName)} • ${esc(t.id)}</option>`).join('')||'<option value="">Koi trip nahi</option>';
+    picker.dataset.filled='1';
+  }
+  const tripId=picker.value||(visibleTrips[0]&&visibleTrips[0].id);
+  const timeline=$('ledgerTimeline');
+  if(!tripId){timeline.innerHTML='<small>Koi trip nahi mila.</small>';return}
+  const entries=tripLedger(tripId).sort((a,b)=>a.at.localeCompare(b.at));
+  let running=0;
+  timeline.innerHTML=entries.map(l=>{
+    const isCredit=l.type==='advance'||l.type==='additional_advance';
+    running+=isCredit?Number(l.amount):-Number(l.amount);
+    const label=l.type==='advance'?'Initial Advance':l.type==='additional_advance'?'Additional Advance':(l.category||'Expense');
+    const proofBtn=l.proofDataUri?`<button class="btn" style="margin-left:6px" onclick="viewProof('${l.id}')">View Bill</button>`:'';
+    return `<div class="event"><b>${esc(label)}</b><strong>${isCredit?'+ ':'- '}${money(l.amount)}</strong><small>${esc(l.byName)} • ${esc(l.at.slice(0,16).replace('T',' '))}${l.remark?' • '+esc(l.remark):''}${proofBtn}</small></div>`;
+  }).join('')+`<div class="event"><b>Running Balance</b><strong>${money(running)}</strong><small>Live calculated</small></div>`;
+}
+function viewProof(ledgerId){
+  const l=ledger.find(x=>x.id===ledgerId);if(!l||!l.proofDataUri)return;
+  $('proofImg').src=l.proofDataUri;show('proofView');
+}
+function renderPendingPage(){
+  const list=$('pendingList');
+  const overdue=trips.filter(isOverdue);
+  if(!overdue.length){list.innerHTML='<small>Koi overdue hisaab nahi hai. 🎉</small>';return}
+  list.innerHTML=overdue.map(t=>`<div class="notice"><b>${esc(t.salesName)} • ${esc(t.location)} • ${esc(t.id)}</b><br>Due ${esc(t.dueDate)} • ${money(tripBalance(t.id))} unsettled
+  <div style="margin-top:6px"><button class="btn" onclick="sendOverdueReminder('${esc(t.id)}')">Send WhatsApp Reminder</button></div></div>`).join('');
+}
+function bars(dataObj){
+  const entries=Object.entries(dataObj).sort((a,b)=>b[1]-a[1]);
+  const max=entries.length?entries[0][1]:1;
+  return entries.map(([k,v])=>`<div class="bar"><label><span>${esc(k)}</span><b>${money(v)}</b></label><div><i style="width:${max?Math.round(v/max*100):0}%"></i></div></div>`).join('')||'<small>Data nahi hai.</small>';
+}
+function renderAnalyticsPage(){
+  const byLocation={},byPerson={},byCategory={};
+  ledger.filter(l=>l.type==='expense').forEach(l=>{
+    byLocation[l.location||'-']=(byLocation[l.location||'-']||0)+Number(l.amount);
+    byPerson[l.byName||'-']=(byPerson[l.byName||'-']||0)+Number(l.amount);
+    byCategory[l.category||'-']=(byCategory[l.category||'-']||0)+Number(l.amount);
+  });
+  $('anaLocation').innerHTML=bars(byLocation);
+  $('anaPerson').innerHTML=bars(byPerson);
+  $('anaCategory').innerHTML=bars(byCategory);
+  const topCat=Object.entries(byCategory).sort((a,b)=>b[1]-a[1])[0];
+  const totalExp=Object.values(byCategory).reduce((a,b)=>a+b,0);
+  $('anaFlag').textContent=topCat&&totalExp?`Top expense head: ${topCat[0]} (${Math.round(topCat[1]/totalExp*100)}% of total).`:'Abhi data nahi hai.';
+  const expenseEntries=ledger.filter(l=>l.type==='expense');
+  const withProof=expenseEntries.filter(l=>l.proofDataUri).length;
+  $('anaProof').textContent=expenseEntries.length?Math.round(withProof/expenseEntries.length*100)+'%':'-';
+  $('anaClosed').textContent=trips.filter(t=>t.status==='closed').length;
+}
+function renderAccountsPage(){
+  const totalExpense=ledger.filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0);
+  const totalIssued=ledger.filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0);
+  $('accTotal').textContent=money(totalExpense);
+  $('accToBook').textContent=trips.filter(t=>t.status==='closed'&&!t.bookedByAccounts).length;
+  $('accIssued').textContent=money(totalIssued);
+  $('accExpense').textContent=money(totalExpense);
+  $('accNoBill').textContent=ledger.filter(l=>l.type==='expense'&&!l.proofDataUri).length;
+  const list=$('accList');
+  if(!trips.length){list.innerHTML='<small>Koi trip nahi hai.</small>';return}
+  list.innerHTML=trips.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(t=>{
+    const issued=tripIssued(t.id),expense=tripExpense(t.id);
+    const tag=t.status==='closed'?(t.bookedByAccounts?'<span class="tag">BOOKED</span>':'<span class="tag amber">READY TO BOOK</span>'):'<span class="tag amber">LIVE TRIP</span>';
+    return `<div class="person"><div class="pt"><div><h3>${esc(t.salesName)} • ${esc(t.location)} • ${esc(t.id)}</h3><p>${esc(t.startDate)} → ${esc(t.dueDate)}</p></div>${tag}</div>
+    <div class="money"><div class="m"><small>ISSUED</small><b>${money(issued)}</b></div><div class="m"><small>EXPENSE</small><b>${money(expense)}</b></div><div class="m"><small>STATUS</small><b>${esc(t.status)}</b></div><div class="m"><small>NOC</small><b>${esc(t.nocNumber||'-')}</b></div>
+    <div class="m"><small>ACTION</small>${(t.status==='closed'&&!t.bookedByAccounts)?`<button class="btn primary" onclick="markBooked('${esc(t.id)}')">Mark Booked</button>`:''}</div></div></div>`;
+  }).join('');
+}
+function renderNotifyPage(){
+  const wrap=$('notifyRows');if(!wrap)return;
+  const rows=[['issued','Amount Issued → Sales Person'],['additional','Additional Advance → Sales Person'],['overdue','Overdue → Sales Person + Admin (manual send)'],['submitted','Hisaab Submitted → Admin/Director'],['closed','Trip Closed / NOC → Sales + Admin + Accounts'],['booked','Trip Booked → Director']];
+  wrap.innerHTML=rows.map(([k,label])=>`<div class="row"><span>${esc(label)}</span><i class="toggle ${notifySettings[k]!==false?'on':''}" onclick="toggleNotify('${k}',this)"></i></div>`).join('');
+}
+async function toggleNotify(key,el){
+  const val=!el.classList.contains('on');
+  el.classList.toggle('on');
+  const patch={};patch[key]=val;
+  await db.collection('te_settings').doc('notify').set(patch,{merge:true});
+}
+
+/* ===== Nav + role gating ===== */
+function go(id,b){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));
+  $(id).classList.add('on');
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+  const target=b||document.querySelector(`nav button[onclick*="go('${id}'"]`);
+  if(target)target.classList.add('on');
+  renderPage(id);
+}
+function mgo(id,b){
+  go(id,null);
+  document.querySelectorAll('.bottomNav button').forEach(x=>x.classList.remove('on'));
+  if(b)b.classList.add('on');
+}
+function renderPage(id){
+  if(id==='admin')renderAdminPage();
+  else if(id==='director')renderDirectorPage();
+  else if(id==='sales')renderSalesPage();
+  else if(id==='ledger')renderLedgerPage();
+  else if(id==='pending')renderPendingPage();
+  else if(id==='analytics')renderAnalyticsPage();
+  else if(id==='accounts')renderAccountsPage();
+  else if(id==='notify')renderNotifyPage();
+}
+function currentPageId(){const on=document.querySelector('.page.on');return on?on.id:'admin'}
+function applyRoleVisibility(){
+  const role=effectiveRole();
+  const allowed=btn=>{const r=btn.dataset.role;if(!r)return true;return r.split(',').includes(role);};
+  let firstAllowed=null;
+  document.querySelectorAll('nav button[data-role]').forEach(b=>{
+    const ok=allowed(b);
+    b.classList.toggle('hidden',!ok);
+    if(ok&&!firstAllowed)firstAllowed=b;
+  });
+  document.querySelectorAll('.bottomNav button[data-role]').forEach(b=>b.classList.toggle('hidden',!allowed(b)));
+  if(!document.querySelector(`nav button:not(.hidden)[onclick*="'${currentPageId()}'"]`) && firstAllowed){
+    firstAllowed.click();
+  }
+}
+
+/* ===== Gate / boot ===== */
+function renderGate(){
+  const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
+  const u=myUserObj();
+  if(!currentUser||!u){
+    gateWrap.style.display='block';appWrap.style.display='none';
+    gateBox.innerHTML=`<h3>Login Required</h3><p style="font-size:11px;color:var(--muted)">Trip Expense app dekhne ke liye login karein — wahi username/password jo Parcel Dispatch aur Bliss One me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
+    return;
+  }
+  const role=effectiveRole();
+  if(u.appAccess && u.appAccess[APP_SLUG]===false){
+    gateWrap.style.display='block';appWrap.style.display='none';
+    gateBox.innerHTML=`<h3>Access Nahi Hai</h3><p style="font-size:11px;color:var(--muted)">Aapko is app ka access nahi diya gaya hai. Bliss One admin se contact karein.</p>`;
+    return;
+  }
+  if(!role){
+    gateWrap.style.display='block';appWrap.style.display='none';
+    gateBox.innerHTML=`<h3>Role Assign Nahi Hua</h3><p style="font-size:11px;color:var(--muted)">Login ho gaya, lekin abhi is app me aapka koi role (Admin/Director/Sales/Accounts) assign nahi hai. Director se karwayein — ya khud Super Admin unlock karke Director → Team Roles se set karein.</p>`;
+    return;
+  }
+  gateWrap.style.display='none';appWrap.style.display='block';
+  $('bottomNav').style.display='';
+}
+function renderAll(){
+  refreshLoginBadge();
+  renderGate();
+  if(currentUser&&myUserObj()&&effectiveRole()){
+    applyRoleVisibility();
+    renderPage(currentPageId());
+  }
+}
+function boot(){
+  currentUser=localStorage.getItem(SESSION_KEY)||null;
+  startUsersSync();startTripsSync();startLedgerSync();startSettingsSync();
+  renderAll();
+}
+document.addEventListener('DOMContentLoaded',boot);
+function show(id){$(id).classList.add('show')}
+function hide(id){$(id).classList.remove('show')}
+</script>
+</body></html>
