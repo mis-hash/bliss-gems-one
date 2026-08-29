@@ -22,10 +22,24 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 .toggle{width:38px;height:22px;background:#cbd5cf;border-radius:20px;position:relative;cursor:pointer;flex:none}.toggle.on{background:var(--g2)}.toggle:after{content:"";position:absolute;width:16px;height:16px;top:3px;left:3px;background:#fff;border-radius:50%;transition:.2s}.toggle.on:after{left:19px}
 .modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:50}.modal.show{display:flex}.box{width:min(500px,100%);background:#fff;border-radius:14px;padding:19px;max-height:90vh;overflow:auto}.box h3{margin:0 0 14px;font-size:19px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field label{display:block;font-size:11px;font-weight:bold;margin-bottom:5px}.field input,.field select,.field textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:7px;font-size:14px}.span2{grid-column:1/-1}.actions{display:flex;justify-content:flex-end;gap:6px;margin-top:14px}.bottomNav{display:none}
 .msg{font-size:12px;margin-top:6px}.gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px}.gate h3{font-size:19px}.gate p{font-size:13px}
+.grouplabel{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:14px 11px 6px}.grouplabel:first-child{padding-top:4px}
+nav button{display:flex;align-items:center;gap:8px;border-left:3px solid transparent}nav button.on{border-left-color:var(--g)}
+.togrow{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #edf1ee;font-size:13px;gap:8px}.togrow:last-child{border:0}
+.benchgroup{padding:9px 0;border-bottom:1px solid #edf1ee}.benchgroup:last-child{border:0}.benchcity{font-size:13px;font-weight:800;margin-bottom:5px}
+.benchrow{display:flex;align-items:center;gap:9px;padding:4px 0 4px 3px;font-size:12.5px}.bdot{width:8px;height:8px;border-radius:50%;flex:none}.bpurpose{width:110px;font-weight:600}.bmeta{flex:1;color:var(--muted);font-size:11px}
+.searchbox{position:relative;flex:1;max-width:280px}.searchbox input{width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;background:var(--bg)}
+.searchresults{position:absolute;top:36px;left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.1);max-height:260px;overflow:auto;z-index:30}
+.searchresults div{padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;font-size:12px}.searchresults div:last-child{border:0}
+table.dtb{width:100%;border-collapse:collapse}table.dtb th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 0 9px;border-bottom:1px solid var(--line)}
+table.dtb td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px}table.dtb tbody tr{cursor:pointer}table.dtb tbody tr:hover td{background:#f7faf8}
+.statusrow{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #edf1ee}.statusrow:last-child{border:0}
+.statusdot{width:9px;height:9px;border-radius:50%;flex:none}.statusdot.on{background:var(--g2)}.statusdot.off{background:var(--red)}
+.statusbadge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px}.statusbadge.on{background:var(--mint);color:var(--g)}.statusbadge.off{background:var(--redbg);color:var(--red)}
 @media(max-width:720px){header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:22px}.brand b{font-size:16px}.brand small,.live{display:none}.shell{display:block;padding:11px 10px 76px}nav{display:none}.hero{padding:17px}.hero h1{font-size:20px}.hero strong{font-size:23px}.cards{grid-template-columns:1fr 1fr}.money{grid-template-columns:1fr 1fr}.money .m:last-child{grid-column:1/-1}.analytics{grid-template-columns:1fr}.tripMoney{grid-template-columns:1fr 1fr}.tripMoney .tm:last-child{grid-column:1/-1}.salesActions{grid-template-columns:1fr}.big{min-height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;text-align:left}.big span{margin:0}.fields{grid-template-columns:1fr}.span2{grid-column:auto}.bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;justify-content:space-around;padding:6px}.bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold}.bottomNav button.hidden{display:none}.bottomNav span{display:block;font-size:19px}.bottomNav button.on{color:var(--g)}}
 </style></head>
 <body>
 <header><div class="head"><div class="brand"><div class="logo" id="secretLogo" onclick="tapLogo()">b</div><div><b>Bliss Gems & Minerals</b><small>Employee Advance & Trip Settlement</small></div></div>
+<div class="searchbox hidden" id="searchBoxWrap"><input id="globalSearch" type="text" placeholder="🔎 Search trip, sales person, location…" oninput="doGlobalSearch()"><div id="searchResults" class="searchresults hidden"></div></div>
 <div class="headRight">
 <button class="btn" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button>
 <span class="pill" id="loginBadge">Not Logged In</span>
@@ -36,13 +50,18 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 <div id="gateWrap" class="shell" style="display:none"><div class="gate" id="gateBox"></div></div>
 
 <div class="shell" id="appWrap" style="display:none"><nav>
+<div class="grouplabel">Operations</div>
 <button class="on" data-role="admin,director" onclick="go('admin',this)">▦ Admin Control</button>
-<button data-role="director" onclick="go('director',this)">★ Super Admin / Directors</button>
-<button data-role="sales" onclick="go('sales',this)">👤 My Trip</button>
 <button data-role="admin,director,accounts" onclick="go('ledger',this)">₹ Advance Ledger</button>
 <button data-role="admin,director" onclick="go('pending',this)">⏱ Pending Hisaab</button>
+<button data-role="sales" onclick="go('sales',this)">👤 My Trip</button>
+<div class="grouplabel">Insights</div>
 <button data-role="director" onclick="go('analytics',this)">📊 Analytics</button>
+<button data-role="admin,director,accounts" onclick="go('explorer',this)">🔎 Detailed Trips</button>
 <button data-role="accounts,director" onclick="go('accounts',this)">📚 Bookkeeping</button>
+<button data-role="admin,director,accounts" onclick="go('activity',this)">🕒 Activity Log</button>
+<div class="grouplabel">System</div>
+<button data-role="director" onclick="go('director',this)">★ Directors</button>
 <button data-role="director" onclick="go('notify',this)">💬 Notifications</button>
 </nav><main>
 
@@ -53,7 +72,7 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 </section>
 
 <section id="director" class="page">
-<div class="hero"><div><h1>Management Intelligence</h1><p>Company-wide trip expense • live data</p></div><div><small>TOTAL EXPENSE (ALL TIME)</small><strong id="dirTotalExpense">₹0</strong></div></div>
+<div class="hero"><div><h1>Management Intelligence</h1><p>Company-wide trip expense • live data</p></div><div style="text-align:right"><small>TOTAL EXPENSE (ALL TIME)</small><strong id="dirTotalExpense">₹0</strong><div style="margin-top:8px"><button class="btn" style="background:#ffffff28;color:#fff" onclick="openReport()">📄 Export Report</button></div></div></div>
 <div class="cards">
 <div class="card"><small>ACTIVE TRIPS</small><b id="dirActive">0</b></div>
 <div class="card"><small>ADVANCE OUTSTANDING</small><b id="dirOutstanding">₹0</b></div>
@@ -61,6 +80,9 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 <div class="card"><small>AVG COST / CLOSED TRIP</small><b id="dirAvg">₹0</b></div>
 </div>
 <div class="panel"><div class="ph"><span>Executive Attention</span></div><div class="pb" id="dirAttention"></div></div>
+<div class="panel"><div class="ph"><span>💰 Idle Advance<small>capital tied up unnecessarily</small></span></div><div class="pb" id="dirIdleAdvance"></div></div>
+<div class="panel"><div class="ph"><span>🏆 Cost Efficiency Ranking<small>vs. company benchmark</small></span></div><div class="pb" id="dirEfficiency"></div></div>
+<div class="panel"><div class="ph"><span>Location × Purpose Benchmark<small>avg. per trip</small></span></div><div class="pb" id="dirBenchmark"></div></div>
 <div class="panel"><div class="ph"><span>Team Roles</span><span class="tag">DIRECTORS ONLY</span></div><div class="pb"><div class="note" style="font-size:12px;color:var(--muted);margin-bottom:8px">Universal Users list se yahan role assign karein — Admin / Director / Sales / Accounts.</div><div id="rolesList"><div class="row"><small>Loading…</small></div></div></div></div>
 </section>
 
@@ -80,9 +102,23 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 </div></section>
 
 <section id="accounts" class="page">
-<div class="hero"><div><h1>Accounts Expense View</h1><p>Full financial visibility • Bookkeeping only</p></div><div><small>ALL-TIME EXPENSE</small><strong id="accTotal">₹0</strong></div></div>
+<div class="hero"><div><h1>Bookkeeping Register</h1><p>Every closed trip, with NOC and entry status</p></div><div><small>ALL-TIME EXPENSE</small><strong id="accTotal">₹0</strong></div></div>
 <div class="cards"><div class="card"><small>TRIPS TO BOOK</small><b id="accToBook">0</b></div><div class="card"><small>TOTAL ISSUED</small><b id="accIssued">₹0</b></div><div class="card"><small>TOTAL EXPENSE</small><b id="accExpense">₹0</b></div><div class="card"><small>NO BILL EXPENSES</small><b id="accNoBill">0</b></div></div>
-<div class="panel"><div class="ph"><span>Sales Person Expense Summary</span></div><div class="pb" id="accList"></div></div>
+<div class="panel"><div class="ph"><span>Sales Person Expense Summary</span><span style="display:flex;gap:6px"><button class="btn" onclick="openLedgerHeads()">🧮 Ledger Heads</button><button class="btn" onclick="exportTally()">⬇️ Tally</button><button class="btn" onclick="exportBusy()">⬇️ Busy</button></span></div><div class="pb" id="accList"></div></div>
+</section>
+
+<section id="explorer" class="page">
+<div class="hero"><div><h1>Detailed Trips</h1><p>Every trip, filterable — sales person, location, status</p></div></div>
+<div class="panel"><div class="pb" style="display:flex;gap:8px;flex-wrap:wrap">
+<select id="expSalesFilter" onchange="renderExplorerPage()" style="padding:8px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">All Sales Persons</option></select>
+<select id="expStatusFilter" onchange="renderExplorerPage()" style="padding:8px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">All Status</option><option value="running">Active</option><option value="hisaab_submitted">To Verify</option><option value="closed">Closed</option><option value="overdue">Overdue</option></select>
+</div></div>
+<div class="panel"><div class="pb" id="explorerList" style="padding-top:6px"></div></div>
+</section>
+
+<section id="activity" class="page">
+<div class="hero"><div><h1>Activity Log</h1><p>Every important action, who did it and when</p></div></div>
+<div class="panel"><div class="pb" id="activityList"><div class="row"><small>Loading…</small></div></div></div>
 </section>
 
 <section id="notify" class="page"><div class="panel"><div class="ph">WhatsApp Notification Control</div><div class="pb" id="notifyRows"></div></div></section>
@@ -104,10 +140,17 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 </div></div>
 
 <div class="modal" id="issue"><div class="box"><h3>Issue Trip Amount</h3><div class="fields">
-<div class="field span2"><label>Sales Person *</label><select id="issueSales"></select></div>
-<div class="field"><label>Location *</label><input id="issueLocation" placeholder="Mumbai"></div>
+<div class="field span2"><label>Sales Person *</label><select id="issueSales" onchange="updateIssueSuggestion()"></select></div>
+<div class="field"><label>Location *</label><select id="issueLocation" onchange="handleIssueLocPurposeChange(this,'issueLocation')"></select></div>
+<div class="field"><label>Trip Purpose *</label><select id="issuePurpose" onchange="handleIssueLocPurposeChange(this,'issuePurpose')"></select></div>
+<div class="field span2 hidden" id="issueAddNewRow" style="display:flex;gap:8px;align-items:flex-end">
+  <div style="flex:1"><label>New value</label><input id="issueAddNewInput" placeholder="Type new name…"></div>
+  <button class="btn primary" type="button" onclick="confirmIssueAddNew()">Add</button>
+  <button class="btn" type="button" onclick="cancelIssueAddNew()">Cancel</button>
+</div>
 <div class="field"><label>Start Date *</label><input type="date" id="issueStart"></div>
 <div class="field"><label>Hisaab Due *</label><input type="date" id="issueDue"></div>
+<div class="field span2" id="issueSuggestBox" style="display:none;background:var(--mint);border:1px solid #cdeadf;border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--g)"></div>
 <div class="field span2"><label>Amount *</label><input type="number" id="issueAmount" placeholder="₹ 0"></div>
 </div><div class="actions"><button class="btn" onclick="hide('issue')">Cancel</button><button class="btn primary" onclick="submitIssue()">Issue & Start Trip</button></div><div class="msg" id="issueMsg"></div></div></div>
 
@@ -127,6 +170,34 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 
 <div class="modal" id="proofView"><div class="box"><h3>Bill / Proof</h3><img id="proofImg" style="max-width:100%;border-radius:8px"><div class="actions"><button class="btn" onclick="hide('proofView')">Close</button></div></div></div>
 
+<div class="modal" id="closeTripModal"><div class="box" style="width:min(460px,100%)">
+<h3>Verify &amp; Close</h3>
+<div class="money" id="closeTripMoney" style="grid-template-columns:repeat(3,1fr)"></div>
+<div class="field span2" style="margin-top:12px"><label id="closeReturnLabel">Amount Returned</label><input id="closeReturnAmt" type="number" oninput="updateCloseReturnNote()"></div>
+<div class="field span2" style="margin-top:8px"><label id="closeReturnModeLabel">Received Via</label><select id="closeReturnMode"><option>Cash-in-Hand</option><option>Bank Transfer</option><option>PhonePe</option><option>Google Pay</option><option>Paytm</option><option>UPI (Other)</option></select></div>
+<div id="closeReturnNote" class="msg"></div>
+<div class="actions"><button class="btn" onclick="hide('closeTripModal')">Cancel</button><button class="btn primary" onclick="confirmCloseTrip()">✓ Close &amp; Send NOC</button></div>
+</div></div>
+
+<div class="modal" id="ledgerHeadsModal"><div class="box" style="width:min(560px,100%)">
+<h3>🧮 Ledger Heads</h3>
+<p style="font-size:12px;color:var(--muted);margin:0 0 12px">Set your own Tally/Busy ledger names — exports and reports use exactly these.</p>
+<div class="fields">
+<div class="field"><label>Cash / Bank Ledger</label><input id="lhCash" value="Cash-in-Hand"></div>
+<div class="field"><label>Staff Advance Ledger</label><input id="lhAdvance" value="Staff Advance A/c"></div>
+</div>
+<div id="lhCategoryRows" style="margin-top:10px"></div>
+<div class="actions"><button class="btn" onclick="hide('ledgerHeadsModal')">Cancel</button><button class="btn primary" onclick="saveLedgerHeads()">Save Ledger Heads</button></div>
+</div></div>
+
+<div class="modal" id="reportModal"><div class="box" style="width:min(560px,100%)">
+<h3>📄 Expense Report</h3>
+<div id="reportBody"></div>
+<div class="actions"><button class="btn" onclick="hide('reportModal')">Close</button><button class="btn primary" onclick="exportBusy()">📥 Download CSV</button></div>
+</div></div>
+
+<div class="modal" id="tripDetailModal"><div class="box" style="width:min(560px,100%)"><div id="tripDetailBody"></div><div class="actions"><button class="btn" onclick="hide('tripDetailModal')">Close</button></div></div></div>
+
 <script>
 const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
 if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
@@ -143,7 +214,12 @@ function genLedgerId(){return 'LG-'+Date.now()+'-'+Math.floor(Math.random()*1000
 
 let users=[],trips=[],ledger=[],notifySettings={issued:true,additional:true,overdue:true,submitted:true,closed:true,booked:true};
 let currentUser=null;
-let usersStarted=false,tripsStarted=false,ledgerStarted=false,settingsStarted=false;
+let usersStarted=false,tripsStarted=false,ledgerStarted=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false;
+let tripOptions={locations:['Surat','Mumbai','Chennai','Udaipur','Ahmedabad','Hyderabad'],purposes:['Exhibition','Client Visit','Sales Tour']};
+const EXPENSE_CATEGORIES=['Hotel','Food','Taxi / Cab','Flight','Train','Fuel','Other'];
+let ledgerHeads={cash:'Cash-in-Hand',advance:'Staff Advance A/c',categories:{Hotel:'Travelling Expenses',Food:'Business Promotion Exp.','Taxi / Cab':'Travelling Expenses',Flight:'Travelling Expenses',Train:'Travelling Expenses',Fuel:'Travelling Expenses',Other:'Miscellaneous Expenses'}};
+let activity=[];
+let closeTripId=null,closeTripExpected=0;
 
 /* ===== Users (shared Universal Users list) ===== */
 function startUsersSync(){
@@ -236,6 +312,34 @@ function startSettingsSync(){
     renderNotifyPage();
   },err=>console.error('settings sync error',err));
 }
+function startOptionsSync(){
+  if(optionsStarted)return;optionsStarted=true;
+  db.collection('te_settings').doc('options').onSnapshot(doc=>{
+    if(doc.exists){
+      const d=doc.data();
+      if(Array.isArray(d.locations)&&d.locations.length)tripOptions.locations=d.locations;
+      if(Array.isArray(d.purposes)&&d.purposes.length)tripOptions.purposes=d.purposes;
+    }
+    populateIssueSelects();
+  },err=>console.error('options sync error',err));
+}
+function startLedgerHeadsSync(){
+  if(ledgerHeadsStarted)return;ledgerHeadsStarted=true;
+  db.collection('te_settings').doc('ledgerHeads').onSnapshot(doc=>{
+    if(doc.exists)ledgerHeads=Object.assign({},ledgerHeads,doc.data(),{categories:Object.assign({},ledgerHeads.categories,doc.data().categories||{})});
+  },err=>console.error('ledgerHeads sync error',err));
+}
+function startActivitySync(){
+  if(activityStarted)return;activityStarted=true;
+  db.collection('te_activity').orderBy('at','desc').limit(100).onSnapshot(snap=>{
+    activity=[];snap.forEach(d=>activity.push(d.data()));
+    if(currentPageId()==='activity')renderActivityPage();
+  },err=>console.error('activity sync error',err));
+}
+function logActivity(title,meta){
+  const id='ACT-'+Date.now()+'-'+Math.floor(Math.random()*1000);
+  db.collection('te_activity').doc(id).set({id,title,meta,at:new Date().toISOString(),byName:(myUserObj()||{}).name||currentUser}).catch(e=>console.error('log activity failed',e));
+}
 
 /* ===== WhatsApp via shared GREEN-API config ===== */
 async function getGreenApiCreds(){
@@ -270,24 +374,86 @@ function tripBalance(tripId){return tripIssued(tripId)-tripExpense(tripId)}
 function isOverdue(t){return t.status!=='closed' && t.dueDate && t.dueDate<todayISO()}
 
 /* ===== Issue / Extra / Expense / Hisaab / Close / Book ===== */
+function populateIssueSelects(){
+  const loc=$('issueLocation'),pur=$('issuePurpose');
+  if(!loc||!pur)return;
+  const locVal=loc.value,purVal=pur.value;
+  loc.innerHTML='<option value="">Select…</option>'+tripOptions.locations.map(l=>`<option>${esc(l)}</option>`).join('')+'<option value="__add__">＋ Add new location…</option>';
+  pur.innerHTML='<option value="">Select…</option>'+tripOptions.purposes.map(p=>`<option>${esc(p)}</option>`).join('')+'<option value="__add__">＋ Add new purpose…</option>';
+  if(tripOptions.locations.includes(locVal))loc.value=locVal;
+  if(tripOptions.purposes.includes(purVal))pur.value=purVal;
+}
+let issueAddNewTarget=null;
+function handleIssueLocPurposeChange(sel,targetId){
+  if(sel.value==='__add__'){
+    issueAddNewTarget=targetId;
+    sel.value='';
+    $('issueAddNewInput').value='';
+    $('issueAddNewInput').placeholder=targetId==='issueLocation'?'e.g. Kolkata':'e.g. Vendor Visit';
+    $('issueAddNewRow').classList.remove('hidden');
+    $('issueAddNewInput').focus();
+    return;
+  }
+  updateIssueSuggestion();
+}
+async function confirmIssueAddNew(){
+  const val=$('issueAddNewInput').value.trim();
+  if(!val||!issueAddNewTarget)return;
+  if(issueAddNewTarget==='issueLocation'){
+    if(!tripOptions.locations.includes(val))tripOptions.locations.push(val);
+  } else {
+    if(!tripOptions.purposes.includes(val))tripOptions.purposes.push(val);
+  }
+  await db.collection('te_settings').doc('options').set(tripOptions,{merge:true});
+  populateIssueSelects();
+  $(issueAddNewTarget).value=val;
+  cancelIssueAddNew();
+  updateIssueSuggestion();
+}
+function cancelIssueAddNew(){$('issueAddNewRow').classList.add('hidden');issueAddNewTarget=null}
+function updateIssueSuggestion(){
+  const salesId=$('issueSales').value,loc=$('issueLocation').value,purpose=$('issuePurpose').value;
+  const box=$('issueSuggestBox');
+  if(!salesId||!loc||!purpose){box.style.display='none';return}
+  const sales=users.find(u=>u.id===salesId);
+  const pastTrips=trips.filter(t=>t.salesId===salesId&&t.location===loc&&t.purpose===purpose&&t.status==='closed');
+  const companyTrips=trips.filter(t=>t.location===loc&&t.purpose===purpose&&t.status==='closed');
+  box.style.display='block';
+  if(pastTrips.length){
+    const avg=pastTrips.reduce((s,t)=>s+tripExpense(t.id),0)/pastTrips.length;
+    const suggested=Math.ceil((avg*1.1)/500)*500;
+    box.innerHTML=`💡 ${esc(sales?sales.name.split(' ')[0]:'')} has done <b>${esc(purpose)}</b> in <b>${esc(loc)}</b> ${pastTrips.length} time${pastTrips.length>1?'s':''} before — average ${money(avg)}.<br>Suggested advance: <b>${money(suggested)}</b> <button class="btn" style="padding:4px 8px;font-size:11px;margin-left:4px" onclick="$('issueAmount').value='${suggested}'">Use This</button>`;
+  } else if(companyTrips.length){
+    const avg=companyTrips.reduce((s,t)=>s+tripExpense(t.id),0)/companyTrips.length;
+    const suggested=Math.ceil((avg*1.1)/500)*500;
+    box.innerHTML=`💡 No history for this person, but <b>${esc(purpose)}</b> in <b>${esc(loc)}</b> averages ${money(avg)} company-wide.<br>Suggested advance: <b>${money(suggested)}</b> <button class="btn" style="padding:4px 8px;font-size:11px;margin-left:4px" onclick="$('issueAmount').value='${suggested}'">Use This</button>`;
+  } else {
+    box.innerHTML=`ℹ️ No history yet for ${esc(purpose)} in ${esc(loc)} — no suggestion available.`;
+  }
+}
 function openIssueModal(){
   $('issueSales').innerHTML=users.filter(u=>u.appRoles&&u.appRoles[APP_SLUG]==='sales'&&u.active!==false).map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('')||'<option value="">No sales users. Director se role assign karwayein.</option>';
   $('issueStart').value=todayISO();
-  $('issueDue').value='';$('issueAmount').value='';$('issueLocation').value='';
+  $('issueDue').value='';$('issueAmount').value='';
+  populateIssueSelects();
+  $('issueLocation').value='';$('issuePurpose').value='';
+  cancelIssueAddNew();
+  $('issueSuggestBox').style.display='none';
   $('issueMsg').textContent='';
   show('issue');
 }
 async function submitIssue(){
-  const salesId=$('issueSales').value,location=$('issueLocation').value.trim(),start=$('issueStart').value,due=$('issueDue').value,amount=Number($('issueAmount').value);
+  const salesId=$('issueSales').value,location=$('issueLocation').value,purpose=$('issuePurpose').value,start=$('issueStart').value,due=$('issueDue').value,amount=Number($('issueAmount').value);
   const msg=$('issueMsg');
-  if(!salesId||!location||!start||!due||!amount){msg.style.color='#b43a35';msg.textContent='Sabhi fields bharein.';return}
+  if(!salesId||!location||!purpose||!start||!due||!amount){msg.style.color='#b43a35';msg.textContent='Sabhi fields bharein.';return}
   const sales=users.find(u=>u.id===salesId);
   const tripId=genId();
-  const trip={id:tripId,salesId,salesName:sales?sales.name:salesId,location,startDate:start,dueDate:due,status:'running',bookedByAccounts:false,createdAt:new Date().toISOString(),createdBy:currentUser};
+  const trip={id:tripId,salesId,salesName:sales?sales.name:salesId,location,purpose,startDate:start,dueDate:due,status:'running',bookedByAccounts:false,createdAt:new Date().toISOString(),createdBy:currentUser};
   await db.collection('te_trips').doc(tripId).set(trip);
   const lg={id:genLedgerId(),tripId,type:'advance',amount,category:'',location,paidTo:'',proofDataUri:'',remark:'Initial Advance',byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
   await db.collection('te_ledger').doc(lg.id).set(lg);
   hide('issue');
+  logActivity(`${(myUserObj()||{}).name||currentUser} issued ${money(amount)} advance`,`to ${sales?sales.name:salesId} · ${location} · ${purpose} · ${tripId}`);
   if(notifySettings.issued && sales)sendWA(sales.phone,`💰 Trip Advance Issued\nAmount: ${money(amount)}\nLocation: ${location}\nHisaab Due: ${due}\nTrip: ${tripId}`);
 }
 let extraForTrip=null;
@@ -358,25 +524,61 @@ async function submitHisaab(){
     usersWithRole('admin').concat(usersWithRole('director')).forEach(u=>sendWA(u.phone,`🧾 Hisaab Submitted\n${trip.salesName} • ${trip.location} • ${trip.id}\nVerify karke Close/NOC karein.`));
   }
 }
-async function closeTrip(tripId){
+function closeTrip(tripId){
   const trip=trips.find(t=>t.id===tripId);
   if(!trip)return;
+  closeTripId=tripId;
   const issued=tripIssued(tripId),expense=tripExpense(tripId),balance=issued-expense;
-  if(!confirm(`Trip close karein?\nIssued: ${money(issued)}\nExpense: ${money(expense)}\nReturn/Balance: ${money(balance)}`))return;
+  closeTripExpected=balance;
+  $('closeTripMoney').innerHTML=`<div class="m"><small>ADVANCE</small><b>${money(issued)}</b></div><div class="m"><small>SPENT</small><b>${money(expense)}</b></div><div class="m"><small>BALANCE</small><b>${money(balance)}</b></div>`;
+  $('closeReturnAmt').value=Math.max(0,balance);
+  $('closeReturnMode').value='Cash-in-Hand';
+  updateCloseReturnNote();
+  show('closeTripModal');
+}
+function updateCloseReturnNote(){
+  const val=Number($('closeReturnAmt').value)||0;
+  const note=$('closeReturnNote');
+  if(closeTripExpected<=0){
+    note.style.color='var(--muted)';
+    note.textContent='Balance is zero or negative — nothing due back.';
+    return;
+  }
+  if(val===closeTripExpected){
+    note.style.color='var(--g)';
+    note.textContent='✓ Full amount received — advance will be fully cleared.';
+  } else if(val<closeTripExpected){
+    note.style.color='var(--amber)';
+    note.textContent=`⚠️ ${money(closeTripExpected-val)} short — stays outstanding, adjusted on the next trip.`;
+  } else {
+    note.style.color='var(--red)';
+    note.textContent=`⚠️ ${money(val-closeTripExpected)} more than expected — please double-check.`;
+  }
+}
+async function confirmCloseTrip(){
+  const tripId=closeTripId;
+  const trip=trips.find(t=>t.id===tripId);
+  if(!trip)return;
+  const returned=Number($('closeReturnAmt').value)||0;
+  const mode=$('closeReturnMode').value;
+  const balance=closeTripExpected;
   const nocNumber='NOC-'+tripId;
-  await db.collection('te_trips').doc(tripId).update({status:'closed',closedAt:new Date().toISOString(),nocNumber,finalBalance:balance});
+  await db.collection('te_trips').doc(tripId).update({status:'closed',closedAt:new Date().toISOString(),nocNumber,finalBalance:balance,returnedAmount:returned,returnedVia:mode});
+  hide('closeTripModal');
+  logActivity(`${(myUserObj()||{}).name||currentUser} closed ${tripId}`,`${nocNumber} generated · ${trip.salesName} · ${money(returned)} via ${mode}`);
   if(notifySettings.closed){
     const sales=users.find(u=>u.id===trip.salesId);
-    const msg=`✅ Trip Closed — ${nocNumber}\n${trip.salesName} • ${trip.location} • ${tripId}\nFinal Balance: ${money(balance)}`;
+    const msg=`✅ Trip Closed — ${nocNumber}\n${trip.salesName} • ${trip.location} • ${tripId}\nFinal Balance: ${money(balance)}\nReceived: ${money(returned)} via ${mode}`;
     if(sales)sendWA(sales.phone,msg);
     usersWithRole('admin').concat(usersWithRole('accounts')).forEach(u=>sendWA(u.phone,msg));
   }
 }
 async function markBooked(tripId){
   await db.collection('te_trips').doc(tripId).update({bookedByAccounts:true});
-  if(notifySettings.booked){
-    const trip=trips.find(t=>t.id===tripId);
-    if(trip){usersWithRole('director').forEach(u=>sendWA(u.phone,`📚 Trip Booked by Accounts\n${trip.id}`));}
+  const trip=trips.find(t=>t.id===tripId);
+  logActivity(`${(myUserObj()||{}).name||currentUser} marked ${tripId} as Booked`,trip?`${trip.salesName} · ${trip.location}`:'');
+  if(notifySettings.booked && trip){
+    usersWithRole('director').forEach(u=>sendWA(u.phone,`📚 Trip Booked by Accounts\n${trip.id}`));
   }
 }
 function sendOverdueReminder(tripId){
@@ -451,6 +653,7 @@ function renderDirectorPage(){
     <div class="row"><span><b>🧾 ${noBill} No-Bill Expenses</b></span></div>
     <div class="row"><span><b>📚 ${money(awaitingBook)} Awaiting Bookkeeping</b></span><button class="btn" onclick="go('accounts')">View</button></div>`;
   renderRolesList();
+  renderDirectorInsights();
 }
 function renderSalesPage(){
   const wrap=$('salesWrap');
@@ -528,13 +731,14 @@ function renderAccountsPage(){
   $('accExpense').textContent=money(totalExpense);
   $('accNoBill').textContent=ledger.filter(l=>l.type==='expense'&&!l.proofDataUri).length;
   const list=$('accList');
-  if(!trips.length){list.innerHTML='<small>Koi trip nahi hai.</small>';return}
-  list.innerHTML=trips.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(t=>{
+  const closedTrips=trips.filter(t=>t.status==='closed');
+  if(!closedTrips.length){list.innerHTML='<small>Koi closed trip nahi hai abhi.</small>';return}
+  list.innerHTML=closedTrips.slice().sort((a,b)=>(b.closedAt||'').localeCompare(a.closedAt||'')).map(t=>{
     const issued=tripIssued(t.id),expense=tripExpense(t.id);
-    const tag=t.status==='closed'?(t.bookedByAccounts?'<span class="tag">BOOKED</span>':'<span class="tag amber">READY TO BOOK</span>'):'<span class="tag amber">LIVE TRIP</span>';
-    return `<div class="person"><div class="pt"><div><h3>${esc(t.salesName)} • ${esc(t.location)} • ${esc(t.id)}</h3><p>${esc(t.startDate)} → ${esc(t.dueDate)}</p></div>${tag}</div>
+    const tag=t.bookedByAccounts?'<span class="tag">BOOKED</span>':'<span class="tag amber">READY TO BOOK</span>';
+    return `<div class="person" style="cursor:pointer" onclick="openTripDetail('${esc(t.id)}')"><div class="pt"><div><h3>${esc(t.salesName)} • ${esc(t.location)} • ${esc(t.id)}</h3><p>${esc(t.purpose||'')} • ${esc(t.startDate)} → ${esc(t.dueDate)}</p></div>${tag}</div>
     <div class="money"><div class="m"><small>ISSUED</small><b>${money(issued)}</b></div><div class="m"><small>EXPENSE</small><b>${money(expense)}</b></div><div class="m"><small>STATUS</small><b>${esc(t.status)}</b></div><div class="m"><small>NOC</small><b>${esc(t.nocNumber||'-')}</b></div>
-    <div class="m"><small>ACTION</small>${(t.status==='closed'&&!t.bookedByAccounts)?`<button class="btn primary" onclick="markBooked('${esc(t.id)}')">Mark Booked</button>`:''}</div></div></div>`;
+    <div class="m"><small>ACTION</small>${!t.bookedByAccounts?`<button class="btn primary" onclick="event.stopPropagation();markBooked('${esc(t.id)}')">Mark Booked</button>`:''}</div></div></div>`;
   }).join('');
 }
 function renderNotifyPage(){
@@ -547,6 +751,216 @@ async function toggleNotify(key,el){
   el.classList.toggle('on');
   const patch={};patch[key]=val;
   await db.collection('te_settings').doc('notify').set(patch,{merge:true});
+}
+
+/* ===== Ledger Heads ===== */
+function openLedgerHeads(){
+  $('lhCash').value=ledgerHeads.cash;
+  $('lhAdvance').value=ledgerHeads.advance;
+  $('lhCategoryRows').innerHTML=EXPENSE_CATEGORIES.map(c=>`<div class="field" style="margin-top:8px"><label>${esc(c)}</label><input id="lhCat_${esc(c).replace(/\W/g,'_')}" value="${esc(ledgerHeads.categories[c]||'')}"></div>`).join('');
+  show('ledgerHeadsModal');
+}
+async function saveLedgerHeads(){
+  const categories={};
+  EXPENSE_CATEGORIES.forEach(c=>{categories[c]=$(`lhCat_${c.replace(/\W/g,'_')}`).value.trim()||c;});
+  const patch={cash:$('lhCash').value.trim()||'Cash-in-Hand',advance:$('lhAdvance').value.trim()||'Staff Advance A/c',categories};
+  await db.collection('te_settings').doc('ledgerHeads').set(patch,{merge:true});
+  ledgerHeads=Object.assign({},ledgerHeads,patch);
+  hide('ledgerHeadsModal');
+  logActivity(`${(myUserObj()||{}).name||currentUser} edited Ledger Heads`,'');
+}
+function downloadFile(filename,content,mime){
+  const blob=new Blob([content],{type:mime});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},200);
+}
+function closedTripVouchers(){
+  const rows=[];
+  trips.filter(t=>t.status==='closed').forEach(t=>{
+    const entries=tripLedger(t.id).sort((a,b)=>a.at.localeCompare(b.at));
+    entries.forEach(l=>{
+      if(l.type==='advance'||l.type==='additional_advance'){
+        rows.push({date:l.at.slice(0,10),type:'Payment',dr:ledgerHeads.advance,cr:ledgerHeads.cash,amount:Number(l.amount),narration:`Advance issued - ${t.salesName} - ${t.location} - ${t.id}`});
+      } else if(l.type==='expense'){
+        const head=ledgerHeads.categories[l.category]||l.category||ledgerHeads.categories.Other;
+        rows.push({date:l.at.slice(0,10),type:'Journal',dr:head,cr:ledgerHeads.advance,amount:Number(l.amount),narration:`${l.category||'Expense'} - ${t.id}`});
+      }
+    });
+    const balance=t.finalBalance||0;
+    if(balance>0){
+      rows.push({date:(t.closedAt||new Date().toISOString()).slice(0,10),type:'Receipt',dr:ledgerHeads.cash,cr:ledgerHeads.advance,amount:balance,narration:`Balance returned - ${t.salesName} - ${t.id} - ${t.nocNumber||''}`});
+    }
+  });
+  return rows;
+}
+function exportTally(){
+  const rows=closedTripVouchers();
+  if(!rows.length){alert('Koi closed trip nahi hai export karne ke liye.');return}
+  const esc2=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const msgs=rows.map((r,i)=>`    <TALLYMESSAGE xmlns:UDF="TallyUDF">
+     <VOUCHER VCHTYPE="${r.type}" ACTION="Create">
+      <DATE>${r.date.replace(/-/g,'')}</DATE>
+      <NARRATION>${esc2(r.narration)}</NARRATION>
+      <VOUCHERTYPENAME>${r.type}</VOUCHERTYPENAME>
+      <VOUCHERNUMBER>${i+1}</VOUCHERNUMBER>
+      <ALLLEDGERENTRIES.LIST>
+       <LEDGERNAME>${esc2(r.dr)}</LEDGERNAME>
+       <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+       <AMOUNT>-${r.amount.toFixed(2)}</AMOUNT>
+      </ALLLEDGERENTRIES.LIST>
+      <ALLLEDGERENTRIES.LIST>
+       <LEDGERNAME>${esc2(r.cr)}</LEDGERNAME>
+       <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+       <AMOUNT>${r.amount.toFixed(2)}</AMOUNT>
+      </ALLLEDGERENTRIES.LIST>
+     </VOUCHER>
+    </TALLYMESSAGE>`).join('\n');
+  const xml=`<ENVELOPE>\n <HEADER>\n  <TALLYREQUEST>Import Data</TALLYREQUEST>\n </HEADER>\n <BODY>\n  <IMPORTDATA>\n   <REQUESTDESC>\n    <REPORTNAME>Vouchers</REPORTNAME>\n    <STATICVARIABLES>\n     <SVCURRENTCOMPANY>Bliss Gems &amp; Minerals</SVCURRENTCOMPANY>\n    </STATICVARIABLES>\n   </REQUESTDESC>\n   <REQUESTDATA>\n${msgs}\n   </REQUESTDATA>\n  </IMPORTDATA>\n </BODY>\n</ENVELOPE>\n`;
+  downloadFile('BlissGems_TripExpense_Tally.xml',xml,'application/xml');
+}
+function exportBusy(){
+  const rows=closedTripVouchers();
+  if(!rows.length){alert('Koi closed trip nahi hai export karne ke liye.');return}
+  const csvEsc=s=>'"'+String(s).replace(/"/g,'""')+'"';
+  const lines=['Date,VoucherType,DrLedger,CrLedger,Amount,Narration'];
+  rows.forEach(r=>{
+    const d=r.date.split('-').reverse().join('-');
+    lines.push([d,r.type,csvEsc(r.dr),csvEsc(r.cr),r.amount.toFixed(2),csvEsc(r.narration)].join(','));
+  });
+  downloadFile('BlissGems_TripExpense_Busy.csv',lines.join('\n'),'text/csv');
+}
+
+/* ===== Trip Detail modal (reused by Explorer/Bookkeeping/Search) ===== */
+function openTripDetail(tripId){
+  const t=trips.find(x=>x.id===tripId);if(!t)return;
+  const issued=tripIssued(tripId),expense=tripExpense(tripId),balance=issued-expense;
+  const entries=tripLedger(tripId).filter(l=>l.type==='expense').sort((a,b)=>b.at.localeCompare(a.at));
+  const rows=entries.map(l=>`<div class="row"><span>${esc(l.category)}<br><small>${esc(l.at.slice(0,10))} • ${l.proofDataUri?'Proof attached':'No Bill'}</small></span>${l.proofDataUri?`<button class="btn" style="margin-right:8px" onclick="viewProof('${esc(l.id)}')">View Proof</button>`:''}<b>${money(l.amount)}</b></div>`).join('')||'<div class="row"><small>Koi expense nahi hai.</small></div>';
+  $('tripDetailBody').innerHTML=`<h3>${esc(t.id)} • ${esc(t.location)}</h3>
+  <p style="font-size:13px;color:var(--muted);margin:-8px 0 12px">${esc(t.salesName)} • ${esc(t.purpose||'')} • Due ${esc(t.dueDate)} ${t.nocNumber?`• NOC ${esc(t.nocNumber)}`:''}</p>
+  <div class="money" style="grid-template-columns:repeat(3,1fr)"><div class="m"><small>ADVANCE</small><b>${money(issued)}</b></div><div class="m"><small>SPENT</small><b>${money(expense)}</b></div><div class="m"><small>BALANCE</small><b>${money(balance)}</b></div></div>
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin:14px 0 6px">Expenses</div>${rows}`;
+  show('tripDetailModal');
+}
+
+/* ===== Detailed Trips (Explorer) ===== */
+function renderExplorerPage(){
+  const salesSel=$('expSalesFilter');
+  if(salesSel.dataset.filled!=='1'){
+    salesSel.innerHTML='<option value="">All Sales Persons</option>'+usersWithRole('sales').map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+    salesSel.dataset.filled='1';
+  }
+  const salesFilter=salesSel.value,statusFilter=$('expStatusFilter').value;
+  let list=trips.slice();
+  if(salesFilter)list=list.filter(t=>t.salesId===salesFilter);
+  if(statusFilter==='overdue')list=list.filter(isOverdue);
+  else if(statusFilter)list=list.filter(t=>t.status===statusFilter);
+  list.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  const wrap=$('explorerList');
+  if(!list.length){wrap.innerHTML='<small>Koi trip nahi mili.</small>';return}
+  wrap.innerHTML=`<div style="overflow-x:auto"><table class="dtb"><thead><tr><th>Trip</th><th>Sales Person</th><th>Location</th><th>Purpose</th><th>Advance</th><th>Spent</th><th>Balance</th><th>Status</th></tr></thead><tbody>`+
+  list.map(t=>{
+    const issued=tripIssued(t.id),expense=tripExpense(t.id),balance=issued-expense;
+    const statusLabel=t.status==='closed'?'Closed':(t.status==='hisaab_submitted'?'To Verify':(isOverdue(t)?'Overdue':'Active'));
+    return `<tr onclick="openTripDetail('${esc(t.id)}')"><td>${esc(t.id)}</td><td>${esc(t.salesName)}</td><td>${esc(t.location)}</td><td>${esc(t.purpose||'-')}</td><td>${money(issued)}</td><td>${money(expense)}</td><td>${money(balance)}</td><td>${esc(statusLabel)}</td></tr>`;
+  }).join('')+`</tbody></table></div>`;
+}
+
+/* ===== Activity Log ===== */
+function renderActivityPage(){
+  const wrap=$('activityList');
+  if(!activity.length){wrap.innerHTML='<small>Koi activity abhi tak nahi hai.</small>';return}
+  wrap.innerHTML=activity.map(a=>`<div class="event"><b>${esc(a.title)}</b><strong>${esc((a.at||'').slice(0,16).replace('T',' '))}</strong><small>${esc(a.meta||'')}</small></div>`).join('');
+}
+
+/* ===== Global Search ===== */
+function doGlobalSearch(){
+  const q=$('globalSearch').value.trim().toLowerCase();
+  const box=$('searchResults');
+  if(!q){box.classList.add('hidden');box.innerHTML='';return}
+  const matches=trips.filter(t=>t.id.toLowerCase().includes(q)||(t.salesName||'').toLowerCase().includes(q)||(t.location||'').toLowerCase().includes(q)).slice(0,10);
+  if(!matches.length){box.innerHTML='<div>No results found.</div>';box.classList.remove('hidden');return}
+  box.innerHTML=matches.map(t=>`<div onmousedown="$('globalSearch').value='';$('searchResults').classList.add('hidden');openTripDetail('${esc(t.id)}')"><b>${esc(t.id)}</b> — ${esc(t.salesName)} · ${esc(t.location)}</div>`).join('');
+  box.classList.remove('hidden');
+}
+document.addEventListener('click',e=>{if(e.target.id!=='globalSearch'){const r=$('searchResults');if(r)r.classList.add('hidden');}});
+
+/* ===== Director insights ===== */
+function renderDirectorInsights(){
+  const closed=trips.filter(t=>t.status==='closed');
+  const bySales={};
+  closed.forEach(t=>{
+    bySales[t.salesId]=bySales[t.salesId]||{name:t.salesName,advanceSum:0,expenseSum:0,count:0};
+    bySales[t.salesId].advanceSum+=tripIssued(t.id);
+    bySales[t.salesId].expenseSum+=tripExpense(t.id);
+    bySales[t.salesId].count++;
+  });
+  const idleWrap=$('dirIdleAdvance');
+  const idleEntries=Object.values(bySales).map(s=>({name:s.name,idlePerTrip:(s.advanceSum-s.expenseSum)/s.count})).sort((a,b)=>b.idlePerTrip-a.idlePerTrip);
+  if(!idleEntries.length){idleWrap.innerHTML='<small>Abhi koi closed trip nahi hai.</small>';}
+  else{
+    const total=idleEntries.reduce((s,e)=>s+Math.max(0,e.idlePerTrip),0);
+    idleWrap.innerHTML=`<div style="text-align:center;padding:6px 0 12px;border-bottom:1px solid #edf1ee;margin-bottom:10px"><small style="color:var(--muted);font-weight:600">AVG IDLE CAPITAL PER TRIP (ALL SALES)</small><div style="font-size:26px;font-weight:800;color:var(--amber);margin-top:4px">${money(total)}</div></div>`+
+    idleEntries.map(e=>`<div class="togrow"><span>${e.idlePerTrip>2000?'🔴':(e.idlePerTrip>500?'🟡':'🟢')} <b>${esc(e.name)}</b></span><b>${money(e.idlePerTrip)} / trip</b></div>`).join('');
+  }
+  const effWrap=$('dirEfficiency');
+  const purposeLocAvg={};
+  closed.forEach(t=>{
+    const key=(t.location||'-')+'|'+(t.purpose||'-');
+    purposeLocAvg[key]=purposeLocAvg[key]||{sum:0,count:0};
+    purposeLocAvg[key].sum+=tripExpense(t.id);purposeLocAvg[key].count++;
+  });
+  const effEntries=Object.values(bySales).map(s=>{
+    const salesTrips=closed.filter(t=>t.salesId===Object.keys(bySales).find(k=>bySales[k]===s));
+    let ratios=[];
+    salesTrips.forEach(t=>{
+      const key=(t.location||'-')+'|'+(t.purpose||'-');
+      const bench=purposeLocAvg[key];
+      if(bench&&bench.count>0){const avg=bench.sum/bench.count;if(avg>0)ratios.push(tripExpense(t.id)/avg);}
+    });
+    const ratio=ratios.length?ratios.reduce((a,b)=>a+b,0)/ratios.length:1;
+    return {name:s.name,pct:Math.round((ratio-1)*100)};
+  }).sort((a,b)=>a.pct-b.pct);
+  if(!effEntries.length){effWrap.innerHTML='<small>Abhi koi closed trip nahi hai.</small>';}
+  else{
+    effWrap.innerHTML=effEntries.map((e,i)=>{
+      const label=e.pct<=-2?'Most Efficient':(e.pct<=2?'On Par':'Room to Improve');
+      const badgeStyle=e.pct<=-2?'background:var(--mint);color:var(--g)':(e.pct<=2?'background:#EEF3F0;color:var(--muted)':'background:var(--amberbg);color:var(--amber)');
+      return `<div class="togrow"><span>${i===0?'🏆 ':''}<b>${esc(e.name)}</b> — ${e.pct>=0?'+':''}${e.pct}% vs benchmark</span><span class="tag" style="${badgeStyle}">${label}</span></div>`;
+    }).join('');
+  }
+  const benchWrap=$('dirBenchmark');
+  const byCity={};
+  Object.entries(purposeLocAvg).forEach(([key,v])=>{
+    const [loc,purpose]=key.split('|');
+    byCity[loc]=byCity[loc]||[];
+    byCity[loc].push({purpose,avg:v.sum/v.count,count:v.count});
+  });
+  if(!Object.keys(byCity).length){benchWrap.innerHTML='<small>Abhi koi closed trip nahi hai.</small>';}
+  else{
+    const colors={Exhibition:'var(--red)','Client Visit':'var(--amber)','Sales Tour':'var(--g2)'};
+    benchWrap.innerHTML=Object.entries(byCity).map(([city,items])=>`<div class="benchgroup"><div class="benchcity">${esc(city)}</div>`+
+      items.sort((a,b)=>b.avg-a.avg).map(it=>`<div class="benchrow"><span class="bdot" style="background:${colors[it.purpose]||'var(--muted)'}"></span><span class="bpurpose">${esc(it.purpose)}</span><span class="bmeta">${it.count} trip${it.count>1?'s':''}</span><b>${money(it.avg)}</b></div>`).join('')+
+    `</div>`).join('');
+  }
+}
+function openReport(){
+  const closed=trips.filter(t=>t.status==='closed');
+  const totalAdvance=closed.reduce((s,t)=>s+tripIssued(t.id),0);
+  const totalSpent=closed.reduce((s,t)=>s+tripExpense(t.id),0);
+  const bySales={};
+  closed.forEach(t=>{bySales[t.salesId]=bySales[t.salesId]||{name:t.salesName,count:0,spent:0};bySales[t.salesId].count++;bySales[t.salesId].spent+=tripExpense(t.id);});
+  const byCategory={};
+  ledger.filter(l=>l.type==='expense').forEach(l=>{byCategory[l.category||'Other']=(byCategory[l.category||'Other']||0)+Number(l.amount);});
+  const catTotal=Object.values(byCategory).reduce((a,b)=>a+b,0)||1;
+  $('reportBody').innerHTML=`<div class="money" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px"><div class="m"><small>TOTAL ADVANCE</small><b>${money(totalAdvance)}</b></div><div class="m"><small>TOTAL SPENT</small><b>${money(totalSpent)}</b></div><div class="m"><small>TRIPS CLOSED</small><b>${closed.length}</b></div></div>`+
+  `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">By Sales Person</div>`+
+  Object.values(bySales).map(s=>`<div class="row"><span>${esc(s.name)}<br><small>${s.count} trip${s.count>1?'s':''}</small></span><b>${money(s.spent)}</b></div>`).join('')+
+  `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin:14px 0 6px">By Category</div>`+
+  Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="bar"><label><span>${esc(c)}</span><b>${money(v)} · ${Math.round(v/catTotal*100)}%</b></label><div><i style="width:${Math.round(v/catTotal*100)}%"></i></div></div>`).join('');
+  show('reportModal');
 }
 
 /* ===== Nav + role gating ===== */
@@ -571,6 +985,8 @@ function renderPage(id){
   else if(id==='pending')renderPendingPage();
   else if(id==='analytics')renderAnalyticsPage();
   else if(id==='accounts')renderAccountsPage();
+  else if(id==='explorer')renderExplorerPage();
+  else if(id==='activity')renderActivityPage();
   else if(id==='notify')renderNotifyPage();
 }
 function currentPageId(){const on=document.querySelector('.page.on');return on?on.id:'admin'}
@@ -592,6 +1008,7 @@ function applyRoleVisibility(){
 /* ===== Gate / boot ===== */
 function renderGate(){
   const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
+  $('searchBoxWrap').classList.add('hidden');
   const u=myUserObj();
   if(!currentUser||!u){
     gateWrap.style.display='block';appWrap.style.display='none';
@@ -611,6 +1028,7 @@ function renderGate(){
   }
   gateWrap.style.display='none';appWrap.style.display='block';
   $('bottomNav').style.display='';
+  $('searchBoxWrap').classList.toggle('hidden',role==='sales');
 }
 function renderAll(){
   refreshLoginBadge();
@@ -622,7 +1040,7 @@ function renderAll(){
 }
 function boot(){
   currentUser=localStorage.getItem(SESSION_KEY)||null;
-  startUsersSync();startTripsSync();startLedgerSync();startSettingsSync();
+  startUsersSync();startTripsSync();startLedgerSync();startSettingsSync();startOptionsSync();startLedgerHeadsSync();startActivitySync();
   renderAll();
 }
 document.addEventListener('DOMContentLoaded',boot);
