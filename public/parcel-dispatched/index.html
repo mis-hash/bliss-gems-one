@@ -1613,7 +1613,7 @@ function refreshLoginBadge(){
 function hardRefreshApp(){
   var btn=document.getElementById('hardRefreshBtn');
   if(btn)btn.textContent='⏳';
-  var done=function(){location.reload(true)};
+  var done=function(){location.replace(location.pathname+'?_r='+Date.now()+location.hash)};
   if('caches' in window){
     caches.keys().then(function(names){
       return Promise.all(names.map(function(n){return caches.delete(n)}));
