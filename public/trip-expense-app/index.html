@@ -30,6 +30,7 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 .grouplabel{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:14px 11px 6px}.grouplabel:first-child{padding-top:4px}
 nav button{display:flex;align-items:center;gap:8px;border-left:3px solid transparent}nav button.on{border-left-color:var(--g)}
 .togrow{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #edf1ee;font-size:13px;gap:8px}.togrow:last-child{border:0}
+.rolerow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #edf1ee}.rolerow:last-child{border:0}.rolerow .avatar{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-weight:800;font-size:11.5px;flex:none;background:var(--mint);color:var(--g)}
 .benchgroup{padding:9px 0;border-bottom:1px solid #edf1ee}.benchgroup:last-child{border:0}.benchcity{font-size:13px;font-weight:800;margin-bottom:5px}
 .benchrow{display:flex;align-items:center;gap:9px;padding:4px 0 4px 3px;font-size:12.5px}.bdot{width:8px;height:8px;border-radius:50%;flex:none}.bpurpose{width:110px;font-weight:600}.bmeta{flex:1;color:var(--muted);font-size:11px}
 .searchbox{position:relative;flex:1;max-width:280px}.searchbox input{width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;background:var(--bg)}
@@ -77,6 +78,7 @@ if(window.self!==window.top){
 <button data-role="director" onclick="go('director',this)">★ Directors</button>
 <button data-role="director" onclick="go('notify',this)">💬 Notifications</button>
 <button data-role="director" onclick="go('templates',this)">📝 Message Templates</button>
+<button data-role="director" onclick="go('teamroles',this)">👥 Team &amp; Roles</button>
 </nav><main>
 
 <section id="admin" class="page on">
@@ -97,7 +99,7 @@ if(window.self!==window.top){
 <div class="panel"><div class="ph"><span>💰 Idle Advance<small>capital tied up unnecessarily</small></span></div><div class="pb" id="dirIdleAdvance"></div></div>
 <div class="panel"><div class="ph"><span>🏆 Cost Efficiency Ranking<small>vs. company benchmark</small></span></div><div class="pb" id="dirEfficiency"></div></div>
 <div class="panel"><div class="ph"><span>Location × Purpose Benchmark<small>avg. per trip</small></span></div><div class="pb" id="dirBenchmark"></div></div>
-<div class="panel"><div class="ph"><span>Team Roles</span><span class="tag">DIRECTORS ONLY</span></div><div class="pb"><div class="note" style="font-size:12px;color:var(--muted);margin-bottom:8px">Universal Users list se yahan role assign karein — Admin / Director / Sales / Accounts.</div><div id="rolesList"><div class="row"><small>Loading…</small></div></div></div></div>
+<div class="panel"><div class="ph"><span>Team Roles</span><span class="tag">DIRECTORS ONLY</span></div><div class="pb"><div class="note" style="font-size:12px;color:var(--muted)">Role assign karne ke liye <b style="color:var(--txt)">Team &amp; Roles</b> page par jaayein.</div><div style="margin-top:10px"><button class="btn primary" onclick="go('teamroles')">👥 Open Team &amp; Roles</button></div></div></div>
 </section>
 
 <section id="sales" class="page"><div class="salesWrap" id="salesWrap"><div class="row"><small>Loading…</small></div></div></section>
@@ -135,9 +137,23 @@ if(window.self!==window.top){
 <div class="panel"><div class="pb" id="activityList"><div class="row"><small>Loading…</small></div></div></div>
 </section>
 
-<section id="notify" class="page"><div class="panel"><div class="ph">WhatsApp Notification Control</div><div class="pb" id="notifyRows"></div></div></section>
+<section id="notify" class="page">
+<div class="hero" style="margin-bottom:12px"><div><h1 style="font-size:20px">WhatsApp Notification Control</h1><p>Kise kis event par WhatsApp jaaye — event ke real Firestore settings se</p></div></div>
+<div id="notifyRows"></div>
+</section>
 
 <section id="templates" class="page"><div class="panel"><div class="ph"><span>Message Templates</span><small style="font-weight:500">{name} {amount} {location} {tripId} {due} {noc} {balance} {returned} {mode} auto-fill karte hain</small></div><div class="pb" id="templatesRows"></div></div></section>
+
+<section id="teamroles" class="page">
+<div class="hero" style="margin-bottom:12px"><div><h1 style="font-size:20px">Team &amp; Roles</h1><p>Bliss One ke Universal Users me se Trip Expense role assign karein</p></div></div>
+<div class="panel"><div class="pb">
+  <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:10px">Naye log <b style="color:var(--txt)">Bliss One hub → Universal Users</b> me banaye jaate hain (naam, mobile, password). Ye page sirf yahi decide karta hai ki unhe Trip Expense me kaunsa role mile.</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <input type="text" id="teamRolesSearch" placeholder="🔎 Naam se Universal Users search karein…" oninput="renderTeamRolesPage()" style="flex:1;min-width:160px;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+  </div>
+</div></div>
+<div class="panel"><div class="ph">Current Team</div><div class="pb" id="teamRolesList"><div class="row"><small>Loading…</small></div></div></div>
+</section>
 </main></div>
 
 <div class="bottomNav" id="bottomNav">
@@ -622,18 +638,21 @@ async function setUserAppRole(userId,role){
   const patch={};patch['appRoles.'+APP_SLUG]=role||firebase.firestore.FieldValue.delete();
   await db.collection(UU_COLLECTION).doc(userId).update(patch);
 }
-function renderRolesList(){
-  const wrap=$('rolesList');if(!wrap)return;
-  if(!users.length){wrap.innerHTML='<div class="row"><small>Koi user nahi hai.</small></div>';return}
-  wrap.innerHTML=users.map(u=>{
+function teamRoleInitials(name){return (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()}
+function renderTeamRolesPage(){
+  const wrap=$('teamRolesList');if(!wrap)return;
+  const q=($('teamRolesSearch')?$('teamRolesSearch').value:'').trim().toLowerCase();
+  const list=q?users.filter(u=>(u.name||'').toLowerCase().includes(q)):users;
+  if(!list.length){wrap.innerHTML='<div class="row"><small>Koi user nahi mila.</small></div>';return}
+  wrap.innerHTML=list.map(u=>{
     const role=(u.appRoles&&u.appRoles[APP_SLUG])||'';
-    return `<div class="row"><span>${esc(u.name)}<br><small>${esc(u.username||u.id)}</small></span>
-    <select style="padding:8px;border:1px solid var(--line);border-radius:6px;font-size:13px" onchange="setUserAppRole('${esc(u.id)}',this.value)">
+    return `<div class="rolerow"><div class="avatar">${esc(teamRoleInitials(u.name))}</div><div style="flex:1;font-size:13px;font-weight:700">${esc(u.name)}<br><small style="font-weight:500;color:var(--muted)">${esc(u.username||u.id)}</small></div>
+    <select class="rolesel" style="border:1px solid var(--line);background:#fff;color:var(--txt);padding:7px 9px;border-radius:6px;font-size:13px" onchange="setUserAppRole('${esc(u.id)}',this.value)">
       <option value=""${role===''?' selected':''}>No Access</option>
-      <option value="sales"${role==='sales'?' selected':''}>Sales Person</option>
+      <option value="sales"${role==='sales'?' selected':''}>Sales</option>
       <option value="admin"${role==='admin'?' selected':''}>Admin</option>
-      <option value="director"${role==='director'?' selected':''}>Director</option>
       <option value="accounts"${role==='accounts'?' selected':''}>Accounts</option>
+      <option value="director"${role==='director'?' selected':''}>Director</option>
     </select></div>`;
   }).join('');
 }
@@ -689,7 +708,6 @@ function renderDirectorPage(){
     <div class="row"><span><b>🔴 ${overdue.length} Hisaab Overdue</b><br><small>${money(overdue.reduce((s,t)=>s+tripBalance(t.id),0))} advance abhi unsettled</small></span><button class="btn" onclick="go('pending')">View</button></div>
     <div class="row"><span><b>🧾 ${noBill} No-Bill Expenses</b></span></div>
     <div class="row"><span><b>📚 ${money(awaitingBook)} Awaiting Bookkeeping</b></span><button class="btn" onclick="go('accounts')">View</button></div>`;
-  renderRolesList();
   renderDirectorInsights();
 }
 function renderSalesPage(){
@@ -780,8 +798,19 @@ function renderAccountsPage(){
 }
 function renderNotifyPage(){
   const wrap=$('notifyRows');if(!wrap)return;
-  const rows=[['issued','Amount Issued → Sales Person'],['additional','Additional Advance → Sales Person'],['overdue','Overdue → Sales Person + Admin (manual send)'],['submitted','Hisaab Submitted → Admin/Director'],['closed','Trip Closed / NOC → Sales + Admin + Accounts'],['booked','Trip Booked → Director']];
-  wrap.innerHTML=rows.map(([k,label])=>`<div class="row"><span>${esc(label)}</span><i class="toggle ${notifySettings[k]!==false?'on':''}" onclick="toggleNotify('${k}',this)"></i></div>`).join('');
+  const groups=[
+    ['👤 Sales Person','the person on the trip',[['issued','Advance issued to them'],['additional','Additional advance issued']]],
+    ['▦ Admin','issues advances, verifies hisaab',[['submitted','Hisaab submitted, ready to verify'],['overdue','Overdue reminder (manual send)']]],
+    ['📚 Accounts','books the closed trips',[['closed','Trip closed — NOC + settlement notice']]],
+    ['★ Director','oversight, escalations',[['booked','Trip marked Booked']]],
+  ];
+  wrap.innerHTML=groups.map(([title,sub,rows])=>`
+    <div class="panel" style="margin-bottom:14px"><div class="ph"><span>${esc(title)}<small style="display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:2px">${esc(sub)}</small></span></div><div class="pb">
+    ${rows.map(([k,label])=>`<div class="togrow"><span>${esc(label)}</span><i class="toggle ${notifySettings[k]!==false?'on':''}" onclick="toggleNotify('${k}',this)"></i></div>`).join('')}
+    </div></div>`).join('')
+  +`<div class="panel"><div class="ph">⚠️ Failure Alerts<small style="display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:2px">Kuch send nahi ho paya to yahan flag hota hai — inhe band nahi kiya ja sakta</small></div><div class="pb">
+    <div style="font-size:11.5px;color:var(--muted);line-height:1.55">WhatsApp bhejne me fail ho (GREEN-API down ya connection issue) to hub par ${esc('🔄')} status dikhta hai. Failure alerts hamesha on rehte hain kyunki ye kisi ke turant dhyaan maangte hain, routine update nahi.</div>
+    </div></div>`;
 }
 async function toggleNotify(key,el){
   const val=!el.classList.contains('on');
@@ -1056,6 +1085,7 @@ function renderPage(id){
   else if(id==='explorer')renderExplorerPage();
   else if(id==='activity')renderActivityPage();
   else if(id==='notify')renderNotifyPage();
+  else if(id==='teamroles')renderTeamRolesPage();
 }
 function currentPageId(){const on=document.querySelector('.page.on');return on?on.id:'admin'}
 function applyRoleVisibility(){
