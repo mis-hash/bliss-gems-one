@@ -3,11 +3,15 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bliss Gems & Minerals - Trip Expense</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <style>
 :root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--pink:#F2A8C0;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
-*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}button,input,select,textarea{font:inherit}
+*{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}button,input,select,textarea{font:inherit}
+.disp,h1,h2,h3,.card b,.kpi .val,.m b,.tm b,.trip-row>div>b,.pamt,.pname,.tabular{font-family:'Manrope',sans-serif}
 .hidden{display:none!important}
 header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}.head{height:100%;max-width:1250px;margin:auto;padding:0 18px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;gap:10px;align-items:center}.logo{width:44px;height:44px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:28px;font-weight:900;color:var(--g2)}.brand b{color:var(--g);font-size:20px}.brand small{display:block;font-size:12px;color:var(--muted);margin-top:2px}.live{font-size:13px;font-weight:800;color:var(--g2)}
 .headRight{display:flex;align-items:center;gap:10px}.pill{font-size:13px;font-weight:700;background:var(--mint);color:var(--g);padding:7px 12px;border-radius:999px}
@@ -1093,7 +1097,7 @@ function renderGate(){
     gateBox.innerHTML=`<h3>Role Assign Nahi Hua</h3><p style="font-size:13px;color:var(--muted)">Login ho gaya, lekin abhi is app me aapka koi role (Admin/Director/Sales/Accounts) assign nahi hai. Director se karwayein — ya khud Super Admin unlock karke Director → Team Roles se set karein.</p>`;
     return;
   }
-  gateWrap.style.display='none';appWrap.style.display='block';
+  gateWrap.style.display='none';appWrap.style.display='';
   $('bottomNav').style.display='';
   $('searchBoxWrap').classList.toggle('hidden',role==='sales');
 }
