@@ -1899,4 +1899,19 @@ window.addEventListener('storage',e=>{
 });
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){renderHistory();renderReturnHistory();}});
 
+/* ===== Use Bliss One's shared GREEN-API config (same as hub + Trip Expense) if set, ===== */
+/* falling back to this app's own local settings otherwise. */
+async function pdLoadSharedGreenApi(){
+  try{
+    const doc=await pdDb.collection('app_config').doc('greenapi').get();
+    if(doc.exists){
+      const d=doc.data();
+      if(d.idInstance&&d.apiToken){
+        api={baseUrl:d.baseUrl||'https://api.green-api.com',idInstance:d.idInstance,apiToken:d.apiToken};
+        if(typeof pdRefreshStatusBar==='function')pdRefreshStatusBar();
+      }
+    }
+  }catch(e){console.error('shared greenapi load failed',e);}
+}
+document.addEventListener('DOMContentLoaded',pdLoadSharedGreenApi);
 </script></body></html>
