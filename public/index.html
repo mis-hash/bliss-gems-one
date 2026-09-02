@@ -220,6 +220,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
         <button class="btn soft" id="staffLoginBtn" onclick="openStaffLoginModal()">👤 Staff Login</button>
         <div class="hidden" id="staffUserMenu" style="position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.15);min-width:180px;overflow:hidden;z-index:50">
           <div id="staffUserMenuName" style="padding:10px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)"></div>
+          <button class="btn" style="width:100%;border:none;border-radius:0;text-align:left" onclick="openStaffChangePasswordModal()">🔑 Change Password</button>
           <button class="btn" style="width:100%;border:none;border-radius:0;text-align:left" onclick="staffLogout()">Logout</button>
         </div>
       </div>
@@ -457,14 +458,23 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
         <button class="btn primary" type="button" onclick="staffLogin()" style="width:100%;margin-top:10px">
           Login
         </button>
+        <button class="btn" type="button" onclick="staffForgotPassword()" style="width:100%;margin-top:8px;background:transparent;border:none;color:var(--green);font-weight:600">
+          Forgot Password?
+        </button>
       </div>
       <div id="staffLoginStep2" class="hidden">
         <div class="deployBox" id="staffOtpInfo" style="margin-bottom:10px"></div>
         <label>WhatsApp OTP</label>
-        <input type="text" id="staffLoginOtp" placeholder="6-digit code" autocomplete="off" inputmode="numeric"
+        <input type="text" id="staffLoginOtp" placeholder="6-digit code" autocomplete="off" inputmode="numeric">
+        <div style="height:8px"></div>
+        <label>New Password</label>
+        <input type="password" id="staffNewPassword" placeholder="Kam se kam 4 characters" autocomplete="new-password">
+        <div style="height:8px"></div>
+        <label>Confirm New Password</label>
+        <input type="password" id="staffNewPasswordConfirm" placeholder="Dobara likhein" autocomplete="new-password"
                onkeydown="if(event.key==='Enter')staffVerifyOtp()">
         <button class="btn primary" type="button" onclick="staffVerifyOtp()" style="width:100%;margin-top:10px">
-          Verify &amp; Login
+          Verify &amp; Set Password
         </button>
         <button class="btn" type="button" onclick="staffLoginBackToStep1()" style="width:100%;margin-top:8px">
           ← Back
@@ -472,6 +482,30 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       </div>
       <div id="staffLoginMsg" style="font-size:12px;margin-top:8px"></div>
       <div id="staffLoggedInBox" class="hidden" style="margin-top:8px;font-size:13px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="adminModal hidden" id="staffChangePasswordModal">
+  <div class="adminBox">
+    <div class="adminHead">
+      <b>🔑 Change Password</b>
+      <button class="btn" type="button" onclick="closeStaffChangePasswordModal()">✕</button>
+    </div>
+    <div class="adminBody">
+      <label>Current Password</label>
+      <input type="password" id="staffCurrentPassword" autocomplete="current-password">
+      <div style="height:8px"></div>
+      <label>New Password</label>
+      <input type="password" id="staffChangeNewPassword" placeholder="Kam se kam 4 characters" autocomplete="new-password">
+      <div style="height:8px"></div>
+      <label>Confirm New Password</label>
+      <input type="password" id="staffChangeNewPasswordConfirm" placeholder="Dobara likhein" autocomplete="new-password"
+             onkeydown="if(event.key==='Enter')staffSaveNewPassword()">
+      <button class="btn primary" type="button" onclick="staffSaveNewPassword()" style="width:100%;margin-top:10px">
+        Save New Password
+      </button>
+      <div id="staffChangePasswordMsg" style="font-size:12px;margin-top:8px"></div>
     </div>
   </div>
 </div>
@@ -615,6 +649,21 @@ async function sendWhatsAppOtp(phone,code){
   });
   if(!res.ok)throw new Error('WhatsApp OTP bhejne mein error aaya.');
 }
+async function staffSendOtpToUser(match){
+  const u=match.data();
+  if(!u.phone)throw new Error('Is user ka mobile number saved nahi hai, OTP nahi bhej sakte.');
+  const code=String(Math.floor(100000+Math.random()*900000));
+  await fbDb.collection(OTP_COLLECTION).doc(match.id).set({code,expiresAt:Date.now()+5*60*1000});
+  await sendWhatsAppOtp(u.phone,code);
+  pendingOtpUser=match.id;
+  document.getElementById('staffLoginStep1').classList.add('hidden');
+  document.getElementById('staffLoginStep2').classList.remove('hidden');
+  document.getElementById('staffOtpInfo').textContent='OTP '+u.phone+' par WhatsApp se bheja gaya hai. Verify karke naya password set karein.';
+  document.getElementById('staffLoginOtp').value='';
+  document.getElementById('staffNewPassword').value='';
+  document.getElementById('staffNewPasswordConfirm').value='';
+  setTimeout(()=>document.getElementById('staffLoginOtp')?.focus(),30);
+}
 async function staffLogin(){
   const uname=document.getElementById('staffLoginUsername').value.trim();
   const pass=document.getElementById('staffLoginPassword').value;
@@ -632,18 +681,35 @@ async function staffLogin(){
       return;
     }
     const u=match.data();
-    if(!u.phone){msg.style.color='#a12222';msg.textContent='Is user ka mobile number saved nahi hai, OTP nahi bhej sakte.';return;}
-    msg.style.color='';msg.textContent='OTP bhej rahe hain…';
-    const code=String(Math.floor(100000+Math.random()*900000));
-    await fbDb.collection(OTP_COLLECTION).doc(match.id).set({code,expiresAt:Date.now()+5*60*1000});
-    await sendWhatsAppOtp(u.phone,code);
-    pendingOtpUser=match.id;
-    document.getElementById('staffLoginStep1').classList.add('hidden');
-    document.getElementById('staffLoginStep2').classList.remove('hidden');
-    document.getElementById('staffOtpInfo').textContent='OTP '+u.phone+' par WhatsApp se bheja gaya hai.';
-    document.getElementById('staffLoginOtp').value='';
+    if(String(u.password||'1234')!=='1234'){
+      // apna password already set kar chuke hain — OTP ki zaroorat nahi
+      localStorage.setItem(PD_SESSION_KEY,match.id);
+      msg.textContent='';
+      closeStaffLoginModal();
+      updateStaffHeaderLabel();
+      return;
+    }
+    msg.style.color='';msg.textContent='Pehli baar login — WhatsApp OTP se naya password set karein…';
+    await staffSendOtpToUser(match);
     msg.textContent='';
-    setTimeout(()=>document.getElementById('staffLoginOtp')?.focus(),30);
+  }catch(e){
+    msg.style.color='#a12222';msg.textContent='Error: '+e.message;
+  }
+}
+async function staffForgotPassword(){
+  const uname=document.getElementById('staffLoginUsername').value.trim();
+  const msg=document.getElementById('staffLoginMsg');
+  if(!uname){msg.style.color='#a12222';msg.textContent='Pehle Username bharein, phir "Forgot Password" dabayein.';return;}
+  msg.style.color='';msg.textContent='OTP bhej rahe hain…';
+  try{
+    const snap=await fbDb.collection(UU_COLLECTION).get();
+    const match=snap.docs.find(d=>{
+      const u=d.data();
+      return String(u.username||d.id).toLowerCase()===uname.toLowerCase() && u.active!==false;
+    });
+    if(!match){msg.style.color='#a12222';msg.textContent='Username nahi mila.';return;}
+    await staffSendOtpToUser(match);
+    msg.textContent='';
   }catch(e){
     msg.style.color='#a12222';msg.textContent='Error: '+e.message;
   }
@@ -651,13 +717,18 @@ async function staffLogin(){
 async function staffVerifyOtp(){
   const msg=document.getElementById('staffLoginMsg');
   const entered=document.getElementById('staffLoginOtp').value.trim();
+  const newPw=document.getElementById('staffNewPassword').value;
+  const confirmPw=document.getElementById('staffNewPasswordConfirm').value;
   if(!pendingOtpUser){staffLoginBackToStep1();return;}
   if(!entered){msg.style.color='#a12222';msg.textContent='OTP daalein.';return;}
+  if(!newPw||newPw.length<4){msg.style.color='#a12222';msg.textContent='Naya password kam se kam 4 characters ka hona chahiye.';return;}
+  if(newPw==='1234'){msg.style.color='#a12222';msg.textContent='Default password (1234) se alag naya password chunein.';return;}
+  if(newPw!==confirmPw){msg.style.color='#a12222';msg.textContent='New Password aur Confirm Password match nahi karte.';return;}
   msg.style.color='';msg.textContent='Verify ho raha hai…';
   try{
     const doc=await fbDb.collection(OTP_COLLECTION).doc(pendingOtpUser).get();
     if(!doc.exists || doc.data().expiresAt<Date.now()){
-      msg.style.color='#a12222';msg.textContent='OTP expire ho gaya, dobara Login try karein.';
+      msg.style.color='#a12222';msg.textContent='OTP expire ho gaya, dobara try karein.';
       return;
     }
     if(String(doc.data().code)!==entered){
@@ -665,10 +736,45 @@ async function staffVerifyOtp(){
       return;
     }
     await fbDb.collection(OTP_COLLECTION).doc(pendingOtpUser).delete();
+    await fbDb.collection(UU_COLLECTION).doc(pendingOtpUser).update({password:newPw});
     localStorage.setItem(PD_SESSION_KEY,pendingOtpUser);
     pendingOtpUser=null;
     closeStaffLoginModal();
     updateStaffHeaderLabel();
+  }catch(e){
+    msg.style.color='#a12222';msg.textContent='Error: '+e.message;
+  }
+}
+function openStaffChangePasswordModal(){
+  toggleStaffUserMenu();
+  ['staffCurrentPassword','staffChangeNewPassword','staffChangeNewPasswordConfirm'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  document.getElementById('staffChangePasswordMsg').textContent='';
+  document.getElementById('staffChangePasswordModal')?.classList.remove('hidden');
+}
+function closeStaffChangePasswordModal(){
+  document.getElementById('staffChangePasswordModal')?.classList.add('hidden');
+}
+async function staffSaveNewPassword(){
+  const msg=document.getElementById('staffChangePasswordMsg');
+  const id=pdLoggedUserId();
+  if(!id){msg.style.color='#a12222';msg.textContent='Pehle login karein.';return;}
+  const cur=document.getElementById('staffCurrentPassword').value;
+  const newPw=document.getElementById('staffChangeNewPassword').value;
+  const confirmPw=document.getElementById('staffChangeNewPasswordConfirm').value;
+  if(newPw.length<4){msg.style.color='#a12222';msg.textContent='Naya password kam se kam 4 characters ka hona chahiye.';return;}
+  if(newPw!==confirmPw){msg.style.color='#a12222';msg.textContent='New Password aur Confirm Password match nahi karte.';return;}
+  msg.style.color='';msg.textContent='Save ho raha hai…';
+  try{
+    const doc=await fbDb.collection(UU_COLLECTION).doc(id).get();
+    if(!doc.exists){msg.style.color='#a12222';msg.textContent='User record nahi mila.';return;}
+    if(cur!==String(doc.data().password||'1234')){
+      msg.style.color='#a12222';msg.textContent='Current Password galat hai.';
+      return;
+    }
+    await fbDb.collection(UU_COLLECTION).doc(id).update({password:newPw});
+    closeStaffChangePasswordModal();
   }catch(e){
     msg.style.color='#a12222';msg.textContent='Error: '+e.message;
   }
