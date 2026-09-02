@@ -15,6 +15,7 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 .page{display:none}.page.on{display:block}.hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px;display:flex;justify-content:space-between;gap:12px}.hero h1{font-size:26px;margin:0 0 5px}.hero p{font-size:13px;margin:0;opacity:.9}.hero small{display:block;text-align:right;font-size:11px;opacity:.85}.hero strong{font-size:30px}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}.card,.panel{background:#fff;border:1px solid var(--line);border-radius:13px}.card{padding:15px}.card small{font-size:11px;color:var(--muted)}.card b{display:block;font-size:22px;margin-top:6px}.red{background:var(--redbg)!important;color:var(--red)!important}.panel{overflow:hidden;margin-top:12px}.ph{padding:14px 16px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}.pb{padding:15px}.btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer}.primary{background:var(--g);color:#fff}.btn.danger{background:var(--redbg);color:var(--red)}
 .person{border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:13px;margin-bottom:10px;background:#fff;box-shadow:0 1px 2px rgba(22,36,31,.04)}.person.overdue{border-left-color:var(--red)}.person.verify{border-left-color:var(--amber)}.pt{display:flex;justify-content:space-between;gap:8px}.person h3{font-size:14px;margin:0}.person p{font-size:12px;color:var(--muted);margin:4px 0}.tag{font-size:11px;font-weight:bold;background:var(--mint);color:var(--g);padding:6px 9px;border-radius:99px;height:max-content}.amber{background:var(--amberbg);color:var(--amber)}.money{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:10px}.m{background:#f7faf8;padding:9px;border-radius:7px}.m small{display:block;font-size:10px;color:var(--muted)}.m b{font-size:13px}
+.trip-row{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid var(--line);border-radius:13px;padding:13px 15px;margin-bottom:9px}.trip-row .stripe{width:4px;align-self:stretch;border-radius:3px;flex:none}.trip-row .avatar{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-weight:800;font-size:11.5px;flex:none}.trip-row .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:5px 10px;border-radius:99px;white-space:nowrap;flex:none}
 .timeline{position:relative;padding-left:18px}.event{position:relative;padding:0 0 18px 15px;border-left:2px solid #dfe9e3}.event:last-child{padding-bottom:0}.event:before{content:"";position:absolute;width:10px;height:10px;border-radius:50%;background:var(--g2);left:-6px;top:1px}.event b{font-size:13px}.event small{display:block;font-size:11px;color:var(--muted);margin-top:4px}.event strong{font-size:13px;float:right}
 .filters{display:flex;gap:6px;flex-wrap:wrap}.filters select{padding:8px;border:1px solid var(--line);border-radius:7px;font-size:12px;background:#fff}.analytics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.metric{background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px}.metric h3{font-size:13px;margin:0 0 10px}.bar{margin:9px 0}.bar label{font-size:11px;display:flex;justify-content:space-between}.bar div{height:6px;background:#edf1ee;border-radius:9px;margin-top:4px}.bar i{display:block;height:100%;background:var(--g2);border-radius:9px}
 .salesWrap{max-width:640px;margin:auto}.trip{background:radial-gradient(circle at 100% 100%,rgba(242,168,192,.3),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:18px;padding:20px}.trip h1{font-size:23px;margin:0 0 4px}.trip p{font-size:12px;margin:0;opacity:.85}.tripMoney{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}.tm{background:#ffffff12;border:1px solid #ffffff25;border-radius:9px;padding:11px}.tm small{font-size:10px;display:block;opacity:.85}.tm b{font-size:19px;display:block;margin-top:4px}.salesActions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.big{min-height:74px;border:1px solid var(--line);background:#fff;border-radius:12px;font-size:13px;font-weight:bold;cursor:pointer}.big span{font-size:22px;display:block;margin-bottom:4px}
@@ -647,12 +648,24 @@ function renderAdminPage(){
   if(!active.length){list.innerHTML='<div class="row"><small>Koi live trip nahi hai.</small></div>';return}
   list.innerHTML=active.map(t=>{
     const issued=tripIssued(t.id),expense=tripExpense(t.id),balance=issued-expense;
-    const noBill=tripLedger(t.id).filter(l=>l.type==='expense'&&!l.proofDataUri).length;
-    const tag=t.status==='hisaab_submitted'?'<span class="tag amber">VERIFY</span>':(isOverdue(t)?'<span class="tag" style="background:var(--redbg);color:var(--red)">OVERDUE</span>':'<span class="tag">RUNNING</span>');
-    const stateClass=t.status==='hisaab_submitted'?'verify':(isOverdue(t)?'overdue':'');
-    return `<div class="person ${stateClass}"><div class="pt"><div><h3>${esc(t.salesName)} • ${esc(t.location)} • ${esc(t.id)}</h3><p>Due ${esc(t.dueDate)}</p></div>${tag}</div>
-    <div class="money"><div class="m"><small>ISSUED</small><b>${money(issued)}</b></div><div class="m"><small>SPENT</small><b>${money(expense)}</b></div><div class="m"><small>BALANCE</small><b>${money(balance)}</b></div><div class="m"><small>NO BILL</small><b>${noBill}</b></div>
-    <div class="m"><small>ACTION</small>${t.status==='hisaab_submitted'?`<button class="btn primary" onclick="closeTrip('${esc(t.id)}')">Close/NOC</button>`:`<button class="btn" onclick="openExtraModal('${esc(t.id)}')">+ Advance</button>`}</div></div></div>`;
+    const initials=String(t.salesName||'?').trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    const state=t.status==='hisaab_submitted'?'verify':(isOverdue(t)?'overdue':'active');
+    const colors={
+      active:{stripe:'var(--g2)',avatarBg:'var(--mint)',avatarColor:'var(--g)',badgeBg:'var(--mint)',badgeColor:'var(--g)',label:'Active'},
+      overdue:{stripe:'var(--red)',avatarBg:'var(--redbg)',avatarColor:'var(--red)',badgeBg:'var(--redbg)',badgeColor:'var(--red)',label:'Overdue'},
+      verify:{stripe:'var(--amber)',avatarBg:'var(--amberbg)',avatarColor:'var(--amber)',badgeBg:'var(--amberbg)',badgeColor:'var(--amber)',label:'To Verify'}
+    }[state];
+    const action=state==='verify'
+      ?`<button class="btn primary" style="margin-left:8px" onclick="event.stopPropagation();closeTrip('${esc(t.id)}')">✓ Verify &amp; Close</button>`
+      :(state==='active'?`<button class="btn" style="margin-left:8px" onclick="event.stopPropagation();openExtraModal('${esc(t.id)}')">+ Advance</button>`:'');
+    return `<div class="trip-row" style="cursor:pointer" onclick="openTripDetail('${esc(t.id)}')">
+    <div class="stripe" style="background:${colors.stripe}"></div>
+    <div class="avatar" style="background:${colors.avatarBg};color:${colors.avatarColor}">${esc(initials)}</div>
+    <div style="flex:1"><b>${esc(t.salesName)}</b><br><small style="color:var(--muted)">${esc(t.location)} • Due ${esc(t.dueDate)}</small></div>
+    <div style="text-align:right"><div style="font-weight:800">${money(balance)}</div><small style="color:var(--muted)">balance</small></div>
+    <span class="badge" style="background:${colors.badgeBg};color:${colors.badgeColor}">${esc(colors.label)}</span>
+    ${action}
+    </div>`;
   }).join('');
 }
 function renderDirectorPage(){
