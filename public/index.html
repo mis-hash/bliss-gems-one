@@ -18,6 +18,7 @@
   --shadow:0 10px 30px rgba(21,83,45,.08);
 }
 *{box-sizing:border-box}
+html{scroll-behavior:smooth}
 body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
 header{
   position:sticky;top:0;z-index:20;background:rgba(255,255,255,.95);
@@ -36,9 +37,13 @@ header{
 .actions{display:flex;gap:8px;align-items:center}
 .btn{
   border:1px solid var(--line);background:white;color:var(--text);
-  padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer
+  padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer;
+  transition:background .15s ease,border-color .15s ease,box-shadow .15s ease,transform .08s ease
 }
+.btn:hover{box-shadow:0 4px 14px rgba(21,83,45,.1)}
+.btn:active{transform:scale(.97)}
 .btn.primary{background:var(--green);color:white;border-color:var(--green)}
+.btn.primary:hover{background:var(--green2)}
 .btn.soft{background:var(--soft);color:var(--green);border-color:#cce0d3}
 .page{max-width:1400px;margin:auto;padding:22px 18px 40px}
 .hero{
@@ -64,8 +69,10 @@ input,select{
 .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
 .appCard{
   background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;
-  box-shadow:0 4px 16px rgba(0,0,0,.035);display:flex;flex-direction:column;gap:12px
+  box-shadow:0 4px 16px rgba(0,0,0,.035);display:flex;flex-direction:column;gap:12px;
+  transition:box-shadow .18s ease,transform .18s ease
 }
+.appCard:hover{box-shadow:0 10px 26px rgba(21,83,45,.1);transform:translateY(-2px)}
 .appHead{display:flex;gap:12px;align-items:center}
 .appIcon{
   width:46px;height:46px;border-radius:12px;background:var(--soft);display:grid;
@@ -114,20 +121,34 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
 .appSidebar .sideLabel{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:6px 10px;margin-top:6px}
 .sideItem{
   display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:10px;
-  cursor:pointer;color:var(--text);font-weight:600;font-size:13px;border:1px solid transparent
+  cursor:pointer;color:var(--text);font-weight:600;font-size:13px;border:1px solid transparent;
+  transition:background .15s ease,color .15s ease
 }
 .sideItem:hover{background:var(--soft)}
 .sideItem.active{background:var(--green);color:#fff}
 .sideItem .sideIcon{font-size:16px}
 .sideEmpty{padding:10px;font-size:12px;color:var(--muted)}
 .shellWrap .page{max-width:none;margin:0;flex:1;min-width:0}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+#appViewer:not(.hidden),#dashboardContent:not(.hidden){animation:fadeIn .18s ease}
 #appViewer{
   flex:1 1 auto;min-width:0;height:calc(100vh - 73px);
-  display:flex;flex-direction:column;background:var(--card)
+  display:flex;flex-direction:column;background:var(--card);position:relative
 }
 .appViewerHead{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);flex-shrink:0}
 .appViewerHead h3{margin:0;font-size:15px;flex:1}
-#appViewerFrame{flex:1;width:100%;border:0;display:block}
+#appViewerFrame{flex:1;width:100%;border:0;display:block;opacity:0;transition:opacity .25s ease}
+#appViewerFrame.loaded{opacity:1}
+#appViewerLoading{
+  position:absolute;inset:0;top:53px;display:flex;align-items:center;justify-content:center;
+  background:var(--card);gap:10px;color:var(--muted);font-size:13px;font-weight:600
+}
+#appViewerLoading.hidden{display:none}
+.spinner{
+  width:22px;height:22px;border-radius:50%;border:3px solid var(--line);
+  border-top-color:var(--green);animation:spin .7s linear infinite
+}
+@keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:1100px){.grid{grid-template-columns:repeat(2,1fr)}.hero{grid-template-columns:1fr}.uploadGrid{grid-template-columns:1fr 1fr}.steps{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:900px){
   .shellWrap{flex-direction:column}
@@ -393,6 +414,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <h3 id="appViewerTitle"></h3>
       <a class="btn soft" id="appViewerOpenNew" href="#" target="_blank" rel="noopener">↗ New Tab</a>
     </div>
+    <div class="hidden" id="appViewerLoading"><span class="spinner"></span> Loading…</div>
     <iframe id="appViewerFrame" src="about:blank"></iframe>
   </section>
 </div>
@@ -1237,7 +1259,15 @@ function renderSidebarApps(list){
 function openAppInline(slug,name){
   document.getElementById('dashboardContent')?.classList.add('hidden');
   document.getElementById('appViewerTitle').textContent=name;
-  document.getElementById('appViewerFrame').src='/'+slug+'/';
+  const frame=document.getElementById('appViewerFrame');
+  const loading=document.getElementById('appViewerLoading');
+  frame.classList.remove('loaded');
+  loading?.classList.remove('hidden');
+  frame.onload=()=>{
+    frame.classList.add('loaded');
+    loading?.classList.add('hidden');
+  };
+  frame.src='/'+slug+'/';
   document.getElementById('appViewerOpenNew').href='/'+slug+'/';
   document.getElementById('appViewer')?.classList.remove('hidden');
   document.getElementById('staffLoginWrap')?.classList.add('hidden');
@@ -1253,7 +1283,8 @@ function closeAppViewer(){
   document.getElementById('dashboardContent')?.classList.remove('hidden');
   document.getElementById('staffLoginWrap')?.classList.remove('hidden');
   const frame=document.getElementById('appViewerFrame');
-  if(frame)frame.src='about:blank';
+  if(frame){frame.src='about:blank';frame.classList.remove('loaded');}
+  document.getElementById('appViewerLoading')?.classList.add('hidden');
   document.getElementById('sideDashboardBtn')?.classList.add('active');
   document.querySelectorAll('#sideAppsList .sideItem').forEach(el=>el.classList.remove('active'));
   if(location.hash)history.replaceState(null,'',location.pathname);
