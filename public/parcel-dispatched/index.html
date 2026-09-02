@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta charset="UTF-8"><meta name="viewport" id="viewportMeta" content="width=device-width,initial-scale=1.0">
+<script>if(localStorage.getItem('pd_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')</script>
 <title>Parcel Dispatch Slip</title>
 <style>
 :root{--p:#268F76;--p2:#3FAF93;--mint:#E8F8F2;--bg:#f4f7f5;--b:#d9e2dc;--t:#17211b;--m:#66756c;--danger:#b42318}
@@ -121,7 +122,7 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 
 </head>
 <body>
-<header><div class="head"><div id="secretAdminLogo" title="" style="display:flex;align-items:center;gap:10px"><div class="logo">b</div><div><h2>Parcel Dispatch Slip</h2><small>Simple one-page dispatch app</small></div></div><div class="row"><button class="btn secondary" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button><span id="loginBadge" class="pill">Not Logged In</span><button class="btn secondary" id="loginBtn" onclick="openLogin()">👤 Login</button><button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button><button class="btn secondary hidden" id="logoutBtn" onclick="doLogout()">↪ Logout</button><button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button><button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button><button class="btn secondary" onclick="newParcel()">＋ New</button></div></div></header>
+<header><div class="head"><div id="secretAdminLogo" title="" style="display:flex;align-items:center;gap:10px"><div class="logo">b</div><div><h2>Parcel Dispatch Slip</h2><small>Simple one-page dispatch app</small></div></div><div class="row"><button class="btn secondary" id="desktopViewBtn" onclick="toggleDesktopView()" title="Switch between mobile and desktop layout">🖥 Desktop View</button><button class="btn secondary" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button><span id="loginBadge" class="pill">Not Logged In</span><button class="btn secondary" id="loginBtn" onclick="openLogin()">👤 Login</button><button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button><button class="btn secondary hidden" id="logoutBtn" onclick="doLogout()">↪ Logout</button><button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button><button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button><button class="btn secondary" onclick="newParcel()">＋ New</button></div></div></header>
 <script>
 if(window.self!==window.top){
   ['loginBadge','loginBtn','logoutBtn','changePasswordBtn'].forEach(function(id){
@@ -1622,6 +1623,17 @@ function hardRefreshApp(){
     done();
   }
 }
+function toggleDesktopView(){
+  var forced=localStorage.getItem('pd_force_desktop')==='1';
+  if(forced)localStorage.removeItem('pd_force_desktop');else localStorage.setItem('pd_force_desktop','1');
+  location.replace(location.pathname+'?_r='+Date.now()+location.hash);
+}
+function syncDesktopViewBtn(){
+  var btn=document.getElementById('desktopViewBtn');if(!btn)return;
+  var forced=localStorage.getItem('pd_force_desktop')==='1';
+  btn.textContent=forced?'📱 Mobile View':'🖥 Desktop View';
+}
+syncDesktopViewBtn();
 function openLogin(){$('loginModal').classList.remove('hidden')}
 function closeLogin(){$('loginModal').classList.add('hidden')}
 function doLogin(){
