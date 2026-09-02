@@ -195,7 +195,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
     </div>
     <div class="actions">
       <button class="btn soft" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button>
-      <div style="position:relative">
+      <div style="position:relative" id="staffLoginWrap">
         <button class="btn soft" id="staffLoginBtn" onclick="openStaffLoginModal()">👤 Staff Login</button>
         <div class="hidden" id="staffUserMenu" style="position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.15);min-width:180px;overflow:hidden;z-index:50">
           <div id="staffUserMenuName" style="padding:10px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)"></div>
@@ -1240,6 +1240,7 @@ function openAppInline(slug,name){
   document.getElementById('appViewerFrame').src='/'+slug+'/';
   document.getElementById('appViewerOpenNew').href='/'+slug+'/';
   document.getElementById('appViewer')?.classList.remove('hidden');
+  document.getElementById('staffLoginWrap')?.classList.add('hidden');
   document.getElementById('sideDashboardBtn')?.classList.remove('active');
   document.querySelectorAll('#sideAppsList .sideItem').forEach(el=>{
     el.classList.toggle('active',el.dataset.slug===slug);
@@ -1250,6 +1251,7 @@ function openAppInline(slug,name){
 function closeAppViewer(){
   document.getElementById('appViewer')?.classList.add('hidden');
   document.getElementById('dashboardContent')?.classList.remove('hidden');
+  document.getElementById('staffLoginWrap')?.classList.remove('hidden');
   const frame=document.getElementById('appViewerFrame');
   if(frame)frame.src='about:blank';
   document.getElementById('sideDashboardBtn')?.classList.add('active');
