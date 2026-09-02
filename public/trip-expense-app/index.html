@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" id="viewportMeta" content="width=device-width,initial-scale=1">
+<script>if(localStorage.getItem('te_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')</script>
 <title>Bliss Gems & Minerals - Trip Expense</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,6 +48,7 @@ table.dtb td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px}tab
 <header><div class="head"><div class="brand"><div class="logo" id="secretLogo" onclick="tapLogo()">b</div><div><b>Bliss Gems & Minerals</b><small>Employee Advance & Trip Settlement</small></div></div>
 <div class="searchbox hidden" id="searchBoxWrap"><input id="globalSearch" type="text" placeholder="🔎 Search trip, sales person, location…" oninput="doGlobalSearch()"><div id="searchResults" class="searchresults hidden"></div></div>
 <div class="headRight">
+<button class="btn" id="desktopViewBtn" onclick="toggleDesktopView()" title="Switch between mobile and desktop layout">🖥 Desktop View</button>
 <button class="btn" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button>
 <span class="pill" id="loginBadge">Not Logged In</span>
 <button class="btn" id="loginBtn" onclick="openLogin()">Login</button>
@@ -293,6 +295,17 @@ function hardRefreshApp(){
     done();
   }
 }
+function toggleDesktopView(){
+  var forced=localStorage.getItem('te_force_desktop')==='1';
+  if(forced)localStorage.removeItem('te_force_desktop');else localStorage.setItem('te_force_desktop','1');
+  location.replace(location.pathname+'?_r='+Date.now()+location.hash);
+}
+function syncDesktopViewBtn(){
+  var btn=document.getElementById('desktopViewBtn');if(!btn)return;
+  var forced=localStorage.getItem('te_force_desktop')==='1';
+  btn.textContent=forced?'📱 Mobile View':'🖥 Desktop View';
+}
+syncDesktopViewBtn();
 function tapLogo(){
   secretTapCount++;
   clearTimeout(secretTapTimer);
