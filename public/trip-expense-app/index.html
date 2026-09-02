@@ -46,6 +46,14 @@ table.dtb td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px}tab
 <button class="btn" id="loginBtn" onclick="openLogin()">Login</button>
 <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
 </div></div></header>
+<script>
+if(window.self!==window.top){
+  ['loginBadge','loginBtn','logoutBtn'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el)el.style.display='none';
+  });
+}
+</script>
 
 <div id="gateWrap" class="shell" style="display:none"><div class="gate" id="gateBox"></div></div>
 
@@ -1012,7 +1020,10 @@ function renderGate(){
   const u=myUserObj();
   if(!currentUser||!u){
     gateWrap.style.display='block';appWrap.style.display='none';
-    gateBox.innerHTML=`<h3>Login Required</h3><p style="font-size:13px;color:var(--muted)">Trip Expense app dekhne ke liye login karein — wahi username/password jo Parcel Dispatch aur Bliss One me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
+    const inFrame=window.self!==window.top;
+    gateBox.innerHTML=inFrame
+      ? `<h3>Login Required</h3><p style="font-size:13px;color:var(--muted)">Trip Expense app dekhne ke liye Bliss One dashboard se login karein.</p><button class="btn primary" onclick="loginFromHub()">Login</button>`
+      : `<h3>Login Required</h3><p style="font-size:13px;color:var(--muted)">Trip Expense app dekhne ke liye login karein — wahi username/password jo Parcel Dispatch aur Bliss One me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
     return;
   }
   const role=effectiveRole();
@@ -1046,5 +1057,14 @@ function boot(){
 document.addEventListener('DOMContentLoaded',boot);
 function show(id){$(id).classList.add('show')}
 function hide(id){$(id).classList.remove('show')}
+function loginFromHub(){
+  try{
+    if(window.self!==window.top && window.top.openStaffLoginModal){window.top.openStaffLoginModal();return;}
+  }catch(e){}
+  openLogin();
+}
+window.addEventListener('storage',e=>{
+  if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();}
+});
 </script>
 </body></html>
