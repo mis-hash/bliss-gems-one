@@ -730,10 +730,19 @@ function newParcel(){editing=null;currentParcelId=genId();localStorage.setItem(A
 shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();syncShippingSection();saveStageLocks({});applySequenceAndLocks()}
 function formData(){let o={parcelId:editing||currentParcelId||genId(),createdAt:new Date().toISOString()};document.querySelectorAll('main input,main select,main textarea').forEach(e=>{if(e.id&&e.id!=='search')o[e.id]=e.value});return o}
 function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;return `PD-${ds}-${String(Date.now()).slice(-4)}`}
-function saveParcel(silent){let d=formData();if(!d.dispatchDate||!d.shipTo||!d.shipThrough){if(!silent)toast('Dispatch Date, Ship To aur Ship Through required hain.');return}let a=JSON.parse(localStorage.getItem(K.records)||'[]'),i=a.findIndex(x=>x.parcelId===d.parcelId);if(i>=0)a[i]={...a[i],...d};else a.unshift(d);localStorage.setItem(K.records,JSON.stringify(a));editing=d.parcelId;renderHistory();pdPushRecordToCloud(a.find(x=>x.parcelId===d.parcelId));if(silent){let t=$('autoSaveTag');if(t)t.textContent='✓ Saved '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}else toast('Parcel saved: '+d.parcelId)}
+function persistParcelRecord(){let d=formData();let a=JSON.parse(localStorage.getItem(K.records)||'[]'),i=a.findIndex(x=>x.parcelId===d.parcelId);if(i>=0)a[i]={...a[i],...d};else a.unshift(d);localStorage.setItem(K.records,JSON.stringify(a));editing=d.parcelId;renderHistory();pdPushRecordToCloud(a.find(x=>x.parcelId===d.parcelId));return d}
+function markAutoSaved(){let t=$('autoSaveTag');if(t)t.textContent='✓ Saved '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}
+function saveParcel(silent){let d=formData();if(!d.dispatchDate||!d.shipTo||!d.shipThrough){if(!silent)toast('Dispatch Date, Ship To aur Ship Through required hain.');return}persistParcelRecord();if(silent)markAutoSaved();else toast('Parcel saved: '+d.parcelId)}
+function autoSaveParcel(){
+  // Looser than the manual Save gate — appears in Recent Dispatch Records as soon as
+  // any one identifying field is filled, so the user can find/continue it from the list too.
+  if(!$('dispatchDate').value && !$('shipTo').value && !$('shipThrough').value)return;
+  persistParcelRecord();
+  markAutoSaved();
+}
 function updateSlipNoTag(){let t=$('slipNoTag');if(t)t.textContent='Slip No: '+(currentParcelId||'')}
 let autoSaveTimer=null;
-function scheduleAutoSave(){clearTimeout(autoSaveTimer);autoSaveTimer=setTimeout(()=>_oldSaveParcel(true),1200)}
+function scheduleAutoSave(){clearTimeout(autoSaveTimer);autoSaveTimer=setTimeout(autoSaveParcel,1200)}
 function printSlip(){
   if(!$('dispatchDate').value||!$('shipTo').value||!$('shipThrough').value){toast('Print se pehle Dispatch Date, Ship To aur Ship Through fill karein.');return}
   window.print();
