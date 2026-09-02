@@ -143,7 +143,7 @@ if(window.self!==window.top){
   
 </div>
 <div id="dispatchModule">
-<section class="card"><h3>1. Basic Dispatch & Preparation</h3><div class="body"><div class="grid">
+<section class="card"><h3>1. Basic Dispatch & Preparation<span id="slipNoTag" style="float:right;font-size:12px;font-weight:700;color:var(--p)"></span></h3><div class="body"><div class="grid">
 <div class="field"><label>Dispatch Date <span class="req">*</span></label><input type="date" id="dispatchDate"></div>
 <div class="field"><label>Ship To / Party Name <span class="req">*</span></label>
 <div class="comboBox" id="shipToCombo">
@@ -238,7 +238,7 @@ if(window.self!==window.top){
 <div id="workflowStatus" class="note" style="margin-top:10px"></div>
 </div></section>
 
-<div class="save"><button class="btn secondary" onclick="newParcel()">Clear</button><button class="btn primary" onclick="printSlip()">🖨 Print Slip</button><button class="btn primary" onclick="saveParcel()">💾 SAVE PARCEL</button></div>
+<div class="save"><span id="autoSaveTag" class="note" style="margin-right:auto"></span><button class="btn secondary" onclick="newParcel()">Clear</button><button class="btn primary" onclick="printSlip()">🖨 Print Slip</button><button class="btn primary" onclick="saveParcel()">💾 SAVE PARCEL</button></div>
 <div class="no-print" style="margin-top:16px"><button class="btn secondary" onclick="openRecordType('dispatch')">📋 VIEW DISPATCH SAVED RECORDS</button></div>
 <section class="card" id="historyCard" style="margin-top:10px"><h3>Recent Dispatch Records</h3><div class="body">
 <div class="recordFilters">
@@ -720,11 +720,14 @@ function shippingInsuranceRule(){
   if(!yes && $('shippingInsuranceAmount')) $('shippingInsuranceAmount').value='';
 }
 
-function newParcel(){editing=null;currentParcelId=genId();document.querySelectorAll('main input,main textarea').forEach(x=>{if(x.id!=='search')x.value=''});document.querySelectorAll('main select').forEach(x=>x.value='');let d=new Date();$('dispatchDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;if($('shippingDate'))$('shippingDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function newParcel(){editing=null;currentParcelId=genId();updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';document.querySelectorAll('main input,main textarea').forEach(x=>{if(x.id!=='search')x.value=''});document.querySelectorAll('main select').forEach(x=>x.value='');let d=new Date();$('dispatchDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;if($('shippingDate'))$('shippingDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 shipChanged();priceChanged();pktChanged();shippingInsuranceRule();syncShippingSection();saveStageLocks({});applySequenceAndLocks()}
 function formData(){let o={parcelId:editing||currentParcelId||genId(),createdAt:new Date().toISOString()};document.querySelectorAll('main input,main select,main textarea').forEach(e=>{if(e.id&&e.id!=='search')o[e.id]=e.value});return o}
 function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;return `PD-${ds}-${String(Date.now()).slice(-4)}`}
-function saveParcel(){let d=formData();if(!d.dispatchDate||!d.shipTo||!d.shipThrough){toast('Dispatch Date, Ship To aur Ship Through required hain.');return}let a=JSON.parse(localStorage.getItem(K.records)||'[]'),i=a.findIndex(x=>x.parcelId===d.parcelId);if(i>=0)a[i]={...a[i],...d};else a.unshift(d);localStorage.setItem(K.records,JSON.stringify(a));editing=d.parcelId;renderHistory();pdPushRecordToCloud(a.find(x=>x.parcelId===d.parcelId));toast('Parcel saved: '+d.parcelId)}
+function saveParcel(silent){let d=formData();if(!d.dispatchDate||!d.shipTo||!d.shipThrough){if(!silent)toast('Dispatch Date, Ship To aur Ship Through required hain.');return}let a=JSON.parse(localStorage.getItem(K.records)||'[]'),i=a.findIndex(x=>x.parcelId===d.parcelId);if(i>=0)a[i]={...a[i],...d};else a.unshift(d);localStorage.setItem(K.records,JSON.stringify(a));editing=d.parcelId;renderHistory();pdPushRecordToCloud(a.find(x=>x.parcelId===d.parcelId));if(silent){let t=$('autoSaveTag');if(t)t.textContent='✓ Saved '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}else toast('Parcel saved: '+d.parcelId)}
+function updateSlipNoTag(){let t=$('slipNoTag');if(t)t.textContent='Slip No: '+(currentParcelId||'')}
+let autoSaveTimer=null;
+function scheduleAutoSave(){clearTimeout(autoSaveTimer);autoSaveTimer=setTimeout(()=>_oldSaveParcel(true),1200)}
 function printSlip(){
   if(!$('dispatchDate').value||!$('shipTo').value||!$('shipThrough').value){toast('Print se pehle Dispatch Date, Ship To aur Ship Through fill karein.');return}
   window.print();
@@ -765,7 +768,7 @@ function renderHistory(){
  $('history').innerHTML=a.length?a.map(x=>`<tr><td><b>${esc(x.parcelId||'')}</b></td><td>${esc(x.shippingDate||x.dispatchDate||'')}</td><td>${esc(x.shipTo||'')}</td><td>${esc(x.courierName||x.shipThrough||'')}</td><td>${esc(x.broker||'')}</td><td>${esc(x.awbNo||'')}</td><td>${esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button></td></tr>`).join(''):'<tr><td colspan="8">No records.</td></tr>';
  if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(x.parcelId||'')}</b><span>${esc(x.shippingFinalStatus||x.status||'')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Party</small><strong>${esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button></div>`).join(''):'<div class="note">No records.</div>';
 }
-function editRecord(id){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();pktChanged();shippingInsuranceRule();if(findClientByParty($('shipTo').value))$('broker').value=findClientByParty($('shipTo').value).broker||'';syncShippingSection();applySequenceAndLocks();scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}
+function editRecord(id){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();pktChanged();shippingInsuranceRule();if(findClientByParty($('shipTo').value))$('broker').value=findClientByParty($('shipTo').value).broker||'';syncShippingSection();applySequenceAndLocks();scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}
 function openManage(){currentTab='users';$('manageModal').classList.remove('hidden');renderManage()}function closeManage(){$('manageModal').classList.add('hidden');populate();shipChanged()}function tab(b,t){currentTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));renderManage()}
 function renderManage(){let c=$('manageContent');if(currentTab==='users'){c.innerHTML=`<div class="grid"><div class="field"><label>User Name <span class="req">*</span></label><input id="mUserName"></div><div class="field"><label>Username <span class="req">*</span></label><input id="mUsername"></div><div class="field"><label>Mobile Number <span class="req">*</span></label><input id="mUserPhone" placeholder="10 digit or 91..."></div><div class="field"><label>Department <span class="req">*</span></label><input id="mDepartment"></div><div class="field"><label>&nbsp; <span class="req">*</span></label><button class="btn primary" onclick="addUser()">Add Universal User</button></div></div><div class="note">Handover dropdowns me sabhi active Doers dikhenge. Actual-work fields (Slip Fill, Weight Check, Lines & Tags, Noted By, Item Packed etc.) me logged-in user sirf apna naam fill kar sakta hai. Dusre Doer ka actual-work naam us Doer ki login ID se hi fill hoga. New user ka default password 1234 hai.</div><div style="margin:8px 0"><button class="btn secondary small" onclick="resetDefaultUsers()">↻ Reset Default Doers</button></div><div>${users.map((u,i)=>`<div class="item"><span><b>${esc(u.name)}</b> <small>(${esc(u.username||u.id)})</small><br><small>${esc(u.phone)} • ${esc(u.department||'No Department')} • ${u.active===false?'INACTIVE':'ACTIVE'}</small></span><span><button class="btn small secondary" onclick="toggleUser(${i})">${u.active===false?'Activate':'Deactivate'}</button> <button class="btn small secondary" onclick="editUser(${i})">Edit</button> <button class="btn small secondary" onclick="resetUserPassword(${i})">Reset Password</button> <button class="btn small danger" onclick="delUser(${i})">Delete</button></span></div>`).join('')}</div>`}
 else if(currentTab==='shipto'){c.innerHTML=`<div class="row"><input id="mShipTo" placeholder="Add Client / Ship To" style="flex:1"><button class="btn primary" onclick="addShipTo()">Add</button></div>${shipTo.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delShipTo(${i})">Delete</button></div>`).join('')}`}
@@ -1197,6 +1200,14 @@ function requiredReturnOk(){
 }
 const _oldSaveParcel=saveParcel;
 saveParcel=function(){if(!requiredDispatchOk())return;_oldSaveParcel();}
+if($('dispatchModule')){
+  ['input','change'].forEach(function(evt){
+    $('dispatchModule').addEventListener(evt,function(e){
+      if(e.target.id==='search'||e.target.closest('#historyCard'))return;
+      scheduleAutoSave();
+    },true);
+  });
+}
 const _oldSaveReturn=saveReturn;
 saveReturn=function(silent=false){if(!silent&&!requiredReturnOk())return;_oldSaveReturn(silent);}
 
