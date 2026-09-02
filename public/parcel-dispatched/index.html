@@ -727,7 +727,7 @@ function shippingInsuranceRule(){
 }
 
 function newParcel(){editing=null;currentParcelId=genId();localStorage.setItem(ACTIVE_DRAFT_KEY,currentParcelId);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';document.querySelectorAll('main input,main textarea').forEach(x=>{if(x.id!=='search')x.value=''});document.querySelectorAll('main select').forEach(x=>x.value='');let d=new Date();$('dispatchDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;if($('shippingDate'))$('shippingDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();syncShippingSection();saveStageLocks({});applySequenceAndLocks()}
+shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();syncShippingSection();saveStageLocks({});applySequenceAndLocks();persistParcelRecord();markAutoSaved()}
 function formData(){let o={parcelId:editing||currentParcelId||genId(),createdAt:new Date().toISOString()};document.querySelectorAll('main input,main select,main textarea').forEach(e=>{if(e.id&&e.id!=='search')o[e.id]=e.value});return o}
 function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;return `PD-${ds}-${String(Date.now()).slice(-4)}`}
 function persistParcelRecord(){let d=formData();let a=JSON.parse(localStorage.getItem(K.records)||'[]'),i=a.findIndex(x=>x.parcelId===d.parcelId);if(i>=0)a[i]={...a[i],...d};else a.unshift(d);localStorage.setItem(K.records,JSON.stringify(a));editing=d.parcelId;renderHistory();pdPushRecordToCloud(a.find(x=>x.parcelId===d.parcelId));return d}
