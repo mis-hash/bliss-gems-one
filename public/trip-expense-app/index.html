@@ -71,6 +71,7 @@ if(window.self!==window.top){
 <div class="grouplabel">System</div>
 <button data-role="director" onclick="go('director',this)">★ Directors</button>
 <button data-role="director" onclick="go('notify',this)">💬 Notifications</button>
+<button data-role="director" onclick="go('templates',this)">📝 Message Templates</button>
 </nav><main>
 
 <section id="admin" class="page on">
@@ -130,6 +131,8 @@ if(window.self!==window.top){
 </section>
 
 <section id="notify" class="page"><div class="panel"><div class="ph">WhatsApp Notification Control</div><div class="pb" id="notifyRows"></div></div></section>
+
+<section id="templates" class="page"><div class="panel"><div class="ph"><span>Message Templates</span><small style="font-weight:500">{name} {amount} {location} {tripId} {due} {noc} {balance} {returned} {mode} auto-fill karte hain</small></div><div class="pb" id="templatesRows"></div></div></section>
 </main></div>
 
 <div class="bottomNav" id="bottomNav">
@@ -221,8 +224,16 @@ function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1)
 function genLedgerId(){return 'LG-'+Date.now()+'-'+Math.floor(Math.random()*1000)}
 
 let users=[],trips=[],ledger=[],notifySettings={issued:true,additional:true,overdue:true,submitted:true,closed:true,booked:true};
+let messageTemplates={
+  issued:'💰 Trip Advance Issued\nAmount: {amount}\nLocation: {location}\nHisaab Due: {due}\nTrip: {tripId}',
+  additional:'💰 Additional Advance Issued\nAmount: {amount}\nTrip: {tripId}',
+  submitted:'🧾 Hisaab Submitted\n{name} • {location} • {tripId}\nVerify karke Close/NOC karein.',
+  closed:'✅ Trip Closed — {noc}\n{name} • {location} • {tripId}\nFinal Balance: {balance}\nReceived: {returned} via {mode}',
+  booked:'📚 Trip Booked by Accounts\n{tripId}',
+  overdue:'⏰ Hisaab Reminder\n{location} trip ka hisaab pending hai.\nDue: {due}\nOutstanding: {balance}'
+};
 let currentUser=null;
-let usersStarted=false,tripsStarted=false,ledgerStarted=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false;
+let usersStarted=false,tripsStarted=false,ledgerStarted=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false;
 let tripOptions={locations:['Surat','Mumbai','Chennai','Udaipur','Ahmedabad','Hyderabad'],purposes:['Exhibition','Client Visit','Sales Tour']};
 const EXPENSE_CATEGORIES=['Hotel','Food','Taxi / Cab','Flight','Train','Fuel','Other'];
 let ledgerHeads={cash:'Cash-in-Hand',advance:'Staff Advance A/c',categories:{Hotel:'Travelling Expenses',Food:'Business Promotion Exp.','Taxi / Cab':'Travelling Expenses',Flight:'Travelling Expenses',Train:'Travelling Expenses',Fuel:'Travelling Expenses',Other:'Miscellaneous Expenses'}};
@@ -462,7 +473,7 @@ async function submitIssue(){
   await db.collection('te_ledger').doc(lg.id).set(lg);
   hide('issue');
   logActivity(`${(myUserObj()||{}).name||currentUser} issued ${money(amount)} advance`,`to ${sales?sales.name:salesId} · ${location} · ${purpose} · ${tripId}`);
-  if(notifySettings.issued && sales)sendWA(sales.phone,`💰 Trip Advance Issued\nAmount: ${money(amount)}\nLocation: ${location}\nHisaab Due: ${due}\nTrip: ${tripId}`);
+  if(notifySettings.issued && sales)sendWA(sales.phone,renderTemplate(messageTemplates.issued,{amount:money(amount),location,due,tripId}));
 }
 let extraForTrip=null;
 function openExtraModal(tripId){extraForTrip=tripId;$('extraAmount').value='';$('extraMode').value='Cash';$('extraRemark').value='';$('extraMsg').textContent='';show('extra')}
@@ -476,7 +487,7 @@ async function submitExtra(){
   hide('extra');
   if(notifySettings.additional && trip){
     const sales=users.find(u=>u.id===trip.salesId);
-    if(sales)sendWA(sales.phone,`💰 Additional Advance Issued\nAmount: ${money(amount)}\nTrip: ${extraForTrip}`);
+    if(sales)sendWA(sales.phone,renderTemplate(messageTemplates.additional,{amount:money(amount),tripId:extraForTrip}));
   }
 }
 function fileToCompressedDataUri(file){
@@ -529,7 +540,8 @@ async function submitHisaab(){
   if(!confirm('Hisaab submit karein? Iske baad Admin verify karega.'))return;
   await db.collection('te_trips').doc(trip.id).update({status:'hisaab_submitted'});
   if(notifySettings.submitted){
-    usersWithRole('admin').concat(usersWithRole('director')).forEach(u=>sendWA(u.phone,`🧾 Hisaab Submitted\n${trip.salesName} • ${trip.location} • ${trip.id}\nVerify karke Close/NOC karein.`));
+    const submittedMsg=renderTemplate(messageTemplates.submitted,{name:trip.salesName,location:trip.location,tripId:trip.id});
+    usersWithRole('admin').concat(usersWithRole('director')).forEach(u=>sendWA(u.phone,submittedMsg));
   }
 }
 function closeTrip(tripId){
@@ -576,7 +588,7 @@ async function confirmCloseTrip(){
   logActivity(`${(myUserObj()||{}).name||currentUser} closed ${tripId}`,`${nocNumber} generated · ${trip.salesName} · ${money(returned)} via ${mode}`);
   if(notifySettings.closed){
     const sales=users.find(u=>u.id===trip.salesId);
-    const msg=`✅ Trip Closed — ${nocNumber}\n${trip.salesName} • ${trip.location} • ${tripId}\nFinal Balance: ${money(balance)}\nReceived: ${money(returned)} via ${mode}`;
+    const msg=renderTemplate(messageTemplates.closed,{noc:nocNumber,name:trip.salesName,location:trip.location,tripId,balance:money(balance),returned:money(returned),mode});
     if(sales)sendWA(sales.phone,msg);
     usersWithRole('admin').concat(usersWithRole('accounts')).forEach(u=>sendWA(u.phone,msg));
   }
@@ -586,14 +598,14 @@ async function markBooked(tripId){
   const trip=trips.find(t=>t.id===tripId);
   logActivity(`${(myUserObj()||{}).name||currentUser} marked ${tripId} as Booked`,trip?`${trip.salesName} · ${trip.location}`:'');
   if(notifySettings.booked && trip){
-    usersWithRole('director').forEach(u=>sendWA(u.phone,`📚 Trip Booked by Accounts\n${trip.id}`));
+    usersWithRole('director').forEach(u=>sendWA(u.phone,renderTemplate(messageTemplates.booked,{tripId:trip.id})));
   }
 }
 function sendOverdueReminder(tripId){
   const trip=trips.find(t=>t.id===tripId);if(!trip)return;
   const sales=users.find(u=>u.id===trip.salesId);
   const bal=tripBalance(tripId);
-  const msg=`⏰ Hisaab Reminder\n${trip.location} trip ka hisaab pending hai.\nDue: ${trip.dueDate}\nOutstanding: ${money(bal)}`;
+  const msg=renderTemplate(messageTemplates.overdue,{location:trip.location,due:trip.dueDate,balance:money(bal)});
   if(sales)sendWA(sales.phone,msg);
   usersWithRole('admin').forEach(u=>sendWA(u.phone,msg));
   toast('Reminder bhej diya.');
@@ -759,6 +771,37 @@ async function toggleNotify(key,el){
   el.classList.toggle('on');
   const patch={};patch[key]=val;
   await db.collection('te_settings').doc('notify').set(patch,{merge:true});
+}
+
+/* ===== Message Templates ===== */
+function startTemplatesSync(){
+  if(templatesStarted)return;templatesStarted=true;
+  db.collection('te_settings').doc('templates').onSnapshot(doc=>{
+    if(doc.exists)messageTemplates=Object.assign({},messageTemplates,doc.data());
+    renderTemplatesPage();
+  },err=>console.error('templates sync error',err));
+}
+const TEMPLATE_ROWS=[
+  ['issued','💰 Advance Issued','{amount} {location} {due} {tripId}'],
+  ['additional','💰 Additional Advance','{amount} {tripId}'],
+  ['submitted','🧾 Hisaab Submitted','{name} {location} {tripId}'],
+  ['closed','✅ Trip Closed / NOC','{noc} {name} {location} {tripId} {balance} {returned} {mode}'],
+  ['booked','📚 Trip Booked','{tripId}'],
+  ['overdue','⏰ Overdue Reminder','{location} {due} {balance}']
+];
+function renderTemplatesPage(){
+  const wrap=$('templatesRows');if(!wrap)return;
+  wrap.innerHTML=TEMPLATE_ROWS.map(([k,label,ph])=>`<div class="field" style="margin-bottom:14px"><label>${esc(label)} <small style="color:var(--muted);font-weight:500">${esc(ph)}</small></label><textarea id="tpl_${k}" style="width:100%;min-height:70px;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-family:inherit;resize:vertical">${esc(messageTemplates[k]||'')}</textarea></div>`).join('')
+    +'<button class="btn primary" onclick="saveTemplates()">Save All Templates</button>';
+}
+async function saveTemplates(){
+  const patch={};
+  TEMPLATE_ROWS.forEach(([k])=>{const el=$('tpl_'+k);if(el)patch[k]=el.value;});
+  await db.collection('te_settings').doc('templates').set(patch,{merge:true});
+  toast('Templates saved.');
+}
+function renderTemplate(tpl,vars){
+  return String(tpl||'').replace(/\{(\w+)\}/g,(m,k)=>(k in vars && vars[k]!=null)?String(vars[k]):m);
 }
 
 /* ===== Ledger Heads ===== */
@@ -1051,7 +1094,7 @@ function renderAll(){
 }
 function boot(){
   currentUser=localStorage.getItem(SESSION_KEY)||null;
-  startUsersSync();startTripsSync();startLedgerSync();startSettingsSync();startOptionsSync();startLedgerHeadsSync();startActivitySync();
+  startUsersSync();startTripsSync();startLedgerSync();startSettingsSync();startOptionsSync();startLedgerHeadsSync();startActivitySync();startTemplatesSync();
   renderAll();
 }
 document.addEventListener('DOMContentLoaded',boot);
