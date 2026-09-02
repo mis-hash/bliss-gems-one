@@ -407,6 +407,7 @@ if(window.self!==window.top){
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
 const K={users:'pd_users_v2',shipto:'pd_shipto_v2',shipthrough:'pd_shipthrough_v2',api:'pd_greenapi_v2',records:'pd_records_v2'};
+const ACTIVE_DRAFT_KEY='pd_active_draft_v1';
 let currentParcelId=null;
 
 /* ===== Firebase cloud sync (shared across all doers/devices, instead of per-browser localStorage) ===== */
@@ -617,7 +618,12 @@ document.addEventListener('DOMContentLoaded',()=>{ensureDoerMaster();ensureUserP
     saveMasters();
   }
   shipTo=clientMaster.map(x=>x.party);
-  populate();newParcel();renderHistory();
+  populate();
+  const activeDraftId=localStorage.getItem(ACTIVE_DRAFT_KEY);
+  const activeDraftExists=activeDraftId&&JSON.parse(localStorage.getItem(K.records)||'[]').some(x=>x.parcelId===activeDraftId);
+  if(activeDraftExists){editRecord(activeDraftId,true);toast('Continuing last slip: '+activeDraftId);}
+  else newParcel();
+  renderHistory();
   pdStartRecordsSync();
 });
 function saveMasters(){localStorage.setItem(K.users,JSON.stringify(users));localStorage.setItem(K.shipto,JSON.stringify(shipTo));localStorage.setItem(K.shipthrough,JSON.stringify(shipThrough));localStorage.setItem(K.api,JSON.stringify(api));pdSyncUsersToCloud();}
@@ -649,7 +655,7 @@ function normalizePhone(p){let n=String(p||'').replace(/\D/g,'');if(n.length===1
 async function sendWA(){if(!waTarget)return;let id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');if(!id||!token){toast('Manage → GREEN-API me ID Instance aur API Token save karein.');return}let phone=normalizePhone(waTarget.user.phone);if(phone.length<11){toast('User mobile number valid nahi hai.');return}let btn=$('waSendBtn');btn.disabled=true;btn.textContent='Sending...';try{let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:phone+'@c.us',message:$('waMessage').value})});let data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.message||data.error||('HTTP '+r.status));closeWA();toast('WhatsApp message sent successfully.')}catch(e){toast('Message send failed: '+e.message)}finally{btn.disabled=false;btn.textContent='Send WhatsApp'}}
 function closeWA(){$('waModal').classList.add('hidden')}
 function shipChanged(){let v=($('shipThrough').value||'').toUpperCase().trim();let yes=['SECURE','SEQUEL','SQL','BVC'].includes(v);$('section1A').classList.toggle('hidden',!yes);$('deliveryChallanRequired').value=yes?'YES':'NO';if(!yes){['dlcItem','dlcPrice','remark1','remark2','remark3'].forEach(id=>$(id).value='')}}
-function priceChanged(){let yes=$('priceFill').value==='YES';$('priceWrap').classList.toggle('hidden',!yes);if(!yes)$('price').value=''}function pktChanged(){let yes=$('pktChangeRequired').value==='YES';$('pktByWrap').classList.toggle('hidden',!yes);$('pktTimeWrap').classList.toggle('hidden',!yes);if(!yes){$('pktChangeBy').value='';$('pktChangeTime').value=''}}
+function priceChanged(){let yes=$('priceFill').value==='YES';$('priceWrap').classList.toggle('hidden',!yes);if(!yes)$('price').value=''}
 
 
 function saveClientMaster(){
@@ -720,8 +726,8 @@ function shippingInsuranceRule(){
   if(!yes && $('shippingInsuranceAmount')) $('shippingInsuranceAmount').value='';
 }
 
-function newParcel(){editing=null;currentParcelId=genId();updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';document.querySelectorAll('main input,main textarea').forEach(x=>{if(x.id!=='search')x.value=''});document.querySelectorAll('main select').forEach(x=>x.value='');let d=new Date();$('dispatchDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;if($('shippingDate'))$('shippingDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-shipChanged();priceChanged();pktChanged();shippingInsuranceRule();syncShippingSection();saveStageLocks({});applySequenceAndLocks()}
+function newParcel(){editing=null;currentParcelId=genId();localStorage.setItem(ACTIVE_DRAFT_KEY,currentParcelId);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';document.querySelectorAll('main input,main textarea').forEach(x=>{if(x.id!=='search')x.value=''});document.querySelectorAll('main select').forEach(x=>x.value='');let d=new Date();$('dispatchDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;if($('shippingDate'))$('shippingDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();syncShippingSection();saveStageLocks({});applySequenceAndLocks()}
 function formData(){let o={parcelId:editing||currentParcelId||genId(),createdAt:new Date().toISOString()};document.querySelectorAll('main input,main select,main textarea').forEach(e=>{if(e.id&&e.id!=='search')o[e.id]=e.value});return o}
 function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;return `PD-${ds}-${String(Date.now()).slice(-4)}`}
 function saveParcel(silent){let d=formData();if(!d.dispatchDate||!d.shipTo||!d.shipThrough){if(!silent)toast('Dispatch Date, Ship To aur Ship Through required hain.');return}let a=JSON.parse(localStorage.getItem(K.records)||'[]'),i=a.findIndex(x=>x.parcelId===d.parcelId);if(i>=0)a[i]={...a[i],...d};else a.unshift(d);localStorage.setItem(K.records,JSON.stringify(a));editing=d.parcelId;renderHistory();pdPushRecordToCloud(a.find(x=>x.parcelId===d.parcelId));if(silent){let t=$('autoSaveTag');if(t)t.textContent='✓ Saved '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}else toast('Parcel saved: '+d.parcelId)}
@@ -768,7 +774,7 @@ function renderHistory(){
  $('history').innerHTML=a.length?a.map(x=>`<tr><td><b>${esc(x.parcelId||'')}</b></td><td>${esc(x.shippingDate||x.dispatchDate||'')}</td><td>${esc(x.shipTo||'')}</td><td>${esc(x.courierName||x.shipThrough||'')}</td><td>${esc(x.broker||'')}</td><td>${esc(x.awbNo||'')}</td><td>${esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button></td></tr>`).join(''):'<tr><td colspan="8">No records.</td></tr>';
  if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(x.parcelId||'')}</b><span>${esc(x.shippingFinalStatus||x.status||'')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Party</small><strong>${esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button></div>`).join(''):'<div class="note">No records.</div>';
 }
-function editRecord(id){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();pktChanged();shippingInsuranceRule();if(findClientByParty($('shipTo').value))$('broker').value=findClientByParty($('shipTo').value).broker||'';syncShippingSection();applySequenceAndLocks();scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}
+function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();if(findClientByParty($('shipTo').value))$('broker').value=findClientByParty($('shipTo').value).broker||'';syncShippingSection();applySequenceAndLocks();if(!silent){scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
 function openManage(){currentTab='users';$('manageModal').classList.remove('hidden');renderManage()}function closeManage(){$('manageModal').classList.add('hidden');populate();shipChanged()}function tab(b,t){currentTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));renderManage()}
 function renderManage(){let c=$('manageContent');if(currentTab==='users'){c.innerHTML=`<div class="grid"><div class="field"><label>User Name <span class="req">*</span></label><input id="mUserName"></div><div class="field"><label>Username <span class="req">*</span></label><input id="mUsername"></div><div class="field"><label>Mobile Number <span class="req">*</span></label><input id="mUserPhone" placeholder="10 digit or 91..."></div><div class="field"><label>Department <span class="req">*</span></label><input id="mDepartment"></div><div class="field"><label>&nbsp; <span class="req">*</span></label><button class="btn primary" onclick="addUser()">Add Universal User</button></div></div><div class="note">Handover dropdowns me sabhi active Doers dikhenge. Actual-work fields (Slip Fill, Weight Check, Lines & Tags, Noted By, Item Packed etc.) me logged-in user sirf apna naam fill kar sakta hai. Dusre Doer ka actual-work naam us Doer ki login ID se hi fill hoga. New user ka default password 1234 hai.</div><div style="margin:8px 0"><button class="btn secondary small" onclick="resetDefaultUsers()">↻ Reset Default Doers</button></div><div>${users.map((u,i)=>`<div class="item"><span><b>${esc(u.name)}</b> <small>(${esc(u.username||u.id)})</small><br><small>${esc(u.phone)} • ${esc(u.department||'No Department')} • ${u.active===false?'INACTIVE':'ACTIVE'}</small></span><span><button class="btn small secondary" onclick="toggleUser(${i})">${u.active===false?'Activate':'Deactivate'}</button> <button class="btn small secondary" onclick="editUser(${i})">Edit</button> <button class="btn small secondary" onclick="resetUserPassword(${i})">Reset Password</button> <button class="btn small danger" onclick="delUser(${i})">Delete</button></span></div>`).join('')}</div>`}
 else if(currentTab==='shipto'){c.innerHTML=`<div class="row"><input id="mShipTo" placeholder="Add Client / Ship To" style="flex:1"><button class="btn primary" onclick="addShipTo()">Add</button></div>${shipTo.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delShipTo(${i})">Delete</button></div>`).join('')}`}
@@ -1205,7 +1211,8 @@ if($('dispatchModule')){
     $('dispatchModule').addEventListener(evt,function(e){
       if(e.target.id==='search'||e.target.closest('#historyCard'))return;
       scheduleAutoSave();
-    },true);
+      if(!e.target.closest('#workflowControlCard'))applySequenceAndLocks();
+    });
   });
 }
 const _oldSaveReturn=saveReturn;
@@ -1520,6 +1527,10 @@ function canEditField(el){
   return previousStagesLocked(stage);
 }
 function applySequenceAndLocks(){
+  refreshFieldStates();
+  autoLockCompletedStage();
+}
+function refreshFieldStates(){
   const locks=getStageLocks();
   document.querySelectorAll('#dispatchModule input,#dispatchModule select,#dispatchModule textarea').forEach(el=>{
     if(!el.id || ['search','allRecordSearch'].includes(el.id))return;
@@ -1538,6 +1549,15 @@ function applySequenceAndLocks(){
   applyWorkerPermissions();
   renderWorkflowStatus();
 }
+// Only auto-locks ONE stage per call (does not re-check after locking) — a single field
+// completing its stage shouldn't cascade through several stages in the same tick just
+// because self-only fields get convenience-prefilled the moment the next stage unlocks.
+function autoLockCompletedStage(){
+  const stage=currentEditableStage();
+  if(!stage||!stageComplete(stage))return;
+  if(!loggedUser())return;
+  lockCurrentStage(true);
+}
 function renderWorkflowStatus(){
   const box=$('workflowStatus'); if(!box)return;
   const locks=getStageLocks();
@@ -1554,21 +1574,21 @@ function currentEditableStage(){
   }
   return null;
 }
-function lockCurrentStage(){
+function lockCurrentStage(silent){
   const actor=loggedUser();
-  if(!actor){alert('Stage lock karne ke liye login required hai.');return}
+  if(!actor){if(!silent)alert('Stage lock karne ke liye login required hai.');return}
   const stage=currentEditableStage();
-  if(!stage){alert('Koi editable stage available nahi hai.');return}
+  if(!stage){if(!silent)alert('Koi editable stage available nahi hai.');return}
   if(!stageComplete(stage)){
-    alert(stage.name+' complete nahi hai. Sab mandatory fields fill karein.');
+    if(!silent)alert(stage.name+' complete nahi hai. Sab mandatory fields fill karein.');
     return;
   }
   const locks=getStageLocks();
   locks[stage.id]={lockedAt:new Date().toISOString(),lockedBy:actor.id,lockedByName:actor.name};
   saveStageLocks(locks);
   auditFieldChange({id:'',closest:()=>null},'',stage.name,'LOCK_STAGE');
-  applySequenceAndLocks();
-  toast(stage.name+' locked');
+  refreshFieldStates();
+  toast(stage.name+(silent?' auto-locked — next section unlocked':' locked'));
 }
 function isAdminUser(){
   const u=loggedUser();
