@@ -122,6 +122,14 @@ header{background:var(--p);color:#fff;padding:15px;position:sticky;top:0;z-index
 </head>
 <body>
 <header><div class="head"><div id="secretAdminLogo" title=""><h2>📦 Parcel Dispatch Slip</h2><small>Simple one-page dispatch app</small></div><div class="row"><button class="btn secondary" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button><span id="loginBadge" class="pill">Not Logged In</span><button class="btn secondary" id="loginBtn" onclick="openLogin()">👤 Login</button><button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button><button class="btn secondary hidden" id="logoutBtn" onclick="doLogout()">↪ Logout</button><button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button><button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button><button class="btn secondary" onclick="newParcel()">＋ New</button></div></div></header>
+<script>
+if(window.self!==window.top){
+  ['loginBadge','loginBtn','logoutBtn','changePasswordBtn'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el)el.style.display='none';
+  });
+}
+</script>
 <div class="row superAdminOnly hidden" id="pdStatusBar" style="padding:6px 14px;background:#f4f7f5;border-bottom:1px solid #e2e8e4;font-size:12px;font-weight:600">
 <span id="pdFirebaseStatusBadge" style="padding:3px 9px;border-radius:999px;background:#eef4f0">☁️ Firebase: Connecting…</span>
 <span id="pdGreenApiStatusBadge" style="padding:3px 9px;border-radius:999px;background:#eef4f0">💬 WhatsApp: Checking…</span>
@@ -1887,6 +1895,7 @@ if(_unlockStageAsAdminOriginal){
 window.addEventListener('storage',e=>{
  if(e.key===K.records)renderHistory();
  if(e.key===RETURN_RECORDS_KEY)renderReturnHistory();
+ if(e.key===SESSION_KEY)refreshLoginBadge();
 });
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){renderHistory();renderReturnHistory();}});
 
