@@ -130,7 +130,7 @@ tr.pendingRow td:first-child{border-left:3px solid #f0b429}
 
 </head>
 <body>
-<header><div class="head"><div id="secretAdminLogo" title="" style="display:flex;align-items:center;gap:10px"><div class="logo">b</div><div><h2>Parcel Dispatch Slip</h2><small>Simple one-page dispatch app</small></div></div><div class="row"><button class="btn secondary" id="desktopViewBtn" onclick="toggleDesktopView()" title="Switch between mobile and desktop layout">🖥 Desktop View</button><button class="btn secondary" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button><span id="loginBadge" class="pill">Not Logged In</span><button class="btn secondary" id="loginBtn" onclick="openLogin()">👤 Login</button><button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button><button class="btn secondary hidden" id="logoutBtn" onclick="doLogout()">↪ Logout</button><button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button><button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button><button class="btn secondary" onclick="startNewDispatch()">＋ New</button></div></div></header>
+<header><div class="head"><div id="secretAdminLogo" title="" style="display:flex;align-items:center;gap:10px"><div class="logo">b</div><div><h2>Parcel Dispatch Slip</h2><small>Simple one-page dispatch app</small></div></div><div class="row"><button class="btn secondary" id="desktopViewBtn" onclick="toggleDesktopView()" title="Switch between mobile and desktop layout">🖥 Desktop View</button><button class="btn secondary" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button><span id="loginBadge" class="pill">Not Logged In</span><button class="btn secondary" id="loginBtn" onclick="openLogin()">👤 Login</button><button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button><button class="btn secondary hidden" id="logoutBtn" onclick="doLogout()">↪ Logout</button><button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button><button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button><button class="btn secondary" onclick="newRecord()">＋ New</button></div></div></header>
 <script>
 if(window.self!==window.top){
   ['loginBadge','loginBtn','logoutBtn','changePasswordBtn'].forEach(function(id){
@@ -1185,6 +1185,16 @@ function startNewDispatch(){
   newParcel();
   showDispatchFormView();
 }
+function newRecord(){
+  // Header's "+ New" is shared by both modules — it must act on whichever one is
+  // actually visible, not silently reset the hidden Dispatch form while you're
+  // sitting on the Return tab.
+  if($('returnModule') && !$('returnModule').classList.contains('hidden')){
+    clearReturn();
+  }else{
+    startNewDispatch();
+  }
+}
 function closeDispatchForm(){
   showDispatchListView();
 }
@@ -1257,11 +1267,13 @@ function saveReturn(silent=false){
  if(!silent){toast('Return saved: '+data.returnId);renderReturnHistory();}
 }
 function clearReturn(){
- if(!confirm('Start new Return record?'))return;
  returnControls().forEach(e=>e.value='');
  currentReturnId=genReturnId(); localStorage.removeItem(RETURN_KEY);
  let x=$('returnDate');if(x)x.value=new Date().toISOString().slice(0,10);
- populateReturnUsers(); toast('New Return: '+currentReturnId);
+ populateReturnUsers();
+ if(typeof returnPktRule==='function')returnPktRule();
+ if(typeof syncAllComboInputs==='function')syncAllComboInputs();
+ toast('New Return: '+currentReturnId);
 }
 function restoreReturn(){
  let raw=localStorage.getItem(RETURN_KEY);if(!raw){if(!currentReturnId)currentReturnId=genReturnId();return}
