@@ -1880,14 +1880,11 @@ function applyWorkerPermissions(){
 
     if(inp){
       inp.readOnly=!actor;
-      inp.placeholder=actor ? 'Only: '+actor.name : 'Login required';
-      inp.title=actor ? 'Verified field: only your own name can be entered.' : 'Please login first.';
-      if(actor && !s.value && (typeof canEditField!=='function' || canEditField(s))){
-        s.value=actor.id;
-        inp.value=actor.name;
-        let t=$(s.dataset.time);
-        if(t)t.value=now();
-      }
+      // Left blank on purpose, even for the logged-in doer — this field's timestamp is
+      // supposed to mark when the physical work actually happened, so it must be picked
+      // explicitly from the dropdown, not silently pre-filled the moment the stage opens.
+      inp.placeholder=actor ? 'Select: '+actor.name : 'Login required';
+      inp.title=actor ? 'Verified field: select your own name once you have actually done this work.' : 'Please login first.';
     }
   });
 }
