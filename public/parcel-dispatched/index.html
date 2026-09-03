@@ -113,6 +113,9 @@ tr.pendingRow{background:#fff8e1!important}
 tr.pendingRow td:first-child{border-left:3px solid #f0b429}
 .recordCard.pending{border-color:#f0b429;background:#fffaf0;box-shadow:0 0 0 1px #f0b42933}
 .pendingBadge{background:#fef3c7!important;color:#92400e!important}
+.cellDash{color:#a7b3ac;font-style:italic}
+#history td{white-space:nowrap}
+#history td:nth-child(3){white-space:normal}
 @media(max-width:1100px){.recordFilters{grid-template-columns:repeat(3,minmax(0,1fr))}.recordFilters input:first-child{grid-column:span 2}}
 @media(max-width:700px){
  body{font-size:14px}.container{padding-left:8px;padding-right:8px}.body{padding:10px}.card h3{font-size:15px;padding:11px 12px}
@@ -160,6 +163,7 @@ if(window.self!==window.top){
 <button class="btn secondary small" type="button" onclick="clearDispatchFilters()">Clear Filters</button>
 </div>
 <div class="recordSummary" id="dispatchRecordSummary"></div>
+<label id="hideEmptyDraftsWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="hideEmptyDrafts" onchange="renderHistory()" style="width:auto"> Hide empty drafts (<span id="hideEmptyDraftsCount">0</span>)</label>
 <div class="table desktopRecords"><table><thead><tr><th>Parcel ID</th><th>Date</th><th>Ship To</th><th>Courier</th><th>Broker</th><th>AWB</th><th>Status</th><th>Action</th></tr></thead><tbody id="history"></tbody></table></div>
 <div id="dispatchMobileCards" class="mobileRecordCards"></div>
 </div></section>
@@ -522,6 +526,9 @@ function pdStartRecordsSync(){
     const arr=[];snap.forEach(d=>arr.push(d.data()));
     localStorage.setItem(K.records,JSON.stringify(arr));
     try{if(typeof renderHistory==='function')renderHistory();}catch(e){}
+    if(window._pendingOpenParcelId && arr.some(x=>x.parcelId===window._pendingOpenParcelId)){
+      openFromLink(window._pendingOpenParcelId);
+    }
   },err=>{console.error('pd records sync error',err);pdSetFirebaseStatus('error',err.message);});
 }
 async function pdPushReturnToCloud(record){
@@ -554,29 +561,29 @@ let msgSettings=JSON.parse(localStorage.getItem('pd_message_settings_v1')||'null
 
 const WA_TEMPLATE_KEY='pd_whatsapp_templates_v2';
 const DEFAULT_WA_TEMPLATES=[
-{id:'parcel_created',name:'Parcel Created',category:'Dispatch',text:'📦 Parcel Created\nParcel ID: {ParcelID}\nParty: {Party}\nBroker: {Broker}\nShip Through: {ShipThrough}\nDate: {DispatchDate}\nCreated/Updated By: {LoginUser}'},
-{id:'slip_filled',name:'Slip Fill Completed',category:'Dispatch',text:'📝 Slip Fill Completed\nParcel ID: {ParcelID}\nParty: {Party}\nSlip Fill By: {SlipFillBy}\nTime: {SlipFillTime}'},
-{id:'parcel_given',name:'Parcel Given / Handover',category:'Dispatch',text:'📦 Parcel Given\nParcel ID: {ParcelID}\nParty: {Party}\nParcel Given By: {ParcelGivenBy}\nTime: {ParcelGivenTime}'},
-{id:'pkt_change_required',name:'PKT Change Required',category:'Dispatch',text:'🔁 PKT Change Required\nParcel ID: {ParcelID}\nParty: {Party}\nRequired: {PKTRequired}\nChanged By: {PKTChangeBy}\nTime: {PKTChangeTime}'},
-{id:'handover_prepare',name:'Handover To Prepare',category:'Dispatch',text:'➡️ Handover To Prepare\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverPrepare}\nTime: {PrepareTime}'},
-{id:'weight_checked',name:'Weight Checked',category:'Dispatch',text:'⚖️ Weight Check Completed\nParcel ID: {ParcelID}\nParty: {Party}\nWeight Checked By: {WeightCheckedBy}\nTime: {WeightCheckedTime}'},
-{id:'lines_tags_checked',name:'Lines & Tags Checked',category:'Dispatch',text:'🏷️ Lines & Tags Check Completed\nParcel ID: {ParcelID}\nParty: {Party}\nChecked By: {LinesTagsCheckedBy}\nTime: {LinesTagsTime}'},
-{id:'handover_noting',name:'Handover To Noting',category:'Dispatch',text:'➡️ Handover To Noting\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverNoting}\nTime: {NotingTime}'},
-{id:'noting_done',name:'Noting Completed',category:'Dispatch',text:'✅ Noting Completed\nParcel ID: {ParcelID}\nParty: {Party}\nNoted By: {NotedBy}\nNo. of Items: {ItemsNoted}\nTime: {NotedTime}'},
-{id:'handover_recheck',name:'Handover To Recheck',category:'Dispatch',text:'🔎 Handover To Recheck\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverRecheck}\nTime: {RecheckTime}'},
-{id:'handover_packing',name:'Handover To Packing',category:'Dispatch',text:'📦 Handover To Packing\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverPacking}\nTime: {PackingHandoverTime}'},
-{id:'item_packed',name:'Item Packed',category:'Dispatch',text:'📦 Item Packed\nParcel ID: {ParcelID}\nParty: {Party}\nPacked By: {ItemPackedBy}\nItems Packed: {ItemsPacked}\nParcel Weight: {ParcelWeight} GR\nTime: {PackedTime}'},
-{id:'address_given',name:'Delivery Address',category:'Dispatch',text:'📍 Delivery Address\nParcel ID: {ParcelID}\nParty: {Party}\nAddress: {DeliveryAddress}'},
+{id:'parcel_created',name:'Parcel Created',category:'Dispatch',text:'📦 Parcel Created\nParcel ID: {ParcelID}\nParty: {Party}\nBroker: {Broker}\nShip Through: {ShipThrough}\nDate: {DispatchDate}\nCreated/Updated By: {LoginUser}\n\n👉 {OpenLink}'},
+{id:'slip_filled',name:'Slip Fill Completed',category:'Dispatch',text:'📝 Slip Fill Completed\nParcel ID: {ParcelID}\nParty: {Party}\nSlip Fill By: {SlipFillBy}\nTime: {SlipFillTime}\n\n👉 {OpenLink}'},
+{id:'parcel_given',name:'Parcel Given / Handover',category:'Dispatch',text:'📦 Parcel Given\nParcel ID: {ParcelID}\nParty: {Party}\nParcel Given By: {ParcelGivenBy}\nTime: {ParcelGivenTime}\n\n👉 {OpenLink}'},
+{id:'pkt_change_required',name:'PKT Change Required',category:'Dispatch',text:'🔁 PKT Change Required\nParcel ID: {ParcelID}\nParty: {Party}\nRequired: {PKTRequired}\nChanged By: {PKTChangeBy}\nTime: {PKTChangeTime}\n\n👉 {OpenLink}'},
+{id:'handover_prepare',name:'Handover To Prepare',category:'Dispatch',text:'➡️ Handover To Prepare\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverPrepare}\nTime: {PrepareTime}\n\n👉 {OpenLink}'},
+{id:'weight_checked',name:'Weight Checked',category:'Dispatch',text:'⚖️ Weight Check Completed\nParcel ID: {ParcelID}\nParty: {Party}\nWeight Checked By: {WeightCheckedBy}\nTime: {WeightCheckedTime}\n\n👉 {OpenLink}'},
+{id:'lines_tags_checked',name:'Lines & Tags Checked',category:'Dispatch',text:'🏷️ Lines & Tags Check Completed\nParcel ID: {ParcelID}\nParty: {Party}\nChecked By: {LinesTagsCheckedBy}\nTime: {LinesTagsTime}\n\n👉 {OpenLink}'},
+{id:'handover_noting',name:'Handover To Noting',category:'Dispatch',text:'➡️ Handover To Noting\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverNoting}\nTime: {NotingTime}\n\n👉 {OpenLink}'},
+{id:'noting_done',name:'Noting Completed',category:'Dispatch',text:'✅ Noting Completed\nParcel ID: {ParcelID}\nParty: {Party}\nNoted By: {NotedBy}\nNo. of Items: {ItemsNoted}\nTime: {NotedTime}\n\n👉 {OpenLink}'},
+{id:'handover_recheck',name:'Handover To Recheck',category:'Dispatch',text:'🔎 Handover To Recheck\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverRecheck}\nTime: {RecheckTime}\n\n👉 {OpenLink}'},
+{id:'handover_packing',name:'Handover To Packing',category:'Dispatch',text:'📦 Handover To Packing\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverPacking}\nTime: {PackingHandoverTime}\n\n👉 {OpenLink}'},
+{id:'item_packed',name:'Item Packed',category:'Dispatch',text:'📦 Item Packed\nParcel ID: {ParcelID}\nParty: {Party}\nPacked By: {ItemPackedBy}\nItems Packed: {ItemsPacked}\nParcel Weight: {ParcelWeight} GR\nTime: {PackedTime}\n\n👉 {OpenLink}'},
+{id:'address_given',name:'Delivery Address',category:'Dispatch',text:'📍 Delivery Address\nParcel ID: {ParcelID}\nParty: {Party}\nAddress: {DeliveryAddress}\n\n👉 {OpenLink}'},
 
-{id:'ready_dispatch',name:'Ready For Dispatch',category:'Courier',text:'✅ Ready For Dispatch\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nWeight: {ShippingWeight} GR\nShipping Date: {ShippingDate}'},
-{id:'courier_arrived',name:'Courier Person Arrived',category:'Courier',text:'🚚 Courier Person Arrived\nParcel ID: {ParcelID}\nParty: {Party}\nCourier Person: {CourierPerson}\nCourier: {CourierName}'},
-{id:'parcel_handover_courier',name:'Parcel Handover To Courier',category:'Courier',text:'📤 Parcel Handover To Courier\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nHandover By: {ParcelHandoverBy}\nTime: {ParcelHandoverTime}'},
-{id:'courier_slip_received',name:'Courier Slip Received',category:'Courier',text:'🧾 Courier Slip Received\nParcel ID: {ParcelID}\nParty: {Party}\nSlip No.: {CourierSlipNo}\nReceived By: {CourierSlipReceivedBy}\nTime: {CourierSlipReceivedTime}'},
-{id:'awb_received',name:'AWB / Tracking Received',category:'Courier',text:'🔎 AWB / Tracking Received\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nExpected Delivery: {ExpectedDeliveryDate}'},
-{id:'insurance',name:'Insurance Details',category:'Courier',text:'🛡️ Insurance Details\nParcel ID: {ParcelID}\nParty: {Party}\nInsurance: {Insurance}\nInsurance Amount: {InsuranceAmount}'},
-{id:'dispatched',name:'Parcel Dispatched',category:'Courier',text:'🚚 Parcel Dispatched\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nShipping Date: {ShippingDate}\nExpected Delivery: {ExpectedDeliveryDate}'},
-{id:'delivery_pending',name:'Delivery Confirmation Pending',category:'Courier',text:'⏳ Delivery Confirmation Pending\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nExpected Delivery: {ExpectedDeliveryDate}'},
-{id:'delivered_closed',name:'Delivered / Closed',category:'Courier',text:'✅ Parcel Delivered / Closed\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nFinal Status: {FinalStatus}'},
+{id:'ready_dispatch',name:'Ready For Dispatch',category:'Courier',text:'✅ Ready For Dispatch\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nWeight: {ShippingWeight} GR\nShipping Date: {ShippingDate}\n\n👉 {OpenLink}'},
+{id:'courier_arrived',name:'Courier Person Arrived',category:'Courier',text:'🚚 Courier Person Arrived\nParcel ID: {ParcelID}\nParty: {Party}\nCourier Person: {CourierPerson}\nCourier: {CourierName}\n\n👉 {OpenLink}'},
+{id:'parcel_handover_courier',name:'Parcel Handover To Courier',category:'Courier',text:'📤 Parcel Handover To Courier\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nHandover By: {ParcelHandoverBy}\nTime: {ParcelHandoverTime}\n\n👉 {OpenLink}'},
+{id:'courier_slip_received',name:'Courier Slip Received',category:'Courier',text:'🧾 Courier Slip Received\nParcel ID: {ParcelID}\nParty: {Party}\nSlip No.: {CourierSlipNo}\nReceived By: {CourierSlipReceivedBy}\nTime: {CourierSlipReceivedTime}\n\n👉 {OpenLink}'},
+{id:'awb_received',name:'AWB / Tracking Received',category:'Courier',text:'🔎 AWB / Tracking Received\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nExpected Delivery: {ExpectedDeliveryDate}\n\n👉 {OpenLink}'},
+{id:'insurance',name:'Insurance Details',category:'Courier',text:'🛡️ Insurance Details\nParcel ID: {ParcelID}\nParty: {Party}\nInsurance: {Insurance}\nInsurance Amount: {InsuranceAmount}\n\n👉 {OpenLink}'},
+{id:'dispatched',name:'Parcel Dispatched',category:'Courier',text:'🚚 Parcel Dispatched\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nShipping Date: {ShippingDate}\nExpected Delivery: {ExpectedDeliveryDate}\n\n👉 {OpenLink}'},
+{id:'delivery_pending',name:'Delivery Confirmation Pending',category:'Courier',text:'⏳ Delivery Confirmation Pending\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nExpected Delivery: {ExpectedDeliveryDate}\n\n👉 {OpenLink}'},
+{id:'delivered_closed',name:'Delivered / Closed',category:'Courier',text:'✅ Parcel Delivered / Closed\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nFinal Status: {FinalStatus}\n\n👉 {OpenLink}'},
 
 {id:'return_received',name:'Return Parcel Received',category:'Return',text:'↩️ Return Parcel Received\nReturn From: {ReturnFrom}\nReturn Through: {ReturnThrough}\nReceived By: {ReturnReceiveBy}\nTime: {ReturnReceiveTime}'},
 {id:'return_checking_handover',name:'Return Handover For Checking',category:'Return',text:'➡️ Return Handover For Checking\nReturn From: {ReturnFrom}\nHandover To: {ReturnCheckingBy}\nTime: {ReturnCheckingTime}'},
@@ -588,13 +595,13 @@ const DEFAULT_WA_TEMPLATES=[
 {id:'return_pkt_change',name:'Return PKT / Tag Change',category:'Return',text:'🔁 Return PKT / Tag Change\nReturn From: {ReturnFrom}\nRequired: {ReturnPKTRequired}\nChanged By: {ReturnPKTBy}\nTime: {ReturnPKTTime}'},
 {id:'stock_boxes',name:'Stock Goods Put In Boxes',category:'Return',text:'📦 Stock Goods Put In Boxes\nReturn From: {ReturnFrom}\nDone By: {StockBoxesBy}\nTime: {StockBoxesTime}'},
 
-{id:'task_assigned',name:'Task Assigned',category:'Task',text:'📌 Task Assigned\nParcel ID: {ParcelID}\nParty: {Party}\nTask: {CustomTask}\nAssigned To: {SelectedUser}\nAssigned By: {LoginUser}'},
-{id:'task_reminder',name:'Pending Task Reminder',category:'Task',text:'⏰ Pending Task Reminder\nParcel ID: {ParcelID}\nParty: {Party}\nTask: {CustomTask}\nPlease complete the pending task.'},
-{id:'stage_locked',name:'Stage Locked',category:'Control',text:'🔒 Stage Locked\nParcel ID: {ParcelID}\nParty: {Party}\nStage: {CustomStage}\nLocked By: {LoginUser}\nTime: {CurrentTime}'},
-{id:'stage_unlocked',name:'Stage Unlocked By Admin',category:'Control',text:'🔓 Stage Unlocked\nParcel ID: {ParcelID}\nParty: {Party}\nStage: {CustomStage}\nUnlocked By: {LoginUser}\nTime: {CurrentTime}'},
-{id:'correction_request',name:'Correction Request',category:'Control',text:'✏️ Correction Request\nParcel ID: {ParcelID}\nParty: {Party}\nField / Stage: {CustomStage}\nReason: {CustomReason}\nRequested By: {LoginUser}'},
-{id:'urgent',name:'Urgent Parcel Alert',category:'Alert',text:'🚨 URGENT PARCEL\nParcel ID: {ParcelID}\nParty: {Party}\nCurrent Stage: {CustomStage}\nRemark: {CustomReason}'},
-{id:'custom',name:'Custom Message',category:'Custom',text:'{CustomMessage}'}
+{id:'task_assigned',name:'Task Assigned',category:'Task',text:'📌 Task Assigned\nParcel ID: {ParcelID}\nParty: {Party}\nTask: {CustomTask}\nAssigned To: {SelectedUser}\nAssigned By: {LoginUser}\n\n👉 {OpenLink}'},
+{id:'task_reminder',name:'Pending Task Reminder',category:'Task',text:'⏰ Pending Task Reminder\nParcel ID: {ParcelID}\nParty: {Party}\nTask: {CustomTask}\nPlease complete the pending task.\n\n👉 {OpenLink}'},
+{id:'stage_locked',name:'Stage Locked',category:'Control',text:'🔒 Stage Locked\nParcel ID: {ParcelID}\nParty: {Party}\nStage: {CustomStage}\nLocked By: {LoginUser}\nTime: {CurrentTime}\n\n👉 {OpenLink}'},
+{id:'stage_unlocked',name:'Stage Unlocked By Admin',category:'Control',text:'🔓 Stage Unlocked\nParcel ID: {ParcelID}\nParty: {Party}\nStage: {CustomStage}\nUnlocked By: {LoginUser}\nTime: {CurrentTime}\n\n👉 {OpenLink}'},
+{id:'correction_request',name:'Correction Request',category:'Control',text:'✏️ Correction Request\nParcel ID: {ParcelID}\nParty: {Party}\nField / Stage: {CustomStage}\nReason: {CustomReason}\nRequested By: {LoginUser}\n\n👉 {OpenLink}'},
+{id:'urgent',name:'Urgent Parcel Alert',category:'Alert',text:'🚨 URGENT PARCEL\nParcel ID: {ParcelID}\nParty: {Party}\nCurrent Stage: {CustomStage}\nRemark: {CustomReason}\n\n👉 {OpenLink}'},
+{id:'custom',name:'Custom Message',category:'Custom',text:'{CustomMessage}\n\n👉 {OpenLink}'}
 ];
 let waTemplates=JSON.parse(localStorage.getItem(WA_TEMPLATE_KEY)||'null');
 if(!Array.isArray(waTemplates)||!waTemplates.length){
@@ -638,13 +645,25 @@ document.addEventListener('DOMContentLoaded',()=>{ensureDoerMaster();ensureUserP
   }
   shipTo=clientMaster.map(x=>x.party);
   populate();
-  const activeDraftId=localStorage.getItem(ACTIVE_DRAFT_KEY);
-  const activeDraftExists=activeDraftId&&JSON.parse(localStorage.getItem(K.records)||'[]').some(x=>x.parcelId===activeDraftId);
-  if(activeDraftExists){editRecord(activeDraftId,true);toast('Continuing last slip: '+activeDraftId);}
-  else newParcel();
+  const openId=new URLSearchParams(location.search).get('open');
+  if(openId){
+    window._pendingOpenParcelId=openId;
+    const existing=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===openId);
+    if(existing){openFromLink(openId)}else{newParcel();toast('Slip load ho rahi hai…')}
+  }else{
+    const activeDraftId=localStorage.getItem(ACTIVE_DRAFT_KEY);
+    const activeDraftExists=activeDraftId&&JSON.parse(localStorage.getItem(K.records)||'[]').some(x=>x.parcelId===activeDraftId);
+    if(activeDraftExists){editRecord(activeDraftId,true);toast('Continuing last slip: '+activeDraftId);}
+    else newParcel();
+  }
   renderHistory();
   pdStartRecordsSync();
 });
+function openFromLink(parcelId){
+  editRecord(parcelId);
+  window._pendingOpenParcelId=null;
+  if(history.replaceState)history.replaceState(null,'',location.pathname);
+}
 function saveMasters(){localStorage.setItem(K.users,JSON.stringify(users));localStorage.setItem(K.shipto,JSON.stringify(shipTo));localStorage.setItem(K.shipthrough,JSON.stringify(shipThrough));localStorage.setItem(K.api,JSON.stringify(api));pdSyncUsersToCloud();}
 function options(arr,val=x=>x,label=x=>x){return '<option value="">Select</option>'+arr.map(x=>`<option value="${esc(val(x))}">${esc(label(x))}</option>`).join('')}
 function populate(){ensureDoerMaster();document.querySelectorAll('.person').forEach(s=>{let old=s.value;let au=users.filter(u=>u.active!==false);s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});$('shipThroughList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('courierNameList'))$('courierNameList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');renderShipToMenu('')}
@@ -680,13 +699,16 @@ async function sendBackgroundWA(u,eventName){
   let phone=normalizePhone(u.phone); if(phone.length<11)return false;
   let parcel=editing||currentParcelId||'(New Parcel)';
   let client=$('shipTo').value||'-',st=$('shipThrough').value||'-',tm=now();
-  let message=`📦 Parcel Dispatch\n\nClient: ${client}\nParcel ID: ${parcel}\nShip Through: ${st}\n${eventName}: ${u.name}\nTime: ${tm}\n\nParcel update: ${eventName} completed/handed over to ${u.name}.`;
+  let message=`📦 Parcel Dispatch\n\nClient: ${client}\nParcel ID: ${parcel}\nShip Through: ${st}\n${eventName}: ${u.name}\nTime: ${tm}\n\nParcel update: ${eventName} completed/handed over to ${u.name}.\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(parcel)}`;
   let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:phone+'@c.us',message})});
   if(!r.ok){let d=await r.json().catch(()=>({}));throw new Error(d.message||d.error||('HTTP '+r.status))}
   return true;
 }
 function mask(p){p=String(p);return p.length>4?'••••••'+p.slice(-4):p}
 function normalizePhone(p){let n=String(p||'').replace(/\D/g,'');if(n.length===10)n='91'+n;return n}
+function parcelOpenLink(parcelId){
+  return 'https://bliss-gems-one.web.app/parcel-dispatched/?open='+encodeURIComponent(parcelId);
+}
 async function sendWA(){if(!waTarget)return;let id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');if(!id||!token){toast('Manage → GREEN-API me ID Instance aur API Token save karein.');return}let phone=normalizePhone(waTarget.user.phone);if(phone.length<11){toast('User mobile number valid nahi hai.');return}let btn=$('waSendBtn');btn.disabled=true;btn.textContent='Sending...';try{let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:phone+'@c.us',message:$('waMessage').value})});let data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.message||data.error||('HTTP '+r.status));closeWA();toast('WhatsApp message sent successfully.')}catch(e){toast('Message send failed: '+e.message)}finally{btn.disabled=false;btn.textContent='Send WhatsApp'}}
 function closeWA(){$('waModal').classList.add('hidden')}
 function shipChanged(){let v=($('shipThrough').value||'').toUpperCase().trim();let yes=['SECURE','SEQUEL','SQL','BVC'].includes(v);$('section1A').classList.toggle('hidden',!yes);$('deliveryChallanRequired').value=yes?'YES':'NO';if(!yes){['dlcItem','dlcPrice','remark1','remark2','remark3'].forEach(id=>$(id).value='')}}
@@ -859,9 +881,17 @@ function renderHistory(){
  });
  a.sort((x,y)=>(isRecordPending(x.parcelId)?0:1)-(isRecordPending(y.parcelId)?0:1));
  let pendingCount=a.filter(x=>isRecordPending(x.parcelId)).length;
+ let emptyCount=a.filter(x=>isEmptyDraft(x)).length;
+ if($('hideEmptyDraftsWrap'))$('hideEmptyDraftsWrap').classList.toggle('hidden',!emptyCount);
+ if($('hideEmptyDraftsCount'))$('hideEmptyDraftsCount').textContent=emptyCount;
+ if($('hideEmptyDrafts')&&$('hideEmptyDrafts').checked)a=a.filter(x=>!isEmptyDraft(x));
  if($('dispatchRecordSummary'))$('dispatchRecordSummary').textContent=`Showing ${a.length} of ${all.length} dispatch records`+(pendingCount?` • ${pendingCount} pending (in progress)`:'');
- $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(x.parcelId||'')}</b></td><td>${esc(x.shippingDate||x.dispatchDate||'')}</td><td>${esc(x.shipTo||'')}</td><td>${esc(x.courierName||x.shipThrough||'')}</td><td>${esc(x.broker||'')}</td><td>${esc(x.awbNo||'')}</td><td>${pend?'<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>':esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button></td></tr>`}).join(''):'<tr><td colspan="8">No records.</td></tr>';
- if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(x.parcelId||'')}</b><span${pend?' class="pendingBadge"':''}>${pend?'📝 Pending':esc(x.shippingFinalStatus||x.status||'')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Party</small><strong>${esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button></div>`}).join(''):'<div class="note">No records.</div>';
+ const dash=v=>v?esc(v):'<span class="cellDash">—</span>';
+ $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(x.parcelId||'')}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend?'<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>':esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button></td></tr>`}).join(''):'<tr><td colspan="8">No records.</td></tr>';
+ if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(x.parcelId||'')}</b><span${pend?' class="pendingBadge"':''}>${pend?'📝 Pending':esc(x.shippingFinalStatus||x.status||'')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button></div>`}).join(''):'<div class="note">No records.</div>';
+}
+function isEmptyDraft(x){
+  return !x.shipTo && !x.courierName && !x.shipThrough && !x.broker && !x.awbNo;
 }
 function isRecordPending(parcelId){
  if(!parcelId)return true;
@@ -1017,6 +1047,7 @@ function nameOfUserId(id){let u=users.find(x=>x.id===id);return u?u.name:''}
 function waContext(){
   return {
     ParcelID:editing||currentParcelId||'',Party:$('shipTo')?.value||'',Broker:$('broker')?.value||'',ShipThrough:$('shipThrough')?.value||'',DispatchDate:$('dispatchDate')?.value||'',LoginUser:loggedUser()?.name||'',CurrentTime:now(),
+    OpenLink:parcelOpenLink(editing||currentParcelId||''),
     SlipFillBy:nameOfUserId($('slipFillBy')?.value),SlipFillTime:$('slipFillTime')?.value||'',
     ParcelGivenBy:nameOfUserId($('parcelGivenBy')?.value),ParcelGivenTime:$('parcelGivenTime')?.value||'',
     PKTRequired:$('dispatchPktRequired')?.value||'',PKTChangeBy:nameOfUserId($('dispatchPktBy')?.value),PKTChangeTime:$('dispatchPktTime')?.value||'',
@@ -1923,7 +1954,7 @@ function logWorkerSelection(field,selectedId){
  if(actor && actor.id!==worker.id){
    let q=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
    q.unshift({createdAt:row.at,toUserId:worker.id,toPhone:worker.phone,parcelId:row.parcelId,stage:field,status:'PENDING',reminderEveryMinutes:30,
-     message:reason?`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} ka task aapko transfer kiya hai. Reason: ${reason}. Task pending hone tak reminder har 30 minute.`:`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} me aapka naam select kiya hai. Task pending hone tak reminder har 30 minute.`});
+     message:(reason?`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} ka task aapko transfer kiya hai. Reason: ${reason}. Task pending hone tak reminder har 30 minute.`:`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} me aapka naam select kiya hai. Task pending hone tak reminder har 30 minute.`)+`\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(row.parcelId)}`});
    localStorage.setItem(WA_QUEUE_KEY,JSON.stringify(q));
  }
 }
