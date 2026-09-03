@@ -270,7 +270,34 @@ if(window.self!==window.top){
 </div>
 </div>
 <div id="returnModule" class="hidden">
-<section class="card"><h3>↩ PARCEL RETURN RECORD</h3><div class="body"><div class="note">Separate Return Module • Universal Users • Auto Time</div></div></section>
+<div id="returnListView">
+<div class="no-print" style="margin-bottom:14px"><button class="btn primary" style="font-size:15px;padding:14px 18px" onclick="startNewReturn()">＋ New Return Slip</button></div>
+<section class="card" id="returnHistoryCard" style="margin-top:0">
+  <h3>Recent Return Records</h3>
+  <div class="body">
+    <div class="recordFilters">
+<input id="returnSearch" placeholder="Search Return ID / Party / Courier / User / Remark" oninput="renderReturnHistory()">
+<select id="returnPartyFilter" onchange="renderReturnHistory()"><option value="">All Parties</option></select>
+<select id="returnCourierFilter" onchange="renderReturnHistory()"><option value="">All Couriers</option></select>
+<select id="returnUserFilter" onchange="renderReturnHistory()"><option value="">All Users</option></select>
+<input type="date" id="returnDateFrom" onchange="renderReturnHistory()" title="From Date">
+<input type="date" id="returnDateTo" onchange="renderReturnHistory()" title="To Date">
+<button class="btn secondary small" type="button" onclick="clearReturnFilters()">Clear Filters</button>
+</div>
+<div class="recordSummary" id="returnRecordSummary"></div>
+    <div class="table desktopRecords">
+<table>
+<thead><tr><th>Return ID</th><th>Date</th><th>Party</th><th>Courier</th><th>User / Doer</th><th>Status</th><th>Saved At</th><th>Action</th></tr></thead>
+<tbody id="returnHistory"></tbody>
+</table>
+</div>
+<div id="returnMobileCards" class="mobileRecordCards"></div>
+  </div>
+</section>
+</div>
+<div id="returnFormView" class="hidden">
+<div class="no-print" style="margin-bottom:12px"><button class="btn secondary" onclick="showReturnListView()">← Back to Records</button></div>
+<section class="card"><h3>↩ PARCEL RETURN RECORD<span id="returnIdTag" style="float:right;font-size:12px;font-weight:700;color:var(--p)"></span></h3><div class="body"><div class="note">Separate Return Module • Universal Users • Auto Time</div></div></section>
 
 <section class="card"><h3>1. Parcel Receive & Handover</h3><div class="body"><div class="grid">
 <div class="field"><label>Date <span class="req">*</span></label><input type="date" id="returnDate"></div>
@@ -302,31 +329,8 @@ if(window.self!==window.top){
 <div class="field"><label>Stock Goods Put in Boxes - Name <span class="req">*</span></label><select class="returnPerson" id="stockBoxesBy" data-time="stockBoxesTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="stockBoxesTime" readonly></div>
 <div class="field full"><label>Remarks</label><textarea id="returnRemarks"></textarea></div>
 </div></div></section>
-<div class="no-print" style="margin:14px 0"><button class="btn secondary" onclick="openRecordType('return')">📋 VIEW RETURN SAVED RECORDS</button></div>
 <div class="save"><button class="btn secondary" onclick="clearReturn()">Clear Return</button><button class="btn primary" onclick="printReturn()">🖨 Print Return Slip</button><button class="btn primary" onclick="saveReturn()">💾 SAVE RETURN</button></div>
-
-<section class="card" id="returnHistoryCard" style="margin-top:10px">
-  <h3>Recent Return Records</h3>
-  <div class="body">
-    <div class="recordFilters">
-<input id="returnSearch" placeholder="Search Return ID / Party / Courier / User / Remark" oninput="renderReturnHistory()">
-<select id="returnPartyFilter" onchange="renderReturnHistory()"><option value="">All Parties</option></select>
-<select id="returnCourierFilter" onchange="renderReturnHistory()"><option value="">All Couriers</option></select>
-<select id="returnUserFilter" onchange="renderReturnHistory()"><option value="">All Users</option></select>
-<input type="date" id="returnDateFrom" onchange="renderReturnHistory()" title="From Date">
-<input type="date" id="returnDateTo" onchange="renderReturnHistory()" title="To Date">
-<button class="btn secondary small" type="button" onclick="clearReturnFilters()">Clear Filters</button>
 </div>
-<div class="recordSummary" id="returnRecordSummary"></div>
-    <div class="table desktopRecords">
-<table>
-<thead><tr><th>Return ID</th><th>Date</th><th>Party</th><th>Courier</th><th>User / Doer</th><th>Status</th><th>Saved At</th><th>Action</th></tr></thead>
-<tbody id="returnHistory"></tbody>
-</table>
-</div>
-<div id="returnMobileCards" class="mobileRecordCards"></div>
-  </div>
-</section>
 
 </div></main>
 
@@ -1166,7 +1170,20 @@ function switchModule(which){
   $('dispatchTabBtn').className='btn '+(which==='dispatch'?'primary':'secondary');
   $('returnTabBtn').className='btn '+(which==='return'?'primary':'secondary');
   if(which==='dispatch'){ showDispatchListView(); }
-  if(which==='return'){ populateReturnUsers(); restoreReturn(); renderReturnHistory(); setTimeout(()=>{makeSingleSearchCombos();syncAllComboInputs();},30); }
+  if(which==='return'){ populateReturnUsers(); restoreReturn(); renderReturnHistory(); showReturnListView(); setTimeout(()=>{makeSingleSearchCombos();syncAllComboInputs();},30); }
+}
+function showReturnListView(){
+  if($('returnListView'))$('returnListView').classList.remove('hidden');
+  if($('returnFormView'))$('returnFormView').classList.add('hidden');
+  renderReturnHistory();
+}
+function showReturnFormView(){
+  if($('returnListView'))$('returnListView').classList.add('hidden');
+  if($('returnFormView'))$('returnFormView').classList.remove('hidden');
+}
+function startNewReturn(){
+  clearReturn();
+  showReturnFormView();
 }
 function showDispatchListView(){
   if($('dispatchListView'))$('dispatchListView').classList.remove('hidden');
@@ -1190,7 +1207,7 @@ function newRecord(){
   // actually visible, not silently reset the hidden Dispatch form while you're
   // sitting on the Return tab.
   if($('returnModule') && !$('returnModule').classList.contains('hidden')){
-    clearReturn();
+    startNewReturn();
   }else{
     startNewDispatch();
   }
@@ -1273,6 +1290,7 @@ function clearReturn(){
  populateReturnUsers();
  if(typeof returnPktRule==='function')returnPktRule();
  if(typeof syncAllComboInputs==='function')syncAllComboInputs();
+ if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+currentReturnId;
  toast('New Return: '+currentReturnId);
 }
 function restoreReturn(){
@@ -1309,7 +1327,8 @@ function renderReturnHistory(){
    return (!q||text.includes(q))&&(!party||r.returnFrom===party)&&(!courier||r.returnThrough===courier)&&(!user||usersText.toLowerCase().includes(user.toLowerCase()))&&inDateRange(date,from,to);
  });
  if($('returnRecordSummary'))$('returnRecordSummary').textContent=`Showing ${a.length} of ${all.length} return records`;
- body.innerHTML=a.length?a.map(r=>`<tr><td><b>${esc(r.returnId||'')}</b></td><td>${esc(r.returnDate||'')}</td><td>${esc(r.returnFrom||'')}</td><td>${esc(r.returnThrough||'')}</td><td>${esc(returnUserNames(r)||'')}</td><td>${esc(r.status||'Return')}</td><td>${esc(r.savedAt?new Date(r.savedAt).toLocaleString('en-IN'):'')}</td><td><button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button></td></tr>`).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
+ const dash=v=>v?esc(v):'<span class="cellDash">—</span>';
+ body.innerHTML=a.length?a.map(r=>`<tr><td><b>${esc(r.returnId||'')}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${dash(returnUserNames(r))}</td><td>${esc(r.status||'Return')}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td><button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button></td></tr>`).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
  if($('returnMobileCards'))$('returnMobileCards').innerHTML=a.length?a.map(r=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(r.returnId||'')}</b><span>${esc(r.status||'Return')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div><div><small>User / Doer</small><strong>${esc(returnUserNames(r)||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button></div>`).join(''):'<div class="note">No return records.</div>';
 }
 
@@ -1337,7 +1356,11 @@ function openReturnRecord(id){
  let a=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]'),r=a.find(x=>x.returnId===id);if(!r)return;
  closeAllRecords();switchModule('return');currentReturnId=id;
  returnControls().forEach((e,i)=>{let k=e.dataset.rkey||('r_'+i);e.value=r[k]??''});
- localStorage.setItem(RETURN_KEY,JSON.stringify(r));toast('Return opened: '+id);
+ localStorage.setItem(RETURN_KEY,JSON.stringify(r));
+ if(typeof returnPktRule==='function')returnPktRule();
+ if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+id;
+ showReturnFormView();
+ toast('Return opened: '+id);
 }
 
 function populateReturnUsers2(){let au=users.filter(u=>u.active!==false);document.querySelectorAll('#returnModule .returnPerson').forEach(s=>{let old=s.value;s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});let rf=$('returnFrom');if(rf){let old=rf.value;rf.innerHTML=options(shipTo);if(shipTo.includes(old))rf.value=old}}
