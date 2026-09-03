@@ -14,7 +14,7 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 @media print{
   @page{size:A4;margin:8mm}
   body{background:#fff;font-size:10px}
-  header,.save,#historyCard,.modal,.toast,.no-print{display:none!important}
+  header,.save,#historyCard,#returnHistoryCard,#dashboardCard,.modal,.toast,.no-print{display:none!important}
   .container{max-width:none;margin:0;padding:0}
   .card{break-inside:avoid;border:1px solid #777;border-radius:0;margin:0 0 5px;box-shadow:none}
   .card h3{padding:5px 7px;font-size:11px;background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -55,7 +55,8 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 
 <style id="dispatch-closing-print-fix">
 @media print{
-  #dispatchModule .card{break-inside:avoid;page-break-inside:avoid}
+  #dispatchModule .card,#returnModule .card{break-inside:avoid;page-break-inside:avoid}
+  #returnIdTag,#slipNoTag{float:none!important;display:block;font-size:10px;margin-top:2px}
 }
 </style>
 
@@ -115,6 +116,12 @@ tr.pendingRow td:first-child{border-left:3px solid #f0b429}
 .pendingBadge{background:#fef3c7!important;color:#92400e!important}
 .cellDash{color:#a7b3ac;font-style:italic}
 .pendingBadge.stuck{background:#fee4e2!important;color:#9b1c1c!important}
+.statTile{background:var(--bg);border:1px solid var(--b);border-radius:10px;padding:12px 14px}
+.statTile small{display:block;color:var(--m);font-size:11px;margin-bottom:5px;text-transform:uppercase;letter-spacing:.03em}
+.statTile strong{display:block;font-size:22px;line-height:1.2}
+.statTile span{display:block;font-size:12px;color:var(--m);margin-top:3px}
+.statTile.warn strong{color:#a66b08}
+.statTile.danger strong{color:#9b1c1c}
 .cellSub{color:var(--m);font-size:11px}
 #history td{white-space:nowrap}
 #history td:nth-child(3){white-space:normal}
@@ -154,6 +161,10 @@ if(window.self!==window.top){
 <div id="dispatchModule">
 <div id="dispatchListView">
 <div class="no-print" style="margin-bottom:14px"><button class="btn primary" style="font-size:15px;padding:14px 18px" onclick="startNewDispatch()">＋ New Dispatch Slip</button></div>
+<section class="card" id="dashboardCard">
+  <h3>📊 Dashboard <select id="dashboardRange" onchange="renderDashboard()" style="width:auto;display:inline-block;margin-left:8px;font-size:12px;padding:5px 8px;font-weight:400"><option value="today">Today</option><option value="week">This Week</option><option value="all">All Time</option></select></h3>
+  <div class="body"><div id="dashboardStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div></div>
+</section>
 <section class="card" id="historyCard" style="margin-top:0"><h3>Recent Dispatch Records</h3><div class="body">
 <div class="recordFilters">
 <input id="search" placeholder="Search Parcel / Party / Courier / AWB / Broker" oninput="renderHistory()">
@@ -917,6 +928,42 @@ function renderHistory(){
  };
  $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(x.parcelId||'')}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button></td></tr>`}).join(''):'<tr><td colspan="8">No records.</td></tr>';
  if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(x.parcelId||'')}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button></div>`}).join(''):'<div class="note">No records.</div>';
+ renderDashboard();
+}
+function renderDashboard(){
+  const box=$('dashboardStats'); if(!box)return;
+  const range=$('dashboardRange')?.value||'today';
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>!isEmptyDraft(x));
+  const now=Date.now();
+  const inRange=x=>{
+    if(range==='all')return true;
+    if(!x.createdAt)return false;
+    if(range==='today'){
+      const d=new Date(x.createdAt),n=new Date();
+      return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate();
+    }
+    return (now-new Date(x.createdAt).getTime())<=7*24*36e5;
+  };
+  const a=all.filter(inRange);
+  const topOf=fn=>{
+    const m={};
+    a.forEach(x=>{const v=(fn(x)||'').trim();if(v)m[v]=(m[v]||0)+1});
+    let top='',topN=0;
+    Object.keys(m).forEach(k=>{if(m[k]>topN){top=k;topN=m[k]}});
+    return {top,topN};
+  };
+  const courier=topOf(x=>x.courierName||x.shipThrough);
+  const party=topOf(x=>x.shipTo);
+  const pendingCount=a.filter(x=>isRecordPending(x.parcelId)).length;
+  const stuckCount=all.filter(x=>isRecordPending(x.parcelId)&&x.createdAt&&(now-new Date(x.createdAt).getTime())>=24*36e5).length;
+  const rangeLabel=range==='today'?'Aaj':(range==='week'?'Is Hafte':'Ab Tak');
+  box.innerHTML=`
+    <div class="statTile"><small>${rangeLabel} Dispatch Hue</small><strong>${a.length}</strong></div>
+    <div class="statTile${pendingCount?' warn':''}"><small>${rangeLabel} Pending</small><strong>${pendingCount}</strong></div>
+    <div class="statTile"><small>Top Courier (${rangeLabel})</small><strong>${courier.top?esc(courier.top):'—'}</strong>${courier.top?`<span>${courier.topN} parcels</span>`:''}</div>
+    <div class="statTile"><small>Sabse Active Party (${rangeLabel})</small><strong>${party.top?esc(party.top):'—'}</strong>${party.top?`<span>${party.topN} parcels</span>`:''}</div>
+    <div class="statTile${stuckCount?' danger':''}"><small>Stuck 24h+ (Overall)</small><strong>${stuckCount}</strong></div>
+  `;
 }
 function isEmptyDraft(x){
   return !x.shipTo && !x.courierName && !x.shipThrough && !x.broker && !x.awbNo;
