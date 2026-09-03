@@ -12,17 +12,20 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 @media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.grid{grid-template-columns:1fr}.span2,.full{grid-column:auto}.head{align-items:flex-start;flex-direction:column}.save{flex-direction:column}.save .btn{width:100%}}
 
 @media print{
-  @page{size:A4;margin:8mm}
-  body{background:#fff;font-size:10px}
-  header,.save,#historyCard,#returnHistoryCard,#dashboardCard,.modal,.toast,.no-print{display:none!important}
+  @page{size:A4;margin:6mm}
+  html,body{background:#fff;font-size:9px}
+  header,.save,#historyCard,#returnHistoryCard,#dashboardCard,.modal,.toast,.no-print,.note{display:none!important}
   .container{max-width:none;margin:0;padding:0}
-  .card{break-inside:avoid;border:1px solid #777;border-radius:0;margin:0 0 5px;box-shadow:none}
-  .card h3{padding:5px 7px;font-size:11px;background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .body{padding:6px}
-  .grid{grid-template-columns:repeat(4,1fr);gap:5px 7px}
-  label{font-size:8px;margin-bottom:2px}
-  input,select,textarea{border:0;border-bottom:1px solid #999;border-radius:0;padding:2px 1px;font-size:9px;min-height:18px;background:#fff!important;color:#000!important;appearance:none;-webkit-appearance:none}
-  textarea{min-height:28px;resize:none}
+  .card{break-inside:avoid;page-break-inside:avoid;border:1px solid #777;border-radius:0;margin:0 0 3px;box-shadow:none}
+  .card h3{padding:3px 6px;font-size:10px;background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .body{padding:4px}
+  .grid{display:flex!important;flex-wrap:wrap;gap:1px 8px}
+  .field{flex:0 0 auto;width:22%;min-width:0;break-inside:avoid;page-break-inside:avoid;margin-bottom:1px}
+  .span2{width:47%}
+  .full{width:100%}
+  label{font-size:7px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  input,select,textarea{border:0;border-bottom:1px solid #999;border-radius:0;padding:1px 0;font-size:8px;min-height:13px;line-height:1.3;background:#fff!important;color:#000!important;appearance:none;-webkit-appearance:none}
+  textarea{min-height:20px;resize:none}
   .hidden{display:none!important}
   #section1A:not(.hidden){display:block!important}
 }
@@ -55,8 +58,7 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 
 <style id="dispatch-closing-print-fix">
 @media print{
-  #dispatchModule .card,#returnModule .card{break-inside:avoid;page-break-inside:avoid}
-  #returnIdTag,#slipNoTag{float:none!important;display:block;font-size:10px;margin-top:2px}
+  #returnIdTag,#slipNoTag{float:none!important;display:block;font-size:9px;margin-top:1px}
 }
 </style>
 
