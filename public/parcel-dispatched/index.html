@@ -182,7 +182,7 @@ if(window.self!==window.top){
 <div class="field hidden" id="priceWrap"><label>Price <span class="req">*</span></label><input type="number" id="price"></div>
 <div class="field span2"><label>Self Remark</label><textarea id="selfRemark" placeholder="Optional • Secret/Code"></textarea>
 </div><div class="field span2"><label>Client Remark</label><textarea id="clientRemark"></textarea></div>
-<div class="field"><label>Slip Fill By <span class="req">*</span></label><select class="person" id="slipFillBy" data-time="slipFillTime" data-event="Slip Fill By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="slipFillTime" readonly></div>
+<div class="field"><label>Slip Fill By <span class="req">*</span></label><select class="person" id="slipFillBy" data-time="slipFillTime" data-event="Slip Fill By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('slipFillBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="slipFillTime" readonly></div>
 <div class="field"><label>Parcel Given By <span class="req">*</span></label><select class="person" id="parcelGivenBy" data-time="parcelGivenTime" data-event="Parcel Given By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="parcelGivenTime" readonly></div>
 <div class="field"><label>PKT Change Required <span class="req">*</span></label><select id="dispatchPktRequired" onchange="dispatchPktRule()"><option value="">Select</option><option>YES</option><option>NO</option></select></div><div class="field"><label>Handover To Prepare <span class="req">*</span></label><select class="person" id="handoverToPrepare" data-time="prepareTime" data-event="Handover To Prepare" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="prepareTime" readonly></div>
 </div></div></section>
@@ -190,19 +190,19 @@ if(window.self!==window.top){
 <div class="field"><label>Delivery Challan Required <span class="req">*</span></label><select id="deliveryChallanRequired"><option>YES</option><option>NO</option></select></div><div class="field"><label>Item Name <span class="req">*</span></label><input id="dlcItem"></div><div class="field"><label>Price in DLC <span class="req">*</span></label><input type="number" id="dlcPrice"></div><div class="field"><label>Remark 1</label><input id="remark1"></div><div class="field"><label>Remark 2</label><input id="remark2"></div><div class="field"><label>Remark 3</label><input id="remark3"></div>
 </div></div></section>
 <section class="card"><h3>2. Weight & Checking</h3><div class="body"><div class="grid">
-<div class="field hidden" id="dispatchPktByWrap"><label>PKT Change By <span class="req">*</span></label><select class="person" id="dispatchPktBy" data-time="dispatchPktTime" data-event="PKT Change By" onchange="personChanged(this)"></select></div>
+<div class="field hidden" id="dispatchPktByWrap"><label>PKT Change By <span class="req">*</span></label><select class="person" id="dispatchPktBy" data-time="dispatchPktTime" data-event="PKT Change By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('dispatchPktBy')">🔄 Transfer</button></div>
 <div class="field hidden" id="dispatchPktTimeWrap"><label>Time <span class="req">*</span></label><input id="dispatchPktTime" readonly></div>
-<div class="field"><label>Weight Checked By <span class="req">*</span></label><select class="person" id="weightCheckedBy" data-time="weightCheckedTime" data-event="Weight Checked By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="weightCheckedTime" readonly></div>
-<div class="field"><label>Lines & Tags Checked By <span class="req">*</span></label><select class="person" id="linesTagsCheckedBy" data-time="linesTagsTime" data-event="Lines & Tags Checked By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="linesTagsTime" readonly></div>
+<div class="field"><label>Weight Checked By <span class="req">*</span></label><select class="person" id="weightCheckedBy" data-time="weightCheckedTime" data-event="Weight Checked By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('weightCheckedBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="weightCheckedTime" readonly></div>
+<div class="field"><label>Lines & Tags Checked By <span class="req">*</span></label><select class="person" id="linesTagsCheckedBy" data-time="linesTagsTime" data-event="Lines & Tags Checked By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('linesTagsCheckedBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="linesTagsTime" readonly></div>
 
 </div></div></section>
-<section class="card"><h3>3. Noting</h3><div class="body"><div class="grid"><div class="field"><label>Handover To Noting <span class="req">*</span></label><select class="person" id="handoverToNoting" data-time="notingTime" data-event="Handover To Noting" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="notingTime" readonly></div><div class="field"><label>Noted By <span class="req">*</span></label><select class="person" id="notedBy" data-time="notedTime" data-event="Noted By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="notedTime" readonly></div><div class="field"><label>No. of Items Noted <span class="req">*</span></label><input type="number" id="itemsNoted"></div></div></div></section>
+<section class="card"><h3>3. Noting</h3><div class="body"><div class="grid"><div class="field"><label>Handover To Noting <span class="req">*</span></label><select class="person" id="handoverToNoting" data-time="notingTime" data-event="Handover To Noting" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="notingTime" readonly></div><div class="field"><label>Noted By <span class="req">*</span></label><select class="person" id="notedBy" data-time="notedTime" data-event="Noted By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('notedBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="notedTime" readonly></div><div class="field"><label>No. of Items Noted <span class="req">*</span></label><input type="number" id="itemsNoted"></div></div></div></section>
 <section class="card"><h3>4. Recheck & Packing</h3><div class="body"><div class="grid"><div class="field"><label>Handover To Recheck <span class="req">*</span></label><select class="person" id="handoverToRecheck" data-time="recheckTime" data-event="Handover To Recheck" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="recheckTime" readonly></div><div class="field"><label>Handover To Packing <span class="req">*</span></label><select class="person" id="handoverToPacking" data-time="packingHandoverTime" data-event="Handover To Packing" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="packingHandoverTime" readonly></div></div></div></section>
 <section class="card"><h3>5. Final Packing</h3><div class="body"><div class="grid">
-<div class="field"><label>Item Packed By <span class="req">*</span></label><select class="person" id="itemPackedBy" data-time="packedTime" data-event="Item Packed By" onchange="personChanged(this)"></select></div>
+<div class="field"><label>Item Packed By <span class="req">*</span></label><select class="person" id="itemPackedBy" data-time="packedTime" data-event="Item Packed By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('itemPackedBy')">🔄 Transfer</button></div>
 <div class="field"><label>Time <span class="req">*</span></label><input id="packedTime" readonly></div>
 <div class="field"><label>No. Items Packed <span class="req">*</span></label><input type="number" id="itemsPacked"></div>
-<div class="field"><label>Address Given By <span class="req">*</span></label><select class="person" id="addressGivenBy" data-time="addressTime" data-event="Address Given By" onchange="personChanged(this)"></select></div>
+<div class="field"><label>Address Given By <span class="req">*</span></label><select class="person" id="addressGivenBy" data-time="addressTime" data-event="Address Given By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('addressGivenBy')">🔄 Transfer</button></div>
 <div class="field"><label>Time <span class="req">*</span></label><input id="addressTime" readonly></div>
 <div class="field"><label>Parcel Weight (GR) <span class="req">*</span></label><input type="number" id="parcelWeight" oninput="syncShippingSection()"></div>
 </div></div></section>
@@ -234,7 +234,7 @@ if(window.self!==window.top){
 <div class="field"><label>Handover Time <span class="req">*</span></label><input id="parcelHandoverTime" readonly></div>
 
 <div class="field"><label>Courier Slip Received By</label>
-<select class="person" id="courierSlipReceivedBy" data-time="courierSlipReceivedTime" data-event="Courier Slip Received By" onchange="personChanged(this)"></select></div>
+<select class="person" id="courierSlipReceivedBy" data-time="courierSlipReceivedTime" data-event="Courier Slip Received By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('courierSlipReceivedBy')">🔄 Transfer</button></div>
 <div class="field"><label>Slip Received Time</label><input id="courierSlipReceivedTime" readonly></div>
 
 <div class="field"><label>Final Status <span class="req">*</span></label>
@@ -409,7 +409,16 @@ if(window.self!==window.top){
 <div class="row" style="margin-bottom:10px">
 <input id="auditSearch" placeholder="Search field / user / value / parcel" oninput="renderAuditTrail()" style="flex:1">
 </div>
-<div class="table"><table><thead><tr><th>Time</th><th>Parcel</th><th>User</th><th>Field</th><th>Old Value</th><th>New Value</th><th>Action</th></tr></thead><tbody id="auditBody"></tbody></table></div>
+<div class="table"><table><thead><tr><th>Time</th><th>Parcel</th><th>User</th><th>Field</th><th>Old Value</th><th>New Value</th><th>Action</th><th>Reason</th></tr></thead><tbody id="auditBody"></tbody></table></div>
+</div></div></div>
+
+<div class="modal hidden" id="transferTaskModal"><div class="box" style="width:min(440px,100%)">
+<div class="mh"><b id="transferTaskTitle">🔄 Transfer Task</b><button class="btn secondary small" onclick="closeTransferTask()">✕</button></div>
+<div class="mb">
+<div class="field"><label>Doer busy hai — Naya Doer <span class="req">*</span></label><select id="transferNewDoer"></select></div>
+<div class="field" style="margin-top:10px"><label>Reason for Transfer <span class="req">*</span></label><textarea id="transferReason" placeholder="e.g. Busy with another parcel, On leave, Urgent elsewhere"></textarea></div>
+<button class="btn primary" style="margin-top:12px" onclick="confirmTransferTask()">Transfer Task</button>
+<div class="note" style="margin-top:8px">Naye Doer ko WhatsApp par turant notify kiya jayega. Ye transfer Audit Trail me reason ke saath record hoga.</div>
 </div></div></div>
 
 <div class="toast" id="toast"></div>
@@ -1535,7 +1544,7 @@ function fieldLabel(el){
   const lab=f&&f.querySelector('label');
   return lab?lab.textContent.replace('*','').trim():el.id;
 }
-function auditFieldChange(el,oldVal,newVal,action='CHANGE'){
+function auditFieldChange(el,oldVal,newVal,action='CHANGE',reason=''){
   if(!el || oldVal===newVal)return;
   const actor=loggedUser();
   const row={
@@ -1547,7 +1556,8 @@ function auditFieldChange(el,oldVal,newVal,action='CHANGE'){
     field:fieldLabel(el),
     oldValue:String(oldVal??''),
     newValue:String(newVal??''),
-    action
+    action,
+    reason
   };
   const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
   a.unshift(row);
@@ -1684,7 +1694,7 @@ function renderAuditTrail(){
   const q=($('auditSearch')?.value||'').toLowerCase();
   let a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
   a=a.filter(x=>`${x.parcelId} ${x.userName} ${x.field} ${x.oldValue} ${x.newValue} ${x.action}`.toLowerCase().includes(q));
-  $('auditBody').innerHTML=a.length?a.slice(0,500).map(x=>`<tr>
+  $('auditBody').innerHTML=a.length?a.slice(0,500).map(x=>`<tr${x.action==='TRANSFER'?' style="background:#fff8e1"':''}>
     <td>${esc(new Date(x.at).toLocaleString('en-IN'))}</td>
     <td>${esc(x.parcelId)}</td>
     <td>${esc(x.userName)}</td>
@@ -1692,7 +1702,8 @@ function renderAuditTrail(){
     <td>${esc(x.oldValue)}</td>
     <td>${esc(x.newValue)}</td>
     <td>${esc(x.action)}</td>
-  </tr>`).join(''):'<tr><td colspan="7">No audit history.</td></tr>';
+    <td>${esc(x.reason||'')}</td>
+  </tr>`).join(''):'<tr><td colspan="8">No audit history.</td></tr>';
 }
 
 function refreshLoginBadge(){
@@ -1810,6 +1821,7 @@ function applyWorkerPermissions(){
   });
 }
 function canSelectWorker(select,selectedId){
+  if(window.__transferInProgress)return true;
   if(!isSelfOnlyField(select))return true;
   const actor=loggedUser();
   if(!actor){
@@ -1825,14 +1837,55 @@ function canSelectWorker(select,selectedId){
 function logWorkerSelection(field,selectedId){
  let actor=loggedUser(),worker=users.find(u=>u.id===selectedId);
  if(!worker)return;
+ let reason=window.__transferReason||'';
  let row={at:new Date().toISOString(),parcelId:currentParcelId||'',field,enteredBy:actor?actor.name:'Unknown',workBy:worker.name};
  let a=JSON.parse(localStorage.getItem(WORK_AUDIT_KEY)||'[]');a.unshift(row);localStorage.setItem(WORK_AUDIT_KEY,JSON.stringify(a));
  if(actor && actor.id!==worker.id){
    let q=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
    q.unshift({createdAt:row.at,toUserId:worker.id,toPhone:worker.phone,parcelId:row.parcelId,stage:field,status:'PENDING',reminderEveryMinutes:30,
-     message:`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} me aapka naam select kiya hai. Task pending hone tak reminder har 30 minute.`});
+     message:reason?`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} ka task aapko transfer kiya hai. Reason: ${reason}. Task pending hone tak reminder har 30 minute.`:`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} me aapka naam select kiya hai. Task pending hone tak reminder har 30 minute.`});
    localStorage.setItem(WA_QUEUE_KEY,JSON.stringify(q));
  }
+}
+function openTransferTask(fieldId){
+  const el=$(fieldId);
+  if(!el)return;
+  const actor=loggedUser();
+  if(!actor){alert('Task transfer karne ke liye pehle login karein.');return}
+  if(el.disabled){alert('Ye task abhi transfer ke liye available nahi hai — sequence me pichla stage lock nahi hua ya ye stage already locked hai.');return}
+  if(el.value && el.value!==actor.id && !window.superAdminUnlocked){
+    alert('Sirf jis Doer ko ye task currently assigned hai (ya Super Admin), wahi ise transfer kar sakta hai.');
+    return;
+  }
+  window._transferFieldId=fieldId;
+  const label=el.closest('.field')?.querySelector('label')?.textContent.replace('*','').trim()||'Task';
+  $('transferTaskTitle').textContent='🔄 Transfer: '+label;
+  const au=users.filter(u=>u.active!==false && u.id!==el.value);
+  $('transferNewDoer').innerHTML=options(au,u=>u.id,u=>u.name);
+  $('transferReason').value='';
+  $('transferTaskModal').classList.remove('hidden');
+}
+function closeTransferTask(){$('transferTaskModal').classList.add('hidden');window._transferFieldId=null}
+function confirmTransferTask(){
+  const el=$(window._transferFieldId);
+  if(!el)return;
+  const newId=$('transferNewDoer').value;
+  const reason=$('transferReason').value.trim();
+  if(!newId){toast('Naya Doer select karein.');return}
+  if(!reason){toast('Transfer ka reason likhna zaroori hai.');return}
+  const oldVal=el.value;
+  const oldWorker=users.find(u=>u.id===oldVal);
+  const newWorker=users.find(u=>u.id===newId);
+  window.__transferInProgress=true;
+  window.__transferReason=reason;
+  if(typeof _auditPrev!=='undefined')_auditPrev.set(el,newId);
+  el.value=newId;
+  el.dispatchEvent(new Event('change',{bubbles:true}));
+  window.__transferInProgress=false;
+  window.__transferReason='';
+  auditFieldChange(el,oldVal,newId,'TRANSFER',reason);
+  toast('Task transfer ho gaya: '+(newWorker?newWorker.name:newId)+(oldWorker?' (from '+oldWorker.name+')':''));
+  closeTransferTask();
 }
 document.addEventListener('change',e=>{
  if(e.target.matches('select.person,select.returnPerson') && e.target.value){
