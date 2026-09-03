@@ -1883,7 +1883,7 @@ function applyWorkerPermissions(){
       // Left blank on purpose, even for the logged-in doer — this field's timestamp is
       // supposed to mark when the physical work actually happened, so it must be picked
       // explicitly from the dropdown, not silently pre-filled the moment the stage opens.
-      inp.placeholder=actor ? 'Select: '+actor.name : 'Login required';
+      inp.placeholder=actor ? 'Type / Search Name' : 'Login required';
       inp.title=actor ? 'Verified field: select your own name once you have actually done this work.' : 'Please login first.';
     }
   });
