@@ -278,7 +278,7 @@ if(window.self!==window.top){
 <div id="workflowStatus" class="note" style="margin-top:10px"></div>
 </div></section>
 
-<div class="save"><span id="autoSaveTag" class="note" style="margin-right:auto"></span><button class="btn secondary" onclick="newParcel()">Clear</button><button class="btn primary" onclick="printSlip()">🖨 Print Slip</button><button class="btn primary" onclick="saveParcel()">💾 SAVE PARCEL</button></div>
+<div class="save"><span id="autoSaveTag" class="note" style="margin-right:auto"></span><button class="btn secondary" onclick="newParcel()">Clear</button><button class="btn primary" onclick="printSlip()">🖨 Print Slip</button></div>
 <div class="no-print" style="margin-top:16px"><button class="btn secondary" onclick="openRecordType('dispatch')">📋 VIEW DISPATCH SAVED RECORDS</button></div>
 </div>
 </div>
@@ -863,7 +863,6 @@ async function handlePackPhoto(inputEl){
 function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;return `PD-${ds}-${String(Date.now()).slice(-4)}`}
 function persistParcelRecord(){let d=formData();let a=JSON.parse(localStorage.getItem(K.records)||'[]'),i=a.findIndex(x=>x.parcelId===d.parcelId);if(i>=0)a[i]={...a[i],...d};else a.unshift(d);localStorage.setItem(K.records,JSON.stringify(a));editing=d.parcelId;renderHistory();pdPushRecordToCloud(a.find(x=>x.parcelId===d.parcelId));return d}
 function markAutoSaved(){let t=$('autoSaveTag');if(t)t.textContent='✓ Saved '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}
-function saveParcel(silent){let d=formData();if(!d.dispatchDate||!d.shipTo||!d.shipThrough){if(!silent)toast('Dispatch Date, Ship To aur Ship Through required hain.');return}persistParcelRecord();if(silent)markAutoSaved();else toast('Parcel saved: '+d.parcelId)}
 function autoSaveParcel(){
   // Looser than the manual Save gate — appears in Recent Dispatch Records as soon as
   // any one identifying field is filled, so the user can find/continue it from the list too.
