@@ -122,7 +122,7 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 
 </head>
 <body>
-<header><div class="head"><div id="secretAdminLogo" title="" style="display:flex;align-items:center;gap:10px"><div class="logo">b</div><div><h2>Parcel Dispatch Slip</h2><small>Simple one-page dispatch app</small></div></div><div class="row"><button class="btn secondary" id="desktopViewBtn" onclick="toggleDesktopView()" title="Switch between mobile and desktop layout">🖥 Desktop View</button><button class="btn secondary" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button><span id="loginBadge" class="pill">Not Logged In</span><button class="btn secondary" id="loginBtn" onclick="openLogin()">👤 Login</button><button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button><button class="btn secondary hidden" id="logoutBtn" onclick="doLogout()">↪ Logout</button><button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button><button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button><button class="btn secondary" onclick="newParcel()">＋ New</button></div></div></header>
+<header><div class="head"><div id="secretAdminLogo" title="" style="display:flex;align-items:center;gap:10px"><div class="logo">b</div><div><h2>Parcel Dispatch Slip</h2><small>Simple one-page dispatch app</small></div></div><div class="row"><button class="btn secondary" id="desktopViewBtn" onclick="toggleDesktopView()" title="Switch between mobile and desktop layout">🖥 Desktop View</button><button class="btn secondary" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button><span id="loginBadge" class="pill">Not Logged In</span><button class="btn secondary" id="loginBtn" onclick="openLogin()">👤 Login</button><button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button><button class="btn secondary hidden" id="logoutBtn" onclick="doLogout()">↪ Logout</button><button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button><button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button><button class="btn secondary" onclick="startNewDispatch()">＋ New</button></div></div></header>
 <script>
 if(window.self!==window.top){
   ['loginBadge','loginBtn','logoutBtn','changePasswordBtn'].forEach(function(id){
@@ -143,6 +143,25 @@ if(window.self!==window.top){
   
 </div>
 <div id="dispatchModule">
+<div id="dispatchListView">
+<div class="no-print" style="margin-bottom:14px"><button class="btn primary" style="font-size:15px;padding:14px 18px" onclick="startNewDispatch()">＋ New Dispatch Slip</button></div>
+<section class="card" id="historyCard" style="margin-top:0"><h3>Recent Dispatch Records</h3><div class="body">
+<div class="recordFilters">
+<input id="search" placeholder="Search Parcel / Party / Courier / AWB / Broker" oninput="renderHistory()">
+<select id="dispatchPartyFilter" onchange="renderHistory()"><option value="">All Parties</option></select>
+<select id="dispatchCourierFilter" onchange="renderHistory()"><option value="">All Couriers</option></select>
+<select id="dispatchStatusFilter" onchange="renderHistory()"><option value="">All Status</option></select>
+<input type="date" id="dispatchDateFrom" onchange="renderHistory()" title="From Date">
+<input type="date" id="dispatchDateTo" onchange="renderHistory()" title="To Date">
+<button class="btn secondary small" type="button" onclick="clearDispatchFilters()">Clear Filters</button>
+</div>
+<div class="recordSummary" id="dispatchRecordSummary"></div>
+<div class="table desktopRecords"><table><thead><tr><th>Parcel ID</th><th>Date</th><th>Ship To</th><th>Courier</th><th>Broker</th><th>AWB</th><th>Status</th><th>Action</th></tr></thead><tbody id="history"></tbody></table></div>
+<div id="dispatchMobileCards" class="mobileRecordCards"></div>
+</div></section>
+</div>
+<div id="dispatchFormView" class="hidden">
+<div class="no-print" style="margin-bottom:12px"><button class="btn secondary" onclick="closeDispatchForm()">← Back to Records</button></div>
 <section class="card"><h3>1. Basic Dispatch & Preparation<span id="slipNoTag" style="float:right;font-size:12px;font-weight:700;color:var(--p)"></span></h3><div class="body"><div class="grid">
 <div class="field"><label>Dispatch Date <span class="req">*</span></label><input type="date" id="dispatchDate"></div>
 <div class="field"><label>Ship To / Party Name <span class="req">*</span></label>
@@ -240,20 +259,7 @@ if(window.self!==window.top){
 
 <div class="save"><span id="autoSaveTag" class="note" style="margin-right:auto"></span><button class="btn secondary" onclick="newParcel()">Clear</button><button class="btn primary" onclick="printSlip()">🖨 Print Slip</button><button class="btn primary" onclick="saveParcel()">💾 SAVE PARCEL</button></div>
 <div class="no-print" style="margin-top:16px"><button class="btn secondary" onclick="openRecordType('dispatch')">📋 VIEW DISPATCH SAVED RECORDS</button></div>
-<section class="card" id="historyCard" style="margin-top:10px"><h3>Recent Dispatch Records</h3><div class="body">
-<div class="recordFilters">
-<input id="search" placeholder="Search Parcel / Party / Courier / AWB / Broker" oninput="renderHistory()">
-<select id="dispatchPartyFilter" onchange="renderHistory()"><option value="">All Parties</option></select>
-<select id="dispatchCourierFilter" onchange="renderHistory()"><option value="">All Couriers</option></select>
-<select id="dispatchStatusFilter" onchange="renderHistory()"><option value="">All Status</option></select>
-<input type="date" id="dispatchDateFrom" onchange="renderHistory()" title="From Date">
-<input type="date" id="dispatchDateTo" onchange="renderHistory()" title="To Date">
-<button class="btn secondary small" type="button" onclick="clearDispatchFilters()">Clear Filters</button>
 </div>
-<div class="recordSummary" id="dispatchRecordSummary"></div>
-<div class="table desktopRecords"><table><thead><tr><th>Parcel ID</th><th>Date</th><th>Ship To</th><th>Courier</th><th>Broker</th><th>AWB</th><th>Status</th><th>Action</th></tr></thead><tbody id="history"></tbody></table></div>
-<div id="dispatchMobileCards" class="mobileRecordCards"></div>
-</div></section>
 </div>
 <div id="returnModule" class="hidden">
 <section class="card"><h3>↩ PARCEL RETURN RECORD</h3><div class="body"><div class="note">Separate Return Module • Universal Users • Auto Time</div></div></section>
@@ -783,7 +789,7 @@ function renderHistory(){
  $('history').innerHTML=a.length?a.map(x=>`<tr><td><b>${esc(x.parcelId||'')}</b></td><td>${esc(x.shippingDate||x.dispatchDate||'')}</td><td>${esc(x.shipTo||'')}</td><td>${esc(x.courierName||x.shipThrough||'')}</td><td>${esc(x.broker||'')}</td><td>${esc(x.awbNo||'')}</td><td>${esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button></td></tr>`).join(''):'<tr><td colspan="8">No records.</td></tr>';
  if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(x.parcelId||'')}</b><span>${esc(x.shippingFinalStatus||x.status||'')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Party</small><strong>${esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button></div>`).join(''):'<div class="note">No records.</div>';
 }
-function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();if(findClientByParty($('shipTo').value))$('broker').value=findClientByParty($('shipTo').value).broker||'';syncShippingSection();applySequenceAndLocks();if(!silent){scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
+function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();if(findClientByParty($('shipTo').value))$('broker').value=findClientByParty($('shipTo').value).broker||'';syncShippingSection();applySequenceAndLocks();if(!silent){showDispatchFormView();scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
 function openManage(){currentTab='users';$('manageModal').classList.remove('hidden');renderManage()}function closeManage(){$('manageModal').classList.add('hidden');populate();shipChanged()}function tab(b,t){currentTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));renderManage()}
 function renderManage(){let c=$('manageContent');if(currentTab==='users'){c.innerHTML=`<div class="grid"><div class="field"><label>User Name <span class="req">*</span></label><input id="mUserName"></div><div class="field"><label>Username <span class="req">*</span></label><input id="mUsername"></div><div class="field"><label>Mobile Number <span class="req">*</span></label><input id="mUserPhone" placeholder="10 digit or 91..."></div><div class="field"><label>Department <span class="req">*</span></label><input id="mDepartment"></div><div class="field"><label>&nbsp; <span class="req">*</span></label><button class="btn primary" onclick="addUser()">Add Universal User</button></div></div><div class="note">Handover dropdowns me sabhi active Doers dikhenge. Actual-work fields (Slip Fill, Weight Check, Lines & Tags, Noted By, Item Packed etc.) me logged-in user sirf apna naam fill kar sakta hai. Dusre Doer ka actual-work naam us Doer ki login ID se hi fill hoga. New user ka default password 1234 hai.</div><div style="margin:8px 0"><button class="btn secondary small" onclick="resetDefaultUsers()">↻ Reset Default Doers</button></div><div>${users.map((u,i)=>`<div class="item"><span><b>${esc(u.name)}</b> <small>(${esc(u.username||u.id)})</small><br><small>${esc(u.phone)} • ${esc(u.department||'No Department')} • ${u.active===false?'INACTIVE':'ACTIVE'}</small></span><span><button class="btn small secondary" onclick="toggleUser(${i})">${u.active===false?'Activate':'Deactivate'}</button> <button class="btn small secondary" onclick="editUser(${i})">Edit</button> <button class="btn small secondary" onclick="resetUserPassword(${i})">Reset Password</button> <button class="btn small danger" onclick="delUser(${i})">Delete</button></span></div>`).join('')}</div>`}
 else if(currentTab==='shipto'){c.innerHTML=`<div class="row"><input id="mShipTo" placeholder="Add Client / Ship To" style="flex:1"><button class="btn primary" onclick="addShipTo()">Add</button></div>${shipTo.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delShipTo(${i})">Delete</button></div>`).join('')}`}
@@ -1043,7 +1049,28 @@ function switchModule(which){
   $('returnModule').classList.toggle('hidden',which!=='return');
   $('dispatchTabBtn').className='btn '+(which==='dispatch'?'primary':'secondary');
   $('returnTabBtn').className='btn '+(which==='return'?'primary':'secondary');
+  if(which==='dispatch'){ showDispatchListView(); }
   if(which==='return'){ populateReturnUsers(); restoreReturn(); renderReturnHistory(); setTimeout(()=>{makeSingleSearchCombos();syncAllComboInputs();},30); }
+}
+function showDispatchListView(){
+  if($('dispatchListView'))$('dispatchListView').classList.remove('hidden');
+  if($('dispatchFormView'))$('dispatchFormView').classList.add('hidden');
+  renderHistory();
+}
+function showDispatchFormView(){
+  if($('dispatchListView'))$('dispatchListView').classList.add('hidden');
+  if($('dispatchFormView'))$('dispatchFormView').classList.remove('hidden');
+  // isFieldFilled() treats any field under a .hidden ancestor as "filled" (a pre-existing
+  // escape hatch for conditionally-hidden fields like priceWrap) — while the form itself
+  // was hidden behind this view, every field read as filled. Recompute now that it's visible.
+  applySequenceAndLocks();
+}
+function startNewDispatch(){
+  newParcel();
+  showDispatchFormView();
+}
+function closeDispatchForm(){
+  showDispatchListView();
 }
 function populateReturnUsers(){
   let au=users.filter(u=>u.active!==false);
@@ -1215,12 +1242,20 @@ function requiredReturnOk(){
 }
 const _oldSaveParcel=saveParcel;
 saveParcel=function(){if(!requiredDispatchOk())return;_oldSaveParcel();}
+let sequenceRecalcTimer=null;
+function scheduleSequenceRecalc(){
+  // A single real field change fires both 'input' and 'change' — collapse both into
+  // one recalculation so a field's stage-completion check sees the final state (e.g.
+  // a paired auto-filled Time field) and auto-lock doesn't advance twice per action.
+  clearTimeout(sequenceRecalcTimer);
+  sequenceRecalcTimer=setTimeout(applySequenceAndLocks,0);
+}
 if($('dispatchModule')){
   ['input','change'].forEach(function(evt){
     $('dispatchModule').addEventListener(evt,function(e){
       if(e.target.id==='search'||e.target.closest('#historyCard'))return;
       scheduleAutoSave();
-      if(!e.target.closest('#workflowControlCard'))applySequenceAndLocks();
+      if(!e.target.closest('#workflowControlCard'))scheduleSequenceRecalc();
     });
   });
 }
@@ -1536,6 +1571,12 @@ function canEditField(el){
   return previousStagesLocked(stage);
 }
 function applySequenceAndLocks(){
+  // isFieldFilled() treats any field under a .hidden ancestor as "filled" (a pre-existing
+  // escape hatch for conditionally-hidden fields like priceWrap). While #dispatchFormView
+  // itself is navigationally hidden, every field would misread as filled and wrongly
+  // auto-lock stages — so skip entirely until the form is actually visible.
+  const fv=$('dispatchFormView');
+  if(fv&&fv.classList.contains('hidden'))return;
   refreshFieldStates();
   autoLockCompletedStage();
 }
