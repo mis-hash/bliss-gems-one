@@ -184,12 +184,13 @@ if(window.self!==window.top){
 </div><div class="field span2"><label>Client Remark</label><textarea id="clientRemark"></textarea></div>
 <div class="field"><label>Slip Owner <span class="req">*</span></label><select class="person" id="slipFillBy" data-time="slipFillTime" data-event="Slip Owner" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('slipFillBy')">🔄 Transfer</button></div><div class="field"><label>Slip Start Time <span class="req">*</span></label><input id="slipFillTime" readonly></div>
 <div class="field"><label>Parcel Given By <span class="req">*</span></label><select class="person" id="parcelGivenBy" data-time="parcelGivenTime" data-event="Parcel Given By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="parcelGivenTime" readonly></div>
-<div class="field"><label>PKT Change Required <span class="req">*</span></label><select id="dispatchPktRequired" onchange="dispatchPktRule()"><option value="">Select</option><option>YES</option><option>NO</option></select></div><div class="field"><label>Handover To Weight Check &amp; PKT Change <span class="req">*</span></label><select class="person" id="handoverToPrepare" data-time="prepareTime" data-event="Handover To Weight Check &amp; PKT Change" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="prepareTime" readonly></div>
+<div class="field"><label>PKT Change Required <span class="req">*</span></label><select id="dispatchPktRequired" onchange="dispatchPktRule()"><option value="">Select</option><option>YES</option><option>NO</option></select></div><div class="field"><label>Handover To Weight Check &amp; PKT Change <span class="req">*</span></label><select class="person" id="handoverToPrepare" data-time="prepareTime" data-event="Handover To Weight Check &amp; PKT Change" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToPrepare')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="prepareTime" readonly></div>
 </div></div></section>
 <section class="card hidden" id="section1A"><h3>1-A. DLC / Delivery Challan</h3><div class="body"><div class="grid">
 <div class="field"><label>Delivery Challan Required <span class="req">*</span></label><select id="deliveryChallanRequired"><option>YES</option><option>NO</option></select></div><div class="field"><label>Item Name <span class="req">*</span></label><input id="dlcItem"></div><div class="field"><label>Price in DLC <span class="req">*</span></label><input type="number" id="dlcPrice"></div><div class="field"><label>Remark 1</label><input id="remark1"></div><div class="field"><label>Remark 2</label><input id="remark2"></div><div class="field"><label>Remark 3</label><input id="remark3"></div>
 </div></div></section>
 <section class="card"><h3>2. Weight & Checking</h3><div class="body"><div class="grid">
+<div class="field full"><label>Handed Over By (Section 1)</label><input id="handoverPrepareRef" readonly></div>
 <div class="field hidden" id="dispatchPktByWrap"><label>PKT Change By <span class="req">*</span></label><select class="person" id="dispatchPktBy" data-time="dispatchPktTime" data-event="PKT Change By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('dispatchPktBy')">🔄 Transfer</button></div>
 <div class="field hidden" id="dispatchPktTimeWrap"><label>Time <span class="req">*</span></label><input id="dispatchPktTime" readonly></div>
 <div class="field"><label>Weight Checked By <span class="req">*</span></label><select class="person" id="weightCheckedBy" data-time="weightCheckedTime" data-event="Weight Checked By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('weightCheckedBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="weightCheckedTime" readonly></div>
@@ -724,8 +725,8 @@ function renderShipToMenu(q=''){
       <small style="display:block;opacity:.72">Broker: ${esc(x.broker||'-')}${x.partyCode?` • Code: ${esc(x.partyCode)}`:''}</small>
     </div>`).join(''):'<div class="comboOption">No matching party</div>';
 }
-function openShipToMenu(){
-  renderShipToMenu($('shipTo').value);
+function openShipToMenu(showAll){
+  renderShipToMenu(showAll ? '' : $('shipTo').value);
   const menu=$('shipToMenu'), inp=$('shipTo');
   if(!menu||!inp)return;
   menu.classList.add('show');
@@ -743,7 +744,7 @@ document.addEventListener('input',e=>{
   }
 });
 document.addEventListener('focusin',e=>{
-  if(e.target&&e.target.id==='shipTo')openShipToMenu();
+  if(e.target&&e.target.id==='shipTo'){$('shipTo').select();openShipToMenu(true);}
 });
 document.addEventListener('click',e=>{
   const opt=e.target.closest&&e.target.closest('.clientOpt');
@@ -1403,8 +1404,8 @@ function makeSingleSearchCombos(){
        menu.style.borderRadius='0 0 8px 8px';
      }
    }
-   function draw(){
-     let q=inp.value.trim().toLowerCase();
+   function draw(showAll){
+     let q=showAll?'':inp.value.trim().toLowerCase();
      let actor=loggedUser();
      let source=isSelfOnlyField(s) ? (actor?[actor]:[]) : users.slice();
      let list=source.slice().sort((a,b)=>a.name.localeCompare(b.name)).filter(u=>!q||u.name.toLowerCase().includes(q)||String(u.username||'').toLowerCase().includes(q)||String(u.department||'').toLowerCase().includes(q));
@@ -1412,7 +1413,11 @@ function makeSingleSearchCombos(){
      positionMenu();
      menu.classList.add('show');
    }
-   inp.onfocus=draw;inp.oninput=draw;
+   // Focusing an already-filled combo shows the full list straight away (and selects the
+   // text) so a different name can be picked in one click, instead of having to manually
+   // clear the box first before the dropdown will show anything else.
+   inp.onfocus=()=>{inp.select();draw(true)};
+   inp.oninput=()=>draw(false);
    menu.onmousedown=e=>{let o=e.target.closest('[data-v]');if(!o)return;let wanted=o.dataset.v;if(!canSelectWorker(s,wanted)){menu.classList.remove('show');return;}s.value=wanted;let u=users.find(x=>x.id===s.value);inp.value=u?u.name:'';menu.classList.remove('show');s.dispatchEvent(new Event('change',{bubbles:true}))};
    inp.onblur=()=>setTimeout(()=>menu.classList.remove('show'),120);
    s.onchange=()=>{if(s.value&&!canSelectWorker(s,s.value)){s.value='';inp.value='';let t=s.dataset.time?$(s.dataset.time):null;if(t)t.value='';return;}let u=users.find(x=>x.id===s.value);inp.value=u?u.name:'';if(s.classList.contains('person'))personChanged(s);applyWorkerPermissions()};
@@ -1435,14 +1440,15 @@ function makeReturnFromCombo(){
   }
   let inp=wrap.querySelector('input'),menu=wrap.querySelector('.comboMenu');
   if(document.activeElement!==inp)inp.value=s.value||'';
-  function draw(){
-    let q=inp.value.trim().toLowerCase();
+  function draw(showAll){
+    let q=showAll?'':inp.value.trim().toLowerCase();
     let list=shipTo.filter(p=>!q||p.toLowerCase().includes(q));
     menu.innerHTML=list.length?list.map(p=>`<div class="comboOption" data-v="${esc(p)}"><b>${esc(p)}</b></div>`).join(''):'<div class="comboOption">No match</div>';
     forceVisibleComboMenu(inp,menu);
     menu.classList.add('show');
   }
-  inp.onfocus=draw;inp.oninput=draw;
+  inp.onfocus=()=>{inp.select();draw(true)};
+  inp.oninput=()=>draw(false);
   menu.onmousedown=e=>{let o=e.target.closest('[data-v]');if(!o)return;s.value=o.dataset.v;inp.value=o.dataset.v;menu.classList.remove('show');s.dispatchEvent(new Event('change',{bubbles:true}))};
   inp.onblur=()=>setTimeout(()=>menu.classList.remove('show'),120);
 }
@@ -1683,6 +1689,7 @@ function refreshFieldStates(){
   });
   applyWorkerPermissions();
   renderWorkflowStatus();
+  if($('handoverPrepareRef'))$('handoverPrepareRef').value=nameOfUserId($('handoverToPrepare')?.value)||'-';
 }
 // Only auto-locks ONE stage per call (does not re-check after locking) — a single field
 // completing its stage shouldn't cascade through several stages in the same tick just
