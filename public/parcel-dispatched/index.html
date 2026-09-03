@@ -216,9 +216,7 @@ if(window.self!==window.top){
 <input id="courierName" list="courierNameList" class="titleCaseField" autocomplete="off">
 <datalist id="courierNameList"></datalist></div>
 
-<div class="field"><label>Party Name <span class="req">*</span></label><input id="shippingPartyName" readonly></div>
 <div class="field"><label>Location / Destination</label><input id="shippingLocation" class="titleCaseField" placeholder="City / destination"></div>
-<div class="field"><label>Parcel Weight (GR) <span class="req">*</span></label><input type="number" id="shippingWeight" readonly></div>
 
 <div class="field"><label>Insurance <span class="req">*</span></label>
 <select id="shippingInsurance" onchange="shippingInsuranceRule()">
@@ -753,8 +751,6 @@ document.addEventListener('click',e=>{
 });
 
 function syncShippingSection(){
-  if($('shippingPartyName')) $('shippingPartyName').value = $('shipTo') ? $('shipTo').value : '';
-  if($('shippingWeight')) $('shippingWeight').value = $('parcelWeight') ? $('parcelWeight').value : '';
   if($('courierNameList')) $('courierNameList').innerHTML = (shipThrough||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
   if($('courierName') && !$('courierName').value && $('shipThrough')) $('courierName').value = $('shipThrough').value || '';
 }
@@ -1033,7 +1029,7 @@ function waContext(){
     HandoverPacking:nameOfUserId($('handoverToPacking')?.value),PackingHandoverTime:$('packingHandoverTime')?.value||'',
     ItemPackedBy:nameOfUserId($('itemPackedBy')?.value),PackedTime:$('packedTime')?.value||'',ItemsPacked:$('itemsPacked')?.value||'',
     DeliveryAddress:$('deliveryAddress')?.value||'',ParcelWeight:$('parcelWeight')?.value||'',
-    ShippingDate:$('shippingDate')?.value||'',ExpectedDeliveryDate:$('expectedDeliveryDate')?.value||'',CourierName:$('courierName')?.value||'',ShippingWeight:$('shippingWeight')?.value||'',
+    ShippingDate:$('shippingDate')?.value||'',ExpectedDeliveryDate:$('expectedDeliveryDate')?.value||'',CourierName:$('courierName')?.value||'',ShippingWeight:$('parcelWeight')?.value||'',
     Insurance:$('shippingInsurance')?.value||'',InsuranceAmount:$('shippingInsuranceAmount')?.value||'',CourierSlipNo:$('courierSlipNo')?.value||'',AWB:$('awbNo')?.value||'',CourierPerson:$('courierPersonName')?.value||'',
     ParcelHandoverBy:nameOfUserId($('parcelHandoverBy')?.value),ParcelHandoverTime:$('parcelHandoverTime')?.value||'',
     CourierSlipReceivedBy:nameOfUserId($('courierSlipReceivedBy')?.value),CourierSlipReceivedTime:$('courierSlipReceivedTime')?.value||'',FinalStatus:$('shippingFinalStatus')?.value||'',
@@ -1564,7 +1560,7 @@ const STAGE_SEQUENCE=[
   {id:'stage3',name:'3. Noting',fields:['handoverToNoting','notingTime','notedBy','notedTime','itemsNoted']},
   {id:'stage4',name:'4. Recheck & Packing',fields:['handoverToRecheck','recheckTime','handoverToPacking','packingHandoverTime']},
   {id:'stage5',name:'5. Final Packing',fields:['itemPackedBy','packedTime','itemsPacked','deliveryAddress','parcelWeight','packPhotoData']},
-  {id:'stage6',name:'6. Courier / Shipping Dispatch',fields:['shippingDate','courierName','shippingPartyName','shippingWeight','shippingInsurance','parcelHandoverBy','parcelHandoverTime','shippingFinalStatus']}
+  {id:'stage6',name:'6. Courier / Shipping Dispatch',fields:['shippingDate','courierName','shippingInsurance','parcelHandoverBy','parcelHandoverTime','shippingFinalStatus']}
 ];
 
 const WA_QUEUE_KEY='pd_whatsapp_queue_v1';
@@ -1683,7 +1679,7 @@ function refreshFieldStates(){
       el.disabled=!editable;
     }else{
       // Preserve native readonly fields like time/broker, but sequence can also lock.
-      const nativeReadonly=['slipFillTime','parcelGivenTime','prepareTime','dispatchPktTime','weightCheckedTime','linesTagsTime','notingTime','notedTime','recheckTime','packingHandoverTime','packedTime','deliveryAddress','shippingPartyName','shippingWeight','parcelHandoverTime','courierSlipReceivedTime'].includes(el.id);
+      const nativeReadonly=['slipFillTime','parcelGivenTime','prepareTime','dispatchPktTime','weightCheckedTime','linesTagsTime','notingTime','notedTime','recheckTime','packingHandoverTime','packedTime','deliveryAddress','parcelHandoverTime','courierSlipReceivedTime'].includes(el.id);
       el.readOnly=nativeReadonly || !editable;
     }
   });
