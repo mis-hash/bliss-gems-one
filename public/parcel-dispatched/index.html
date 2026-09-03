@@ -182,9 +182,9 @@ if(window.self!==window.top){
 <div class="field hidden" id="priceWrap"><label>Price <span class="req">*</span></label><input type="number" id="price"></div>
 <div class="field span2"><label>Self Remark</label><textarea id="selfRemark" placeholder="Optional • Secret/Code"></textarea>
 </div><div class="field span2"><label>Client Remark</label><textarea id="clientRemark"></textarea></div>
-<div class="field"><label>Slip Fill By <span class="req">*</span></label><select class="person" id="slipFillBy" data-time="slipFillTime" data-event="Slip Fill By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('slipFillBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="slipFillTime" readonly></div>
+<div class="field"><label>Slip Owner <span class="req">*</span></label><select class="person" id="slipFillBy" data-time="slipFillTime" data-event="Slip Owner" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('slipFillBy')">🔄 Transfer</button></div><div class="field"><label>Slip Start Time <span class="req">*</span></label><input id="slipFillTime" readonly></div>
 <div class="field"><label>Parcel Given By <span class="req">*</span></label><select class="person" id="parcelGivenBy" data-time="parcelGivenTime" data-event="Parcel Given By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="parcelGivenTime" readonly></div>
-<div class="field"><label>PKT Change Required <span class="req">*</span></label><select id="dispatchPktRequired" onchange="dispatchPktRule()"><option value="">Select</option><option>YES</option><option>NO</option></select></div><div class="field"><label>Handover To Prepare <span class="req">*</span></label><select class="person" id="handoverToPrepare" data-time="prepareTime" data-event="Handover To Prepare" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="prepareTime" readonly></div>
+<div class="field"><label>PKT Change Required <span class="req">*</span></label><select id="dispatchPktRequired" onchange="dispatchPktRule()"><option value="">Select</option><option>YES</option><option>NO</option></select></div><div class="field"><label>Handover To Weight Check &amp; PKT Change <span class="req">*</span></label><select class="person" id="handoverToPrepare" data-time="prepareTime" data-event="Handover To Weight Check &amp; PKT Change" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="prepareTime" readonly></div>
 </div></div></section>
 <section class="card hidden" id="section1A"><h3>1-A. DLC / Delivery Challan</h3><div class="body"><div class="grid">
 <div class="field"><label>Delivery Challan Required <span class="req">*</span></label><select id="deliveryChallanRequired"><option>YES</option><option>NO</option></select></div><div class="field"><label>Item Name <span class="req">*</span></label><input id="dlcItem"></div><div class="field"><label>Price in DLC <span class="req">*</span></label><input type="number" id="dlcPrice"></div><div class="field"><label>Remark 1</label><input id="remark1"></div><div class="field"><label>Remark 2</label><input id="remark2"></div><div class="field"><label>Remark 3</label><input id="remark3"></div>
@@ -202,8 +202,7 @@ if(window.self!==window.top){
 <div class="field"><label>Item Packed By <span class="req">*</span></label><select class="person" id="itemPackedBy" data-time="packedTime" data-event="Item Packed By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('itemPackedBy')">🔄 Transfer</button></div>
 <div class="field"><label>Time <span class="req">*</span></label><input id="packedTime" readonly></div>
 <div class="field"><label>No. Items Packed <span class="req">*</span></label><input type="number" id="itemsPacked"></div>
-<div class="field"><label>Address Given By <span class="req">*</span></label><select class="person" id="addressGivenBy" data-time="addressTime" data-event="Address Given By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('addressGivenBy')">🔄 Transfer</button></div>
-<div class="field"><label>Time <span class="req">*</span></label><input id="addressTime" readonly></div>
+<div class="field span2"><label>Delivery Address <span class="req">*</span></label><textarea id="deliveryAddress" readonly placeholder="Auto from Party Master — Ship To select karte hi aa jayega"></textarea></div>
 <div class="field"><label>Parcel Weight (GR) <span class="req">*</span></label><input type="number" id="parcelWeight" oninput="syncShippingSection()"></div>
 <div class="field span2 no-print"><label>Packed Parcel Photo <span class="req">*</span></label><input type="hidden" id="packPhotoData"><input type="file" id="packPhotoInput" accept="image/*" capture="environment" onchange="handlePackPhoto(this)"><div class="note" id="packPhotoStatus"></div><img id="packPhotoPreview" class="hidden" style="max-width:160px;border-radius:8px;margin-top:6px;display:block"></div>
 </div></div></section>
@@ -568,7 +567,7 @@ const DEFAULT_WA_TEMPLATES=[
 {id:'handover_recheck',name:'Handover To Recheck',category:'Dispatch',text:'🔎 Handover To Recheck\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverRecheck}\nTime: {RecheckTime}'},
 {id:'handover_packing',name:'Handover To Packing',category:'Dispatch',text:'📦 Handover To Packing\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverPacking}\nTime: {PackingHandoverTime}'},
 {id:'item_packed',name:'Item Packed',category:'Dispatch',text:'📦 Item Packed\nParcel ID: {ParcelID}\nParty: {Party}\nPacked By: {ItemPackedBy}\nItems Packed: {ItemsPacked}\nParcel Weight: {ParcelWeight} GR\nTime: {PackedTime}'},
-{id:'address_given',name:'Address Given',category:'Dispatch',text:'📍 Address Given\nParcel ID: {ParcelID}\nParty: {Party}\nAddress Given By: {AddressGivenBy}\nTime: {AddressTime}'},
+{id:'address_given',name:'Delivery Address',category:'Dispatch',text:'📍 Delivery Address\nParcel ID: {ParcelID}\nParty: {Party}\nAddress: {DeliveryAddress}'},
 
 {id:'ready_dispatch',name:'Ready For Dispatch',category:'Courier',text:'✅ Ready For Dispatch\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nWeight: {ShippingWeight} GR\nShipping Date: {ShippingDate}'},
 {id:'courier_arrived',name:'Courier Person Arrived',category:'Courier',text:'🚚 Courier Person Arrived\nParcel ID: {ParcelID}\nParty: {Party}\nCourier Person: {CourierPerson}\nCourier: {CourierName}'},
@@ -654,7 +653,23 @@ function now(){return new Date().toLocaleString('en-IN',{day:'2-digit',month:'sh
 function personChanged(s){
   let t=$(s.dataset.time);
   if(!s.value){if(t)t.value='';return}
-  if(!canSelectWorker(s,s.value)){s.value='';if(t)t.value='';let inp=getComboInput(s);if(inp)inp.value='';return}
+  if(!canSelectWorker(s,s.value)){
+    // Wrong pick on a self-only field: snap straight back to the logged-in doer's own
+    // name (the only valid value) instead of leaving it blank — no separate "delete
+    // then reselect" step needed.
+    const actor=loggedUser();
+    let inp=getComboInput(s);
+    if(actor && isSelfOnlyField(s)){
+      s.value=actor.id;
+      if(inp)inp.value=actor.name;
+      if(t)t.value=now();
+    }else{
+      s.value='';
+      if(inp)inp.value='';
+      if(t)t.value='';
+    }
+    return;
+  }
   if(t)t.value=now();
   let u=users.find(x=>x.id===s.value);
   if(!u||!u.phone){console.warn('Selected user mobile number not saved.');return}
@@ -692,6 +707,7 @@ function applyClientMaster(party){
   if(!r)return;
   $('shipTo').value=r.party;
   $('broker').value=r.broker||'';
+  if($('deliveryAddress'))$('deliveryAddress').value=r.address||'';
   syncShippingSection();
   closeShipToMenu();
 }
@@ -854,20 +870,21 @@ function isRecordPending(parcelId){
  const locks=(JSON.parse(localStorage.getItem(APPROVAL_LOCK_KEY)||'{}'))[parcelId]||{};
  return !STAGE_SEQUENCE.every(s=>locks[s.id]);
 }
-function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();if(findClientByParty($('shipTo').value))$('broker').value=findClientByParty($('shipTo').value).broker||'';syncShippingSection();syncPackPhotoPreview();applySequenceAndLocks();if(!silent){showDispatchFormView();scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
+function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();{const cm=findClientByParty($('shipTo').value);if(cm){$('broker').value=cm.broker||'';if(!r.deliveryAddress&&$('deliveryAddress'))$('deliveryAddress').value=cm.address||'';}}syncShippingSection();syncPackPhotoPreview();applySequenceAndLocks();if(!silent){showDispatchFormView();scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
 function openManage(){currentTab='users';$('manageModal').classList.remove('hidden');renderManage()}function closeManage(){$('manageModal').classList.add('hidden');populate();shipChanged()}function tab(b,t){currentTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));renderManage()}
 function renderManage(){let c=$('manageContent');if(currentTab==='users'){c.innerHTML=`<div class="grid"><div class="field"><label>User Name <span class="req">*</span></label><input id="mUserName"></div><div class="field"><label>Username <span class="req">*</span></label><input id="mUsername"></div><div class="field"><label>Mobile Number <span class="req">*</span></label><input id="mUserPhone" placeholder="10 digit or 91..."></div><div class="field"><label>Department <span class="req">*</span></label><input id="mDepartment"></div><div class="field"><label>&nbsp; <span class="req">*</span></label><button class="btn primary" onclick="addUser()">Add Universal User</button></div></div><div class="note">Handover dropdowns me sabhi active Doers dikhenge. Actual-work fields (Slip Fill, Weight Check, Lines & Tags, Noted By, Item Packed etc.) me logged-in user sirf apna naam fill kar sakta hai. Dusre Doer ka actual-work naam us Doer ki login ID se hi fill hoga. New user ka default password 1234 hai.</div><div style="margin:8px 0"><button class="btn secondary small" onclick="resetDefaultUsers()">↻ Reset Default Doers</button></div><div>${users.map((u,i)=>`<div class="item"><span><b>${esc(u.name)}</b> <small>(${esc(u.username||u.id)})</small><br><small>${esc(u.phone)} • ${esc(u.department||'No Department')} • ${u.active===false?'INACTIVE':'ACTIVE'}</small></span><span><button class="btn small secondary" onclick="toggleUser(${i})">${u.active===false?'Activate':'Deactivate'}</button> <button class="btn small secondary" onclick="editUser(${i})">Edit</button> <button class="btn small secondary" onclick="resetUserPassword(${i})">Reset Password</button> <button class="btn small danger" onclick="delUser(${i})">Delete</button></span></div>`).join('')}</div>`}
 else if(currentTab==='shipto'){c.innerHTML=`<div class="row"><input id="mShipTo" placeholder="Add Client / Ship To" style="flex:1"><button class="btn primary" onclick="addShipTo()">Add</button></div>${shipTo.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delShipTo(${i})">Delete</button></div>`).join('')}`}
 
 else if(currentTab==='clients'){
   c.innerHTML=`<h3 style="margin-top:0">Ship To</h3>
-  <div class="note">Yahan Ship To Party aur uska linked Broker manage karein. Party select hote hi Broker automatically fixed aayega.</div>
+  <div class="note">Yahan Ship To Party, uska linked Broker aur Delivery Address manage karein. Party select hote hi Broker aur Address dono automatically fixed aa jayenge.</div>
   <div class="grid" style="margin-top:12px">
     <div class="field span2"><label>Party Name <span class="req">*</span></label><input id="mClientParty" class="titleCaseField"></div>
     <div class="field"><label>Party Code</label><input id="mClientCode"></div>
     <div class="field span2"><label>App & Sale Book Name</label><input id="mClientSaleName" class="titleCaseField"></div>
     <div class="field span2"><label>Broker Name <span class="req">*</span></label><input id="mClientBroker" class="titleCaseField"></div>
     <div class="field"><label>Broker Code</label><input id="mClientBrokerCode"></div>
+    <div class="field full"><label>Delivery Address</label><textarea id="mClientAddress" placeholder="Full shipping address for this party"></textarea></div>
     <div class="field full"><button class="btn primary" onclick="addClientMaster()">Add Ship To</button></div>
   </div>
   <div class="row" style="margin:14px 0 8px"><input id="clientMasterSearch" placeholder="Search Party / Broker / Code" oninput="renderClientMasterList()" style="flex:1"></div>
@@ -924,20 +941,21 @@ function addClientMaster(){
   let saleName=($('mClientSaleName').value||'').trim();
   let broker=($('mClientBroker').value||'').trim();
   let brokerCode=($('mClientBrokerCode').value||'').trim();
+  let address=($('mClientAddress').value||'').trim();
   if(!party||!broker){toast('Party Name aur Broker Name required hain.');return}
   let i=clientMaster.findIndex(x=>String(x.party).toLowerCase()===party.toLowerCase());
-  let rec={party,partyCode,saleName,broker,brokerCode};
+  let rec={party,partyCode,saleName,broker,brokerCode,address};
   if(i>=0)clientMaster[i]=rec; else clientMaster.push(rec);
   saveClientMaster();populate();renderClientMasterList();toast(i>=0?'Party master updated':'Party + Broker added');
-  ['mClientParty','mClientCode','mClientSaleName','mClientBroker','mClientBrokerCode'].forEach(id=>{if($(id))$(id).value=''});
+  ['mClientParty','mClientCode','mClientSaleName','mClientBroker','mClientBrokerCode','mClientAddress'].forEach(id=>{if($(id))$(id).value=''});
 }
 function renderClientMasterList(){
   let wrap=$('clientMasterList'); if(!wrap)return;
   let q=($('clientMasterSearch')?.value||'').trim().toLowerCase();
-  let arr=clientMaster.filter(x=>!q||`${x.party} ${x.partyCode} ${x.saleName} ${x.broker} ${x.brokerCode}`.toLowerCase().includes(q)).slice(0,250);
+  let arr=clientMaster.filter(x=>!q||`${x.party} ${x.partyCode} ${x.saleName} ${x.broker} ${x.brokerCode} ${x.address||''}`.toLowerCase().includes(q)).slice(0,250);
   wrap.innerHTML=arr.length?arr.map((x)=>{
     let idx=clientMaster.indexOf(x);
-    return `<div class="item"><span><b>${esc(x.party)}</b><br><small>Broker: ${esc(x.broker||'-')} • Party Code: ${esc(x.partyCode||'-')} • Broker Code: ${esc(x.brokerCode||'-')}</small></span><span><button class="btn small secondary" onclick="editClientMaster(${idx})">Edit</button> <button class="btn small danger" onclick="deleteClientMaster(${idx})">Delete</button></span></div>`;
+    return `<div class="item"><span><b>${esc(x.party)}</b><br><small>Broker: ${esc(x.broker||'-')} • Party Code: ${esc(x.partyCode||'-')} • Broker Code: ${esc(x.brokerCode||'-')}</small><br><small>Address: ${esc(x.address||'-')}</small></span><span><button class="btn small secondary" onclick="editClientMaster(${idx})">Edit</button> <button class="btn small danger" onclick="deleteClientMaster(${idx})">Delete</button></span></div>`;
   }).join(''):'<div class="note">No matching parties.</div>';
 }
 function editClientMaster(i){
@@ -947,7 +965,8 @@ function editClientMaster(i){
   let partyCode=prompt('Party Code',x.partyCode||''); if(partyCode===null)return;
   let brokerCode=prompt('Broker Code',x.brokerCode||''); if(brokerCode===null)return;
   let saleName=prompt('App & Sale Book Name',x.saleName||''); if(saleName===null)return;
-  clientMaster[i]={party:party.trim()||x.party,partyCode:partyCode.trim(),saleName:saleName.trim(),broker:broker.trim(),brokerCode:brokerCode.trim()};
+  let address=prompt('Delivery Address',x.address||''); if(address===null)return;
+  clientMaster[i]={party:party.trim()||x.party,partyCode:partyCode.trim(),saleName:saleName.trim(),broker:broker.trim(),brokerCode:brokerCode.trim(),address:address.trim()};
   saveClientMaster();populate();renderClientMasterList();toast('Party master updated');
 }
 function deleteClientMaster(i){
@@ -1011,7 +1030,7 @@ function waContext(){
     HandoverRecheck:nameOfUserId($('handoverToRecheck')?.value),RecheckTime:$('recheckTime')?.value||'',
     HandoverPacking:nameOfUserId($('handoverToPacking')?.value),PackingHandoverTime:$('packingHandoverTime')?.value||'',
     ItemPackedBy:nameOfUserId($('itemPackedBy')?.value),PackedTime:$('packedTime')?.value||'',ItemsPacked:$('itemsPacked')?.value||'',
-    AddressGivenBy:nameOfUserId($('addressGivenBy')?.value),AddressTime:$('addressTime')?.value||'',ParcelWeight:$('parcelWeight')?.value||'',
+    DeliveryAddress:$('deliveryAddress')?.value||'',ParcelWeight:$('parcelWeight')?.value||'',
     ShippingDate:$('shippingDate')?.value||'',ExpectedDeliveryDate:$('expectedDeliveryDate')?.value||'',CourierName:$('courierName')?.value||'',ShippingWeight:$('shippingWeight')?.value||'',
     Insurance:$('shippingInsurance')?.value||'',InsuranceAmount:$('shippingInsuranceAmount')?.value||'',CourierSlipNo:$('courierSlipNo')?.value||'',AWB:$('awbNo')?.value||'',CourierPerson:$('courierPersonName')?.value||'',
     ParcelHandoverBy:nameOfUserId($('parcelHandoverBy')?.value),ParcelHandoverTime:$('parcelHandoverTime')?.value||'',
@@ -1537,7 +1556,7 @@ const STAGE_SEQUENCE=[
   {id:'stage2',name:'2. Weight & Checking',fields:['dispatchPktBy','dispatchPktTime','weightCheckedBy','weightCheckedTime','linesTagsCheckedBy','linesTagsTime']},
   {id:'stage3',name:'3. Noting',fields:['handoverToNoting','notingTime','notedBy','notedTime','itemsNoted']},
   {id:'stage4',name:'4. Recheck & Packing',fields:['handoverToRecheck','recheckTime','handoverToPacking','packingHandoverTime']},
-  {id:'stage5',name:'5. Final Packing',fields:['itemPackedBy','packedTime','itemsPacked','addressGivenBy','addressTime','parcelWeight','packPhotoData']},
+  {id:'stage5',name:'5. Final Packing',fields:['itemPackedBy','packedTime','itemsPacked','deliveryAddress','parcelWeight','packPhotoData']},
   {id:'stage6',name:'6. Courier / Shipping Dispatch',fields:['shippingDate','courierName','shippingPartyName','shippingWeight','shippingInsurance','parcelHandoverBy','parcelHandoverTime','shippingFinalStatus']}
 ];
 
@@ -1555,7 +1574,6 @@ const SELF_ONLY_WORK_FIELDS=new Set([
  'linesTagsCheckedBy',
  'notedBy',
  'itemPackedBy',
- 'addressGivenBy',
  'returnReceiveBy',
  'returnWeightBy',
  'returnLinesBy',
@@ -1658,7 +1676,7 @@ function refreshFieldStates(){
       el.disabled=!editable;
     }else{
       // Preserve native readonly fields like time/broker, but sequence can also lock.
-      const nativeReadonly=['slipFillTime','parcelGivenTime','prepareTime','dispatchPktTime','weightCheckedTime','linesTagsTime','notingTime','notedTime','recheckTime','packingHandoverTime','packedTime','addressTime','shippingPartyName','shippingWeight','parcelHandoverTime','courierSlipReceivedTime'].includes(el.id);
+      const nativeReadonly=['slipFillTime','parcelGivenTime','prepareTime','dispatchPktTime','weightCheckedTime','linesTagsTime','notingTime','notedTime','recheckTime','packingHandoverTime','packedTime','deliveryAddress','shippingPartyName','shippingWeight','parcelHandoverTime','courierSlipReceivedTime'].includes(el.id);
       el.readOnly=nativeReadonly || !editable;
     }
   });
@@ -1882,7 +1900,7 @@ function canSelectWorker(select,selectedId){
     return false;
   }
   if(selectedId!==actor.id){
-    alert('Is field me aap sirf apna naam fill kar sakte hain. Agar kaam kisi aur Doer ne kiya hai to us Doer ko apni ID se login karke fill karna hoga.');
+    alert('Is field me aap sirf apna naam fill kar sakte hain — field aapke naam par wapas set ho jayegi. Kaam kisi aur Doer ne kiya hai to unhe apni ID se login karke fill karna hoga, ya niche "🔄 Transfer" button se task unhe transfer kar dijiye.');
     return false;
   }
   return true;
