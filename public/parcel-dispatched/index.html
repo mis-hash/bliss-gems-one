@@ -109,6 +109,10 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 .recordCardGrid small{display:block;color:var(--m);font-size:10px;margin-bottom:2px}
 .recordCardGrid strong{display:block;font-size:13px;overflow-wrap:anywhere}
 .recordOpenBtn{width:100%;min-height:44px;margin-top:10px}
+tr.pendingRow{background:#fff8e1!important}
+tr.pendingRow td:first-child{border-left:3px solid #f0b429}
+.recordCard.pending{border-color:#f0b429;background:#fffaf0;box-shadow:0 0 0 1px #f0b42933}
+.pendingBadge{background:#fef3c7!important;color:#92400e!important}
 @media(max-width:1100px){.recordFilters{grid-template-columns:repeat(3,minmax(0,1fr))}.recordFilters input:first-child{grid-column:span 2}}
 @media(max-width:700px){
  body{font-size:14px}.container{padding-left:8px;padding-right:8px}.body{padding:10px}.card h3{font-size:15px;padding:11px 12px}
@@ -785,9 +789,16 @@ function renderHistory(){
    let text=`${x.parcelId||''} ${x.shipTo||''} ${c} ${x.broker||''} ${x.awbNo||''} ${s}`.toLowerCase();
    return (!q||text.includes(q))&&(!party||x.shipTo===party)&&(!courier||c===courier)&&(!status||s===status)&&inDateRange(d,from,to);
  });
- if($('dispatchRecordSummary'))$('dispatchRecordSummary').textContent=`Showing ${a.length} of ${all.length} dispatch records`;
- $('history').innerHTML=a.length?a.map(x=>`<tr><td><b>${esc(x.parcelId||'')}</b></td><td>${esc(x.shippingDate||x.dispatchDate||'')}</td><td>${esc(x.shipTo||'')}</td><td>${esc(x.courierName||x.shipThrough||'')}</td><td>${esc(x.broker||'')}</td><td>${esc(x.awbNo||'')}</td><td>${esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button></td></tr>`).join(''):'<tr><td colspan="8">No records.</td></tr>';
- if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(x.parcelId||'')}</b><span>${esc(x.shippingFinalStatus||x.status||'')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Party</small><strong>${esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button></div>`).join(''):'<div class="note">No records.</div>';
+ a.sort((x,y)=>(isRecordPending(x.parcelId)?0:1)-(isRecordPending(y.parcelId)?0:1));
+ let pendingCount=a.filter(x=>isRecordPending(x.parcelId)).length;
+ if($('dispatchRecordSummary'))$('dispatchRecordSummary').textContent=`Showing ${a.length} of ${all.length} dispatch records`+(pendingCount?` • ${pendingCount} pending (in progress)`:'');
+ $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(x.parcelId||'')}</b></td><td>${esc(x.shippingDate||x.dispatchDate||'')}</td><td>${esc(x.shipTo||'')}</td><td>${esc(x.courierName||x.shipThrough||'')}</td><td>${esc(x.broker||'')}</td><td>${esc(x.awbNo||'')}</td><td>${pend?'<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>':esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button></td></tr>`}).join(''):'<tr><td colspan="8">No records.</td></tr>';
+ if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(x.parcelId||'')}</b><span${pend?' class="pendingBadge"':''}>${pend?'📝 Pending':esc(x.shippingFinalStatus||x.status||'')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Party</small><strong>${esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button></div>`}).join(''):'<div class="note">No records.</div>';
+}
+function isRecordPending(parcelId){
+ if(!parcelId)return true;
+ const locks=(JSON.parse(localStorage.getItem(APPROVAL_LOCK_KEY)||'{}'))[parcelId]||{};
+ return !STAGE_SEQUENCE.every(s=>locks[s.id]);
 }
 function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();if(findClientByParty($('shipTo').value))$('broker').value=findClientByParty($('shipTo').value).broker||'';syncShippingSection();applySequenceAndLocks();if(!silent){showDispatchFormView();scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
 function openManage(){currentTab='users';$('manageModal').classList.remove('hidden');renderManage()}function closeManage(){$('manageModal').classList.add('hidden');populate();shipChanged()}function tab(b,t){currentTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));renderManage()}
