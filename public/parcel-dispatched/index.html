@@ -764,6 +764,7 @@ function shippingInsuranceRule(){
 }
 
 function newParcel(){editing=null;currentParcelId=genId();localStorage.setItem(ACTIVE_DRAFT_KEY,currentParcelId);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';document.querySelectorAll('main input,main textarea').forEach(x=>{if(x.id!=='search')x.value=''});document.querySelectorAll('main select').forEach(x=>x.value='');let d=new Date();$('dispatchDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;if($('shippingDate'))$('shippingDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+if($('slipFillTime'))$('slipFillTime').value=now();
 shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();syncShippingSection();syncPackPhotoPreview();saveStageLocks({});applySequenceAndLocks();persistParcelRecord();markAutoSaved()}
 function formData(){let o={parcelId:editing||currentParcelId||genId(),createdAt:new Date().toISOString()};document.querySelectorAll('main input,main select,main textarea').forEach(e=>{if(e.id&&e.id!=='search')o[e.id]=e.value});return o}
 function fileToCompressedDataUri(file){
