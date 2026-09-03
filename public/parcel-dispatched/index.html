@@ -1654,7 +1654,13 @@ function canEditField(el){
   const stage=stageForElement(el);
   if(!stage)return true;
   const locks=getStageLocks();
-  if(locks[stage.id])return false;
+  if(locks[stage.id]){
+    // The doer who actually locked this section can still go back and correct their own
+    // entries afterward — the correction is logged (see the change listener below) rather
+    // than being permanently blocked like it is for everyone else.
+    const actor=loggedUser();
+    return !!(actor && locks[stage.id].lockedBy===actor.id);
+  }
   return previousStagesLocked(stage);
 }
 function applySequenceAndLocks(){
@@ -1769,7 +1775,7 @@ function renderAuditTrail(){
   const q=($('auditSearch')?.value||'').toLowerCase();
   let a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
   a=a.filter(x=>`${x.parcelId} ${x.userName} ${x.field} ${x.oldValue} ${x.newValue} ${x.action}`.toLowerCase().includes(q));
-  $('auditBody').innerHTML=a.length?a.slice(0,500).map(x=>`<tr${x.action==='TRANSFER'?' style="background:#fff8e1"':''}>
+  $('auditBody').innerHTML=a.length?a.slice(0,500).map(x=>`<tr${x.action==='TRANSFER'?' style="background:#fff8e1"':x.action==='POST_LOCK_EDIT'?' style="background:#fee4e2"':''}>
     <td>${esc(new Date(x.at).toLocaleString('en-IN'))}</td>
     <td>${esc(x.parcelId)}</td>
     <td>${esc(x.userName)}</td>
@@ -2000,7 +2006,10 @@ document.addEventListener('change',e=>{
     return;
   }
   const old=_auditPrev.has(el)?_auditPrev.get(el):'';
-  auditFieldChange(el,old,el.value,'CHANGE');
+  const stageOfEl=stageForElement(el);
+  const isPostLockEdit=stageOfEl && getStageLocks()[stageOfEl.id];
+  auditFieldChange(el,old,el.value,isPostLockEdit?'POST_LOCK_EDIT':'CHANGE');
+  if(isPostLockEdit)toast('⚠ Locked section me correction — ye Audit Trail me record ho gaya hai.');
   _auditPrev.set(el,el.value);
   applySequenceAndLocks();
 },true);
