@@ -162,6 +162,7 @@ if(window.self!==window.top){
 <input type="date" id="dispatchDateFrom" onchange="renderHistory()" title="From Date">
 <input type="date" id="dispatchDateTo" onchange="renderHistory()" title="To Date">
 <button class="btn secondary small" type="button" onclick="clearDispatchFilters()">Clear Filters</button>
+<button class="btn secondary small" type="button" onclick="exportDispatchCSV()">⬇ Export CSV</button>
 </div>
 <div class="recordSummary" id="dispatchRecordSummary"></div>
 <label id="hideEmptyDraftsWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="hideEmptyDrafts" onchange="renderHistory()" style="width:auto"> Hide empty drafts (<span id="hideEmptyDraftsCount">0</span>)</label>
@@ -283,6 +284,7 @@ if(window.self!==window.top){
 <input type="date" id="returnDateFrom" onchange="renderReturnHistory()" title="From Date">
 <input type="date" id="returnDateTo" onchange="renderReturnHistory()" title="To Date">
 <button class="btn secondary small" type="button" onclick="clearReturnFilters()">Clear Filters</button>
+<button class="btn secondary small" type="button" onclick="exportReturnCSV()">⬇ Export CSV</button>
 </div>
 <div class="recordSummary" id="returnRecordSummary"></div>
     <div class="table desktopRecords">
@@ -890,6 +892,7 @@ function renderHistory(){
  if($('hideEmptyDraftsWrap'))$('hideEmptyDraftsWrap').classList.toggle('hidden',!emptyCount);
  if($('hideEmptyDraftsCount'))$('hideEmptyDraftsCount').textContent=emptyCount;
  if($('hideEmptyDrafts')&&$('hideEmptyDrafts').checked)a=a.filter(x=>!isEmptyDraft(x));
+ window._dispatchFiltered=a;
  if($('dispatchRecordSummary'))$('dispatchRecordSummary').textContent=`Showing ${a.length} of ${all.length} dispatch records`+(pendingCount?` • ${pendingCount} pending (in progress)`:'');
  const dash=v=>v?esc(v):'<span class="cellDash">—</span>';
  const createdLabel=x=>x.createdAt?new Date(x.createdAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}):'';
@@ -898,6 +901,33 @@ function renderHistory(){
 }
 function isEmptyDraft(x){
   return !x.shipTo && !x.courierName && !x.shipThrough && !x.broker && !x.awbNo;
+}
+function csvCell(v){
+  let s=String(v??'');
+  if(/[",\n]/.test(s))s='"'+s.replace(/"/g,'""')+'"';
+  return s;
+}
+function downloadCSV(filename,rows){
+  const csv=rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},0);
+}
+function exportDispatchCSV(){
+  const a=window._dispatchFiltered||[];
+  if(!a.length){toast('Export karne ke liye koi record nahi hai (filters check karein).');return}
+  const header=['Parcel ID','Dispatch Date','Created At','Ship To / Party','Broker','Ship Through','Courier Name','AWB / Tracking','Final Status','Pending?'];
+  const rows=[header,...a.map(x=>[x.parcelId||'',x.shippingDate||x.dispatchDate||'',x.createdAt?new Date(x.createdAt).toLocaleString('en-IN'):'',x.shipTo||'',x.broker||'',x.shipThrough||'',x.courierName||'',x.awbNo||'',x.shippingFinalStatus||x.status||'',isRecordPending(x.parcelId)?'Yes':'No'])];
+  downloadCSV('Dispatch_Records_'+new Date().toISOString().slice(0,10)+'.csv',rows);
+}
+function exportReturnCSV(){
+  const a=window._returnFiltered||[];
+  if(!a.length){toast('Export karne ke liye koi record nahi hai (filters check karein).');return}
+  const header=['Return ID','Return Date','Party (Return From)','Return Through','User / Doer','Status','Saved At'];
+  const rows=[header,...a.map(r=>[r.returnId||'',r.returnDate||'',r.returnFrom||'',r.returnThrough||'',returnUserNames(r)||'',r.status||'Return',r.savedAt?new Date(r.savedAt).toLocaleString('en-IN'):''])];
+  downloadCSV('Return_Records_'+new Date().toISOString().slice(0,10)+'.csv',rows);
 }
 function isRecordPending(parcelId){
  if(!parcelId)return true;
@@ -1327,6 +1357,7 @@ function renderReturnHistory(){
    return (!q||text.includes(q))&&(!party||r.returnFrom===party)&&(!courier||r.returnThrough===courier)&&(!user||usersText.toLowerCase().includes(user.toLowerCase()))&&inDateRange(date,from,to);
  });
  if($('returnRecordSummary'))$('returnRecordSummary').textContent=`Showing ${a.length} of ${all.length} return records`;
+ window._returnFiltered=a;
  const dash=v=>v?esc(v):'<span class="cellDash">—</span>';
  body.innerHTML=a.length?a.map(r=>`<tr><td><b>${esc(r.returnId||'')}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${dash(returnUserNames(r))}</td><td>${esc(r.status||'Return')}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td><button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button></td></tr>`).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
  if($('returnMobileCards'))$('returnMobileCards').innerHTML=a.length?a.map(r=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(r.returnId||'')}</b><span>${esc(r.status||'Return')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div><div><small>User / Doer</small><strong>${esc(returnUserNames(r)||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button></div>`).join(''):'<div class="note">No return records.</div>';
