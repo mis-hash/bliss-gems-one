@@ -2,7 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" id="viewportMeta" content="width=device-width,initial-scale=1.0">
-<script>if(localStorage.getItem('pd_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')</script>
+<script>
+/* Crash safety net — registered first, before any other script, so it can never itself
+   be skipped by a later error. A broken script tag still halts the rest of THAT tag, but
+   this at least turns a silent dead page into a visible, actionable message instead of the
+   user just clicking buttons that quietly do nothing. */
+(function(){
+  function showCrashBanner(msg){
+    if(document.getElementById('pdCrashBanner'))return;
+    var b=document.createElement('div');
+    b.id='pdCrashBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b42318;color:#fff;padding:10px 14px;font:600 13px Arial,sans-serif;text-align:center;box-shadow:0 2px 10px #0004';
+    b.innerHTML='⚠ App me error aa gaya hai. Page reload karein.'
+      +' <button type="button" style="margin-left:10px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#b42318;font-weight:700;cursor:pointer" onclick="location.reload()">Reload</button>'
+      +'<div style="font-weight:400;font-size:11px;opacity:.85;margin-top:3px">'+String(msg||'').slice(0,200).replace(/[<>]/g,'')+'</div>';
+    function attach(){document.body&&document.body.prepend(b)}
+    if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach);
+  }
+  window.addEventListener('error',function(e){
+    console.error('Uncaught error:',e.error||e.message);
+    showCrashBanner((e.error&&e.error.message)||e.message);
+  });
+  window.addEventListener('unhandledrejection',function(e){
+    console.error('Unhandled promise rejection:',e.reason);
+    showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));
+  });
+})();
+if(localStorage.getItem('pd_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')
+</script>
 <title>Parcel Dispatch Slip</title>
 <style>
 :root{--p:#268F76;--p2:#3FAF93;--mint:#E8F8F2;--bg:#f4f7f5;--b:#d9e2dc;--t:#17211b;--m:#66756c;--danger:#b42318}
@@ -1511,8 +1538,10 @@ if($('dispatchModule')){
     });
   });
 }
-const _oldSaveReturn=saveReturn;
-saveReturn=function(silent=false){if(!silent&&!requiredReturnOk())return;_oldSaveReturn(silent);}
+if(typeof saveReturn==='function'){
+  const _oldSaveReturn=saveReturn;
+  saveReturn=function(silent=false){if(!silent&&!requiredReturnOk())return;_oldSaveReturn(silent);}
+}
 
 function titleCase(v){
  return String(v||'').trim().toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase());
