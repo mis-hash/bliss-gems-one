@@ -189,6 +189,7 @@ tr.pendingRow td:first-child{border-left:3px solid #f0b429}
 <button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button>
 <button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button>
 <button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button>
+<button class="btn secondary superAdminOnly hidden" onclick="openAuditTrail()">📜 Audit Trail</button>
 </div>
 </div>
 </div></div></header>
@@ -483,9 +484,11 @@ if(window.self!==window.top){
 <div class="modal hidden" id="auditModal"><div class="box" style="width:min(1000px,100%)">
 <div class="mh"><b>📜 Complete Audit Trail</b><button class="btn secondary small" onclick="closeAuditTrail()">✕</button></div>
 <div class="mb">
+<div id="transferSummaryBox" style="margin-bottom:14px"></div>
 <div class="row" style="margin-bottom:10px">
 <input id="auditSearch" placeholder="Search field / user / value / parcel" oninput="renderAuditTrail()" style="flex:1">
 </div>
+<div class="note" style="margin-bottom:6px">🔁 = Transfer &nbsp; 🔒 = Post-lock correction (red row)</div>
 <div class="table"><table><thead><tr><th>Time</th><th>Parcel</th><th>User</th><th>Field</th><th>Old Value</th><th>New Value</th><th>Action</th><th>Reason</th></tr></thead><tbody id="auditBody"></tbody></table></div>
 </div></div></div>
 
@@ -2004,7 +2007,21 @@ function openAuditTrail(){
   renderAuditTrail();
 }
 function closeAuditTrail(){$('auditModal').classList.add('hidden')}
+function renderTransferSummary(){
+  const box=$('transferSummaryBox');if(!box)return;
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]').filter(x=>x.action==='TRANSFER');
+  if(!a.length){box.innerHTML='';return}
+  const stats={};
+  const bump=(id,key)=>{if(!id)return;if(!stats[id])stats[id]={name:nameOfUserId(id)||id,given:0,received:0};stats[id][key]++};
+  a.forEach(x=>{bump(x.oldValue,'given');bump(x.newValue,'received')});
+  const rows=Object.values(stats).sort((p,q)=>(q.given+q.received)-(p.given+p.received));
+  box.innerHTML=`<b>🔁 Transfer Summary (${a.length} total transfers)</b>
+  <div class="table" style="margin-top:8px"><table><thead><tr><th>Doer</th><th>Transferred Away</th><th>Received</th></tr></thead><tbody>${
+    rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.given}</td><td>${r.received}</td></tr>`).join('')
+  }</tbody></table></div>`;
+}
 function renderAuditTrail(){
+  renderTransferSummary();
   const q=($('auditSearch')?.value||'').toLowerCase();
   let a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
   a=a.filter(x=>`${x.parcelId} ${x.userName} ${x.field} ${x.oldValue} ${x.newValue} ${x.action}`.toLowerCase().includes(q));
