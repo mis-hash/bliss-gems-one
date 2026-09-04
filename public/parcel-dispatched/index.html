@@ -36,7 +36,7 @@ if(localStorage.getItem('pd_force_desktop')==='1')document.getElementById('viewp
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--t)}
 header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-index:20;border-bottom:1px solid var(--b)}.head{max-width:1250px;margin:auto;display:flex;justify-content:space-between;gap:10px;align-items:center}.head h2{margin:0;font-size:19px;color:var(--p);display:flex;align-items:center;gap:10px}.head small{color:var(--m)}.logo{width:38px;height:38px;border-radius:10px;background:var(--mint);display:grid;place-items:center;font-size:22px;font-weight:900;color:var(--p2);flex:none}
 .container{max-width:1250px;margin:18px auto;padding:0 12px 50px}.card{background:#fff;border:1px solid var(--b);border-radius:12px;margin-bottom:14px;overflow:visible}.card h3{margin:0;padding:13px 15px;background:#f8faf8;border-bottom:1px solid var(--b);font-size:16px}.body{padding:14px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.field{min-width:0}.span2{grid-column:span 2}.full{grid-column:1/-1}label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}input,select,textarea{width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;background:#fff;font:inherit}textarea{min-height:70px}.btn{border:0;border-radius:8px;padding:10px 13px;font-weight:700;cursor:pointer}.primary{background:var(--p);color:#fff}.secondary{background:var(--mint);color:var(--p)}.danger{background:#fee4e2;color:#9b1c1c}.success{background:#15803d;color:#fff}.small{padding:6px 9px;font-size:12px}.hidden{display:none!important}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.save{position:sticky;bottom:8px;background:#ffffffee;border:1px solid var(--b);border-radius:10px;padding:10px;display:flex;justify-content:flex-end;gap:8px;z-index:10}.note{font-size:12px;color:var(--m);margin-top:5px}.modal{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;padding:12px;z-index:100}.box{width:min(850px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:12px}.mh,.mf{padding:13px 15px;display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid var(--b)}.mf{border-top:1px solid var(--b);border-bottom:0}.mb{padding:15px}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tab{padding:8px 10px;border:1px solid var(--b);background:#fff;border-radius:7px;cursor:pointer}.tab.on{background:var(--p);color:#fff}.item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px;border:1px solid var(--b);border-radius:8px;margin:7px 0}.toast{display:none;position:fixed;right:15px;bottom:15px;background:#17211b;color:#fff;padding:11px 14px;border-radius:8px;z-index:200;max-width:80vw}.toast.show{display:block}.table{overflow:auto}table{width:100%;border-collapse:collapse;min-width:800px}th,td{padding:9px;border-bottom:1px solid var(--b);font-size:12px;text-align:left}.req{color:var(--danger)}
-@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.grid{grid-template-columns:1fr}.span2,.full{grid-column:auto}.head{align-items:flex-start;flex-direction:column}.save{flex-direction:column}.save .btn{width:100%}}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}#dashboardStats{grid-template-columns:repeat(2,1fr)!important}}@media(max-width:560px){.grid{grid-template-columns:1fr}.span2,.full{grid-column:auto}.head{align-items:flex-start;flex-direction:column}.save{flex-direction:column}.save .btn{width:100%}#dashboardStats{grid-template-columns:1fr!important;gap:8px!important}.statTile{padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}.statTile small{margin-bottom:0}.statTile strong{font-size:20px}.statTile span{margin-top:0}}
 
 @media print{
   @page{size:A4;margin:6mm}
@@ -191,6 +191,10 @@ if(window.self!==window.top){
 <div id="dispatchListView">
 <div class="no-print" style="margin-bottom:14px"><button class="btn primary" style="font-size:15px;padding:14px 18px" onclick="startNewDispatch()">＋ New Dispatch Slip</button></div>
 <section class="card" id="dashboardCard">
+  <div style="text-align:center;padding:16px 15px 2px">
+    <div class="logo" style="margin:0 auto 8px">b</div>
+    <b style="font-size:16px">Bliss Gems &amp; Minerals</b><br><small style="color:var(--m)">Parcel Dispatch &amp; Return</small>
+  </div>
   <h3>📊 Dashboard <select id="dashboardRange" onchange="renderDashboard()" style="width:auto;display:inline-block;margin-left:8px;font-size:12px;padding:5px 8px;font-weight:400"><option value="today">Today</option><option value="week">This Week</option><option value="all">All Time</option></select></h3>
   <div class="body"><div id="dashboardStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div></div>
 </section>
@@ -988,12 +992,12 @@ function renderDashboard(){
   const party=topOf(x=>x.shipTo);
   const pendingCount=a.filter(x=>isRecordPending(x.parcelId)).length;
   const stuckCount=all.filter(x=>isRecordPending(x.parcelId)&&x.createdAt&&(now-new Date(x.createdAt).getTime())>=24*36e5).length;
-  const rangeLabel=range==='today'?'Aaj':(range==='week'?'Is Hafte':'Ab Tak');
+  const rangeLabel=range==='today'?'Today':(range==='week'?'This Week':'All Time');
   box.innerHTML=`
-    <div class="statTile"><small>${rangeLabel} Dispatch Hue</small><strong>${a.length}</strong></div>
+    <div class="statTile"><small>${rangeLabel} Dispatched</small><strong>${a.length}</strong></div>
     <div class="statTile${pendingCount?' warn':''}"><small>${rangeLabel} Pending</small><strong>${pendingCount}</strong></div>
     <div class="statTile"><small>Top Courier (${rangeLabel})</small><strong>${courier.top?esc(courier.top):'—'}</strong>${courier.top?`<span>${courier.topN} parcels</span>`:''}</div>
-    <div class="statTile"><small>Sabse Active Party (${rangeLabel})</small><strong>${party.top?esc(party.top):'—'}</strong>${party.top?`<span>${party.topN} parcels</span>`:''}</div>
+    <div class="statTile"><small>Most Active Party (${rangeLabel})</small><strong>${party.top?esc(party.top):'—'}</strong>${party.top?`<span>${party.topN} parcels</span>`:''}</div>
     <div class="statTile${stuckCount?' danger':''}"><small>Stuck 24h+ (Overall)</small><strong>${stuckCount}</strong></div>
   `;
 }
