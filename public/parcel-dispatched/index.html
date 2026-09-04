@@ -1485,16 +1485,6 @@ function saveSelfRemarkPrivacy(){
  localStorage.setItem('pd_selfremark_privacy_v1',JSON.stringify(selfRemarkPrivacy));
  console.log('Self Remark privacy saved');
 }
-function requiredDispatchOk(){
- let missing=[];
- document.querySelectorAll('#dispatchModule input,#dispatchModule select').forEach(e=>{
-   if(!e.id||['search','selfRemark','clientRemark','finalRemarks'].includes(e.id))return;
-   if(e.closest('.hidden'))return;
-   if(!String(e.value||'').trim())missing.push(e);
- });
- if(missing.length){missing[0].focus();alert('Please fill all * mandatory Dispatch fields.');return false}
- return true;
-}
 function requiredReturnOk(){
  let missing=[];
  document.querySelectorAll('#returnModule input,#returnModule select').forEach(e=>{
@@ -1504,8 +1494,6 @@ function requiredReturnOk(){
  if(missing.length){missing[0].focus();alert('Please fill all * mandatory Return fields.');return false}
  return true;
 }
-const _oldSaveParcel=saveParcel;
-saveParcel=function(){if(!requiredDispatchOk())return;_oldSaveParcel();}
 let sequenceRecalcTimer=null;
 function scheduleSequenceRecalc(){
   // A single real field change fires both 'input' and 'change' — collapse both into
