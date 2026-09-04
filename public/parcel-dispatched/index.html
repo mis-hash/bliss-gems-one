@@ -909,7 +909,7 @@ function shippingInsuranceRule(){
 
 function newParcel(){editing=null;currentParcelId=genId();localStorage.setItem(ACTIVE_DRAFT_KEY,currentParcelId);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';document.querySelectorAll('main input,main textarea').forEach(x=>{if(x.id!=='search')x.value=''});document.querySelectorAll('main select').forEach(x=>x.value='');let d=new Date();$('dispatchDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;if($('shippingDate'))$('shippingDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 if($('slipFillTime'))$('slipFillTime').value=now();
-shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();syncShippingSection();syncPackPhotoPreview();saveStageLocks({});applySequenceAndLocks();persistParcelRecord();markAutoSaved()}
+shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();syncShippingSection();syncPackPhotoPreview();saveStageLocks({});applySequenceAndLocks();persistParcelRecord();markAutoSaved();assignDispatchSeqIfNeeded(currentParcelId)}
 function formData(){let o={parcelId:editing||currentParcelId||genId(),createdAt:new Date().toISOString()};document.querySelectorAll('main input,main select,main textarea').forEach(e=>{if(e.id&&e.id!=='search')o[e.id]=e.value});return o}
 function fileToCompressedDataUri(file){
   return new Promise((resolve,reject)=>{
@@ -954,6 +954,59 @@ async function handlePackPhoto(inputEl){
     if(statusEl)statusEl.textContent='⚠ Photo attach failed, try again';
   }
 }
+/* ===== Simple sequential Slip No. (001, 002, ...) shown to humans, separate from the
+   collision-safe parcelId/returnId used internally for Firestore doc IDs and deep links.
+   Assigned via a Firestore transaction (atomic increment) so concurrent creations on
+   different devices can never land on the same number. Dispatch and Return each get
+   their own counter. Only applies going forward — existing records keep showing their
+   current ID since they never got a sequence number. ===== */
+async function nextSeqNumber(counterId){
+  const ref=pdDb.collection('app_config').doc(counterId);
+  return await pdDb.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    const current=(snap.exists && snap.data() && snap.data().value)||0;
+    const next=current+1;
+    tx.set(ref,{value:next},{merge:true});
+    return next;
+  });
+}
+function slipLabel(x){
+  const seq=x&&(x.slipSeq||x.returnSeq);
+  if(seq)return String(seq).padStart(3,'0');
+  return (x&&(x.parcelId||x.returnId))||'';
+}
+async function assignDispatchSeqIfNeeded(parcelId){
+  try{
+    let all=JSON.parse(localStorage.getItem(K.records)||'[]');
+    let rec=all.find(x=>x.parcelId===parcelId);
+    if(!rec||rec.slipSeq)return;
+    const n=await nextSeqNumber('pd_dispatch_seq');
+    all=JSON.parse(localStorage.getItem(K.records)||'[]');
+    const idx=all.findIndex(x=>x.parcelId===parcelId);
+    if(idx<0||all[idx].slipSeq)return;
+    all[idx].slipSeq=n;
+    localStorage.setItem(K.records,JSON.stringify(all));
+    pdPushRecordToCloud(all[idx]);
+    renderHistory();
+    updateSlipNoTag();
+  }catch(e){console.error('assign dispatch slip seq failed',e);}
+}
+async function assignReturnSeqIfNeeded(returnId){
+  try{
+    let all=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]');
+    let rec=all.find(x=>x.returnId===returnId);
+    if(!rec||rec.returnSeq)return;
+    const n=await nextSeqNumber('pd_return_seq');
+    all=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]');
+    const idx=all.findIndex(x=>x.returnId===returnId);
+    if(idx<0||all[idx].returnSeq)return;
+    all[idx].returnSeq=n;
+    localStorage.setItem(RETURN_RECORDS_KEY,JSON.stringify(all));
+    pdPushReturnToCloud(all[idx]);
+    renderReturnHistory();
+    if($('returnIdTag')&&currentReturnId===returnId)$('returnIdTag').textContent='Return No: '+slipLabel(all[idx]);
+  }catch(e){console.error('assign return slip seq failed',e);}
+}
 function genId(){
   let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
   let existing=new Set(JSON.parse(localStorage.getItem(K.records)||'[]').map(x=>x.parcelId));
@@ -970,7 +1023,11 @@ function autoSaveParcel(){
   persistParcelRecord();
   markAutoSaved();
 }
-function updateSlipNoTag(){let t=$('slipNoTag');if(t)t.textContent='Slip No: '+(currentParcelId||'')}
+function updateSlipNoTag(){
+  let t=$('slipNoTag');if(!t)return;
+  let rec=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===currentParcelId);
+  t.textContent='Slip No: '+(rec?slipLabel(rec):(currentParcelId||''));
+}
 let autoSaveTimer=null;
 function scheduleAutoSave(){clearTimeout(autoSaveTimer);autoSaveTimer=setTimeout(autoSaveParcel,1200)}
 function printSlip(){
@@ -1006,7 +1063,7 @@ function renderHistory(){
 
  let a=all.filter(x=>{
    let c=x.courierName||x.shipThrough||'',s=x.shippingFinalStatus||x.status||'',d=x.shippingDate||x.dispatchDate||'';
-   let text=`${x.parcelId||''} ${x.shipTo||''} ${c} ${x.broker||''} ${x.awbNo||''} ${s}`.toLowerCase();
+   let text=`${x.parcelId||''} ${slipLabel(x)} ${x.shipTo||''} ${c} ${x.broker||''} ${x.awbNo||''} ${s}`.toLowerCase();
    return (!q||text.includes(q))&&(!party||x.shipTo===party)&&(!courier||c===courier)&&(!status||s===status)&&inDateRange(d,from,to);
  });
  a.sort((x,y)=>(isRecordPending(x.parcelId)?0:1)-(isRecordPending(y.parcelId)?0:1));
@@ -1025,8 +1082,8 @@ function renderHistory(){
    if(hrs>=24){const days=Math.floor(hrs/24);return `<span class="pendingBadge stuck" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">🚨 Stuck ${days}+ day${days>1?'s':''}</span>`}
    return '<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>';
  };
- $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(x.parcelId||'')}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button></td></tr>`}).join(''):'<tr><td colspan="8">No records.</td></tr>';
- if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(x.parcelId||'')}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button></div>`}).join(''):'<div class="note">No records.</div>';
+ $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button></td></tr>`}).join(''):'<tr><td colspan="8">No records.</td></tr>';
+ if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button></div>`}).join(''):'<div class="note">No records.</div>';
  renderDashboard();
 }
 function renderDashboard(){
@@ -1083,15 +1140,15 @@ function downloadCSV(filename,rows){
 function exportDispatchCSV(){
   const a=window._dispatchFiltered||[];
   if(!a.length){toast('Export karne ke liye koi record nahi hai (filters check karein).');return}
-  const header=['Parcel ID','Dispatch Date','Created At','Ship To / Party','Broker','Ship Through','Courier Name','AWB / Tracking','Final Status','Pending?'];
-  const rows=[header,...a.map(x=>[x.parcelId||'',x.shippingDate||x.dispatchDate||'',x.createdAt?new Date(x.createdAt).toLocaleString('en-IN'):'',x.shipTo||'',x.broker||'',x.shipThrough||'',x.courierName||'',x.awbNo||'',x.shippingFinalStatus||x.status||'',isRecordPending(x.parcelId)?'Yes':'No'])];
+  const header=['Slip No.','Parcel ID','Dispatch Date','Created At','Ship To / Party','Broker','Ship Through','Courier Name','AWB / Tracking','Final Status','Pending?'];
+  const rows=[header,...a.map(x=>[x.slipSeq?String(x.slipSeq).padStart(3,'0'):'',x.parcelId||'',x.shippingDate||x.dispatchDate||'',x.createdAt?new Date(x.createdAt).toLocaleString('en-IN'):'',x.shipTo||'',x.broker||'',x.shipThrough||'',x.courierName||'',x.awbNo||'',x.shippingFinalStatus||x.status||'',isRecordPending(x.parcelId)?'Yes':'No'])];
   downloadCSV('Dispatch_Records_'+new Date().toISOString().slice(0,10)+'.csv',rows);
 }
 function exportReturnCSV(){
   const a=window._returnFiltered||[];
   if(!a.length){toast('Export karne ke liye koi record nahi hai (filters check karein).');return}
-  const header=['Return ID','Return Date','Party (Return From)','Return Through','User / Doer','Status','Saved At'];
-  const rows=[header,...a.map(r=>[r.returnId||'',r.returnDate||'',r.returnFrom||'',r.returnThrough||'',returnUserNames(r)||'',r.status||'Return',r.savedAt?new Date(r.savedAt).toLocaleString('en-IN'):''])];
+  const header=['Slip No.','Return ID','Return Date','Party (Return From)','Return Through','User / Doer','Status','Saved At'];
+  const rows=[header,...a.map(r=>[r.returnSeq?String(r.returnSeq).padStart(3,'0'):'',r.returnId||'',r.returnDate||'',r.returnFrom||'',r.returnThrough||'',returnUserNames(r)||'',r.status||'Return',r.savedAt?new Date(r.savedAt).toLocaleString('en-IN'):''])];
   downloadCSV('Return_Records_'+new Date().toISOString().slice(0,10)+'.csv',rows);
 }
 function isRecordPending(parcelId){
@@ -1484,9 +1541,12 @@ function saveReturn(silent=false){
  let data=returnRecordData(); currentReturnId=data.returnId;
  localStorage.setItem(RETURN_KEY,JSON.stringify(data));
  let a=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]'),i=a.findIndex(x=>x.returnId===data.returnId);
- if(i>=0)a[i]=data;else a.unshift(data);
+ // Merge rather than replace — otherwise fields added outside the form (like the
+ // assigned Slip No.) get wiped back to unassigned on every subsequent save.
+ if(i>=0)a[i]={...a[i],...data};else a.unshift(data);
  localStorage.setItem(RETURN_RECORDS_KEY,JSON.stringify(a));
- pdPushReturnToCloud(data);
+ pdPushReturnToCloud(i>=0?a[i]:data);
+ assignReturnSeqIfNeeded(data.returnId);
  if(!silent){toast('Return saved: '+data.returnId);renderReturnHistory();}
 }
 function clearReturn(){
@@ -1529,14 +1589,14 @@ function renderReturnHistory(){
  let from=$('returnDateFrom')?.value||'',to=$('returnDateTo')?.value||'';
  let a=all.filter(r=>{
    let usersText=returnUserNames(r),date=r.returnDate||'',status=r.status||'Return';
-   let text=`${r.returnId||''} ${r.returnFrom||''} ${r.returnThrough||''} ${date} ${usersText} ${r.returnRemarks||''} ${r.notFoundReason||''} ${status}`.toLowerCase();
+   let text=`${r.returnId||''} ${slipLabel(r)} ${r.returnFrom||''} ${r.returnThrough||''} ${date} ${usersText} ${r.returnRemarks||''} ${r.notFoundReason||''} ${status}`.toLowerCase();
    return (!q||text.includes(q))&&(!party||r.returnFrom===party)&&(!courier||r.returnThrough===courier)&&(!user||usersText.toLowerCase().includes(user.toLowerCase()))&&inDateRange(date,from,to);
  });
  if($('returnRecordSummary'))$('returnRecordSummary').textContent=`Showing ${a.length} of ${all.length} return records`;
  window._returnFiltered=a;
  const dash=v=>v?esc(v):'<span class="cellDash">—</span>';
- body.innerHTML=a.length?a.map(r=>`<tr><td><b>${esc(r.returnId||'')}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${dash(returnUserNames(r))}</td><td>${esc(r.status||'Return')}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td><button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button></td></tr>`).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
- if($('returnMobileCards'))$('returnMobileCards').innerHTML=a.length?a.map(r=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(r.returnId||'')}</b><span>${esc(r.status||'Return')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div><div><small>User / Doer</small><strong>${esc(returnUserNames(r)||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button></div>`).join(''):'<div class="note">No return records.</div>';
+ body.innerHTML=a.length?a.map(r=>`<tr><td><b>${esc(slipLabel(r))}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${dash(returnUserNames(r))}</td><td>${esc(r.status||'Return')}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td><button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button></td></tr>`).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
+ if($('returnMobileCards'))$('returnMobileCards').innerHTML=a.length?a.map(r=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(slipLabel(r))}</b><span>${esc(r.status||'Return')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div><div><small>User / Doer</small><strong>${esc(returnUserNames(r)||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button></div>`).join(''):'<div class="note">No return records.</div>';
 }
 
 function openAllRecords(){ openRecordType('dispatch'); }
@@ -1549,14 +1609,14 @@ function closeAllRecords(){ $('allRecordsModal').classList.add('hidden'); }
 function renderAllRecords(filter){
  window._recordFilter=filter;
  let q=($('allRecordSearch')?.value||'').toLowerCase();
- let ds=JSON.parse(localStorage.getItem(K.records)||'[]').map(x=>({type:'DISPATCH',id:x.parcelId,date:x.dispatchDate,party:x.shipTo,status:x.status||'Draft',saved:x.createdAt||'',raw:x}));
- let rs=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').map(x=>({type:'RETURN',id:x.returnId,date:x.returnDate||'',party:x.returnFrom||'',status:x.status||'In Process',saved:x.savedAt||'',raw:x}));
+ let ds=JSON.parse(localStorage.getItem(K.records)||'[]').map(x=>({type:'DISPATCH',id:x.parcelId,label:slipLabel(x),date:x.dispatchDate,party:x.shipTo,status:x.status||'Draft',saved:x.createdAt||'',raw:x}));
+ let rs=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').map(x=>({type:'RETURN',id:x.returnId,label:slipLabel(x),date:x.returnDate||'',party:x.returnFrom||'',status:x.status||'In Process',saved:x.savedAt||'',raw:x}));
  let a=[...ds,...rs];
  if(filter==='dispatch')a=a.filter(x=>x.type==='DISPATCH');
  if(filter==='return')a=a.filter(x=>x.type==='RETURN');
- a=a.filter(x=>`${x.type} ${x.id} ${x.date} ${x.party} ${x.status}`.toLowerCase().includes(q));
+ a=a.filter(x=>`${x.type} ${x.id} ${x.label} ${x.date} ${x.party} ${x.status}`.toLowerCase().includes(q));
  a.sort((x,y)=>String(y.saved).localeCompare(String(x.saved)));
- $('allRecordsBody').innerHTML=a.length?a.map(x=>`<tr><td><b>${x.type}</b></td><td>${esc(x.id||'')}</td><td>${esc(x.date||'')}</td><td>${esc(x.party||'')}</td><td>${esc(x.status||'')}</td><td>${x.saved?new Date(x.saved).toLocaleString('en-IN'):''}</td><td><button class="btn small secondary" onclick="${x.type==='DISPATCH'?`openDispatchRecord('${x.id}')`:`openReturnRecord('${x.id}')`}">Open</button></td></tr>`).join(''):'<tr><td colspan="7">No saved records.</td></tr>';
+ $('allRecordsBody').innerHTML=a.length?a.map(x=>`<tr><td><b>${x.type}</b></td><td>${esc(x.label||'')}</td><td>${esc(x.date||'')}</td><td>${esc(x.party||'')}</td><td>${esc(x.status||'')}</td><td>${x.saved?new Date(x.saved).toLocaleString('en-IN'):''}</td><td><button class="btn small secondary" onclick="${x.type==='DISPATCH'?`openDispatchRecord('${x.id}')`:`openReturnRecord('${x.id}')`}">Open</button></td></tr>`).join(''):'<tr><td colspan="7">No saved records.</td></tr>';
 }
 function openDispatchRecord(id){closeAllRecords();switchModule('dispatch');editRecord(id)}
 function openReturnRecord(id){
@@ -1565,7 +1625,7 @@ function openReturnRecord(id){
  returnControls().forEach((e,i)=>{let k=e.dataset.rkey||('r_'+i);e.value=r[k]??''});
  localStorage.setItem(RETURN_KEY,JSON.stringify(r));
  if(typeof returnPktRule==='function')returnPktRule();
- if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+id;
+ if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+slipLabel(r);
  showReturnFormView();
  toast('Return opened: '+id);
 }
