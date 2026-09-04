@@ -1884,8 +1884,13 @@ function canEditField(el){
   const locks=getStageLocks();
   if(locks[stage.id]){
     // The doer who actually locked this section can still go back and correct their own
-    // entries afterward — the correction is logged (see the change listener below) rather
-    // than being permanently blocked like it is for everyone else.
+    // entries — but only until the NEXT section also locks. Once work has moved past it,
+    // self-correction closes and only Admin (via unlockStageAsAdmin) can reopen it — this
+    // keeps corrections happening close to when the mistake is made instead of being
+    // editable indefinitely.
+    const idx=STAGE_SEQUENCE.findIndex(s=>s.id===stage.id);
+    const nextStage=STAGE_SEQUENCE[idx+1];
+    if(nextStage && locks[nextStage.id])return false;
     const actor=loggedUser();
     return !!(actor && locks[stage.id].lockedBy===actor.id);
   }
