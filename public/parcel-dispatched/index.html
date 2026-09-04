@@ -172,6 +172,36 @@ tr.pendingRow td:first-child{border-left:3px solid #f0b429}
  .desktopRecords{display:none!important}.mobileRecordCards{display:block}
 }
 @media(max-width:430px){.recordFilters{grid-template-columns:1fr}.recordFilters input:first-child,.recordFilters button{grid-column:auto}.recordCardGrid{grid-template-columns:1fr}}
+/* "Mobile View" preview on an actual desktop screen — @media queries key off the real
+   window width, which a desktop browser never shrinks below, so this class mirrors the
+   combined mobile breakpoints above and gets toggled by toggleDesktopView() in JS instead. */
+body.pd-force-mobile{font-size:14px}
+body.pd-force-mobile .container,body.pd-force-mobile header .head{max-width:430px;margin-left:auto;margin-right:auto}
+body.pd-force-mobile .container{padding-left:8px;padding-right:8px}
+body.pd-force-mobile .body{padding:10px}
+body.pd-force-mobile .card h3{font-size:15px;padding:11px 12px}
+body.pd-force-mobile .grid{grid-template-columns:1fr!important;gap:9px}
+body.pd-force-mobile .span2,body.pd-force-mobile .full{grid-column:auto!important}
+body.pd-force-mobile input,body.pd-force-mobile select,body.pd-force-mobile textarea{font-size:16px;min-height:46px}
+body.pd-force-mobile .btn{min-height:44px}
+body.pd-force-mobile .recordFilters{grid-template-columns:1fr;gap:7px}
+body.pd-force-mobile .recordFilters input:first-child,body.pd-force-mobile .recordFilters button{grid-column:auto}
+body.pd-force-mobile .recordCardGrid{grid-template-columns:1fr}
+body.pd-force-mobile .desktopRecords{display:none!important}
+body.pd-force-mobile .mobileRecordCards{display:block}
+body.pd-force-mobile #dashboardStats{grid-template-columns:1fr!important;gap:8px!important}
+body.pd-force-mobile .statTile{padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+body.pd-force-mobile .statTile small{margin-bottom:0}
+body.pd-force-mobile .statTile strong{font-size:20px}
+body.pd-force-mobile .statTile span{margin-top:0}
+body.pd-force-mobile .head{align-items:flex-start;flex-direction:column;flex-wrap:wrap}
+body.pd-force-mobile .save{flex-direction:column}
+body.pd-force-mobile .save .btn{width:100%}
+body.pd-force-mobile .row{flex-wrap:wrap;gap:6px}
+body.pd-force-mobile #headerMoreBtn{display:inline-flex;align-items:center;justify-content:center;width:38px;padding:0;font-size:19px;font-weight:900}
+body.pd-force-mobile #headerMoreMenu{display:flex;flex-direction:column;gap:6px;position:absolute;right:0;top:calc(100% + 8px);background:#fff;border:1px solid var(--b);border-radius:10px;box-shadow:0 10px 26px #0003;padding:8px;min-width:200px;z-index:60}
+body.pd-force-mobile #headerMoreMenu.headerMoreCollapsed{display:none}
+body.pd-force-mobile #headerMoreMenu .btn{width:100%;text-align:left}
 </style>
 
 </head>
@@ -2081,12 +2111,28 @@ function hardRefreshApp(){
   }
 }
 function toggleDesktopView(){
+  // On an actual wide desktop screen, forcing the viewport meta tag does nothing (only
+  // mobile browsers respect it) — so give desktop a real CSS-only mobile-layout preview
+  // instead of reloading with a viewport hack that has no visible effect there.
+  if(window.innerWidth>900){
+    var previewOn=localStorage.getItem('pd_force_mobile_preview')==='1';
+    if(previewOn)localStorage.removeItem('pd_force_mobile_preview');else localStorage.setItem('pd_force_mobile_preview','1');
+    document.body.classList.toggle('pd-force-mobile',!previewOn);
+    syncDesktopViewBtn();
+    return;
+  }
   var forced=localStorage.getItem('pd_force_desktop')==='1';
   if(forced)localStorage.removeItem('pd_force_desktop');else localStorage.setItem('pd_force_desktop','1');
   location.replace(location.pathname+'?_r='+Date.now()+location.hash);
 }
 function syncDesktopViewBtn(){
   var btn=document.getElementById('desktopViewBtn');if(!btn)return;
+  if(window.innerWidth>900){
+    var previewOn=localStorage.getItem('pd_force_mobile_preview')==='1';
+    document.body.classList.toggle('pd-force-mobile',previewOn);
+    btn.textContent=previewOn?'🖥 Desktop View':'📱 Mobile View';
+    return;
+  }
   var forced=localStorage.getItem('pd_force_desktop')==='1';
   btn.textContent=forced?'📱 Mobile View':'🖥 Desktop View';
 }
