@@ -860,7 +860,13 @@ async function handlePackPhoto(inputEl){
     if(statusEl)statusEl.textContent='⚠ Photo attach failed, try again';
   }
 }
-function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;return `PD-${ds}-${String(Date.now()).slice(-4)}`}
+function genId(){
+  let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  let existing=new Set(JSON.parse(localStorage.getItem(K.records)||'[]').map(x=>x.parcelId));
+  let id;
+  do{ id=`PD-${ds}-${(Date.now().toString(36)+Math.random().toString(36).slice(2,6)).slice(-6).toUpperCase()}`; }while(existing.has(id));
+  return id;
+}
 function persistParcelRecord(){let d=formData();let a=JSON.parse(localStorage.getItem(K.records)||'[]'),i=a.findIndex(x=>x.parcelId===d.parcelId);if(i>=0)a[i]={...a[i],...d};else a.unshift(d);localStorage.setItem(K.records,JSON.stringify(a));editing=d.parcelId;renderHistory();pdPushRecordToCloud(a.find(x=>x.parcelId===d.parcelId));return d}
 function markAutoSaved(){let t=$('autoSaveTag');if(t)t.textContent='✓ Saved '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}
 function autoSaveParcel(){
@@ -1363,7 +1369,10 @@ let currentReturnId=null;
 
 function genReturnId(){
  let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
- return `PR-${ds}-${String(Date.now()).slice(-4)}`;
+ let existing=new Set(JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').map(x=>x.returnId));
+ let id;
+ do{ id=`PR-${ds}-${(Date.now().toString(36)+Math.random().toString(36).slice(2,6)).slice(-6).toUpperCase()}`; }while(existing.has(id));
+ return id;
 }
 function returnRecordData(){
  let controls=returnControls(), data={returnId:currentReturnId||genReturnId(),savedAt:new Date().toISOString()};
