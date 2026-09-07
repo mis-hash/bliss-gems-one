@@ -1082,8 +1082,8 @@ function renderHistory(){
    if(hrs>=24){const days=Math.floor(hrs/24);return `<span class="pendingBadge stuck" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">🚨 Stuck ${days}+ day${days>1?'s':''}</span>`}
    return '<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>';
  };
- $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button></td></tr>`}).join(''):'<tr><td colspan="8">No records.</td></tr>';
- if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button></div>`}).join(''):'<div class="note">No records.</div>';
+ $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button>${window.superAdminUnlocked?` <button class="btn small danger" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="8">No records.</td></tr>';
+ if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button>${window.superAdminUnlocked?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑 Delete</button>`:''}</div>`}).join(''):'<div class="note">No records.</div>';
  renderDashboard();
 }
 function renderDashboard(){
@@ -1595,8 +1595,8 @@ function renderReturnHistory(){
  if($('returnRecordSummary'))$('returnRecordSummary').textContent=`Showing ${a.length} of ${all.length} return records`;
  window._returnFiltered=a;
  const dash=v=>v?esc(v):'<span class="cellDash">—</span>';
- body.innerHTML=a.length?a.map(r=>`<tr><td><b>${esc(slipLabel(r))}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${dash(returnUserNames(r))}</td><td>${esc(r.status||'Return')}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td><button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button></td></tr>`).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
- if($('returnMobileCards'))$('returnMobileCards').innerHTML=a.length?a.map(r=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(slipLabel(r))}</b><span>${esc(r.status||'Return')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div><div><small>User / Doer</small><strong>${esc(returnUserNames(r)||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button></div>`).join(''):'<div class="note">No return records.</div>';
+ body.innerHTML=a.length?a.map(r=>`<tr><td><b>${esc(slipLabel(r))}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${dash(returnUserNames(r))}</td><td>${esc(r.status||'Return')}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td><button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button>${window.superAdminUnlocked?` <button class="btn small danger" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑</button>`:''}</td></tr>`).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
+ if($('returnMobileCards'))$('returnMobileCards').innerHTML=a.length?a.map(r=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(slipLabel(r))}</b><span>${esc(r.status||'Return')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div><div><small>User / Doer</small><strong>${esc(returnUserNames(r)||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button>${window.superAdminUnlocked?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑 Delete</button>`:''}</div>`).join(''):'<div class="note">No return records.</div>';
 }
 
 function openAllRecords(){ openRecordType('dispatch'); }
@@ -2115,6 +2115,38 @@ function unlockStageAsAdmin(){
   applySequenceAndLocks();
   toast(stage.name+' unlocked by Admin');
 }
+async function deleteDispatchRecord(parcelId){
+  if(!isAdminUser()){alert('Sirf Admin record delete kar sakta hai.');return}
+  const rec=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===parcelId);
+  if(!rec)return;
+  if(!confirm('Ye record PERMANENTLY delete ho jayega, wapas nahi aayega.\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.shipTo||'-')+'\n\nSach mein delete karna hai?'))return;
+  try{ await pdDb.collection('pd_records_cloud').doc(parcelId).delete(); }
+  catch(e){ console.error('delete dispatch record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>x.parcelId!==parcelId);
+  localStorage.setItem(K.records,JSON.stringify(all));
+  const actor=loggedUser();
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
+  a.unshift({at:new Date().toISOString(),parcelId,userId:actor?actor.id:'',userName:actor?actor.name:'Unknown',fieldId:'',field:'Record',oldValue:slipLabel(rec),newValue:'',action:'DELETE',reason:''});
+  localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
+  renderHistory();
+  toast('Record delete ho gaya: '+slipLabel(rec));
+}
+async function deleteReturnRecord(returnId){
+  if(!isAdminUser()){alert('Sirf Admin record delete kar sakta hai.');return}
+  const rec=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').find(x=>x.returnId===returnId);
+  if(!rec)return;
+  if(!confirm('Ye return record PERMANENTLY delete ho jayega, wapas nahi aayega.\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.returnFrom||'-')+'\n\nSach mein delete karna hai?'))return;
+  try{ await pdDb.collection('pd_returns_cloud').doc(returnId).delete(); }
+  catch(e){ console.error('delete return record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
+  const all=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').filter(x=>x.returnId!==returnId);
+  localStorage.setItem(RETURN_RECORDS_KEY,JSON.stringify(all));
+  const actor=loggedUser();
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
+  a.unshift({at:new Date().toISOString(),parcelId:returnId,userId:actor?actor.id:'',userName:actor?actor.name:'Unknown',fieldId:'',field:'Return Record',oldValue:slipLabel(rec),newValue:'',action:'DELETE',reason:''});
+  localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
+  renderReturnHistory();
+  toast('Return record delete ho gaya: '+slipLabel(rec));
+}
 function openAuditTrail(){
   $('auditModal').classList.remove('hidden');
   renderAuditTrail();
@@ -2138,7 +2170,7 @@ function renderAuditTrail(){
   const q=($('auditSearch')?.value||'').toLowerCase();
   let a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
   a=a.filter(x=>`${x.parcelId} ${x.userName} ${x.field} ${x.oldValue} ${x.newValue} ${x.action}`.toLowerCase().includes(q));
-  $('auditBody').innerHTML=a.length?a.slice(0,500).map(x=>`<tr${x.action==='TRANSFER'?' style="background:#fff8e1"':x.action==='POST_LOCK_EDIT'?' style="background:#fee4e2"':''}>
+  $('auditBody').innerHTML=a.length?a.slice(0,500).map(x=>`<tr${x.action==='TRANSFER'?' style="background:#fff8e1"':x.action==='POST_LOCK_EDIT'?' style="background:#fee4e2"':x.action==='DELETE'?' style="background:#2d1414;color:#fff"':''}>
     <td>${esc(new Date(x.at).toLocaleString('en-IN'))}</td>
     <td>${esc(x.parcelId)}</td>
     <td>${esc(x.userName)}</td>
