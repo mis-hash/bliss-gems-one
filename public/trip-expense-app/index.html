@@ -424,6 +424,7 @@ async function notifyRole(role,message){
 }
 
 /* ===== Derived helpers ===== */
+function activeLedger(){const delIds=new Set(deletedTrips.map(t=>t.id));return ledger.filter(l=>!delIds.has(l.tripId))}
 function tripLedger(tripId){return ledger.filter(l=>l.tripId===tripId)}
 function tripIssued(tripId){return tripLedger(tripId).filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0)}
 function tripExpense(tripId){return tripLedger(tripId).filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0)}
@@ -709,8 +710,8 @@ function renderAdminPage(){
   }).join('');
 }
 function renderDirectorPage(){
-  const totalExpense=ledger.filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0);
-  const totalIssued=ledger.filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0);
+  const totalExpense=activeLedger().filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0);
+  const totalIssued=activeLedger().filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0);
   const active=trips.filter(t=>t.status!=='closed');
   const closed=trips.filter(t=>t.status==='closed');
   const overdue=trips.filter(isOverdue);
@@ -719,7 +720,7 @@ function renderDirectorPage(){
   $('dirOutstanding').textContent=money(totalIssued-totalExpense);
   $('dirOverdue').textContent=overdue.length;
   $('dirAvg').textContent=closed.length?money(closed.reduce((s,t)=>s+tripExpense(t.id),0)/closed.length):'₹0';
-  const noBill=ledger.filter(l=>l.type==='expense'&&!l.proofDataUri).length;
+  const noBill=activeLedger().filter(l=>l.type==='expense'&&!l.proofDataUri).length;
   const awaitingBook=trips.filter(t=>t.status==='closed'&&!t.bookedByAccounts).reduce((s,t)=>s+tripExpense(t.id),0);
   $('dirAttention').innerHTML=`
     <div class="row"><span><b>🔴 ${overdue.length} Hisaab Overdue</b><br><small>${money(overdue.reduce((s,t)=>s+tripBalance(t.id),0))} advance abhi unsettled</small></span><button class="btn" onclick="go('pending')">View</button></div>
@@ -778,7 +779,7 @@ function bars(dataObj){
 }
 function renderAnalyticsPage(){
   const byLocation={},byPerson={},byCategory={};
-  ledger.filter(l=>l.type==='expense').forEach(l=>{
+  activeLedger().filter(l=>l.type==='expense').forEach(l=>{
     byLocation[l.location||'-']=(byLocation[l.location||'-']||0)+Number(l.amount);
     byPerson[l.byName||'-']=(byPerson[l.byName||'-']||0)+Number(l.amount);
     byCategory[l.category||'-']=(byCategory[l.category||'-']||0)+Number(l.amount);
@@ -789,19 +790,19 @@ function renderAnalyticsPage(){
   const topCat=Object.entries(byCategory).sort((a,b)=>b[1]-a[1])[0];
   const totalExp=Object.values(byCategory).reduce((a,b)=>a+b,0);
   $('anaFlag').textContent=topCat&&totalExp?`Top expense head: ${topCat[0]} (${Math.round(topCat[1]/totalExp*100)}% of total).`:'Abhi data nahi hai.';
-  const expenseEntries=ledger.filter(l=>l.type==='expense');
+  const expenseEntries=activeLedger().filter(l=>l.type==='expense');
   const withProof=expenseEntries.filter(l=>l.proofDataUri).length;
   $('anaProof').textContent=expenseEntries.length?Math.round(withProof/expenseEntries.length*100)+'%':'-';
   $('anaClosed').textContent=trips.filter(t=>t.status==='closed').length;
 }
 function renderAccountsPage(){
-  const totalExpense=ledger.filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0);
-  const totalIssued=ledger.filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0);
+  const totalExpense=activeLedger().filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0);
+  const totalIssued=activeLedger().filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0);
   $('accTotal').textContent=money(totalExpense);
   $('accToBook').textContent=trips.filter(t=>t.status==='closed'&&!t.bookedByAccounts).length;
   $('accIssued').textContent=money(totalIssued);
   $('accExpense').textContent=money(totalExpense);
-  $('accNoBill').textContent=ledger.filter(l=>l.type==='expense'&&!l.proofDataUri).length;
+  $('accNoBill').textContent=activeLedger().filter(l=>l.type==='expense'&&!l.proofDataUri).length;
   const list=$('accList');
   const closedTrips=trips.filter(t=>t.status==='closed');
   if(!closedTrips.length){list.innerHTML='<small>Koi closed trip nahi hai abhi.</small>';return}
@@ -1103,7 +1104,7 @@ function openReport(){
   const bySales={};
   closed.forEach(t=>{bySales[t.salesId]=bySales[t.salesId]||{name:t.salesName,count:0,spent:0};bySales[t.salesId].count++;bySales[t.salesId].spent+=tripExpense(t.id);});
   const byCategory={};
-  ledger.filter(l=>l.type==='expense').forEach(l=>{byCategory[l.category||'Other']=(byCategory[l.category||'Other']||0)+Number(l.amount);});
+  activeLedger().filter(l=>l.type==='expense').forEach(l=>{byCategory[l.category||'Other']=(byCategory[l.category||'Other']||0)+Number(l.amount);});
   const catTotal=Object.values(byCategory).reduce((a,b)=>a+b,0)||1;
   $('reportBody').innerHTML=`<div class="money" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px"><div class="m"><small>TOTAL ADVANCE</small><b>${money(totalAdvance)}</b></div><div class="m"><small>TOTAL SPENT</small><b>${money(totalSpent)}</b></div><div class="m"><small>TRIPS CLOSED</small><b>${closed.length}</b></div></div>`+
   `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">By Sales Person</div>`+
