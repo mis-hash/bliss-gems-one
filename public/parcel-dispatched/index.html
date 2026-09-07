@@ -266,6 +266,7 @@ if(window.self!==window.top){
 </div>
 <div class="recordSummary" id="dispatchRecordSummary"></div>
 <label id="hideEmptyDraftsWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="hideEmptyDrafts" onchange="renderHistory()" style="width:auto"> Hide empty drafts (<span id="hideEmptyDraftsCount">0</span>)</label>
+<label id="showDeletedDispatchWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="showDeletedDispatch" onchange="renderHistory()" style="width:auto"> 🗑 Show Deleted (<span id="deletedDispatchCount">0</span>)</label>
 <div class="table desktopRecords"><table><thead><tr><th>Parcel ID</th><th>Date</th><th>Ship To</th><th>Courier</th><th>Broker</th><th>AWB</th><th>Status</th><th>Action</th></tr></thead><tbody id="history"></tbody></table></div>
 <div id="dispatchMobileCards" class="mobileRecordCards"></div>
 </div></section>
@@ -391,6 +392,7 @@ if(window.self!==window.top){
 <button class="btn secondary small" type="button" onclick="exportReturnCSV()">⬇ Export CSV</button>
 </div>
 <div class="recordSummary" id="returnRecordSummary"></div>
+<label id="showDeletedReturnWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="showDeletedReturn" onchange="renderReturnHistory()" style="width:auto"> 🗑 Show Deleted (<span id="deletedReturnCount">0</span>)</label>
     <div class="table desktopRecords">
 <table>
 <thead><tr><th>Return ID</th><th>Date</th><th>Party</th><th>Courier</th><th>User / Doer</th><th>Status</th><th>Saved At</th><th>Action</th></tr></thead>
@@ -1052,6 +1054,11 @@ function clearDispatchFilters(){
 }
 function renderHistory(){
  let all=JSON.parse(localStorage.getItem(K.records)||'[]');
+ const deletedCount=all.filter(x=>x.deletedAt).length;
+ if($('showDeletedDispatchWrap'))$('showDeletedDispatchWrap').classList.toggle('hidden',!deletedCount);
+ if($('deletedDispatchCount'))$('deletedDispatchCount').textContent=deletedCount;
+ const showDeleted=$('showDeletedDispatch')&&$('showDeletedDispatch').checked;
+ all=showDeleted?all.filter(x=>x.deletedAt):all.filter(x=>!x.deletedAt);
  let partyCur=$('dispatchPartyFilter')?.value||'',courierCur=$('dispatchCourierFilter')?.value||'',statusCur=$('dispatchStatusFilter')?.value||'';
  fillRecordFilter('dispatchPartyFilter',uniqueSorted(all.map(x=>x.shipTo)),partyCur,'All Parties');
  fillRecordFilter('dispatchCourierFilter',uniqueSorted(all.map(x=>x.courierName||x.shipThrough)),courierCur,'All Couriers');
@@ -1082,14 +1089,20 @@ function renderHistory(){
    if(hrs>=24){const days=Math.floor(hrs/24);return `<span class="pendingBadge stuck" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">🚨 Stuck ${days}+ day${days>1?'s':''}</span>`}
    return '<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>';
  };
- $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button>${superAdminUnlocked?` <button class="btn small danger" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="8">No records.</td></tr>';
- if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button>${superAdminUnlocked?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑 Delete</button>`:''}</div>`}).join(''):'<div class="note">No records.</div>';
+ const dispatchAction=x=>x.deletedAt
+   ?`<button class="btn small secondary" onclick="restoreDispatchRecord('${esc(x.parcelId||'')}')">↩ Restore</button>`
+   :`<button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button>${loggedUser()?` <button class="btn small danger" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑</button>`:''}`;
+ const dispatchActionCard=x=>x.deletedAt
+   ?`<button class="btn secondary" style="margin-top:6px" onclick="restoreDispatchRecord('${esc(x.parcelId||'')}')">↩ Restore</button>`
+   :`<button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button>${loggedUser()?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑 Delete</button>`:''}`;
+ $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td>${dispatchAction(x)}</td></tr>`}).join(''):'<tr><td colspan="8">No records.</td></tr>';
+ if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div>${dispatchActionCard(x)}</div>`}).join(''):'<div class="note">No records.</div>';
  renderDashboard();
 }
 function renderDashboard(){
   const box=$('dashboardStats'); if(!box)return;
   const range=$('dashboardRange')?.value||'today';
-  const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>!isEmptyDraft(x));
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>!isEmptyDraft(x)&&!x.deletedAt);
   const now=Date.now();
   const inRange=x=>{
     if(range==='all')return true;
@@ -1578,6 +1591,11 @@ function clearReturnFilters(){
 function renderReturnHistory(){
  let body=$('returnHistory');if(!body)return;
  let all=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]');
+ const deletedCount=all.filter(r=>r.deletedAt).length;
+ if($('showDeletedReturnWrap'))$('showDeletedReturnWrap').classList.toggle('hidden',!deletedCount);
+ if($('deletedReturnCount'))$('deletedReturnCount').textContent=deletedCount;
+ const showDeleted=$('showDeletedReturn')&&$('showDeletedReturn').checked;
+ all=showDeleted?all.filter(r=>r.deletedAt):all.filter(r=>!r.deletedAt);
  let partyCur=$('returnPartyFilter')?.value||'',courierCur=$('returnCourierFilter')?.value||'',userCur=$('returnUserFilter')?.value||'';
  fillRecordFilter('returnPartyFilter',uniqueSorted(all.map(r=>r.returnFrom)),partyCur,'All Parties');
  fillRecordFilter('returnCourierFilter',uniqueSorted(all.map(r=>r.returnThrough)),courierCur,'All Couriers');
@@ -1595,8 +1613,14 @@ function renderReturnHistory(){
  if($('returnRecordSummary'))$('returnRecordSummary').textContent=`Showing ${a.length} of ${all.length} return records`;
  window._returnFiltered=a;
  const dash=v=>v?esc(v):'<span class="cellDash">—</span>';
- body.innerHTML=a.length?a.map(r=>`<tr><td><b>${esc(slipLabel(r))}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${dash(returnUserNames(r))}</td><td>${esc(r.status||'Return')}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td><button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button>${superAdminUnlocked?` <button class="btn small danger" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑</button>`:''}</td></tr>`).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
- if($('returnMobileCards'))$('returnMobileCards').innerHTML=a.length?a.map(r=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(slipLabel(r))}</b><span>${esc(r.status||'Return')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div><div><small>User / Doer</small><strong>${esc(returnUserNames(r)||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button>${superAdminUnlocked?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑 Delete</button>`:''}</div>`).join(''):'<div class="note">No return records.</div>';
+ const returnAction=r=>r.deletedAt
+   ?`<button class="btn small secondary" onclick="restoreReturnRecord('${esc(r.returnId||'')}')">↩ Restore</button>`
+   :`<button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button>${loggedUser()?` <button class="btn small danger" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑</button>`:''}`;
+ const returnActionCard=r=>r.deletedAt
+   ?`<button class="btn secondary" style="margin-top:6px" onclick="restoreReturnRecord('${esc(r.returnId||'')}')">↩ Restore</button>`
+   :`<button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button>${loggedUser()?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑 Delete</button>`:''}`;
+ body.innerHTML=a.length?a.map(r=>`<tr><td><b>${esc(slipLabel(r))}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${dash(returnUserNames(r))}</td><td>${esc(r.status||'Return')}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td>${returnAction(r)}</td></tr>`).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
+ if($('returnMobileCards'))$('returnMobileCards').innerHTML=a.length?a.map(r=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(slipLabel(r))}</b><span>${esc(r.status||'Return')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div><div><small>User / Doer</small><strong>${esc(returnUserNames(r)||'-')}</strong></div></div>${returnActionCard(r)}</div>`).join(''):'<div class="note">No return records.</div>';
 }
 
 function openAllRecords(){ openRecordType('dispatch'); }
@@ -1609,8 +1633,8 @@ function closeAllRecords(){ $('allRecordsModal').classList.add('hidden'); }
 function renderAllRecords(filter){
  window._recordFilter=filter;
  let q=($('allRecordSearch')?.value||'').toLowerCase();
- let ds=JSON.parse(localStorage.getItem(K.records)||'[]').map(x=>({type:'DISPATCH',id:x.parcelId,label:slipLabel(x),date:x.dispatchDate,party:x.shipTo,status:x.status||'Draft',saved:x.createdAt||'',raw:x}));
- let rs=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').map(x=>({type:'RETURN',id:x.returnId,label:slipLabel(x),date:x.returnDate||'',party:x.returnFrom||'',status:x.status||'In Process',saved:x.savedAt||'',raw:x}));
+ let ds=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>!x.deletedAt).map(x=>({type:'DISPATCH',id:x.parcelId,label:slipLabel(x),date:x.dispatchDate,party:x.shipTo,status:x.status||'Draft',saved:x.createdAt||'',raw:x}));
+ let rs=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').filter(x=>!x.deletedAt).map(x=>({type:'RETURN',id:x.returnId,label:slipLabel(x),date:x.returnDate||'',party:x.returnFrom||'',status:x.status||'In Process',saved:x.savedAt||'',raw:x}));
  let a=[...ds,...rs];
  if(filter==='dispatch')a=a.filter(x=>x.type==='DISPATCH');
  if(filter==='return')a=a.filter(x=>x.type==='RETURN');
@@ -2116,36 +2140,76 @@ function unlockStageAsAdmin(){
   toast(stage.name+' unlocked by Admin');
 }
 async function deleteDispatchRecord(parcelId){
-  if(!isAdminUser()){alert('Sirf Admin record delete kar sakta hai.');return}
+  const actor=loggedUser();
+  if(!actor){alert('Record delete karne ke liye pehle login karein.');return}
   const rec=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===parcelId);
   if(!rec)return;
-  if(!confirm('Ye record PERMANENTLY delete ho jayega, wapas nahi aayega.\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.shipTo||'-')+'\n\nSach mein delete karna hai?'))return;
-  try{ await pdDb.collection('pd_records_cloud').doc(parcelId).delete(); }
+  if(!confirm('Ye record Deleted list me chala jayega (permanent delete nahi hoga, baad me restore kar sakte hain).\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.shipTo||'-')+'\n\nDelete karna hai?'))return;
+  const patch={deletedAt:new Date().toISOString(),deletedBy:actor.name};
+  try{ await pdDb.collection('pd_records_cloud').doc(parcelId).update(patch); }
   catch(e){ console.error('delete dispatch record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
-  const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>x.parcelId!==parcelId);
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]');
+  const i=all.findIndex(x=>x.parcelId===parcelId);
+  if(i>=0)all[i]={...all[i],...patch};
   localStorage.setItem(K.records,JSON.stringify(all));
-  const actor=loggedUser();
   const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
-  a.unshift({at:new Date().toISOString(),parcelId,userId:actor?actor.id:'',userName:actor?actor.name:'Unknown',fieldId:'',field:'Record',oldValue:slipLabel(rec),newValue:'',action:'DELETE',reason:''});
+  a.unshift({at:new Date().toISOString(),parcelId,userId:actor.id,userName:actor.name,fieldId:'',field:'Record',oldValue:slipLabel(rec),newValue:'',action:'DELETE',reason:''});
   localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
   renderHistory();
-  toast('Record delete ho gaya: '+slipLabel(rec));
+  toast('Record Deleted list me bhej diya: '+slipLabel(rec));
+}
+async function restoreDispatchRecord(parcelId){
+  const actor=loggedUser();
+  if(!actor){alert('Restore karne ke liye pehle login karein.');return}
+  const rec=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===parcelId);
+  if(!rec)return;
+  try{ await pdDb.collection('pd_records_cloud').doc(parcelId).update({deletedAt:firebase.firestore.FieldValue.delete(),deletedBy:firebase.firestore.FieldValue.delete()}); }
+  catch(e){ console.error('restore dispatch record failed',e); alert('Restore fail ho gaya, dobara try karein.'); return; }
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]');
+  const i=all.findIndex(x=>x.parcelId===parcelId);
+  if(i>=0){delete all[i].deletedAt;delete all[i].deletedBy;}
+  localStorage.setItem(K.records,JSON.stringify(all));
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
+  a.unshift({at:new Date().toISOString(),parcelId,userId:actor.id,userName:actor.name,fieldId:'',field:'Record',oldValue:'',newValue:slipLabel(rec),action:'RESTORE',reason:''});
+  localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
+  renderHistory();
+  toast('Record restore ho gaya: '+slipLabel(rec));
 }
 async function deleteReturnRecord(returnId){
-  if(!isAdminUser()){alert('Sirf Admin record delete kar sakta hai.');return}
+  const actor=loggedUser();
+  if(!actor){alert('Record delete karne ke liye pehle login karein.');return}
   const rec=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').find(x=>x.returnId===returnId);
   if(!rec)return;
-  if(!confirm('Ye return record PERMANENTLY delete ho jayega, wapas nahi aayega.\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.returnFrom||'-')+'\n\nSach mein delete karna hai?'))return;
-  try{ await pdDb.collection('pd_returns_cloud').doc(returnId).delete(); }
+  if(!confirm('Ye return record Deleted list me chala jayega (permanent delete nahi hoga, baad me restore kar sakte hain).\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.returnFrom||'-')+'\n\nDelete karna hai?'))return;
+  const patch={deletedAt:new Date().toISOString(),deletedBy:actor.name};
+  try{ await pdDb.collection('pd_returns_cloud').doc(returnId).update(patch); }
   catch(e){ console.error('delete return record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
-  const all=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').filter(x=>x.returnId!==returnId);
+  const all=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]');
+  const i=all.findIndex(x=>x.returnId===returnId);
+  if(i>=0)all[i]={...all[i],...patch};
   localStorage.setItem(RETURN_RECORDS_KEY,JSON.stringify(all));
-  const actor=loggedUser();
   const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
-  a.unshift({at:new Date().toISOString(),parcelId:returnId,userId:actor?actor.id:'',userName:actor?actor.name:'Unknown',fieldId:'',field:'Return Record',oldValue:slipLabel(rec),newValue:'',action:'DELETE',reason:''});
+  a.unshift({at:new Date().toISOString(),parcelId:returnId,userId:actor.id,userName:actor.name,fieldId:'',field:'Return Record',oldValue:slipLabel(rec),newValue:'',action:'DELETE',reason:''});
   localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
   renderReturnHistory();
-  toast('Return record delete ho gaya: '+slipLabel(rec));
+  toast('Return record Deleted list me bhej diya: '+slipLabel(rec));
+}
+async function restoreReturnRecord(returnId){
+  const actor=loggedUser();
+  if(!actor){alert('Restore karne ke liye pehle login karein.');return}
+  const rec=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').find(x=>x.returnId===returnId);
+  if(!rec)return;
+  try{ await pdDb.collection('pd_returns_cloud').doc(returnId).update({deletedAt:firebase.firestore.FieldValue.delete(),deletedBy:firebase.firestore.FieldValue.delete()}); }
+  catch(e){ console.error('restore return record failed',e); alert('Restore fail ho gaya, dobara try karein.'); return; }
+  const all=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]');
+  const i=all.findIndex(x=>x.returnId===returnId);
+  if(i>=0){delete all[i].deletedAt;delete all[i].deletedBy;}
+  localStorage.setItem(RETURN_RECORDS_KEY,JSON.stringify(all));
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
+  a.unshift({at:new Date().toISOString(),parcelId:returnId,userId:actor.id,userName:actor.name,fieldId:'',field:'Return Record',oldValue:'',newValue:slipLabel(rec),action:'RESTORE',reason:''});
+  localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
+  renderReturnHistory();
+  toast('Return record restore ho gaya: '+slipLabel(rec));
 }
 function openAuditTrail(){
   $('auditModal').classList.remove('hidden');
