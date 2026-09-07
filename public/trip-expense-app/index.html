@@ -131,6 +131,7 @@ if(window.self!==window.top){
 <select id="expSalesFilter" onchange="renderExplorerPage()" style="padding:8px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">All Sales Persons</option></select>
 <select id="expStatusFilter" onchange="renderExplorerPage()" style="padding:8px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">All Status</option><option value="running">Active</option><option value="hisaab_submitted">To Verify</option><option value="closed">Closed</option><option value="overdue">Overdue</option></select>
 <label id="showDeletedTripsWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer"><input type="checkbox" id="showDeletedTrips" onchange="renderExplorerPage()" style="width:auto"> 🗑 Show Deleted (<span id="deletedTripsCount">0</span>)</label>
+<button class="btn danger hidden" id="deleteAllTripsBtn" onclick="deleteAllVisibleTrips()" style="margin-left:auto">🗑 Delete All Shown</button>
 </div></div>
 <div class="panel"><div class="pb" id="explorerList" style="padding-top:6px"></div></div>
 </section>
@@ -975,9 +976,11 @@ function renderExplorerPage(){
   if(statusFilter==='overdue')list=list.filter(isOverdue);
   else if(statusFilter)list=list.filter(t=>t.status===statusFilter);
   list.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  window._explorerFiltered=list;
+  const canDelete=canDeleteTrips();
+  if($('deleteAllTripsBtn'))$('deleteAllTripsBtn').classList.toggle('hidden',!(canDelete&&!showDeleted&&list.length));
   const wrap=$('explorerList');
   if(!list.length){wrap.innerHTML=`<small>${showDeleted?'Koi deleted trip nahi hai.':'Koi trip nahi mili.'}</small>`;return}
-  const canDelete=canDeleteTrips();
   wrap.innerHTML=`<div style="overflow-x:auto"><table class="dtb"><thead><tr><th>Trip</th><th>Sales Person</th><th>Location</th><th>Purpose</th><th>Advance</th><th>Spent</th><th>Balance</th><th>Status</th>${canDelete?'<th>Action</th>':''}</tr></thead><tbody>`+
   list.map(t=>{
     const issued=tripIssued(t.id),expense=tripExpense(t.id),balance=issued-expense;
@@ -1002,6 +1005,17 @@ async function restoreTrip(tripId){
   try{ await db.collection('te_trips').doc(tripId).update({deletedAt:firebase.firestore.FieldValue.delete(),deletedBy:firebase.firestore.FieldValue.delete()}); }
   catch(e){ console.error('restore trip failed',e); alert('Restore fail ho gaya, dobara try karein.'); return; }
   toast('Trip restore ho gaya: '+tripId);
+}
+async function deleteAllVisibleTrips(){
+  if(!canDeleteTrips()){alert('Sirf Admin/Director trips delete kar sakte hain.');return}
+  const list=window._explorerFiltered||[];
+  if(!list.length)return;
+  if(!confirm('Abhi jo '+list.length+' trip(s) is filter me dikh rahi hain, sab Deleted list me chali jayengi (permanent delete nahi hoga, baad me restore kar sakte hain).\n\nSach mein sab delete karni hain?'))return;
+  const actor=myUserObj();
+  const patch={deletedAt:new Date().toISOString(),deletedBy:actor?actor.name:'Unknown'};
+  const results=await Promise.allSettled(list.map(t=>db.collection('te_trips').doc(t.id).update(patch)));
+  const failed=results.filter(r=>r.status==='rejected').length;
+  toast(failed?`${list.length-failed} trip(s) delete hui, ${failed} fail ho gayi.`:`${list.length} trip(s) Deleted list me bhej di gayin.`);
 }
 
 /* ===== Activity Log ===== */
