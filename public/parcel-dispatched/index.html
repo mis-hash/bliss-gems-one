@@ -237,6 +237,12 @@ if(window.self!==window.top){
 <button type="button" class="btn secondary small" onclick="pdRefreshStatusBar()">🔄 Refresh</button>
 </div>
 <main class="container">
+<div id="pdGateWrap" class="hidden" style="max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--b);border-radius:14px;padding:26px">
+  <h3>Login Required</h3>
+  <p style="font-size:13px;color:var(--m)">Parcel Dispatch / Return dekhne ke liye pehle login karein.</p>
+  <button class="btn primary" onclick="loginFromHub()">👤 Login</button>
+</div>
+<div id="pdMainContent">
 <div class="no-print" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
   <button type="button" id="dispatchTabBtn" class="btn primary" style="font-size:17px;padding:16px" onclick="switchModule('dispatch')">📦 PARCEL DISPATCH</button>
   <button type="button" id="returnTabBtn" class="btn secondary" style="font-size:17px;padding:16px" onclick="switchModule('return')">↩ PARCEL RETURN</button>
@@ -440,6 +446,7 @@ if(window.self!==window.top){
 <div class="save"><button class="btn secondary" onclick="clearReturn()">Clear Return</button><button class="btn primary" onclick="printReturn()">🖨 Print Return Slip</button><button class="btn primary" onclick="saveReturn()">💾 SAVE RETURN</button></div>
 </div>
 
+</div>
 </div></main>
 
 <div class="modal hidden" id="manageModal"><div class="box"><div class="mh"><b>Admin / Backend Masters</b><button class="btn secondary small" onclick="closeManage()">✕</button></div><div class="mb"><div class="tabs"><button class="tab on" data-tab="users" onclick="tab(this,'users')">Universal Users</button><button class="tab" data-tab="shipto" onclick="tab(this,'shipto')">Ship To</button><button class="tab" data-tab="clients" onclick="tab(this,'clients')">Ship To</button><button class="tab" data-tab="brokers" onclick="tab(this,'brokers')">Brokers</button><button class="tab" data-tab="shipthrough" onclick="tab(this,'shipthrough')">Ship Through</button><button class="tab" data-tab="messages" onclick="tab(this,'messages')">Message Settings</button><button class="tab" data-tab="watemplates" onclick="tab(this,'watemplates')">WhatsApp Templates</button><button class="tab" data-tab="privacy" onclick="tab(this,'privacy')">Self Remark Privacy</button><button class="tab" data-tab="api" onclick="tab(this,'api')">GREEN-API</button></div><div id="manageContent"></div></div><div class="mf"><span class="note">Data is saved in this browser.</span><button class="btn secondary" onclick="closeManage()">Close</button></div></div></div>
@@ -2252,7 +2259,15 @@ function refreshLoginBadge(){
   if($('loginBtn'))$('loginBtn').classList.toggle('hidden',!!u);
   if($('logoutBtn'))$('logoutBtn').classList.toggle('hidden',!u);
   if($('changePasswordBtn'))$('changePasswordBtn').classList.toggle('hidden',!u);
+  if($('pdGateWrap'))$('pdGateWrap').classList.toggle('hidden',!!u);
+  if($('pdMainContent'))$('pdMainContent').classList.toggle('hidden',!u);
   applyWorkerPermissions();
+}
+function loginFromHub(){
+  try{
+    if(window.self!==window.top && window.top.openStaffLoginModal){window.top.openStaffLoginModal();return;}
+  }catch(e){}
+  openLogin();
 }
 function hardRefreshApp(){
   var btn=document.getElementById('hardRefreshBtn');
