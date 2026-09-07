@@ -2,27 +2,66 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" id="viewportMeta" content="width=device-width,initial-scale=1.0">
-<script>if(localStorage.getItem('pd_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')</script>
+<script>
+/* Crash safety net — registered first, before any other script, so it can never itself
+   be skipped by a later error. A broken script tag still halts the rest of THAT tag, but
+   this at least turns a silent dead page into a visible, actionable message instead of the
+   user just clicking buttons that quietly do nothing. */
+(function(){
+  function showCrashBanner(msg){
+    if(document.getElementById('pdCrashBanner'))return;
+    var b=document.createElement('div');
+    b.id='pdCrashBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b42318;color:#fff;padding:10px 14px;font:600 13px Arial,sans-serif;text-align:center;box-shadow:0 2px 10px #0004';
+    b.innerHTML='⚠ App me error aa gaya hai. Page reload karein.'
+      +' <button type="button" style="margin-left:10px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#b42318;font-weight:700;cursor:pointer" onclick="location.reload()">Reload</button>'
+      +'<div style="font-weight:400;font-size:11px;opacity:.85;margin-top:3px">'+String(msg||'').slice(0,200).replace(/[<>]/g,'')+'</div>';
+    function attach(){document.body&&document.body.prepend(b)}
+    if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach);
+  }
+  window.addEventListener('error',function(e){
+    console.error('Uncaught error:',e.error||e.message);
+    showCrashBanner((e.error&&e.error.message)||e.message);
+  });
+  window.addEventListener('unhandledrejection',function(e){
+    console.error('Unhandled promise rejection:',e.reason);
+    showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));
+  });
+})();
+if(localStorage.getItem('pd_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')
+</script>
 <title>Parcel Dispatch Slip</title>
 <style>
 :root{--p:#268F76;--p2:#3FAF93;--mint:#E8F8F2;--bg:#f4f7f5;--b:#d9e2dc;--t:#17211b;--m:#66756c;--danger:#b42318}
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--t)}
 header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-index:20;border-bottom:1px solid var(--b)}.head{max-width:1250px;margin:auto;display:flex;justify-content:space-between;gap:10px;align-items:center}.head h2{margin:0;font-size:19px;color:var(--p);display:flex;align-items:center;gap:10px}.head small{color:var(--m)}.logo{width:38px;height:38px;border-radius:10px;background:var(--mint);display:grid;place-items:center;font-size:22px;font-weight:900;color:var(--p2);flex:none}
-.container{max-width:1250px;margin:18px auto;padding:0 12px 50px}.card{background:#fff;border:1px solid var(--b);border-radius:12px;margin-bottom:14px;overflow:visible}.card h3{margin:0;padding:13px 15px;background:#f8faf8;border-bottom:1px solid var(--b);font-size:16px}.body{padding:14px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.field{min-width:0}.span2{grid-column:span 2}.full{grid-column:1/-1}label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}input,select,textarea{width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;background:#fff;font:inherit}textarea{min-height:70px}.btn{border:0;border-radius:8px;padding:10px 13px;font-weight:700;cursor:pointer}.primary{background:var(--p);color:#fff}.secondary{background:var(--mint);color:var(--p)}.danger{background:#fee4e2;color:#9b1c1c}.success{background:#15803d;color:#fff}.small{padding:6px 9px;font-size:12px}.hidden{display:none!important}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.save{position:sticky;bottom:8px;background:#ffffffee;border:1px solid var(--b);border-radius:10px;padding:10px;display:flex;justify-content:flex-end;gap:8px;z-index:10}.note{font-size:12px;color:var(--m);margin-top:5px}.modal{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;padding:12px;z-index:100}.box{width:min(850px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:12px}.mh,.mf{padding:13px 15px;display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid var(--b)}.mf{border-top:1px solid var(--b);border-bottom:0}.mb{padding:15px}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tab{padding:8px 10px;border:1px solid var(--b);background:#fff;border-radius:7px;cursor:pointer}.tab.on{background:var(--p);color:#fff}.item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px;border:1px solid var(--b);border-radius:8px;margin:7px 0}.toast{display:none!important;position:fixed;right:15px;bottom:15px;background:#17211b;color:#fff;padding:11px 14px;border-radius:8px;display:none;z-index:200}.toast.show{display:block}.table{overflow:auto}table{width:100%;border-collapse:collapse;min-width:800px}th,td{padding:9px;border-bottom:1px solid var(--b);font-size:12px;text-align:left}.req{color:var(--danger)}
-@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.grid{grid-template-columns:1fr}.span2,.full{grid-column:auto}.head{align-items:flex-start;flex-direction:column}.save{flex-direction:column}.save .btn{width:100%}}
+#headerMoreMenu{display:contents}#headerMoreBtn{display:none}
+.container{max-width:1250px;margin:18px auto;padding:0 12px 50px}.card{background:#fff;border:1px solid var(--b);border-radius:12px;margin-bottom:14px;overflow:visible}.card h3{margin:0;padding:13px 15px;background:#f8faf8;border-bottom:1px solid var(--b);font-size:16px}.body{padding:14px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.field{min-width:0}.span2{grid-column:span 2}.full{grid-column:1/-1}label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}input,select,textarea{width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;background:#fff;font:inherit}textarea{min-height:70px}.btn{border:0;border-radius:8px;padding:10px 13px;font-weight:700;cursor:pointer}.primary{background:var(--p);color:#fff}.secondary{background:var(--mint);color:var(--p)}.danger{background:#fee4e2;color:#9b1c1c}.success{background:#15803d;color:#fff}.small{padding:6px 9px;font-size:12px}.hidden{display:none!important}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.save{position:sticky;bottom:8px;background:#ffffffee;border:1px solid var(--b);border-radius:10px;padding:10px;display:flex;justify-content:flex-end;gap:8px;z-index:10}.note{font-size:12px;color:var(--m);margin-top:5px}.modal{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;padding:12px;z-index:100}.box{width:min(850px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:12px}.mh,.mf{padding:13px 15px;display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid var(--b)}.mf{border-top:1px solid var(--b);border-bottom:0}.mb{padding:15px}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tab{padding:8px 10px;border:1px solid var(--b);background:#fff;border-radius:7px;cursor:pointer}.tab.on{background:var(--p);color:#fff}.item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px;border:1px solid var(--b);border-radius:8px;margin:7px 0}.toast{display:none;position:fixed;right:15px;bottom:15px;background:#17211b;color:#fff;padding:11px 14px;border-radius:8px;z-index:200;max-width:80vw}.toast.show{display:block}.table{overflow:auto}table{width:100%;border-collapse:collapse;min-width:800px}th,td{padding:9px;border-bottom:1px solid var(--b);font-size:12px;text-align:left}.req{color:var(--danger)}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}#dashboardStats{grid-template-columns:repeat(2,1fr)!important}}@media(max-width:560px){.grid{grid-template-columns:1fr}.span2,.full{grid-column:auto}.head{align-items:flex-start;flex-direction:column}.save{flex-direction:column}.save .btn{width:100%}#dashboardStats{grid-template-columns:1fr!important;gap:8px!important}.statTile{padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}.statTile small{margin-bottom:0}.statTile strong{font-size:20px}.statTile span{margin-top:0}}
+@media(max-width:720px){
+  #headerMoreBtn{display:inline-flex;align-items:center;justify-content:center;width:38px;padding:0;font-size:19px;font-weight:900}
+  #headerMoreMenu{display:flex;flex-direction:column;gap:6px;position:absolute;right:0;top:calc(100% + 8px);background:#fff;border:1px solid var(--b);border-radius:10px;box-shadow:0 10px 26px #0003;padding:8px;min-width:200px;z-index:60}
+  #headerMoreMenu.headerMoreCollapsed{display:none}
+  #headerMoreMenu .btn{width:100%;text-align:left}
+  .head{flex-wrap:wrap}
+  .row{flex-wrap:wrap;gap:6px}
+}
 
 @media print{
-  @page{size:A4;margin:8mm}
-  body{background:#fff;font-size:10px}
-  header,.save,#historyCard,.modal,.toast,.no-print{display:none!important}
+  @page{size:A4;margin:6mm}
+  html,body{background:#fff;font-size:9px}
+  header,.save,#historyCard,#returnHistoryCard,#dashboardCard,.modal,.toast,.no-print,.note{display:none!important}
   .container{max-width:none;margin:0;padding:0}
-  .card{break-inside:avoid;border:1px solid #777;border-radius:0;margin:0 0 5px;box-shadow:none}
-  .card h3{padding:5px 7px;font-size:11px;background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .body{padding:6px}
-  .grid{grid-template-columns:repeat(4,1fr);gap:5px 7px}
-  label{font-size:8px;margin-bottom:2px}
-  input,select,textarea{border:0;border-bottom:1px solid #999;border-radius:0;padding:2px 1px;font-size:9px;min-height:18px;background:#fff!important;color:#000!important;appearance:none;-webkit-appearance:none}
-  textarea{min-height:28px;resize:none}
+  .card{break-inside:avoid;page-break-inside:avoid;border:1px solid #777;border-radius:0;margin:0 0 3px;box-shadow:none}
+  .card h3{padding:3px 6px;font-size:10px;background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .body{padding:4px}
+  .grid{display:flex!important;flex-wrap:wrap;gap:1px 8px}
+  .field{flex:0 0 auto;width:22%;min-width:0;break-inside:avoid;page-break-inside:avoid;margin-bottom:1px}
+  .span2{width:47%}
+  .full{width:100%}
+  label{font-size:7px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  input,select,textarea{border:0;border-bottom:1px solid #999;border-radius:0;padding:1px 0;font-size:8px;min-height:13px;line-height:1.3;background:#fff!important;color:#000!important;appearance:none;-webkit-appearance:none}
+  textarea{min-height:20px;resize:none}
   .hidden{display:none!important}
   #section1A:not(.hidden){display:block!important}
 }
@@ -55,7 +94,7 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 
 <style id="dispatch-closing-print-fix">
 @media print{
-  #dispatchModule .card{break-inside:avoid;page-break-inside:avoid}
+  #returnIdTag,#slipNoTag{float:none!important;display:block;font-size:9px;margin-top:1px}
 }
 </style>
 
@@ -109,6 +148,21 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 .recordCardGrid small{display:block;color:var(--m);font-size:10px;margin-bottom:2px}
 .recordCardGrid strong{display:block;font-size:13px;overflow-wrap:anywhere}
 .recordOpenBtn{width:100%;min-height:44px;margin-top:10px}
+tr.pendingRow{background:#fff8e1!important}
+tr.pendingRow td:first-child{border-left:3px solid #f0b429}
+.recordCard.pending{border-color:#f0b429;background:#fffaf0;box-shadow:0 0 0 1px #f0b42933}
+.pendingBadge{background:#fef3c7!important;color:#92400e!important}
+.cellDash{color:#a7b3ac;font-style:italic}
+.pendingBadge.stuck{background:#fee4e2!important;color:#9b1c1c!important}
+.statTile{background:var(--bg);border:1px solid var(--b);border-radius:10px;padding:12px 14px}
+.statTile small{display:block;color:var(--m);font-size:11px;margin-bottom:5px;text-transform:uppercase;letter-spacing:.03em}
+.statTile strong{display:block;font-size:22px;line-height:1.2}
+.statTile span{display:block;font-size:12px;color:var(--m);margin-top:3px}
+.statTile.warn strong{color:#a66b08}
+.statTile.danger strong{color:#9b1c1c}
+.cellSub{color:var(--m);font-size:11px}
+#history td{white-space:nowrap}
+#history td:nth-child(3){white-space:normal}
 @media(max-width:1100px){.recordFilters{grid-template-columns:repeat(3,minmax(0,1fr))}.recordFilters input:first-child{grid-column:span 2}}
 @media(max-width:700px){
  body{font-size:14px}.container{padding-left:8px;padding-right:8px}.body{padding:10px}.card h3{font-size:15px;padding:11px 12px}
@@ -118,11 +172,57 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
  .desktopRecords{display:none!important}.mobileRecordCards{display:block}
 }
 @media(max-width:430px){.recordFilters{grid-template-columns:1fr}.recordFilters input:first-child,.recordFilters button{grid-column:auto}.recordCardGrid{grid-template-columns:1fr}}
+/* "Mobile View" preview on an actual desktop screen — @media queries key off the real
+   window width, which a desktop browser never shrinks below, so this class mirrors the
+   combined mobile breakpoints above and gets toggled by toggleDesktopView() in JS instead. */
+body.pd-force-mobile{font-size:14px}
+body.pd-force-mobile .container,body.pd-force-mobile header .head{max-width:430px;margin-left:auto;margin-right:auto}
+body.pd-force-mobile .container{padding-left:8px;padding-right:8px}
+body.pd-force-mobile .body{padding:10px}
+body.pd-force-mobile .card h3{font-size:15px;padding:11px 12px}
+body.pd-force-mobile .grid{grid-template-columns:1fr!important;gap:9px}
+body.pd-force-mobile .span2,body.pd-force-mobile .full{grid-column:auto!important}
+body.pd-force-mobile input,body.pd-force-mobile select,body.pd-force-mobile textarea{font-size:16px;min-height:46px}
+body.pd-force-mobile .btn{min-height:44px}
+body.pd-force-mobile .recordFilters{grid-template-columns:1fr;gap:7px}
+body.pd-force-mobile .recordFilters input:first-child,body.pd-force-mobile .recordFilters button{grid-column:auto}
+body.pd-force-mobile .recordCardGrid{grid-template-columns:1fr}
+body.pd-force-mobile .desktopRecords{display:none!important}
+body.pd-force-mobile .mobileRecordCards{display:block}
+body.pd-force-mobile #dashboardStats{grid-template-columns:1fr!important;gap:8px!important}
+body.pd-force-mobile .statTile{padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+body.pd-force-mobile .statTile small{margin-bottom:0}
+body.pd-force-mobile .statTile strong{font-size:20px}
+body.pd-force-mobile .statTile span{margin-top:0}
+body.pd-force-mobile .head{align-items:flex-start;flex-direction:column;flex-wrap:wrap}
+body.pd-force-mobile .save{flex-direction:column}
+body.pd-force-mobile .save .btn{width:100%}
+body.pd-force-mobile .row{flex-wrap:wrap;gap:6px}
+body.pd-force-mobile #headerMoreBtn{display:inline-flex;align-items:center;justify-content:center;width:38px;padding:0;font-size:19px;font-weight:900}
+body.pd-force-mobile #headerMoreMenu{display:flex;flex-direction:column;gap:6px;position:absolute;right:0;top:calc(100% + 8px);background:#fff;border:1px solid var(--b);border-radius:10px;box-shadow:0 10px 26px #0003;padding:8px;min-width:200px;z-index:60}
+body.pd-force-mobile #headerMoreMenu.headerMoreCollapsed{display:none}
+body.pd-force-mobile #headerMoreMenu .btn{width:100%;text-align:left}
 </style>
 
 </head>
 <body>
-<header><div class="head"><div id="secretAdminLogo" title="" style="display:flex;align-items:center;gap:10px"><div class="logo">b</div><div><h2>Parcel Dispatch Slip</h2><small>Simple one-page dispatch app</small></div></div><div class="row"><button class="btn secondary" id="desktopViewBtn" onclick="toggleDesktopView()" title="Switch between mobile and desktop layout">🖥 Desktop View</button><button class="btn secondary" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button><span id="loginBadge" class="pill">Not Logged In</span><button class="btn secondary" id="loginBtn" onclick="openLogin()">👤 Login</button><button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button><button class="btn secondary hidden" id="logoutBtn" onclick="doLogout()">↪ Logout</button><button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button><button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button><button class="btn secondary" onclick="startNewDispatch()">＋ New</button></div></div></header>
+<header><div class="head"><div id="secretAdminLogo" title="" style="display:flex;align-items:center;gap:10px"><div class="logo">b</div><div><h2>Bliss Gems &amp; Minerals</h2><small>Parcel Dispatch &amp; Return</small></div></div><div class="row">
+<span id="loginBadge" class="pill">Not Logged In</span>
+<button class="btn secondary" id="loginBtn" onclick="openLogin()">👤 Login</button>
+<button class="btn secondary hidden" id="logoutBtn" onclick="doLogout()">↪ Logout</button>
+<button class="btn secondary" onclick="newRecord()">＋ New</button>
+<div id="headerMoreWrap" style="position:relative">
+<button type="button" class="btn secondary" id="headerMoreBtn" onclick="toggleHeaderMore()" title="More options">⋮</button>
+<div id="headerMoreMenu" class="headerMoreCollapsed">
+<button class="btn secondary" id="desktopViewBtn" onclick="toggleDesktopView()" title="Switch between mobile and desktop layout">🖥 Desktop View</button>
+<button class="btn secondary" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄 Refresh</button>
+<button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button>
+<button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button>
+<button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button>
+<button class="btn secondary superAdminOnly hidden" onclick="openAuditTrail()">📜 Audit Trail</button>
+</div>
+</div>
+</div></div></header>
 <script>
 if(window.self!==window.top){
   ['loginBadge','loginBtn','logoutBtn','changePasswordBtn'].forEach(function(id){
@@ -145,6 +245,14 @@ if(window.self!==window.top){
 <div id="dispatchModule">
 <div id="dispatchListView">
 <div class="no-print" style="margin-bottom:14px"><button class="btn primary" style="font-size:15px;padding:14px 18px" onclick="startNewDispatch()">＋ New Dispatch Slip</button></div>
+<section class="card" id="dashboardCard">
+  <div style="text-align:center;padding:16px 15px 2px">
+    <div class="logo" style="margin:0 auto 8px">b</div>
+    <b style="font-size:16px">Bliss Gems &amp; Minerals</b><br><small style="color:var(--m)">Parcel Dispatch &amp; Return</small>
+  </div>
+  <h3>📊 Dashboard <select id="dashboardRange" onchange="renderDashboard()" style="width:auto;display:inline-block;margin-left:8px;font-size:12px;padding:5px 8px;font-weight:400"><option value="today">Today</option><option value="week">This Week</option><option value="all">All Time</option></select></h3>
+  <div class="body"><div id="dashboardStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div></div>
+</section>
 <section class="card" id="historyCard" style="margin-top:0"><h3>Recent Dispatch Records</h3><div class="body">
 <div class="recordFilters">
 <input id="search" placeholder="Search Parcel / Party / Courier / AWB / Broker" oninput="renderHistory()">
@@ -154,8 +262,10 @@ if(window.self!==window.top){
 <input type="date" id="dispatchDateFrom" onchange="renderHistory()" title="From Date">
 <input type="date" id="dispatchDateTo" onchange="renderHistory()" title="To Date">
 <button class="btn secondary small" type="button" onclick="clearDispatchFilters()">Clear Filters</button>
+<button class="btn secondary small" type="button" onclick="exportDispatchCSV()">⬇ Export CSV</button>
 </div>
 <div class="recordSummary" id="dispatchRecordSummary"></div>
+<label id="hideEmptyDraftsWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="hideEmptyDrafts" onchange="renderHistory()" style="width:auto"> Hide empty drafts (<span id="hideEmptyDraftsCount">0</span>)</label>
 <div class="table desktopRecords"><table><thead><tr><th>Parcel ID</th><th>Date</th><th>Ship To</th><th>Courier</th><th>Broker</th><th>AWB</th><th>Status</th><th>Action</th></tr></thead><tbody id="history"></tbody></table></div>
 <div id="dispatchMobileCards" class="mobileRecordCards"></div>
 </div></section>
@@ -168,9 +278,7 @@ if(window.self!==window.top){
 <div class="comboBox" id="shipToCombo">
 <input id="shipTo" class="titleCaseField" autocomplete="off" placeholder="Type / Search Party Name">
 <div class="comboMenu" id="shipToMenu"></div>
-</div>
-<div class="note">Party select karte hi linked Broker auto-fill hoga.</div>
-</div>
+</div></div>
 <div class="field"><label>Broker <span class="req">*</span></label><input id="broker" class="titleCaseField" autocomplete="off" readonly placeholder="Auto from Party Master"></div>
 <div class="field"><label>Ship Through <span class="req">*</span></label><input id="shipThrough" list="shipThroughList" class="titleCaseField" autocomplete="off" onchange="shipChanged();syncShippingSection()"><datalist id="shipThroughList"></datalist></div>
 <div class="field"><label>INSH Amount <span class="req">*</span></label><input type="number" id="inshAmount"></div>
@@ -178,29 +286,36 @@ if(window.self!==window.top){
 <div class="field hidden" id="priceWrap"><label>Price <span class="req">*</span></label><input type="number" id="price"></div>
 <div class="field span2"><label>Self Remark</label><textarea id="selfRemark" placeholder="Optional • Secret/Code"></textarea>
 </div><div class="field span2"><label>Client Remark</label><textarea id="clientRemark"></textarea></div>
-<div class="field"><label>Slip Fill By <span class="req">*</span></label><select class="person" id="slipFillBy" data-time="slipFillTime" data-event="Slip Fill By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="slipFillTime" readonly></div>
+<div class="field"><label>Slip Owner <span class="req">*</span></label><select class="person" id="slipFillBy" data-time="slipFillTime" data-event="Slip Owner" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('slipFillBy')">🔄 Transfer</button></div><div class="field"><label>Slip Start Time <span class="req">*</span></label><input id="slipFillTime" readonly></div>
 <div class="field"><label>Parcel Given By <span class="req">*</span></label><select class="person" id="parcelGivenBy" data-time="parcelGivenTime" data-event="Parcel Given By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="parcelGivenTime" readonly></div>
-<div class="field"><label>PKT Change Required <span class="req">*</span></label><select id="dispatchPktRequired" onchange="dispatchPktRule()"><option value="">Select</option><option>YES</option><option>NO</option></select></div><div class="field"><label>Handover To Prepare <span class="req">*</span></label><select class="person" id="handoverToPrepare" data-time="prepareTime" data-event="Handover To Prepare" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="prepareTime" readonly></div>
+<div class="field"><label>PKT Change Required <span class="req">*</span></label><select id="dispatchPktRequired" onchange="dispatchPktRule()"><option value="">Select</option><option>YES</option><option>NO</option></select></div><div class="field"><label>Handover To Weight Check &amp; PKT Change <span class="req">*</span></label><select class="person" id="handoverToPrepare" data-time="prepareTime" data-event="Handover To Weight Check &amp; PKT Change" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToPrepare')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="prepareTime" readonly></div>
 </div></div></section>
 <section class="card hidden" id="section1A"><h3>1-A. DLC / Delivery Challan</h3><div class="body"><div class="grid">
 <div class="field"><label>Delivery Challan Required <span class="req">*</span></label><select id="deliveryChallanRequired"><option>YES</option><option>NO</option></select></div><div class="field"><label>Item Name <span class="req">*</span></label><input id="dlcItem"></div><div class="field"><label>Price in DLC <span class="req">*</span></label><input type="number" id="dlcPrice"></div><div class="field"><label>Remark 1</label><input id="remark1"></div><div class="field"><label>Remark 2</label><input id="remark2"></div><div class="field"><label>Remark 3</label><input id="remark3"></div>
 </div></div></section>
 <section class="card"><h3>2. Weight & Checking</h3><div class="body"><div class="grid">
-<div class="field hidden" id="dispatchPktByWrap"><label>PKT Change By <span class="req">*</span></label><select class="person" id="dispatchPktBy" data-time="dispatchPktTime" data-event="PKT Change By" onchange="personChanged(this)"></select></div>
+<div class="field full"><label>Handed Over By (Section 1)</label><input id="handoverPrepareRef" readonly><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToPrepare')">🔄 Transfer</button></div>
+<div class="field hidden" id="dispatchPktByWrap"><label>PKT Change By <span class="req">*</span></label><select class="person" id="dispatchPktBy" data-time="dispatchPktTime" data-event="PKT Change By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('dispatchPktBy')">🔄 Transfer</button></div>
 <div class="field hidden" id="dispatchPktTimeWrap"><label>Time <span class="req">*</span></label><input id="dispatchPktTime" readonly></div>
-<div class="field"><label>Weight Checked By <span class="req">*</span></label><select class="person" id="weightCheckedBy" data-time="weightCheckedTime" data-event="Weight Checked By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="weightCheckedTime" readonly></div>
-<div class="field"><label>Lines & Tags Checked By <span class="req">*</span></label><select class="person" id="linesTagsCheckedBy" data-time="linesTagsTime" data-event="Lines & Tags Checked By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="linesTagsTime" readonly></div>
+<div class="field"><label>Weight Checked By <span class="req">*</span></label><select class="person" id="weightCheckedBy" data-time="weightCheckedTime" data-event="Weight Checked By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('weightCheckedBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="weightCheckedTime" readonly></div>
+<div class="field"><label>Lines & Tags Checked By <span class="req">*</span></label><select class="person" id="linesTagsCheckedBy" data-time="linesTagsTime" data-event="Lines & Tags Checked By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('linesTagsCheckedBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="linesTagsTime" readonly></div>
+<div class="field"><label>Handover To Noting <span class="req">*</span></label><select class="person" id="handoverToNoting" data-time="notingTime" data-event="Handover To Noting" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToNoting')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="notingTime" readonly></div>
 
 </div></div></section>
-<section class="card"><h3>3. Noting</h3><div class="body"><div class="grid"><div class="field"><label>Handover To Noting <span class="req">*</span></label><select class="person" id="handoverToNoting" data-time="notingTime" data-event="Handover To Noting" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="notingTime" readonly></div><div class="field"><label>Noted By <span class="req">*</span></label><select class="person" id="notedBy" data-time="notedTime" data-event="Noted By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="notedTime" readonly></div><div class="field"><label>No. of Items Noted <span class="req">*</span></label><input type="number" id="itemsNoted"></div></div></div></section>
-<section class="card"><h3>4. Recheck & Packing</h3><div class="body"><div class="grid"><div class="field"><label>Handover To Recheck <span class="req">*</span></label><select class="person" id="handoverToRecheck" data-time="recheckTime" data-event="Handover To Recheck" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="recheckTime" readonly></div><div class="field"><label>Handover To Packing <span class="req">*</span></label><select class="person" id="handoverToPacking" data-time="packingHandoverTime" data-event="Handover To Packing" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="packingHandoverTime" readonly></div></div></div></section>
+<section class="card"><h3>3. Noting</h3><div class="body"><div class="grid">
+<div class="field full"><label>Handed Over By (Section 2)</label><input id="handoverNotingRef" readonly><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToNoting')">🔄 Transfer</button></div>
+<div class="field"><label>Noted By <span class="req">*</span></label><select class="person" id="notedBy" data-time="notedTime" data-event="Noted By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('notedBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="notedTime" readonly></div><div class="field"><label>No. of Items Noted <span class="req">*</span></label><input type="number" id="itemsNoted"></div><div class="field"><label>Handover To Recheck <span class="req">*</span></label><select class="person" id="handoverToRecheck" data-time="recheckTime" data-event="Handover To Recheck" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToRecheck')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="recheckTime" readonly></div></div></div></section>
+<section class="card"><h3>4. Recheck & Packing</h3><div class="body"><div class="grid">
+<div class="field full"><label>Handed Over By (Section 3)</label><input id="handoverRecheckRef" readonly><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToRecheck')">🔄 Transfer</button></div>
+<div class="field"><label>Actual Recheck By <span class="req">*</span></label><select class="person" id="recheckedBy" data-time="actualRecheckTime" data-event="Actual Recheck By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('recheckedBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="actualRecheckTime" readonly></div><div class="field"><label>Handover To Packing <span class="req">*</span></label><select class="person" id="handoverToPacking" data-time="packingHandoverTime" data-event="Handover To Packing" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToPacking')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="packingHandoverTime" readonly></div></div></div></section>
 <section class="card"><h3>5. Final Packing</h3><div class="body"><div class="grid">
-<div class="field"><label>Item Packed By <span class="req">*</span></label><select class="person" id="itemPackedBy" data-time="packedTime" data-event="Item Packed By" onchange="personChanged(this)"></select></div>
+<div class="field full"><label>Handed Over By (Section 4)</label><input id="handoverPackingRef" readonly><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToPacking')">🔄 Transfer</button></div>
+<div class="field"><label>Item Packed By <span class="req">*</span></label><select class="person" id="itemPackedBy" data-time="packedTime" data-event="Item Packed By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('itemPackedBy')">🔄 Transfer</button></div>
 <div class="field"><label>Time <span class="req">*</span></label><input id="packedTime" readonly></div>
 <div class="field"><label>No. Items Packed <span class="req">*</span></label><input type="number" id="itemsPacked"></div>
-<div class="field"><label>Address Given By <span class="req">*</span></label><select class="person" id="addressGivenBy" data-time="addressTime" data-event="Address Given By" onchange="personChanged(this)"></select></div>
-<div class="field"><label>Time <span class="req">*</span></label><input id="addressTime" readonly></div>
+<div class="field span2"><label>Delivery Address <span class="req">*</span></label><textarea id="deliveryAddress" readonly placeholder="Auto from Party Master — Ship To select karte hi aa jayega"></textarea></div>
 <div class="field"><label>Parcel Weight (GR) <span class="req">*</span></label><input type="number" id="parcelWeight" oninput="syncShippingSection()"></div>
+<div class="field span2 no-print"><label>Packed Parcel Photo <span class="req">*</span></label><input type="hidden" id="packPhotoData"><input type="file" id="packPhotoInput" accept="image/*" capture="environment" onchange="handlePackPhoto(this)"><div class="note" id="packPhotoStatus"></div><img id="packPhotoPreview" class="hidden" style="max-width:160px;border-radius:8px;margin-top:6px;display:block"></div>
 </div></div></section>
 
 <section class="card"><h3>6. Courier / Shipping Dispatch</h3><div class="body"><div class="grid">
@@ -211,9 +326,7 @@ if(window.self!==window.top){
 <input id="courierName" list="courierNameList" class="titleCaseField" autocomplete="off">
 <datalist id="courierNameList"></datalist></div>
 
-<div class="field"><label>Party Name <span class="req">*</span></label><input id="shippingPartyName" readonly></div>
 <div class="field"><label>Location / Destination</label><input id="shippingLocation" class="titleCaseField" placeholder="City / destination"></div>
-<div class="field"><label>Parcel Weight (GR) <span class="req">*</span></label><input type="number" id="shippingWeight" readonly></div>
 
 <div class="field"><label>Insurance <span class="req">*</span></label>
 <select id="shippingInsurance" onchange="shippingInsuranceRule()">
@@ -230,7 +343,7 @@ if(window.self!==window.top){
 <div class="field"><label>Handover Time <span class="req">*</span></label><input id="parcelHandoverTime" readonly></div>
 
 <div class="field"><label>Courier Slip Received By</label>
-<select class="person" id="courierSlipReceivedBy" data-time="courierSlipReceivedTime" data-event="Courier Slip Received By" onchange="personChanged(this)"></select></div>
+<select class="person" id="courierSlipReceivedBy" data-time="courierSlipReceivedTime" data-event="Courier Slip Received By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('courierSlipReceivedBy')">🔄 Transfer</button></div>
 <div class="field"><label>Slip Received Time</label><input id="courierSlipReceivedTime" readonly></div>
 
 <div class="field"><label>Final Status <span class="req">*</span></label>
@@ -257,12 +370,40 @@ if(window.self!==window.top){
 <div id="workflowStatus" class="note" style="margin-top:10px"></div>
 </div></section>
 
-<div class="save"><span id="autoSaveTag" class="note" style="margin-right:auto"></span><button class="btn secondary" onclick="newParcel()">Clear</button><button class="btn primary" onclick="printSlip()">🖨 Print Slip</button><button class="btn primary" onclick="saveParcel()">💾 SAVE PARCEL</button></div>
+<div class="save"><span id="autoSaveTag" class="note" style="margin-right:auto"></span><button class="btn secondary" onclick="newParcel()">Clear</button><button class="btn primary" onclick="printSlip()">🖨 Print Slip</button></div>
 <div class="no-print" style="margin-top:16px"><button class="btn secondary" onclick="openRecordType('dispatch')">📋 VIEW DISPATCH SAVED RECORDS</button></div>
 </div>
 </div>
 <div id="returnModule" class="hidden">
-<section class="card"><h3>↩ PARCEL RETURN RECORD</h3><div class="body"><div class="note">Separate Return Module • Universal Users • Auto Time</div></div></section>
+<div id="returnListView">
+<div class="no-print" style="margin-bottom:14px"><button class="btn primary" style="font-size:15px;padding:14px 18px" onclick="startNewReturn()">＋ New Return Slip</button></div>
+<section class="card" id="returnHistoryCard" style="margin-top:0">
+  <h3>Recent Return Records</h3>
+  <div class="body">
+    <div class="recordFilters">
+<input id="returnSearch" placeholder="Search Return ID / Party / Courier / User / Remark" oninput="renderReturnHistory()">
+<select id="returnPartyFilter" onchange="renderReturnHistory()"><option value="">All Parties</option></select>
+<select id="returnCourierFilter" onchange="renderReturnHistory()"><option value="">All Couriers</option></select>
+<select id="returnUserFilter" onchange="renderReturnHistory()"><option value="">All Users</option></select>
+<input type="date" id="returnDateFrom" onchange="renderReturnHistory()" title="From Date">
+<input type="date" id="returnDateTo" onchange="renderReturnHistory()" title="To Date">
+<button class="btn secondary small" type="button" onclick="clearReturnFilters()">Clear Filters</button>
+<button class="btn secondary small" type="button" onclick="exportReturnCSV()">⬇ Export CSV</button>
+</div>
+<div class="recordSummary" id="returnRecordSummary"></div>
+    <div class="table desktopRecords">
+<table>
+<thead><tr><th>Return ID</th><th>Date</th><th>Party</th><th>Courier</th><th>User / Doer</th><th>Status</th><th>Saved At</th><th>Action</th></tr></thead>
+<tbody id="returnHistory"></tbody>
+</table>
+</div>
+<div id="returnMobileCards" class="mobileRecordCards"></div>
+  </div>
+</section>
+</div>
+<div id="returnFormView" class="hidden">
+<div class="no-print" style="margin-bottom:12px"><button class="btn secondary" onclick="showReturnListView()">← Back to Records</button></div>
+<section class="card"><h3>↩ PARCEL RETURN RECORD<span id="returnIdTag" style="float:right;font-size:12px;font-weight:700;color:var(--p)"></span></h3><div class="body"><div class="note">Separate Return Module • Universal Users • Auto Time</div></div></section>
 
 <section class="card"><h3>1. Parcel Receive & Handover</h3><div class="body"><div class="grid">
 <div class="field"><label>Date <span class="req">*</span></label><input type="date" id="returnDate"></div>
@@ -294,31 +435,8 @@ if(window.self!==window.top){
 <div class="field"><label>Stock Goods Put in Boxes - Name <span class="req">*</span></label><select class="returnPerson" id="stockBoxesBy" data-time="stockBoxesTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="stockBoxesTime" readonly></div>
 <div class="field full"><label>Remarks</label><textarea id="returnRemarks"></textarea></div>
 </div></div></section>
-<div class="no-print" style="margin:14px 0"><button class="btn secondary" onclick="openRecordType('return')">📋 VIEW RETURN SAVED RECORDS</button></div>
 <div class="save"><button class="btn secondary" onclick="clearReturn()">Clear Return</button><button class="btn primary" onclick="printReturn()">🖨 Print Return Slip</button><button class="btn primary" onclick="saveReturn()">💾 SAVE RETURN</button></div>
-
-<section class="card" id="returnHistoryCard" style="margin-top:10px">
-  <h3>Recent Return Records</h3>
-  <div class="body">
-    <div class="recordFilters">
-<input id="returnSearch" placeholder="Search Return ID / Party / Courier / User / Remark" oninput="renderReturnHistory()">
-<select id="returnPartyFilter" onchange="renderReturnHistory()"><option value="">All Parties</option></select>
-<select id="returnCourierFilter" onchange="renderReturnHistory()"><option value="">All Couriers</option></select>
-<select id="returnUserFilter" onchange="renderReturnHistory()"><option value="">All Users</option></select>
-<input type="date" id="returnDateFrom" onchange="renderReturnHistory()" title="From Date">
-<input type="date" id="returnDateTo" onchange="renderReturnHistory()" title="To Date">
-<button class="btn secondary small" type="button" onclick="clearReturnFilters()">Clear Filters</button>
 </div>
-<div class="recordSummary" id="returnRecordSummary"></div>
-    <div class="table desktopRecords">
-<table>
-<thead><tr><th>Return ID</th><th>Date</th><th>Party</th><th>Courier</th><th>User / Doer</th><th>Status</th><th>Saved At</th><th>Action</th></tr></thead>
-<tbody id="returnHistory"></tbody>
-</table>
-</div>
-<div id="returnMobileCards" class="mobileRecordCards"></div>
-  </div>
-</section>
 
 </div></main>
 
@@ -402,10 +520,22 @@ if(window.self!==window.top){
 <div class="modal hidden" id="auditModal"><div class="box" style="width:min(1000px,100%)">
 <div class="mh"><b>📜 Complete Audit Trail</b><button class="btn secondary small" onclick="closeAuditTrail()">✕</button></div>
 <div class="mb">
+<div id="transferSummaryBox" style="margin-bottom:14px"></div>
 <div class="row" style="margin-bottom:10px">
 <input id="auditSearch" placeholder="Search field / user / value / parcel" oninput="renderAuditTrail()" style="flex:1">
 </div>
-<div class="table"><table><thead><tr><th>Time</th><th>Parcel</th><th>User</th><th>Field</th><th>Old Value</th><th>New Value</th><th>Action</th></tr></thead><tbody id="auditBody"></tbody></table></div>
+<div class="note" style="margin-bottom:6px">🔁 = Transfer &nbsp; 🔒 = Post-lock correction (red row)</div>
+<div class="table"><table><thead><tr><th>Time</th><th>Parcel</th><th>User</th><th>Field</th><th>Old Value</th><th>New Value</th><th>Action</th><th>Reason</th></tr></thead><tbody id="auditBody"></tbody></table></div>
+</div></div></div>
+
+<div class="modal hidden" id="transferTaskModal"><div class="box" style="width:min(440px,100%)">
+<div class="mh"><b id="transferTaskTitle">🔄 Transfer Task</b><button class="btn secondary small" onclick="closeTransferTask()">✕</button></div>
+<div class="mb">
+<div class="field"><label>Doer busy hai — Naya Doer <span class="req">*</span></label><select id="transferNewDoer"></select></div>
+<div class="field" style="margin-top:10px"><label>Reason for Transfer <span class="req">*</span></label><textarea id="transferReason" placeholder="e.g. Busy with another parcel, On leave, Urgent elsewhere"></textarea></div>
+<button class="btn primary" style="margin-top:12px" onclick="confirmTransferTask()">Transfer Task</button>
+<div class="note" style="margin-top:8px">Naye Doer ko WhatsApp par turant notify kiya jayega. Ye transfer Audit Trail me reason ke saath record hoga.</div>
+<div id="transferHistoryList"></div>
 </div></div></div>
 
 <div class="toast" id="toast"></div>
@@ -509,6 +639,9 @@ function pdStartRecordsSync(){
     const arr=[];snap.forEach(d=>arr.push(d.data()));
     localStorage.setItem(K.records,JSON.stringify(arr));
     try{if(typeof renderHistory==='function')renderHistory();}catch(e){}
+    if(window._pendingOpenParcelId && arr.some(x=>x.parcelId===window._pendingOpenParcelId)){
+      openFromLink(window._pendingOpenParcelId);
+    }
   },err=>{console.error('pd records sync error',err);pdSetFirebaseStatus('error',err.message);});
 }
 async function pdPushReturnToCloud(record){
@@ -541,29 +674,29 @@ let msgSettings=JSON.parse(localStorage.getItem('pd_message_settings_v1')||'null
 
 const WA_TEMPLATE_KEY='pd_whatsapp_templates_v2';
 const DEFAULT_WA_TEMPLATES=[
-{id:'parcel_created',name:'Parcel Created',category:'Dispatch',text:'📦 Parcel Created\nParcel ID: {ParcelID}\nParty: {Party}\nBroker: {Broker}\nShip Through: {ShipThrough}\nDate: {DispatchDate}\nCreated/Updated By: {LoginUser}'},
-{id:'slip_filled',name:'Slip Fill Completed',category:'Dispatch',text:'📝 Slip Fill Completed\nParcel ID: {ParcelID}\nParty: {Party}\nSlip Fill By: {SlipFillBy}\nTime: {SlipFillTime}'},
-{id:'parcel_given',name:'Parcel Given / Handover',category:'Dispatch',text:'📦 Parcel Given\nParcel ID: {ParcelID}\nParty: {Party}\nParcel Given By: {ParcelGivenBy}\nTime: {ParcelGivenTime}'},
-{id:'pkt_change_required',name:'PKT Change Required',category:'Dispatch',text:'🔁 PKT Change Required\nParcel ID: {ParcelID}\nParty: {Party}\nRequired: {PKTRequired}\nChanged By: {PKTChangeBy}\nTime: {PKTChangeTime}'},
-{id:'handover_prepare',name:'Handover To Prepare',category:'Dispatch',text:'➡️ Handover To Prepare\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverPrepare}\nTime: {PrepareTime}'},
-{id:'weight_checked',name:'Weight Checked',category:'Dispatch',text:'⚖️ Weight Check Completed\nParcel ID: {ParcelID}\nParty: {Party}\nWeight Checked By: {WeightCheckedBy}\nTime: {WeightCheckedTime}'},
-{id:'lines_tags_checked',name:'Lines & Tags Checked',category:'Dispatch',text:'🏷️ Lines & Tags Check Completed\nParcel ID: {ParcelID}\nParty: {Party}\nChecked By: {LinesTagsCheckedBy}\nTime: {LinesTagsTime}'},
-{id:'handover_noting',name:'Handover To Noting',category:'Dispatch',text:'➡️ Handover To Noting\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverNoting}\nTime: {NotingTime}'},
-{id:'noting_done',name:'Noting Completed',category:'Dispatch',text:'✅ Noting Completed\nParcel ID: {ParcelID}\nParty: {Party}\nNoted By: {NotedBy}\nNo. of Items: {ItemsNoted}\nTime: {NotedTime}'},
-{id:'handover_recheck',name:'Handover To Recheck',category:'Dispatch',text:'🔎 Handover To Recheck\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverRecheck}\nTime: {RecheckTime}'},
-{id:'handover_packing',name:'Handover To Packing',category:'Dispatch',text:'📦 Handover To Packing\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverPacking}\nTime: {PackingHandoverTime}'},
-{id:'item_packed',name:'Item Packed',category:'Dispatch',text:'📦 Item Packed\nParcel ID: {ParcelID}\nParty: {Party}\nPacked By: {ItemPackedBy}\nItems Packed: {ItemsPacked}\nParcel Weight: {ParcelWeight} GR\nTime: {PackedTime}'},
-{id:'address_given',name:'Address Given',category:'Dispatch',text:'📍 Address Given\nParcel ID: {ParcelID}\nParty: {Party}\nAddress Given By: {AddressGivenBy}\nTime: {AddressTime}'},
+{id:'parcel_created',name:'Parcel Created',category:'Dispatch',text:'📦 Parcel Created\nParcel ID: {ParcelID}\nParty: {Party}\nBroker: {Broker}\nShip Through: {ShipThrough}\nDate: {DispatchDate}\nCreated/Updated By: {LoginUser}\n\n👉 {OpenLink}'},
+{id:'slip_filled',name:'Slip Fill Completed',category:'Dispatch',text:'📝 Slip Fill Completed\nParcel ID: {ParcelID}\nParty: {Party}\nSlip Fill By: {SlipFillBy}\nTime: {SlipFillTime}\n\n👉 {OpenLink}'},
+{id:'parcel_given',name:'Parcel Given / Handover',category:'Dispatch',text:'📦 Parcel Given\nParcel ID: {ParcelID}\nParty: {Party}\nParcel Given By: {ParcelGivenBy}\nTime: {ParcelGivenTime}\n\n👉 {OpenLink}'},
+{id:'pkt_change_required',name:'PKT Change Required',category:'Dispatch',text:'🔁 PKT Change Required\nParcel ID: {ParcelID}\nParty: {Party}\nRequired: {PKTRequired}\nChanged By: {PKTChangeBy}\nTime: {PKTChangeTime}\n\n👉 {OpenLink}'},
+{id:'handover_prepare',name:'Handover To Prepare',category:'Dispatch',text:'➡️ Handover To Prepare\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverPrepare}\nTime: {PrepareTime}\n\n👉 {OpenLink}'},
+{id:'weight_checked',name:'Weight Checked',category:'Dispatch',text:'⚖️ Weight Check Completed\nParcel ID: {ParcelID}\nParty: {Party}\nWeight Checked By: {WeightCheckedBy}\nTime: {WeightCheckedTime}\n\n👉 {OpenLink}'},
+{id:'lines_tags_checked',name:'Lines & Tags Checked',category:'Dispatch',text:'🏷️ Lines & Tags Check Completed\nParcel ID: {ParcelID}\nParty: {Party}\nChecked By: {LinesTagsCheckedBy}\nTime: {LinesTagsTime}\n\n👉 {OpenLink}'},
+{id:'handover_noting',name:'Handover To Noting',category:'Dispatch',text:'➡️ Handover To Noting\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverNoting}\nTime: {NotingTime}\n\n👉 {OpenLink}'},
+{id:'noting_done',name:'Noting Completed',category:'Dispatch',text:'✅ Noting Completed\nParcel ID: {ParcelID}\nParty: {Party}\nNoted By: {NotedBy}\nNo. of Items: {ItemsNoted}\nTime: {NotedTime}\n\n👉 {OpenLink}'},
+{id:'handover_recheck',name:'Handover To Recheck',category:'Dispatch',text:'🔎 Handover To Recheck\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverRecheck}\nTime: {RecheckTime}\n\n👉 {OpenLink}'},
+{id:'handover_packing',name:'Handover To Packing',category:'Dispatch',text:'📦 Handover To Packing\nParcel ID: {ParcelID}\nParty: {Party}\nHandover To: {HandoverPacking}\nTime: {PackingHandoverTime}\n\n👉 {OpenLink}'},
+{id:'item_packed',name:'Item Packed',category:'Dispatch',text:'📦 Item Packed\nParcel ID: {ParcelID}\nParty: {Party}\nPacked By: {ItemPackedBy}\nItems Packed: {ItemsPacked}\nParcel Weight: {ParcelWeight} GR\nTime: {PackedTime}\n\n👉 {OpenLink}'},
+{id:'address_given',name:'Delivery Address',category:'Dispatch',text:'📍 Delivery Address\nParcel ID: {ParcelID}\nParty: {Party}\nAddress: {DeliveryAddress}\n\n👉 {OpenLink}'},
 
-{id:'ready_dispatch',name:'Ready For Dispatch',category:'Courier',text:'✅ Ready For Dispatch\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nWeight: {ShippingWeight} GR\nShipping Date: {ShippingDate}'},
-{id:'courier_arrived',name:'Courier Person Arrived',category:'Courier',text:'🚚 Courier Person Arrived\nParcel ID: {ParcelID}\nParty: {Party}\nCourier Person: {CourierPerson}\nCourier: {CourierName}'},
-{id:'parcel_handover_courier',name:'Parcel Handover To Courier',category:'Courier',text:'📤 Parcel Handover To Courier\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nHandover By: {ParcelHandoverBy}\nTime: {ParcelHandoverTime}'},
-{id:'courier_slip_received',name:'Courier Slip Received',category:'Courier',text:'🧾 Courier Slip Received\nParcel ID: {ParcelID}\nParty: {Party}\nSlip No.: {CourierSlipNo}\nReceived By: {CourierSlipReceivedBy}\nTime: {CourierSlipReceivedTime}'},
-{id:'awb_received',name:'AWB / Tracking Received',category:'Courier',text:'🔎 AWB / Tracking Received\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nExpected Delivery: {ExpectedDeliveryDate}'},
-{id:'insurance',name:'Insurance Details',category:'Courier',text:'🛡️ Insurance Details\nParcel ID: {ParcelID}\nParty: {Party}\nInsurance: {Insurance}\nInsurance Amount: {InsuranceAmount}'},
-{id:'dispatched',name:'Parcel Dispatched',category:'Courier',text:'🚚 Parcel Dispatched\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nShipping Date: {ShippingDate}\nExpected Delivery: {ExpectedDeliveryDate}'},
-{id:'delivery_pending',name:'Delivery Confirmation Pending',category:'Courier',text:'⏳ Delivery Confirmation Pending\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nExpected Delivery: {ExpectedDeliveryDate}'},
-{id:'delivered_closed',name:'Delivered / Closed',category:'Courier',text:'✅ Parcel Delivered / Closed\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nFinal Status: {FinalStatus}'},
+{id:'ready_dispatch',name:'Ready For Dispatch',category:'Courier',text:'✅ Ready For Dispatch\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nWeight: {ShippingWeight} GR\nShipping Date: {ShippingDate}\n\n👉 {OpenLink}'},
+{id:'courier_arrived',name:'Courier Person Arrived',category:'Courier',text:'🚚 Courier Person Arrived\nParcel ID: {ParcelID}\nParty: {Party}\nCourier Person: {CourierPerson}\nCourier: {CourierName}\n\n👉 {OpenLink}'},
+{id:'parcel_handover_courier',name:'Parcel Handover To Courier',category:'Courier',text:'📤 Parcel Handover To Courier\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nHandover By: {ParcelHandoverBy}\nTime: {ParcelHandoverTime}\n\n👉 {OpenLink}'},
+{id:'courier_slip_received',name:'Courier Slip Received',category:'Courier',text:'🧾 Courier Slip Received\nParcel ID: {ParcelID}\nParty: {Party}\nSlip No.: {CourierSlipNo}\nReceived By: {CourierSlipReceivedBy}\nTime: {CourierSlipReceivedTime}\n\n👉 {OpenLink}'},
+{id:'awb_received',name:'AWB / Tracking Received',category:'Courier',text:'🔎 AWB / Tracking Received\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nExpected Delivery: {ExpectedDeliveryDate}\n\n👉 {OpenLink}'},
+{id:'insurance',name:'Insurance Details',category:'Courier',text:'🛡️ Insurance Details\nParcel ID: {ParcelID}\nParty: {Party}\nInsurance: {Insurance}\nInsurance Amount: {InsuranceAmount}\n\n👉 {OpenLink}'},
+{id:'dispatched',name:'Parcel Dispatched',category:'Courier',text:'🚚 Parcel Dispatched\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nShipping Date: {ShippingDate}\nExpected Delivery: {ExpectedDeliveryDate}\n\n👉 {OpenLink}'},
+{id:'delivery_pending',name:'Delivery Confirmation Pending',category:'Courier',text:'⏳ Delivery Confirmation Pending\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nExpected Delivery: {ExpectedDeliveryDate}\n\n👉 {OpenLink}'},
+{id:'delivered_closed',name:'Delivered / Closed',category:'Courier',text:'✅ Parcel Delivered / Closed\nParcel ID: {ParcelID}\nParty: {Party}\nCourier: {CourierName}\nAWB: {AWB}\nFinal Status: {FinalStatus}\n\n👉 {OpenLink}'},
 
 {id:'return_received',name:'Return Parcel Received',category:'Return',text:'↩️ Return Parcel Received\nReturn From: {ReturnFrom}\nReturn Through: {ReturnThrough}\nReceived By: {ReturnReceiveBy}\nTime: {ReturnReceiveTime}'},
 {id:'return_checking_handover',name:'Return Handover For Checking',category:'Return',text:'➡️ Return Handover For Checking\nReturn From: {ReturnFrom}\nHandover To: {ReturnCheckingBy}\nTime: {ReturnCheckingTime}'},
@@ -575,13 +708,13 @@ const DEFAULT_WA_TEMPLATES=[
 {id:'return_pkt_change',name:'Return PKT / Tag Change',category:'Return',text:'🔁 Return PKT / Tag Change\nReturn From: {ReturnFrom}\nRequired: {ReturnPKTRequired}\nChanged By: {ReturnPKTBy}\nTime: {ReturnPKTTime}'},
 {id:'stock_boxes',name:'Stock Goods Put In Boxes',category:'Return',text:'📦 Stock Goods Put In Boxes\nReturn From: {ReturnFrom}\nDone By: {StockBoxesBy}\nTime: {StockBoxesTime}'},
 
-{id:'task_assigned',name:'Task Assigned',category:'Task',text:'📌 Task Assigned\nParcel ID: {ParcelID}\nParty: {Party}\nTask: {CustomTask}\nAssigned To: {SelectedUser}\nAssigned By: {LoginUser}'},
-{id:'task_reminder',name:'Pending Task Reminder',category:'Task',text:'⏰ Pending Task Reminder\nParcel ID: {ParcelID}\nParty: {Party}\nTask: {CustomTask}\nPlease complete the pending task.'},
-{id:'stage_locked',name:'Stage Locked',category:'Control',text:'🔒 Stage Locked\nParcel ID: {ParcelID}\nParty: {Party}\nStage: {CustomStage}\nLocked By: {LoginUser}\nTime: {CurrentTime}'},
-{id:'stage_unlocked',name:'Stage Unlocked By Admin',category:'Control',text:'🔓 Stage Unlocked\nParcel ID: {ParcelID}\nParty: {Party}\nStage: {CustomStage}\nUnlocked By: {LoginUser}\nTime: {CurrentTime}'},
-{id:'correction_request',name:'Correction Request',category:'Control',text:'✏️ Correction Request\nParcel ID: {ParcelID}\nParty: {Party}\nField / Stage: {CustomStage}\nReason: {CustomReason}\nRequested By: {LoginUser}'},
-{id:'urgent',name:'Urgent Parcel Alert',category:'Alert',text:'🚨 URGENT PARCEL\nParcel ID: {ParcelID}\nParty: {Party}\nCurrent Stage: {CustomStage}\nRemark: {CustomReason}'},
-{id:'custom',name:'Custom Message',category:'Custom',text:'{CustomMessage}'}
+{id:'task_assigned',name:'Task Assigned',category:'Task',text:'📌 Task Assigned\nParcel ID: {ParcelID}\nParty: {Party}\nTask: {CustomTask}\nAssigned To: {SelectedUser}\nAssigned By: {LoginUser}\n\n👉 {OpenLink}'},
+{id:'task_reminder',name:'Pending Task Reminder',category:'Task',text:'⏰ Pending Task Reminder\nParcel ID: {ParcelID}\nParty: {Party}\nTask: {CustomTask}\nPlease complete the pending task.\n\n👉 {OpenLink}'},
+{id:'stage_locked',name:'Stage Locked',category:'Control',text:'🔒 Stage Locked\nParcel ID: {ParcelID}\nParty: {Party}\nStage: {CustomStage}\nLocked By: {LoginUser}\nTime: {CurrentTime}\n\n👉 {OpenLink}'},
+{id:'stage_unlocked',name:'Stage Unlocked By Admin',category:'Control',text:'🔓 Stage Unlocked\nParcel ID: {ParcelID}\nParty: {Party}\nStage: {CustomStage}\nUnlocked By: {LoginUser}\nTime: {CurrentTime}\n\n👉 {OpenLink}'},
+{id:'correction_request',name:'Correction Request',category:'Control',text:'✏️ Correction Request\nParcel ID: {ParcelID}\nParty: {Party}\nField / Stage: {CustomStage}\nReason: {CustomReason}\nRequested By: {LoginUser}\n\n👉 {OpenLink}'},
+{id:'urgent',name:'Urgent Parcel Alert',category:'Alert',text:'🚨 URGENT PARCEL\nParcel ID: {ParcelID}\nParty: {Party}\nCurrent Stage: {CustomStage}\nRemark: {CustomReason}\n\n👉 {OpenLink}'},
+{id:'custom',name:'Custom Message',category:'Custom',text:'{CustomMessage}\n\n👉 {OpenLink}'}
 ];
 let waTemplates=JSON.parse(localStorage.getItem(WA_TEMPLATE_KEY)||'null');
 if(!Array.isArray(waTemplates)||!waTemplates.length){
@@ -625,13 +758,25 @@ document.addEventListener('DOMContentLoaded',()=>{ensureDoerMaster();ensureUserP
   }
   shipTo=clientMaster.map(x=>x.party);
   populate();
-  const activeDraftId=localStorage.getItem(ACTIVE_DRAFT_KEY);
-  const activeDraftExists=activeDraftId&&JSON.parse(localStorage.getItem(K.records)||'[]').some(x=>x.parcelId===activeDraftId);
-  if(activeDraftExists){editRecord(activeDraftId,true);toast('Continuing last slip: '+activeDraftId);}
-  else newParcel();
+  const openId=new URLSearchParams(location.search).get('open');
+  if(openId){
+    window._pendingOpenParcelId=openId;
+    const existing=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===openId);
+    if(existing){openFromLink(openId)}else{newParcel();toast('Slip load ho rahi hai…')}
+  }else{
+    const activeDraftId=localStorage.getItem(ACTIVE_DRAFT_KEY);
+    const activeDraftExists=activeDraftId&&JSON.parse(localStorage.getItem(K.records)||'[]').some(x=>x.parcelId===activeDraftId);
+    if(activeDraftExists){editRecord(activeDraftId,true);toast('Continuing last slip: '+activeDraftId);}
+    else newParcel();
+  }
   renderHistory();
   pdStartRecordsSync();
 });
+function openFromLink(parcelId){
+  editRecord(parcelId);
+  window._pendingOpenParcelId=null;
+  if(history.replaceState)history.replaceState(null,'',location.pathname);
+}
 function saveMasters(){localStorage.setItem(K.users,JSON.stringify(users));localStorage.setItem(K.shipto,JSON.stringify(shipTo));localStorage.setItem(K.shipthrough,JSON.stringify(shipThrough));localStorage.setItem(K.api,JSON.stringify(api));pdSyncUsersToCloud();}
 function options(arr,val=x=>x,label=x=>x){return '<option value="">Select</option>'+arr.map(x=>`<option value="${esc(val(x))}">${esc(label(x))}</option>`).join('')}
 function populate(){ensureDoerMaster();document.querySelectorAll('.person').forEach(s=>{let old=s.value;let au=users.filter(u=>u.active!==false);s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});$('shipThroughList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('courierNameList'))$('courierNameList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');renderShipToMenu('')}
@@ -639,7 +784,23 @@ function now(){return new Date().toLocaleString('en-IN',{day:'2-digit',month:'sh
 function personChanged(s){
   let t=$(s.dataset.time);
   if(!s.value){if(t)t.value='';return}
-  if(!canSelectWorker(s,s.value)){s.value='';if(t)t.value='';let inp=getComboInput(s);if(inp)inp.value='';return}
+  if(!canSelectWorker(s,s.value)){
+    // Wrong pick on a self-only field: snap straight back to the logged-in doer's own
+    // name (the only valid value) instead of leaving it blank — no separate "delete
+    // then reselect" step needed.
+    const actor=loggedUser();
+    let inp=getComboInput(s);
+    if(actor && isSelfOnlyField(s)){
+      s.value=actor.id;
+      if(inp)inp.value=actor.name;
+      if(t)t.value=now();
+    }else{
+      s.value='';
+      if(inp)inp.value='';
+      if(t)t.value='';
+    }
+    return;
+  }
   if(t)t.value=now();
   let u=users.find(x=>x.id===s.value);
   if(!u||!u.phone){console.warn('Selected user mobile number not saved.');return}
@@ -651,13 +812,16 @@ async function sendBackgroundWA(u,eventName){
   let phone=normalizePhone(u.phone); if(phone.length<11)return false;
   let parcel=editing||currentParcelId||'(New Parcel)';
   let client=$('shipTo').value||'-',st=$('shipThrough').value||'-',tm=now();
-  let message=`📦 Parcel Dispatch\n\nClient: ${client}\nParcel ID: ${parcel}\nShip Through: ${st}\n${eventName}: ${u.name}\nTime: ${tm}\n\nParcel update: ${eventName} completed/handed over to ${u.name}.`;
+  let message=`📦 Parcel Dispatch\n\nClient: ${client}\nParcel ID: ${parcel}\nShip Through: ${st}\n${eventName}: ${u.name}\nTime: ${tm}\n\nParcel update: ${eventName} completed/handed over to ${u.name}.\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(parcel)}`;
   let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:phone+'@c.us',message})});
   if(!r.ok){let d=await r.json().catch(()=>({}));throw new Error(d.message||d.error||('HTTP '+r.status))}
   return true;
 }
 function mask(p){p=String(p);return p.length>4?'••••••'+p.slice(-4):p}
 function normalizePhone(p){let n=String(p||'').replace(/\D/g,'');if(n.length===10)n='91'+n;return n}
+function parcelOpenLink(parcelId){
+  return 'https://bliss-gems-one.web.app/parcel-dispatched/?open='+encodeURIComponent(parcelId);
+}
 async function sendWA(){if(!waTarget)return;let id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');if(!id||!token){toast('Manage → GREEN-API me ID Instance aur API Token save karein.');return}let phone=normalizePhone(waTarget.user.phone);if(phone.length<11){toast('User mobile number valid nahi hai.');return}let btn=$('waSendBtn');btn.disabled=true;btn.textContent='Sending...';try{let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:phone+'@c.us',message:$('waMessage').value})});let data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.message||data.error||('HTTP '+r.status));closeWA();toast('WhatsApp message sent successfully.')}catch(e){toast('Message send failed: '+e.message)}finally{btn.disabled=false;btn.textContent='Send WhatsApp'}}
 function closeWA(){$('waModal').classList.add('hidden')}
 function shipChanged(){let v=($('shipThrough').value||'').toUpperCase().trim();let yes=['SECURE','SEQUEL','SQL','BVC'].includes(v);$('section1A').classList.toggle('hidden',!yes);$('deliveryChallanRequired').value=yes?'YES':'NO';if(!yes){['dlcItem','dlcPrice','remark1','remark2','remark3'].forEach(id=>$(id).value='')}}
@@ -677,8 +841,21 @@ function applyClientMaster(party){
   if(!r)return;
   $('shipTo').value=r.party;
   $('broker').value=r.broker||'';
+  if($('deliveryAddress'))$('deliveryAddress').value=r.address||'';
   syncShippingSection();
   closeShipToMenu();
+  checkDuplicateParty();
+}
+function checkDuplicateParty(){
+  const party=($('shipTo')?.value||'').trim();
+  const myId=editing||currentParcelId;
+  if(!party)return;
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]');
+  const today=new Date().toISOString().slice(0,10);
+  const dupes=all.filter(x=>x.parcelId!==myId && String(x.shipTo||'').trim().toLowerCase()===party.toLowerCase() && (x.dispatchDate||'')===today);
+  if(dupes.length){
+    toast('⚠ '+party+' ke liye aaj ek aur slip already ban chuki hai ('+dupes.map(x=>x.parcelId).join(', ')+') — double-entry check kar lein.');
+  }
 }
 function renderShipToMenu(q=''){
   const menu=$('shipToMenu');
@@ -693,8 +870,8 @@ function renderShipToMenu(q=''){
       <small style="display:block;opacity:.72">Broker: ${esc(x.broker||'-')}${x.partyCode?` • Code: ${esc(x.partyCode)}`:''}</small>
     </div>`).join(''):'<div class="comboOption">No matching party</div>';
 }
-function openShipToMenu(){
-  renderShipToMenu($('shipTo').value);
+function openShipToMenu(showAll){
+  renderShipToMenu(showAll ? '' : $('shipTo').value);
   const menu=$('shipToMenu'), inp=$('shipTo');
   if(!menu||!inp)return;
   menu.classList.add('show');
@@ -712,7 +889,7 @@ document.addEventListener('input',e=>{
   }
 });
 document.addEventListener('focusin',e=>{
-  if(e.target&&e.target.id==='shipTo')openShipToMenu();
+  if(e.target&&e.target.id==='shipTo'){$('shipTo').select();openShipToMenu(true);}
 });
 document.addEventListener('click',e=>{
   const opt=e.target.closest&&e.target.closest('.clientOpt');
@@ -721,8 +898,6 @@ document.addEventListener('click',e=>{
 });
 
 function syncShippingSection(){
-  if($('shippingPartyName')) $('shippingPartyName').value = $('shipTo') ? $('shipTo').value : '';
-  if($('shippingWeight')) $('shippingWeight').value = $('parcelWeight') ? $('parcelWeight').value : '';
   if($('courierNameList')) $('courierNameList').innerHTML = (shipThrough||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
   if($('courierName') && !$('courierName').value && $('shipThrough')) $('courierName').value = $('shipThrough').value || '';
 }
@@ -733,12 +908,114 @@ function shippingInsuranceRule(){
 }
 
 function newParcel(){editing=null;currentParcelId=genId();localStorage.setItem(ACTIVE_DRAFT_KEY,currentParcelId);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';document.querySelectorAll('main input,main textarea').forEach(x=>{if(x.id!=='search')x.value=''});document.querySelectorAll('main select').forEach(x=>x.value='');let d=new Date();$('dispatchDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;if($('shippingDate'))$('shippingDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();syncShippingSection();saveStageLocks({});applySequenceAndLocks();persistParcelRecord();markAutoSaved()}
+if($('slipFillTime'))$('slipFillTime').value=now();
+shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();syncShippingSection();syncPackPhotoPreview();saveStageLocks({});applySequenceAndLocks();persistParcelRecord();markAutoSaved();assignDispatchSeqIfNeeded(currentParcelId)}
 function formData(){let o={parcelId:editing||currentParcelId||genId(),createdAt:new Date().toISOString()};document.querySelectorAll('main input,main select,main textarea').forEach(e=>{if(e.id&&e.id!=='search')o[e.id]=e.value});return o}
-function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;return `PD-${ds}-${String(Date.now()).slice(-4)}`}
+function fileToCompressedDataUri(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        const maxW=900;const scale=Math.min(1,maxW/img.width);
+        const canvas=document.createElement('canvas');
+        canvas.width=img.width*scale;canvas.height=img.height*scale;
+        canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL('image/jpeg',0.6));
+      };
+      img.onerror=reject;
+      img.src=reader.result;
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+function syncPackPhotoPreview(){
+  const val=$('packPhotoData')?$('packPhotoData').value:'';
+  const prev=$('packPhotoPreview');
+  if(!prev)return;
+  if(val){prev.src=val;prev.classList.remove('hidden')}
+  else{prev.src='';prev.classList.add('hidden')}
+  if($('packPhotoStatus'))$('packPhotoStatus').textContent=val?'✓ Photo attached':'';
+}
+async function handlePackPhoto(inputEl){
+  const file=inputEl.files&&inputEl.files[0];
+  if(!file)return;
+  const statusEl=$('packPhotoStatus');
+  if(statusEl)statusEl.textContent='Compressing photo…';
+  try{
+    const dataUri=await fileToCompressedDataUri(file);
+    if($('packPhotoData'))$('packPhotoData').value=dataUri;
+    syncPackPhotoPreview();
+    if(typeof scheduleAutoSave==='function')scheduleAutoSave();
+    if(typeof applySequenceAndLocks==='function')applySequenceAndLocks();
+  }catch(e){
+    console.error('photo compress failed',e);
+    if(statusEl)statusEl.textContent='⚠ Photo attach failed, try again';
+  }
+}
+/* ===== Simple sequential Slip No. (001, 002, ...) shown to humans, separate from the
+   collision-safe parcelId/returnId used internally for Firestore doc IDs and deep links.
+   Assigned via a Firestore transaction (atomic increment) so concurrent creations on
+   different devices can never land on the same number. Dispatch and Return each get
+   their own counter. Only applies going forward — existing records keep showing their
+   current ID since they never got a sequence number. ===== */
+async function nextSeqNumber(counterId){
+  const ref=pdDb.collection('app_config').doc(counterId);
+  return await pdDb.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    const current=(snap.exists && snap.data() && snap.data().value)||0;
+    const next=current+1;
+    tx.set(ref,{value:next},{merge:true});
+    return next;
+  });
+}
+function slipLabel(x){
+  const seq=x&&(x.slipSeq||x.returnSeq);
+  if(seq)return String(seq).padStart(3,'0');
+  return (x&&(x.parcelId||x.returnId))||'';
+}
+async function assignDispatchSeqIfNeeded(parcelId){
+  try{
+    let all=JSON.parse(localStorage.getItem(K.records)||'[]');
+    let rec=all.find(x=>x.parcelId===parcelId);
+    if(!rec||rec.slipSeq)return;
+    const n=await nextSeqNumber('pd_dispatch_seq');
+    all=JSON.parse(localStorage.getItem(K.records)||'[]');
+    const idx=all.findIndex(x=>x.parcelId===parcelId);
+    if(idx<0||all[idx].slipSeq)return;
+    all[idx].slipSeq=n;
+    localStorage.setItem(K.records,JSON.stringify(all));
+    pdPushRecordToCloud(all[idx]);
+    renderHistory();
+    updateSlipNoTag();
+  }catch(e){console.error('assign dispatch slip seq failed',e);}
+}
+async function assignReturnSeqIfNeeded(returnId){
+  try{
+    let all=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]');
+    let rec=all.find(x=>x.returnId===returnId);
+    if(!rec||rec.returnSeq)return;
+    const n=await nextSeqNumber('pd_return_seq');
+    all=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]');
+    const idx=all.findIndex(x=>x.returnId===returnId);
+    if(idx<0||all[idx].returnSeq)return;
+    all[idx].returnSeq=n;
+    localStorage.setItem(RETURN_RECORDS_KEY,JSON.stringify(all));
+    pdPushReturnToCloud(all[idx]);
+    renderReturnHistory();
+    if($('returnIdTag')&&currentReturnId===returnId)$('returnIdTag').textContent='Return No: '+slipLabel(all[idx]);
+  }catch(e){console.error('assign return slip seq failed',e);}
+}
+function genId(){
+  let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  let existing=new Set(JSON.parse(localStorage.getItem(K.records)||'[]').map(x=>x.parcelId));
+  let id;
+  do{ id=`PD-${ds}-${(Date.now().toString(36)+Math.random().toString(36).slice(2,6)).slice(-6).toUpperCase()}`; }while(existing.has(id));
+  return id;
+}
 function persistParcelRecord(){let d=formData();let a=JSON.parse(localStorage.getItem(K.records)||'[]'),i=a.findIndex(x=>x.parcelId===d.parcelId);if(i>=0)a[i]={...a[i],...d};else a.unshift(d);localStorage.setItem(K.records,JSON.stringify(a));editing=d.parcelId;renderHistory();pdPushRecordToCloud(a.find(x=>x.parcelId===d.parcelId));return d}
 function markAutoSaved(){let t=$('autoSaveTag');if(t)t.textContent='✓ Saved '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}
-function saveParcel(silent){let d=formData();if(!d.dispatchDate||!d.shipTo||!d.shipThrough){if(!silent)toast('Dispatch Date, Ship To aur Ship Through required hain.');return}persistParcelRecord();if(silent)markAutoSaved();else toast('Parcel saved: '+d.parcelId)}
 function autoSaveParcel(){
   // Looser than the manual Save gate — appears in Recent Dispatch Records as soon as
   // any one identifying field is filled, so the user can find/continue it from the list too.
@@ -746,7 +1023,11 @@ function autoSaveParcel(){
   persistParcelRecord();
   markAutoSaved();
 }
-function updateSlipNoTag(){let t=$('slipNoTag');if(t)t.textContent='Slip No: '+(currentParcelId||'')}
+function updateSlipNoTag(){
+  let t=$('slipNoTag');if(!t)return;
+  let rec=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===currentParcelId);
+  t.textContent='Slip No: '+(rec?slipLabel(rec):(currentParcelId||''));
+}
 let autoSaveTimer=null;
 function scheduleAutoSave(){clearTimeout(autoSaveTimer);autoSaveTimer=setTimeout(autoSaveParcel,1200)}
 function printSlip(){
@@ -782,27 +1063,114 @@ function renderHistory(){
 
  let a=all.filter(x=>{
    let c=x.courierName||x.shipThrough||'',s=x.shippingFinalStatus||x.status||'',d=x.shippingDate||x.dispatchDate||'';
-   let text=`${x.parcelId||''} ${x.shipTo||''} ${c} ${x.broker||''} ${x.awbNo||''} ${s}`.toLowerCase();
+   let text=`${x.parcelId||''} ${slipLabel(x)} ${x.shipTo||''} ${c} ${x.broker||''} ${x.awbNo||''} ${s}`.toLowerCase();
    return (!q||text.includes(q))&&(!party||x.shipTo===party)&&(!courier||c===courier)&&(!status||s===status)&&inDateRange(d,from,to);
  });
- if($('dispatchRecordSummary'))$('dispatchRecordSummary').textContent=`Showing ${a.length} of ${all.length} dispatch records`;
- $('history').innerHTML=a.length?a.map(x=>`<tr><td><b>${esc(x.parcelId||'')}</b></td><td>${esc(x.shippingDate||x.dispatchDate||'')}</td><td>${esc(x.shipTo||'')}</td><td>${esc(x.courierName||x.shipThrough||'')}</td><td>${esc(x.broker||'')}</td><td>${esc(x.awbNo||'')}</td><td>${esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button></td></tr>`).join(''):'<tr><td colspan="8">No records.</td></tr>';
- if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(x.parcelId||'')}</b><span>${esc(x.shippingFinalStatus||x.status||'')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Party</small><strong>${esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button></div>`).join(''):'<div class="note">No records.</div>';
+ a.sort((x,y)=>(isRecordPending(x.parcelId)?0:1)-(isRecordPending(y.parcelId)?0:1));
+ let pendingCount=a.filter(x=>isRecordPending(x.parcelId)).length;
+ let emptyCount=a.filter(x=>isEmptyDraft(x)).length;
+ if($('hideEmptyDraftsWrap'))$('hideEmptyDraftsWrap').classList.toggle('hidden',!emptyCount);
+ if($('hideEmptyDraftsCount'))$('hideEmptyDraftsCount').textContent=emptyCount;
+ if($('hideEmptyDrafts')&&$('hideEmptyDrafts').checked)a=a.filter(x=>!isEmptyDraft(x));
+ window._dispatchFiltered=a;
+ if($('dispatchRecordSummary'))$('dispatchRecordSummary').textContent=`Showing ${a.length} of ${all.length} dispatch records`+(pendingCount?` • ${pendingCount} pending (in progress)`:'');
+ const dash=v=>v?esc(v):'<span class="cellDash">—</span>';
+ const createdLabel=x=>x.createdAt?new Date(x.createdAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}):'';
+ const pendingBadge=x=>{
+   if(!x.createdAt)return '<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>';
+   const hrs=(Date.now()-new Date(x.createdAt).getTime())/36e5;
+   if(hrs>=24){const days=Math.floor(hrs/24);return `<span class="pendingBadge stuck" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">🚨 Stuck ${days}+ day${days>1?'s':''}</span>`}
+   return '<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>';
+ };
+ $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td><button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button>${window.superAdminUnlocked?` <button class="btn small danger" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="8">No records.</td></tr>';
+ if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button>${window.superAdminUnlocked?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑 Delete</button>`:''}</div>`}).join(''):'<div class="note">No records.</div>';
+ renderDashboard();
 }
-function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();if(findClientByParty($('shipTo').value))$('broker').value=findClientByParty($('shipTo').value).broker||'';syncShippingSection();applySequenceAndLocks();if(!silent){showDispatchFormView();scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
+function renderDashboard(){
+  const box=$('dashboardStats'); if(!box)return;
+  const range=$('dashboardRange')?.value||'today';
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>!isEmptyDraft(x));
+  const now=Date.now();
+  const inRange=x=>{
+    if(range==='all')return true;
+    if(!x.createdAt)return false;
+    if(range==='today'){
+      const d=new Date(x.createdAt),n=new Date();
+      return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate();
+    }
+    return (now-new Date(x.createdAt).getTime())<=7*24*36e5;
+  };
+  const a=all.filter(inRange);
+  const topOf=fn=>{
+    const m={};
+    a.forEach(x=>{const v=(fn(x)||'').trim();if(v)m[v]=(m[v]||0)+1});
+    let top='',topN=0;
+    Object.keys(m).forEach(k=>{if(m[k]>topN){top=k;topN=m[k]}});
+    return {top,topN};
+  };
+  const courier=topOf(x=>x.courierName||x.shipThrough);
+  const party=topOf(x=>x.shipTo);
+  const pendingCount=a.filter(x=>isRecordPending(x.parcelId)).length;
+  const stuckCount=all.filter(x=>isRecordPending(x.parcelId)&&x.createdAt&&(now-new Date(x.createdAt).getTime())>=24*36e5).length;
+  const rangeLabel=range==='today'?'Today':(range==='week'?'This Week':'All Time');
+  box.innerHTML=`
+    <div class="statTile"><small>${rangeLabel} Dispatched</small><strong>${a.length}</strong></div>
+    <div class="statTile${pendingCount?' warn':''}"><small>${rangeLabel} Pending</small><strong>${pendingCount}</strong></div>
+    <div class="statTile"><small>Top Courier (${rangeLabel})</small><strong>${courier.top?esc(courier.top):'—'}</strong>${courier.top?`<span>${courier.topN} parcels</span>`:''}</div>
+    <div class="statTile"><small>Most Active Party (${rangeLabel})</small><strong>${party.top?esc(party.top):'—'}</strong>${party.top?`<span>${party.topN} parcels</span>`:''}</div>
+    <div class="statTile${stuckCount?' danger':''}"><small>Stuck 24h+ (Overall)</small><strong>${stuckCount}</strong></div>
+  `;
+}
+function isEmptyDraft(x){
+  return !x.shipTo && !x.courierName && !x.shipThrough && !x.broker && !x.awbNo;
+}
+function csvCell(v){
+  let s=String(v??'');
+  if(/[",\n]/.test(s))s='"'+s.replace(/"/g,'""')+'"';
+  return s;
+}
+function downloadCSV(filename,rows){
+  const csv=rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},0);
+}
+function exportDispatchCSV(){
+  const a=window._dispatchFiltered||[];
+  if(!a.length){toast('Export karne ke liye koi record nahi hai (filters check karein).');return}
+  const header=['Slip No.','Parcel ID','Dispatch Date','Created At','Ship To / Party','Broker','Ship Through','Courier Name','AWB / Tracking','Final Status','Pending?'];
+  const rows=[header,...a.map(x=>[x.slipSeq?String(x.slipSeq).padStart(3,'0'):'',x.parcelId||'',x.shippingDate||x.dispatchDate||'',x.createdAt?new Date(x.createdAt).toLocaleString('en-IN'):'',x.shipTo||'',x.broker||'',x.shipThrough||'',x.courierName||'',x.awbNo||'',x.shippingFinalStatus||x.status||'',isRecordPending(x.parcelId)?'Yes':'No'])];
+  downloadCSV('Dispatch_Records_'+new Date().toISOString().slice(0,10)+'.csv',rows);
+}
+function exportReturnCSV(){
+  const a=window._returnFiltered||[];
+  if(!a.length){toast('Export karne ke liye koi record nahi hai (filters check karein).');return}
+  const header=['Slip No.','Return ID','Return Date','Party (Return From)','Return Through','User / Doer','Status','Saved At'];
+  const rows=[header,...a.map(r=>[r.returnSeq?String(r.returnSeq).padStart(3,'0'):'',r.returnId||'',r.returnDate||'',r.returnFrom||'',r.returnThrough||'',returnUserNames(r)||'',r.status||'Return',r.savedAt?new Date(r.savedAt).toLocaleString('en-IN'):''])];
+  downloadCSV('Return_Records_'+new Date().toISOString().slice(0,10)+'.csv',rows);
+}
+function isRecordPending(parcelId){
+ if(!parcelId)return true;
+ const locks=(JSON.parse(localStorage.getItem(APPROVAL_LOCK_KEY)||'{}'))[parcelId]||{};
+ return !STAGE_SEQUENCE.every(s=>locks[s.id]);
+}
+function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();{const cm=findClientByParty($('shipTo').value);if(cm){$('broker').value=cm.broker||'';if(!r.deliveryAddress&&$('deliveryAddress'))$('deliveryAddress').value=cm.address||'';}}syncShippingSection();syncPackPhotoPreview();applySequenceAndLocks();if(!silent){showDispatchFormView();scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
 function openManage(){currentTab='users';$('manageModal').classList.remove('hidden');renderManage()}function closeManage(){$('manageModal').classList.add('hidden');populate();shipChanged()}function tab(b,t){currentTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));renderManage()}
 function renderManage(){let c=$('manageContent');if(currentTab==='users'){c.innerHTML=`<div class="grid"><div class="field"><label>User Name <span class="req">*</span></label><input id="mUserName"></div><div class="field"><label>Username <span class="req">*</span></label><input id="mUsername"></div><div class="field"><label>Mobile Number <span class="req">*</span></label><input id="mUserPhone" placeholder="10 digit or 91..."></div><div class="field"><label>Department <span class="req">*</span></label><input id="mDepartment"></div><div class="field"><label>&nbsp; <span class="req">*</span></label><button class="btn primary" onclick="addUser()">Add Universal User</button></div></div><div class="note">Handover dropdowns me sabhi active Doers dikhenge. Actual-work fields (Slip Fill, Weight Check, Lines & Tags, Noted By, Item Packed etc.) me logged-in user sirf apna naam fill kar sakta hai. Dusre Doer ka actual-work naam us Doer ki login ID se hi fill hoga. New user ka default password 1234 hai.</div><div style="margin:8px 0"><button class="btn secondary small" onclick="resetDefaultUsers()">↻ Reset Default Doers</button></div><div>${users.map((u,i)=>`<div class="item"><span><b>${esc(u.name)}</b> <small>(${esc(u.username||u.id)})</small><br><small>${esc(u.phone)} • ${esc(u.department||'No Department')} • ${u.active===false?'INACTIVE':'ACTIVE'}</small></span><span><button class="btn small secondary" onclick="toggleUser(${i})">${u.active===false?'Activate':'Deactivate'}</button> <button class="btn small secondary" onclick="editUser(${i})">Edit</button> <button class="btn small secondary" onclick="resetUserPassword(${i})">Reset Password</button> <button class="btn small danger" onclick="delUser(${i})">Delete</button></span></div>`).join('')}</div>`}
 else if(currentTab==='shipto'){c.innerHTML=`<div class="row"><input id="mShipTo" placeholder="Add Client / Ship To" style="flex:1"><button class="btn primary" onclick="addShipTo()">Add</button></div>${shipTo.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delShipTo(${i})">Delete</button></div>`).join('')}`}
 
 else if(currentTab==='clients'){
   c.innerHTML=`<h3 style="margin-top:0">Ship To</h3>
-  <div class="note">Yahan Ship To Party aur uska linked Broker manage karein. Party select hote hi Broker automatically fixed aayega.</div>
+  <div class="note">Yahan Ship To Party, uska linked Broker aur Delivery Address manage karein. Party select hote hi Broker aur Address dono automatically fixed aa jayenge.</div>
   <div class="grid" style="margin-top:12px">
     <div class="field span2"><label>Party Name <span class="req">*</span></label><input id="mClientParty" class="titleCaseField"></div>
     <div class="field"><label>Party Code</label><input id="mClientCode"></div>
     <div class="field span2"><label>App & Sale Book Name</label><input id="mClientSaleName" class="titleCaseField"></div>
     <div class="field span2"><label>Broker Name <span class="req">*</span></label><input id="mClientBroker" class="titleCaseField"></div>
     <div class="field"><label>Broker Code</label><input id="mClientBrokerCode"></div>
+    <div class="field full"><label>Delivery Address</label><textarea id="mClientAddress" placeholder="Full shipping address for this party"></textarea></div>
     <div class="field full"><button class="btn primary" onclick="addClientMaster()">Add Ship To</button></div>
   </div>
   <div class="row" style="margin:14px 0 8px"><input id="clientMasterSearch" placeholder="Search Party / Broker / Code" oninput="renderClientMasterList()" style="flex:1"></div>
@@ -859,20 +1227,21 @@ function addClientMaster(){
   let saleName=($('mClientSaleName').value||'').trim();
   let broker=($('mClientBroker').value||'').trim();
   let brokerCode=($('mClientBrokerCode').value||'').trim();
+  let address=($('mClientAddress').value||'').trim();
   if(!party||!broker){toast('Party Name aur Broker Name required hain.');return}
   let i=clientMaster.findIndex(x=>String(x.party).toLowerCase()===party.toLowerCase());
-  let rec={party,partyCode,saleName,broker,brokerCode};
+  let rec={party,partyCode,saleName,broker,brokerCode,address};
   if(i>=0)clientMaster[i]=rec; else clientMaster.push(rec);
   saveClientMaster();populate();renderClientMasterList();toast(i>=0?'Party master updated':'Party + Broker added');
-  ['mClientParty','mClientCode','mClientSaleName','mClientBroker','mClientBrokerCode'].forEach(id=>{if($(id))$(id).value=''});
+  ['mClientParty','mClientCode','mClientSaleName','mClientBroker','mClientBrokerCode','mClientAddress'].forEach(id=>{if($(id))$(id).value=''});
 }
 function renderClientMasterList(){
   let wrap=$('clientMasterList'); if(!wrap)return;
   let q=($('clientMasterSearch')?.value||'').trim().toLowerCase();
-  let arr=clientMaster.filter(x=>!q||`${x.party} ${x.partyCode} ${x.saleName} ${x.broker} ${x.brokerCode}`.toLowerCase().includes(q)).slice(0,250);
+  let arr=clientMaster.filter(x=>!q||`${x.party} ${x.partyCode} ${x.saleName} ${x.broker} ${x.brokerCode} ${x.address||''}`.toLowerCase().includes(q)).slice(0,250);
   wrap.innerHTML=arr.length?arr.map((x)=>{
     let idx=clientMaster.indexOf(x);
-    return `<div class="item"><span><b>${esc(x.party)}</b><br><small>Broker: ${esc(x.broker||'-')} • Party Code: ${esc(x.partyCode||'-')} • Broker Code: ${esc(x.brokerCode||'-')}</small></span><span><button class="btn small secondary" onclick="editClientMaster(${idx})">Edit</button> <button class="btn small danger" onclick="deleteClientMaster(${idx})">Delete</button></span></div>`;
+    return `<div class="item"><span><b>${esc(x.party)}</b><br><small>Broker: ${esc(x.broker||'-')} • Party Code: ${esc(x.partyCode||'-')} • Broker Code: ${esc(x.brokerCode||'-')}</small><br><small>Address: ${esc(x.address||'-')}</small></span><span><button class="btn small secondary" onclick="editClientMaster(${idx})">Edit</button> <button class="btn small danger" onclick="deleteClientMaster(${idx})">Delete</button></span></div>`;
   }).join(''):'<div class="note">No matching parties.</div>';
 }
 function editClientMaster(i){
@@ -882,7 +1251,8 @@ function editClientMaster(i){
   let partyCode=prompt('Party Code',x.partyCode||''); if(partyCode===null)return;
   let brokerCode=prompt('Broker Code',x.brokerCode||''); if(brokerCode===null)return;
   let saleName=prompt('App & Sale Book Name',x.saleName||''); if(saleName===null)return;
-  clientMaster[i]={party:party.trim()||x.party,partyCode:partyCode.trim(),saleName:saleName.trim(),broker:broker.trim(),brokerCode:brokerCode.trim()};
+  let address=prompt('Delivery Address',x.address||''); if(address===null)return;
+  clientMaster[i]={party:party.trim()||x.party,partyCode:partyCode.trim(),saleName:saleName.trim(),broker:broker.trim(),brokerCode:brokerCode.trim(),address:address.trim()};
   saveClientMaster();populate();renderClientMasterList();toast('Party master updated');
 }
 function deleteClientMaster(i){
@@ -935,6 +1305,7 @@ function nameOfUserId(id){let u=users.find(x=>x.id===id);return u?u.name:''}
 function waContext(){
   return {
     ParcelID:editing||currentParcelId||'',Party:$('shipTo')?.value||'',Broker:$('broker')?.value||'',ShipThrough:$('shipThrough')?.value||'',DispatchDate:$('dispatchDate')?.value||'',LoginUser:loggedUser()?.name||'',CurrentTime:now(),
+    OpenLink:parcelOpenLink(editing||currentParcelId||''),
     SlipFillBy:nameOfUserId($('slipFillBy')?.value),SlipFillTime:$('slipFillTime')?.value||'',
     ParcelGivenBy:nameOfUserId($('parcelGivenBy')?.value),ParcelGivenTime:$('parcelGivenTime')?.value||'',
     PKTRequired:$('dispatchPktRequired')?.value||'',PKTChangeBy:nameOfUserId($('dispatchPktBy')?.value),PKTChangeTime:$('dispatchPktTime')?.value||'',
@@ -944,10 +1315,11 @@ function waContext(){
     HandoverNoting:nameOfUserId($('handoverToNoting')?.value),NotingTime:$('notingTime')?.value||'',
     NotedBy:nameOfUserId($('notedBy')?.value),NotedTime:$('notedTime')?.value||'',ItemsNoted:$('itemsNoted')?.value||'',
     HandoverRecheck:nameOfUserId($('handoverToRecheck')?.value),RecheckTime:$('recheckTime')?.value||'',
+    RecheckedBy:nameOfUserId($('recheckedBy')?.value),ActualRecheckTime:$('actualRecheckTime')?.value||'',
     HandoverPacking:nameOfUserId($('handoverToPacking')?.value),PackingHandoverTime:$('packingHandoverTime')?.value||'',
     ItemPackedBy:nameOfUserId($('itemPackedBy')?.value),PackedTime:$('packedTime')?.value||'',ItemsPacked:$('itemsPacked')?.value||'',
-    AddressGivenBy:nameOfUserId($('addressGivenBy')?.value),AddressTime:$('addressTime')?.value||'',ParcelWeight:$('parcelWeight')?.value||'',
-    ShippingDate:$('shippingDate')?.value||'',ExpectedDeliveryDate:$('expectedDeliveryDate')?.value||'',CourierName:$('courierName')?.value||'',ShippingWeight:$('shippingWeight')?.value||'',
+    DeliveryAddress:$('deliveryAddress')?.value||'',ParcelWeight:$('parcelWeight')?.value||'',
+    ShippingDate:$('shippingDate')?.value||'',ExpectedDeliveryDate:$('expectedDeliveryDate')?.value||'',CourierName:$('courierName')?.value||'',ShippingWeight:$('parcelWeight')?.value||'',
     Insurance:$('shippingInsurance')?.value||'',InsuranceAmount:$('shippingInsuranceAmount')?.value||'',CourierSlipNo:$('courierSlipNo')?.value||'',AWB:$('awbNo')?.value||'',CourierPerson:$('courierPersonName')?.value||'',
     ParcelHandoverBy:nameOfUserId($('parcelHandoverBy')?.value),ParcelHandoverTime:$('parcelHandoverTime')?.value||'',
     CourierSlipReceivedBy:nameOfUserId($('courierSlipReceivedBy')?.value),CourierSlipReceivedTime:$('courierSlipReceivedTime')?.value||'',FinalStatus:$('shippingFinalStatus')?.value||'',
@@ -1039,7 +1411,15 @@ function delUser(i){if(confirm('Delete '+users[i].name+'?')){users.splice(i,1);s
 function addShipTo(){let v=$('mShipTo').value.trim();if(v&&!shipTo.some(x=>x.toLowerCase()===v.toLowerCase())){shipTo.push(v);saveMasters();populate();renderManage()}}function delShipTo(i){shipTo.splice(i,1);saveMasters();populate();renderManage()}
 function addShipThrough(){let v=$('mShipThrough').value.trim();if(v&&!shipThrough.some(x=>x.toLowerCase()===v.toLowerCase())){shipThrough.push(v);saveMasters();populate();renderManage()}}function delShipThrough(i){shipThrough.splice(i,1);saveMasters();populate();renderManage()}
 function saveApi(){api={baseUrl:$('mBase').value.trim()||'https://api.green-api.com',idInstance:$('mId').value.trim(),apiToken:$('mToken').value.trim()};saveMasters();toast('GREEN-API settings saved')}
-let tt;function toast(m){console.log(m);}
+let tt;function toast(m){
+  console.log(m);
+  const el=$('toast');
+  if(!el)return;
+  el.textContent=m;
+  el.classList.add('show');
+  clearTimeout(tt);
+  tt=setTimeout(()=>el.classList.remove('show'),3200);
+}
 
 const RETURN_KEY='pd_return_current_v4_stable';
 
@@ -1050,7 +1430,20 @@ function switchModule(which){
   $('dispatchTabBtn').className='btn '+(which==='dispatch'?'primary':'secondary');
   $('returnTabBtn').className='btn '+(which==='return'?'primary':'secondary');
   if(which==='dispatch'){ showDispatchListView(); }
-  if(which==='return'){ populateReturnUsers(); restoreReturn(); renderReturnHistory(); setTimeout(()=>{makeSingleSearchCombos();syncAllComboInputs();},30); }
+  if(which==='return'){ populateReturnUsers(); restoreReturn(); renderReturnHistory(); showReturnListView(); setTimeout(()=>{makeSingleSearchCombos();syncAllComboInputs();},30); }
+}
+function showReturnListView(){
+  if($('returnListView'))$('returnListView').classList.remove('hidden');
+  if($('returnFormView'))$('returnFormView').classList.add('hidden');
+  renderReturnHistory();
+}
+function showReturnFormView(){
+  if($('returnListView'))$('returnListView').classList.add('hidden');
+  if($('returnFormView'))$('returnFormView').classList.remove('hidden');
+}
+function startNewReturn(){
+  clearReturn();
+  showReturnFormView();
 }
 function showDispatchListView(){
   if($('dispatchListView'))$('dispatchListView').classList.remove('hidden');
@@ -1068,6 +1461,16 @@ function showDispatchFormView(){
 function startNewDispatch(){
   newParcel();
   showDispatchFormView();
+}
+function newRecord(){
+  // Header's "+ New" is shared by both modules — it must act on whichever one is
+  // actually visible, not silently reset the hidden Dispatch form while you're
+  // sitting on the Return tab.
+  if($('returnModule') && !$('returnModule').classList.contains('hidden')){
+    startNewReturn();
+  }else{
+    startNewDispatch();
+  }
 }
 function closeDispatchForm(){
   showDispatchListView();
@@ -1117,7 +1520,10 @@ let currentReturnId=null;
 
 function genReturnId(){
  let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
- return `PR-${ds}-${String(Date.now()).slice(-4)}`;
+ let existing=new Set(JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').map(x=>x.returnId));
+ let id;
+ do{ id=`PR-${ds}-${(Date.now().toString(36)+Math.random().toString(36).slice(2,6)).slice(-6).toUpperCase()}`; }while(existing.has(id));
+ return id;
 }
 function returnRecordData(){
  let controls=returnControls(), data={returnId:currentReturnId||genReturnId(),savedAt:new Date().toISOString()};
@@ -1135,17 +1541,23 @@ function saveReturn(silent=false){
  let data=returnRecordData(); currentReturnId=data.returnId;
  localStorage.setItem(RETURN_KEY,JSON.stringify(data));
  let a=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]'),i=a.findIndex(x=>x.returnId===data.returnId);
- if(i>=0)a[i]=data;else a.unshift(data);
+ // Merge rather than replace — otherwise fields added outside the form (like the
+ // assigned Slip No.) get wiped back to unassigned on every subsequent save.
+ if(i>=0)a[i]={...a[i],...data};else a.unshift(data);
  localStorage.setItem(RETURN_RECORDS_KEY,JSON.stringify(a));
- pdPushReturnToCloud(data);
+ pdPushReturnToCloud(i>=0?a[i]:data);
+ assignReturnSeqIfNeeded(data.returnId);
  if(!silent){toast('Return saved: '+data.returnId);renderReturnHistory();}
 }
 function clearReturn(){
- if(!confirm('Start new Return record?'))return;
  returnControls().forEach(e=>e.value='');
  currentReturnId=genReturnId(); localStorage.removeItem(RETURN_KEY);
  let x=$('returnDate');if(x)x.value=new Date().toISOString().slice(0,10);
- populateReturnUsers(); toast('New Return: '+currentReturnId);
+ populateReturnUsers();
+ if(typeof returnPktRule==='function')returnPktRule();
+ if(typeof syncAllComboInputs==='function')syncAllComboInputs();
+ if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+currentReturnId;
+ toast('New Return: '+currentReturnId);
 }
 function restoreReturn(){
  let raw=localStorage.getItem(RETURN_KEY);if(!raw){if(!currentReturnId)currentReturnId=genReturnId();return}
@@ -1177,12 +1589,14 @@ function renderReturnHistory(){
  let from=$('returnDateFrom')?.value||'',to=$('returnDateTo')?.value||'';
  let a=all.filter(r=>{
    let usersText=returnUserNames(r),date=r.returnDate||'',status=r.status||'Return';
-   let text=`${r.returnId||''} ${r.returnFrom||''} ${r.returnThrough||''} ${date} ${usersText} ${r.returnRemarks||''} ${r.notFoundReason||''} ${status}`.toLowerCase();
+   let text=`${r.returnId||''} ${slipLabel(r)} ${r.returnFrom||''} ${r.returnThrough||''} ${date} ${usersText} ${r.returnRemarks||''} ${r.notFoundReason||''} ${status}`.toLowerCase();
    return (!q||text.includes(q))&&(!party||r.returnFrom===party)&&(!courier||r.returnThrough===courier)&&(!user||usersText.toLowerCase().includes(user.toLowerCase()))&&inDateRange(date,from,to);
  });
  if($('returnRecordSummary'))$('returnRecordSummary').textContent=`Showing ${a.length} of ${all.length} return records`;
- body.innerHTML=a.length?a.map(r=>`<tr><td><b>${esc(r.returnId||'')}</b></td><td>${esc(r.returnDate||'')}</td><td>${esc(r.returnFrom||'')}</td><td>${esc(r.returnThrough||'')}</td><td>${esc(returnUserNames(r)||'')}</td><td>${esc(r.status||'Return')}</td><td>${esc(r.savedAt?new Date(r.savedAt).toLocaleString('en-IN'):'')}</td><td><button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button></td></tr>`).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
- if($('returnMobileCards'))$('returnMobileCards').innerHTML=a.length?a.map(r=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(r.returnId||'')}</b><span>${esc(r.status||'Return')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div><div><small>User / Doer</small><strong>${esc(returnUserNames(r)||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button></div>`).join(''):'<div class="note">No return records.</div>';
+ window._returnFiltered=a;
+ const dash=v=>v?esc(v):'<span class="cellDash">—</span>';
+ body.innerHTML=a.length?a.map(r=>`<tr><td><b>${esc(slipLabel(r))}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${dash(returnUserNames(r))}</td><td>${esc(r.status||'Return')}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td><button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button>${window.superAdminUnlocked?` <button class="btn small danger" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑</button>`:''}</td></tr>`).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
+ if($('returnMobileCards'))$('returnMobileCards').innerHTML=a.length?a.map(r=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(slipLabel(r))}</b><span>${esc(r.status||'Return')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div><div><small>User / Doer</small><strong>${esc(returnUserNames(r)||'-')}</strong></div></div><button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button>${window.superAdminUnlocked?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑 Delete</button>`:''}</div>`).join(''):'<div class="note">No return records.</div>';
 }
 
 function openAllRecords(){ openRecordType('dispatch'); }
@@ -1195,21 +1609,25 @@ function closeAllRecords(){ $('allRecordsModal').classList.add('hidden'); }
 function renderAllRecords(filter){
  window._recordFilter=filter;
  let q=($('allRecordSearch')?.value||'').toLowerCase();
- let ds=JSON.parse(localStorage.getItem(K.records)||'[]').map(x=>({type:'DISPATCH',id:x.parcelId,date:x.dispatchDate,party:x.shipTo,status:x.status||'Draft',saved:x.createdAt||'',raw:x}));
- let rs=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').map(x=>({type:'RETURN',id:x.returnId,date:x.returnDate||'',party:x.returnFrom||'',status:x.status||'In Process',saved:x.savedAt||'',raw:x}));
+ let ds=JSON.parse(localStorage.getItem(K.records)||'[]').map(x=>({type:'DISPATCH',id:x.parcelId,label:slipLabel(x),date:x.dispatchDate,party:x.shipTo,status:x.status||'Draft',saved:x.createdAt||'',raw:x}));
+ let rs=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').map(x=>({type:'RETURN',id:x.returnId,label:slipLabel(x),date:x.returnDate||'',party:x.returnFrom||'',status:x.status||'In Process',saved:x.savedAt||'',raw:x}));
  let a=[...ds,...rs];
  if(filter==='dispatch')a=a.filter(x=>x.type==='DISPATCH');
  if(filter==='return')a=a.filter(x=>x.type==='RETURN');
- a=a.filter(x=>`${x.type} ${x.id} ${x.date} ${x.party} ${x.status}`.toLowerCase().includes(q));
+ a=a.filter(x=>`${x.type} ${x.id} ${x.label} ${x.date} ${x.party} ${x.status}`.toLowerCase().includes(q));
  a.sort((x,y)=>String(y.saved).localeCompare(String(x.saved)));
- $('allRecordsBody').innerHTML=a.length?a.map(x=>`<tr><td><b>${x.type}</b></td><td>${esc(x.id||'')}</td><td>${esc(x.date||'')}</td><td>${esc(x.party||'')}</td><td>${esc(x.status||'')}</td><td>${x.saved?new Date(x.saved).toLocaleString('en-IN'):''}</td><td><button class="btn small secondary" onclick="${x.type==='DISPATCH'?`openDispatchRecord('${x.id}')`:`openReturnRecord('${x.id}')`}">Open</button></td></tr>`).join(''):'<tr><td colspan="7">No saved records.</td></tr>';
+ $('allRecordsBody').innerHTML=a.length?a.map(x=>`<tr><td><b>${x.type}</b></td><td>${esc(x.label||'')}</td><td>${esc(x.date||'')}</td><td>${esc(x.party||'')}</td><td>${esc(x.status||'')}</td><td>${x.saved?new Date(x.saved).toLocaleString('en-IN'):''}</td><td><button class="btn small secondary" onclick="${x.type==='DISPATCH'?`openDispatchRecord('${x.id}')`:`openReturnRecord('${x.id}')`}">Open</button></td></tr>`).join(''):'<tr><td colspan="7">No saved records.</td></tr>';
 }
 function openDispatchRecord(id){closeAllRecords();switchModule('dispatch');editRecord(id)}
 function openReturnRecord(id){
  let a=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]'),r=a.find(x=>x.returnId===id);if(!r)return;
  closeAllRecords();switchModule('return');currentReturnId=id;
  returnControls().forEach((e,i)=>{let k=e.dataset.rkey||('r_'+i);e.value=r[k]??''});
- localStorage.setItem(RETURN_KEY,JSON.stringify(r));toast('Return opened: '+id);
+ localStorage.setItem(RETURN_KEY,JSON.stringify(r));
+ if(typeof returnPktRule==='function')returnPktRule();
+ if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+slipLabel(r);
+ showReturnFormView();
+ toast('Return opened: '+id);
 }
 
 function populateReturnUsers2(){let au=users.filter(u=>u.active!==false);document.querySelectorAll('#returnModule .returnPerson').forEach(s=>{let old=s.value;s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});let rf=$('returnFrom');if(rf){let old=rf.value;rf.innerHTML=options(shipTo);if(shipTo.includes(old))rf.value=old}}
@@ -1221,16 +1639,6 @@ function saveSelfRemarkPrivacy(){
  localStorage.setItem('pd_selfremark_privacy_v1',JSON.stringify(selfRemarkPrivacy));
  console.log('Self Remark privacy saved');
 }
-function requiredDispatchOk(){
- let missing=[];
- document.querySelectorAll('#dispatchModule input,#dispatchModule select').forEach(e=>{
-   if(!e.id||['search','selfRemark','clientRemark','finalRemarks'].includes(e.id))return;
-   if(e.closest('.hidden'))return;
-   if(!String(e.value||'').trim())missing.push(e);
- });
- if(missing.length){missing[0].focus();alert('Please fill all * mandatory Dispatch fields.');return false}
- return true;
-}
 function requiredReturnOk(){
  let missing=[];
  document.querySelectorAll('#returnModule input,#returnModule select').forEach(e=>{
@@ -1240,8 +1648,6 @@ function requiredReturnOk(){
  if(missing.length){missing[0].focus();alert('Please fill all * mandatory Return fields.');return false}
  return true;
 }
-const _oldSaveParcel=saveParcel;
-saveParcel=function(){if(!requiredDispatchOk())return;_oldSaveParcel();}
 let sequenceRecalcTimer=null;
 function scheduleSequenceRecalc(){
   // A single real field change fires both 'input' and 'change' — collapse both into
@@ -1259,8 +1665,10 @@ if($('dispatchModule')){
     });
   });
 }
-const _oldSaveReturn=saveReturn;
-saveReturn=function(silent=false){if(!silent&&!requiredReturnOk())return;_oldSaveReturn(silent);}
+if(typeof saveReturn==='function'){
+  const _oldSaveReturn=saveReturn;
+  saveReturn=function(silent=false){if(!silent&&!requiredReturnOk())return;_oldSaveReturn(silent);}
+}
 
 function titleCase(v){
  return String(v||'').trim().toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase());
@@ -1318,8 +1726,8 @@ function makeSingleSearchCombos(){
        menu.style.borderRadius='0 0 8px 8px';
      }
    }
-   function draw(){
-     let q=inp.value.trim().toLowerCase();
+   function draw(showAll){
+     let q=showAll?'':inp.value.trim().toLowerCase();
      let actor=loggedUser();
      let source=isSelfOnlyField(s) ? (actor?[actor]:[]) : users.slice();
      let list=source.slice().sort((a,b)=>a.name.localeCompare(b.name)).filter(u=>!q||u.name.toLowerCase().includes(q)||String(u.username||'').toLowerCase().includes(q)||String(u.department||'').toLowerCase().includes(q));
@@ -1327,7 +1735,11 @@ function makeSingleSearchCombos(){
      positionMenu();
      menu.classList.add('show');
    }
-   inp.onfocus=draw;inp.oninput=draw;
+   // Focusing an already-filled combo shows the full list straight away (and selects the
+   // text) so a different name can be picked in one click, instead of having to manually
+   // clear the box first before the dropdown will show anything else.
+   inp.onfocus=()=>{inp.select();draw(true)};
+   inp.oninput=()=>draw(false);
    menu.onmousedown=e=>{let o=e.target.closest('[data-v]');if(!o)return;let wanted=o.dataset.v;if(!canSelectWorker(s,wanted)){menu.classList.remove('show');return;}s.value=wanted;let u=users.find(x=>x.id===s.value);inp.value=u?u.name:'';menu.classList.remove('show');s.dispatchEvent(new Event('change',{bubbles:true}))};
    inp.onblur=()=>setTimeout(()=>menu.classList.remove('show'),120);
    s.onchange=()=>{if(s.value&&!canSelectWorker(s,s.value)){s.value='';inp.value='';let t=s.dataset.time?$(s.dataset.time):null;if(t)t.value='';return;}let u=users.find(x=>x.id===s.value);inp.value=u?u.name:'';if(s.classList.contains('person'))personChanged(s);applyWorkerPermissions()};
@@ -1350,14 +1762,15 @@ function makeReturnFromCombo(){
   }
   let inp=wrap.querySelector('input'),menu=wrap.querySelector('.comboMenu');
   if(document.activeElement!==inp)inp.value=s.value||'';
-  function draw(){
-    let q=inp.value.trim().toLowerCase();
+  function draw(showAll){
+    let q=showAll?'':inp.value.trim().toLowerCase();
     let list=shipTo.filter(p=>!q||p.toLowerCase().includes(q));
     menu.innerHTML=list.length?list.map(p=>`<div class="comboOption" data-v="${esc(p)}"><b>${esc(p)}</b></div>`).join(''):'<div class="comboOption">No match</div>';
     forceVisibleComboMenu(inp,menu);
     menu.classList.add('show');
   }
-  inp.onfocus=draw;inp.oninput=draw;
+  inp.onfocus=()=>{inp.select();draw(true)};
+  inp.oninput=()=>draw(false);
   menu.onmousedown=e=>{let o=e.target.closest('[data-v]');if(!o)return;s.value=o.dataset.v;inp.value=o.dataset.v;menu.classList.remove('show');s.dispatchEvent(new Event('change',{bubbles:true}))};
   inp.onblur=()=>setTimeout(()=>menu.classList.remove('show'),120);
 }
@@ -1469,11 +1882,11 @@ const FIELD_AUDIT_KEY='pd_field_audit_v1';
 const APPROVAL_LOCK_KEY='pd_stage_approval_locks_v1';
 const STAGE_SEQUENCE=[
   {id:'stage1',name:'1. Basic Dispatch & Preparation',fields:['dispatchDate','shipTo','shipThrough','broker','inshAmount','priceFill','slipFillBy','slipFillTime','parcelGivenBy','parcelGivenTime','dispatchPktRequired','handoverToPrepare','prepareTime']},
-  {id:'stage2',name:'2. Weight & Checking',fields:['dispatchPktBy','dispatchPktTime','weightCheckedBy','weightCheckedTime','linesTagsCheckedBy','linesTagsTime']},
-  {id:'stage3',name:'3. Noting',fields:['handoverToNoting','notingTime','notedBy','notedTime','itemsNoted']},
-  {id:'stage4',name:'4. Recheck & Packing',fields:['handoverToRecheck','recheckTime','handoverToPacking','packingHandoverTime']},
-  {id:'stage5',name:'5. Final Packing',fields:['itemPackedBy','packedTime','itemsPacked','addressGivenBy','addressTime','parcelWeight']},
-  {id:'stage6',name:'6. Courier / Shipping Dispatch',fields:['shippingDate','courierName','shippingPartyName','shippingWeight','shippingInsurance','parcelHandoverBy','parcelHandoverTime','shippingFinalStatus']}
+  {id:'stage2',name:'2. Weight & Checking',fields:['dispatchPktBy','dispatchPktTime','weightCheckedBy','weightCheckedTime','linesTagsCheckedBy','linesTagsTime','handoverToNoting','notingTime']},
+  {id:'stage3',name:'3. Noting',fields:['notedBy','notedTime','itemsNoted','handoverToRecheck','recheckTime']},
+  {id:'stage4',name:'4. Recheck & Packing',fields:['recheckedBy','actualRecheckTime','handoverToPacking','packingHandoverTime']},
+  {id:'stage5',name:'5. Final Packing',fields:['itemPackedBy','packedTime','itemsPacked','deliveryAddress','parcelWeight','packPhotoData']},
+  {id:'stage6',name:'6. Courier / Shipping Dispatch',fields:['shippingDate','courierName','shippingInsurance','parcelHandoverBy','parcelHandoverTime','shippingFinalStatus']}
 ];
 
 const WA_QUEUE_KEY='pd_whatsapp_queue_v1';
@@ -1489,8 +1902,8 @@ const SELF_ONLY_WORK_FIELDS=new Set([
  'weightCheckedBy',
  'linesTagsCheckedBy',
  'notedBy',
+ 'recheckedBy',
  'itemPackedBy',
- 'addressGivenBy',
  'returnReceiveBy',
  'returnWeightBy',
  'returnLinesBy',
@@ -1524,7 +1937,7 @@ function fieldLabel(el){
   const lab=f&&f.querySelector('label');
   return lab?lab.textContent.replace('*','').trim():el.id;
 }
-function auditFieldChange(el,oldVal,newVal,action='CHANGE'){
+function auditFieldChange(el,oldVal,newVal,action='CHANGE',reason=''){
   if(!el || oldVal===newVal)return;
   const actor=loggedUser();
   const row={
@@ -1536,7 +1949,8 @@ function auditFieldChange(el,oldVal,newVal,action='CHANGE'){
     field:fieldLabel(el),
     oldValue:String(oldVal??''),
     newValue:String(newVal??''),
-    action
+    action,
+    reason
   };
   const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
   a.unshift(row);
@@ -1567,7 +1981,18 @@ function canEditField(el){
   const stage=stageForElement(el);
   if(!stage)return true;
   const locks=getStageLocks();
-  if(locks[stage.id])return false;
+  if(locks[stage.id]){
+    // The doer who actually locked this section can still go back and correct their own
+    // entries — but only until the NEXT section also locks. Once work has moved past it,
+    // self-correction closes and only Admin (via unlockStageAsAdmin) can reopen it — this
+    // keeps corrections happening close to when the mistake is made instead of being
+    // editable indefinitely.
+    const idx=STAGE_SEQUENCE.findIndex(s=>s.id===stage.id);
+    const nextStage=STAGE_SEQUENCE[idx+1];
+    if(nextStage && locks[nextStage.id])return false;
+    const actor=loggedUser();
+    return !!(actor && locks[stage.id].lockedBy===actor.id);
+  }
   return previousStagesLocked(stage);
 }
 function applySequenceAndLocks(){
@@ -1592,12 +2017,30 @@ function refreshFieldStates(){
       el.disabled=!editable;
     }else{
       // Preserve native readonly fields like time/broker, but sequence can also lock.
-      const nativeReadonly=['slipFillTime','parcelGivenTime','prepareTime','dispatchPktTime','weightCheckedTime','linesTagsTime','notingTime','notedTime','recheckTime','packingHandoverTime','packedTime','addressTime','shippingPartyName','shippingWeight','parcelHandoverTime','courierSlipReceivedTime'].includes(el.id);
+      const nativeReadonly=['slipFillTime','parcelGivenTime','prepareTime','dispatchPktTime','weightCheckedTime','linesTagsTime','notingTime','notedTime','recheckTime','actualRecheckTime','packingHandoverTime','packedTime','deliveryAddress','parcelHandoverTime','courierSlipReceivedTime'].includes(el.id);
       el.readOnly=nativeReadonly || !editable;
     }
   });
   applyWorkerPermissions();
   renderWorkflowStatus();
+  if($('handoverPrepareRef'))$('handoverPrepareRef').value=transferChainLabel('handoverToPrepare');
+  if($('handoverNotingRef'))$('handoverNotingRef').value=transferChainLabel('handoverToNoting');
+  if($('handoverRecheckRef'))$('handoverRecheckRef').value=transferChainLabel('handoverToRecheck');
+  if($('handoverPackingRef'))$('handoverPackingRef').value=transferChainLabel('handoverToPacking');
+}
+// Shows "A → B" when a field has been transferred, instead of just the current name,
+// so anyone reading a readonly mirror (e.g. Section 2's copy of Section 1's handover)
+// can see the reassignment at a glance without opening the Transfer history separately.
+function transferChainLabel(fieldId){
+  const el=$(fieldId);
+  const current=el?nameOfUserId(el.value):'';
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]')
+    .filter(x=>x.action==='TRANSFER'&&x.parcelId===currentRecordKey()&&x.fieldId===fieldId)
+    .slice().reverse();
+  if(!a.length)return current||'-';
+  const chain=[nameOfUserId(a[0].oldValue)||a[0].oldValue];
+  a.forEach(x=>chain.push(nameOfUserId(x.newValue)||x.newValue));
+  return chain.filter(Boolean).join(' → ')||'-';
 }
 // Only auto-locks ONE stage per call (does not re-check after locking) — a single field
 // completing its stage shouldn't cascade through several stages in the same tick just
@@ -1639,6 +2082,14 @@ function lockCurrentStage(silent){
   auditFieldChange({id:'',closest:()=>null},'',stage.name,'LOCK_STAGE');
   refreshFieldStates();
   toast(stage.name+(silent?' auto-locked — next section unlocked':' locked'));
+  if(STAGE_SEQUENCE.every(s=>locks[s.id]))finalizeParcelSlip();
+}
+function finalizeParcelSlip(){
+  // Slip fully filled (all 6 sections locked) — save it as final automatically,
+  // so the doer doesn't have to remember to press SAVE PARCEL.
+  const d=persistParcelRecord();
+  if($('autoSaveTag'))$('autoSaveTag').textContent='✅ Slip Complete — Saved '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  toast('✅ Slip '+(d.parcelId||'')+' pura fill ho gaya — automatically final save ho gaya hai.');
 }
 function isAdminUser(){
   const u=loggedUser();
@@ -1664,16 +2115,62 @@ function unlockStageAsAdmin(){
   applySequenceAndLocks();
   toast(stage.name+' unlocked by Admin');
 }
+async function deleteDispatchRecord(parcelId){
+  if(!isAdminUser()){alert('Sirf Admin record delete kar sakta hai.');return}
+  const rec=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===parcelId);
+  if(!rec)return;
+  if(!confirm('Ye record PERMANENTLY delete ho jayega, wapas nahi aayega.\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.shipTo||'-')+'\n\nSach mein delete karna hai?'))return;
+  try{ await pdDb.collection('pd_records_cloud').doc(parcelId).delete(); }
+  catch(e){ console.error('delete dispatch record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>x.parcelId!==parcelId);
+  localStorage.setItem(K.records,JSON.stringify(all));
+  const actor=loggedUser();
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
+  a.unshift({at:new Date().toISOString(),parcelId,userId:actor?actor.id:'',userName:actor?actor.name:'Unknown',fieldId:'',field:'Record',oldValue:slipLabel(rec),newValue:'',action:'DELETE',reason:''});
+  localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
+  renderHistory();
+  toast('Record delete ho gaya: '+slipLabel(rec));
+}
+async function deleteReturnRecord(returnId){
+  if(!isAdminUser()){alert('Sirf Admin record delete kar sakta hai.');return}
+  const rec=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').find(x=>x.returnId===returnId);
+  if(!rec)return;
+  if(!confirm('Ye return record PERMANENTLY delete ho jayega, wapas nahi aayega.\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.returnFrom||'-')+'\n\nSach mein delete karna hai?'))return;
+  try{ await pdDb.collection('pd_returns_cloud').doc(returnId).delete(); }
+  catch(e){ console.error('delete return record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
+  const all=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').filter(x=>x.returnId!==returnId);
+  localStorage.setItem(RETURN_RECORDS_KEY,JSON.stringify(all));
+  const actor=loggedUser();
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
+  a.unshift({at:new Date().toISOString(),parcelId:returnId,userId:actor?actor.id:'',userName:actor?actor.name:'Unknown',fieldId:'',field:'Return Record',oldValue:slipLabel(rec),newValue:'',action:'DELETE',reason:''});
+  localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
+  renderReturnHistory();
+  toast('Return record delete ho gaya: '+slipLabel(rec));
+}
 function openAuditTrail(){
   $('auditModal').classList.remove('hidden');
   renderAuditTrail();
 }
 function closeAuditTrail(){$('auditModal').classList.add('hidden')}
+function renderTransferSummary(){
+  const box=$('transferSummaryBox');if(!box)return;
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]').filter(x=>x.action==='TRANSFER');
+  if(!a.length){box.innerHTML='';return}
+  const stats={};
+  const bump=(id,key)=>{if(!id)return;if(!stats[id])stats[id]={name:nameOfUserId(id)||id,given:0,received:0};stats[id][key]++};
+  a.forEach(x=>{bump(x.oldValue,'given');bump(x.newValue,'received')});
+  const rows=Object.values(stats).sort((p,q)=>(q.given+q.received)-(p.given+p.received));
+  box.innerHTML=`<b>🔁 Transfer Summary (${a.length} total transfers)</b>
+  <div class="table" style="margin-top:8px"><table><thead><tr><th>Doer</th><th>Transferred Away</th><th>Received</th></tr></thead><tbody>${
+    rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.given}</td><td>${r.received}</td></tr>`).join('')
+  }</tbody></table></div>`;
+}
 function renderAuditTrail(){
+  renderTransferSummary();
   const q=($('auditSearch')?.value||'').toLowerCase();
   let a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
   a=a.filter(x=>`${x.parcelId} ${x.userName} ${x.field} ${x.oldValue} ${x.newValue} ${x.action}`.toLowerCase().includes(q));
-  $('auditBody').innerHTML=a.length?a.slice(0,500).map(x=>`<tr>
+  $('auditBody').innerHTML=a.length?a.slice(0,500).map(x=>`<tr${x.action==='TRANSFER'?' style="background:#fff8e1"':x.action==='POST_LOCK_EDIT'?' style="background:#fee4e2"':x.action==='DELETE'?' style="background:#2d1414;color:#fff"':''}>
     <td>${esc(new Date(x.at).toLocaleString('en-IN'))}</td>
     <td>${esc(x.parcelId)}</td>
     <td>${esc(x.userName)}</td>
@@ -1681,7 +2178,8 @@ function renderAuditTrail(){
     <td>${esc(x.oldValue)}</td>
     <td>${esc(x.newValue)}</td>
     <td>${esc(x.action)}</td>
-  </tr>`).join(''):'<tr><td colspan="7">No audit history.</td></tr>';
+    <td>${esc(x.reason||'')}</td>
+  </tr>`).join(''):'<tr><td colspan="8">No audit history.</td></tr>';
 }
 
 function refreshLoginBadge(){
@@ -1705,15 +2203,41 @@ function hardRefreshApp(){
   }
 }
 function toggleDesktopView(){
+  // On an actual wide desktop screen, forcing the viewport meta tag does nothing (only
+  // mobile browsers respect it) — so give desktop a real CSS-only mobile-layout preview
+  // instead of reloading with a viewport hack that has no visible effect there.
+  if(window.innerWidth>900){
+    var previewOn=localStorage.getItem('pd_force_mobile_preview')==='1';
+    if(previewOn)localStorage.removeItem('pd_force_mobile_preview');else localStorage.setItem('pd_force_mobile_preview','1');
+    document.body.classList.toggle('pd-force-mobile',!previewOn);
+    syncDesktopViewBtn();
+    return;
+  }
   var forced=localStorage.getItem('pd_force_desktop')==='1';
   if(forced)localStorage.removeItem('pd_force_desktop');else localStorage.setItem('pd_force_desktop','1');
   location.replace(location.pathname+'?_r='+Date.now()+location.hash);
 }
 function syncDesktopViewBtn(){
   var btn=document.getElementById('desktopViewBtn');if(!btn)return;
+  if(window.innerWidth>900){
+    var previewOn=localStorage.getItem('pd_force_mobile_preview')==='1';
+    document.body.classList.toggle('pd-force-mobile',previewOn);
+    btn.textContent=previewOn?'🖥 Desktop View':'📱 Mobile View';
+    return;
+  }
   var forced=localStorage.getItem('pd_force_desktop')==='1';
   btn.textContent=forced?'📱 Mobile View':'🖥 Desktop View';
 }
+function toggleHeaderMore(){
+  var m=document.getElementById('headerMoreMenu');if(!m)return;
+  m.classList.toggle('headerMoreCollapsed');
+}
+document.addEventListener('click',function(e){
+  var wrap=document.getElementById('headerMoreWrap');
+  if(!wrap||wrap.contains(e.target))return;
+  var m=document.getElementById('headerMoreMenu');
+  if(m)m.classList.add('headerMoreCollapsed');
+});
 syncDesktopViewBtn();
 function openLogin(){$('loginModal').classList.remove('hidden')}
 function closeLogin(){$('loginModal').classList.add('hidden')}
@@ -1787,18 +2311,16 @@ function applyWorkerPermissions(){
 
     if(inp){
       inp.readOnly=!actor;
-      inp.placeholder=actor ? 'Only: '+actor.name : 'Login required';
-      inp.title=actor ? 'Verified field: only your own name can be entered.' : 'Please login first.';
-      if(actor && !s.value && (typeof canEditField!=='function' || canEditField(s))){
-        s.value=actor.id;
-        inp.value=actor.name;
-        let t=$(s.dataset.time);
-        if(t)t.value=now();
-      }
+      // Left blank on purpose, even for the logged-in doer — this field's timestamp is
+      // supposed to mark when the physical work actually happened, so it must be picked
+      // explicitly from the dropdown, not silently pre-filled the moment the stage opens.
+      inp.placeholder=actor ? 'Type / Search Name' : 'Login required';
+      inp.title=actor ? 'Verified field: select your own name once you have actually done this work.' : 'Please login first.';
     }
   });
 }
 function canSelectWorker(select,selectedId){
+  if(window.__transferInProgress)return true;
   if(!isSelfOnlyField(select))return true;
   const actor=loggedUser();
   if(!actor){
@@ -1806,7 +2328,7 @@ function canSelectWorker(select,selectedId){
     return false;
   }
   if(selectedId!==actor.id){
-    alert('Is field me aap sirf apna naam fill kar sakte hain. Agar kaam kisi aur Doer ne kiya hai to us Doer ko apni ID se login karke fill karna hoga.');
+    alert('Is field me aap sirf apna naam fill kar sakte hain — field aapke naam par wapas set ho jayegi. Kaam kisi aur Doer ne kiya hai to unhe apni ID se login karke fill karna hoga, ya niche "🔄 Transfer" button se task unhe transfer kar dijiye.');
     return false;
   }
   return true;
@@ -1814,14 +2336,67 @@ function canSelectWorker(select,selectedId){
 function logWorkerSelection(field,selectedId){
  let actor=loggedUser(),worker=users.find(u=>u.id===selectedId);
  if(!worker)return;
+ let reason=window.__transferReason||'';
  let row={at:new Date().toISOString(),parcelId:currentParcelId||'',field,enteredBy:actor?actor.name:'Unknown',workBy:worker.name};
  let a=JSON.parse(localStorage.getItem(WORK_AUDIT_KEY)||'[]');a.unshift(row);localStorage.setItem(WORK_AUDIT_KEY,JSON.stringify(a));
  if(actor && actor.id!==worker.id){
    let q=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
    q.unshift({createdAt:row.at,toUserId:worker.id,toPhone:worker.phone,parcelId:row.parcelId,stage:field,status:'PENDING',reminderEveryMinutes:30,
-     message:`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} me aapka naam select kiya hai. Task pending hone tak reminder har 30 minute.`});
+     message:(reason?`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} ka task aapko transfer kiya hai. Reason: ${reason}. Task pending hone tak reminder har 30 minute.`:`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} me aapka naam select kiya hai. Task pending hone tak reminder har 30 minute.`)+`\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(row.parcelId)}`});
    localStorage.setItem(WA_QUEUE_KEY,JSON.stringify(q));
  }
+}
+function openTransferTask(fieldId){
+  const el=$(fieldId);
+  if(!el)return;
+  const actor=loggedUser();
+  if(!actor){alert('Task transfer karne ke liye pehle login karein.');return}
+  if(el.disabled){alert('Ye task abhi transfer ke liye available nahi hai — sequence me pichla stage lock nahi hua ya ye stage already locked hai.');return}
+  if(el.value && el.value!==actor.id && !window.superAdminUnlocked){
+    alert('Sirf jis Doer ko ye task currently assigned hai (ya Super Admin), wahi ise transfer kar sakta hai.');
+    return;
+  }
+  window._transferFieldId=fieldId;
+  const label=el.closest('.field')?.querySelector('label')?.textContent.replace('*','').trim()||'Task';
+  $('transferTaskTitle').textContent='🔄 Transfer: '+label;
+  const au=users.filter(u=>u.active!==false && u.id!==el.value);
+  $('transferNewDoer').innerHTML=options(au,u=>u.id,u=>u.name);
+  $('transferReason').value='';
+  renderTransferHistoryFor(fieldId);
+  $('transferTaskModal').classList.remove('hidden');
+}
+function renderTransferHistoryFor(fieldId){
+  const box=$('transferHistoryList');
+  if(!box)return;
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
+  const rows=a.filter(x=>x.action==='TRANSFER'&&x.parcelId===currentRecordKey()&&x.fieldId===fieldId);
+  if(!rows.length){box.innerHTML='';return}
+  box.innerHTML='<div class="note" style="margin-top:10px"><b>🔄 Pehle ke transfers is task ke liye:</b><br>'+rows.map(x=>{
+    const from=users.find(u=>u.id===x.oldValue),to=users.find(u=>u.id===x.newValue);
+    return `${esc(new Date(x.at).toLocaleString('en-IN'))}: ${esc(from?from.name:x.oldValue)} → ${esc(to?to.name:x.newValue)}${x.reason?' — '+esc(x.reason):''} (by ${esc(x.userName)})`;
+  }).join('<br>')+'</div>';
+}
+function closeTransferTask(){$('transferTaskModal').classList.add('hidden');window._transferFieldId=null}
+function confirmTransferTask(){
+  const el=$(window._transferFieldId);
+  if(!el)return;
+  const newId=$('transferNewDoer').value;
+  const reason=$('transferReason').value.trim();
+  if(!newId){toast('Naya Doer select karein.');return}
+  if(!reason){toast('Transfer ka reason likhna zaroori hai.');return}
+  const oldVal=el.value;
+  const oldWorker=users.find(u=>u.id===oldVal);
+  const newWorker=users.find(u=>u.id===newId);
+  window.__transferInProgress=true;
+  window.__transferReason=reason;
+  if(typeof _auditPrev!=='undefined')_auditPrev.set(el,newId);
+  el.value=newId;
+  el.dispatchEvent(new Event('change',{bubbles:true}));
+  window.__transferInProgress=false;
+  window.__transferReason='';
+  auditFieldChange(el,oldVal,newId,'TRANSFER',reason);
+  toast('Task transfer ho gaya: '+(newWorker?newWorker.name:newId)+(oldWorker?' (from '+oldWorker.name+')':''));
+  closeTransferTask();
 }
 document.addEventListener('change',e=>{
  if(e.target.matches('select.person,select.returnPerson') && e.target.value){
@@ -1852,7 +2427,10 @@ document.addEventListener('change',e=>{
     return;
   }
   const old=_auditPrev.has(el)?_auditPrev.get(el):'';
-  auditFieldChange(el,old,el.value,'CHANGE');
+  const stageOfEl=stageForElement(el);
+  const isPostLockEdit=stageOfEl && getStageLocks()[stageOfEl.id];
+  auditFieldChange(el,old,el.value,isPostLockEdit?'POST_LOCK_EDIT':'CHANGE');
+  if(isPostLockEdit)toast('⚠ Locked section me correction — ye Audit Trail me record ho gaya hai.');
   _auditPrev.set(el,el.value);
   applySequenceAndLocks();
 },true);
