@@ -2,11 +2,13 @@
   {
     "slug": "parcel-dispatched",
     "name": "Parcel Dispatch & Return",
-    "pushedAt": 0
+    "pushedAt": 0,
+    "enabled": true
   },
   {
     "slug": "trip-expense-app",
     "name": "Trip Expense app",
-    "pushedAt": 0
+    "pushedAt": 0,
+    "enabled": true
   }
 ]

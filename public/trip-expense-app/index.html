@@ -130,6 +130,7 @@ if(window.self!==window.top){
 <div class="panel"><div class="pb" style="display:flex;gap:8px;flex-wrap:wrap">
 <select id="expSalesFilter" onchange="renderExplorerPage()" style="padding:8px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">All Sales Persons</option></select>
 <select id="expStatusFilter" onchange="renderExplorerPage()" style="padding:8px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">All Status</option><option value="running">Active</option><option value="hisaab_submitted">To Verify</option><option value="closed">Closed</option><option value="overdue">Overdue</option></select>
+<label id="showDeletedTripsWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer"><input type="checkbox" id="showDeletedTrips" onchange="renderExplorerPage()" style="width:auto"> 🗑 Show Deleted (<span id="deletedTripsCount">0</span>)</label>
 </div></div>
 <div class="panel"><div class="pb" id="explorerList" style="padding-top:6px"></div></div>
 </section>
@@ -246,7 +247,7 @@ const todayISO=()=>new Date().toISOString().slice(0,10);
 function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;return `TRP-${ds}-${String(Date.now()).slice(-4)}`}
 function genLedgerId(){return 'LG-'+Date.now()+'-'+Math.floor(Math.random()*1000)}
 
-let users=[],trips=[],ledger=[],notifySettings={issued:true,additional:true,overdue:true,submitted:true,closed:true,booked:true};
+let users=[],trips=[],allTripsRaw=[],deletedTrips=[],ledger=[],notifySettings={issued:true,additional:true,overdue:true,submitted:true,closed:true,booked:true};
 let messageTemplates={
   issued:'💰 Trip Advance Issued\nAmount: {amount}\nLocation: {location}\nHisaab Due: {due}\nTrip: {tripId}',
   additional:'💰 Additional Advance Issued\nAmount: {amount}\nTrip: {tripId}',
@@ -347,7 +348,9 @@ function refreshLoginBadge(){
 function startTripsSync(){
   if(tripsStarted)return;tripsStarted=true;
   db.collection('te_trips').onSnapshot(snap=>{
-    trips=[];snap.forEach(d=>trips.push(d.data()));
+    allTripsRaw=[];snap.forEach(d=>allTripsRaw.push(d.data()));
+    trips=allTripsRaw.filter(t=>!t.deletedAt);
+    deletedTrips=allTripsRaw.filter(t=>t.deletedAt);
     renderAll();
   },err=>console.error('trips sync error',err));
 }
@@ -956,26 +959,49 @@ function openTripDetail(tripId){
 }
 
 /* ===== Detailed Trips (Explorer) ===== */
+function canDeleteTrips(){const r=effectiveRole();return r==='admin'||r==='director'}
 function renderExplorerPage(){
   const salesSel=$('expSalesFilter');
   if(salesSel.dataset.filled!=='1'){
     salesSel.innerHTML='<option value="">All Sales Persons</option>'+usersWithRole('sales').map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
     salesSel.dataset.filled='1';
   }
+  if($('showDeletedTripsWrap'))$('showDeletedTripsWrap').classList.toggle('hidden',!deletedTrips.length);
+  if($('deletedTripsCount'))$('deletedTripsCount').textContent=deletedTrips.length;
+  const showDeleted=$('showDeletedTrips')&&$('showDeletedTrips').checked;
   const salesFilter=salesSel.value,statusFilter=$('expStatusFilter').value;
-  let list=trips.slice();
+  let list=(showDeleted?deletedTrips:trips).slice();
   if(salesFilter)list=list.filter(t=>t.salesId===salesFilter);
   if(statusFilter==='overdue')list=list.filter(isOverdue);
   else if(statusFilter)list=list.filter(t=>t.status===statusFilter);
   list.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   const wrap=$('explorerList');
-  if(!list.length){wrap.innerHTML='<small>Koi trip nahi mili.</small>';return}
-  wrap.innerHTML=`<div style="overflow-x:auto"><table class="dtb"><thead><tr><th>Trip</th><th>Sales Person</th><th>Location</th><th>Purpose</th><th>Advance</th><th>Spent</th><th>Balance</th><th>Status</th></tr></thead><tbody>`+
+  if(!list.length){wrap.innerHTML=`<small>${showDeleted?'Koi deleted trip nahi hai.':'Koi trip nahi mili.'}</small>`;return}
+  const canDelete=canDeleteTrips();
+  wrap.innerHTML=`<div style="overflow-x:auto"><table class="dtb"><thead><tr><th>Trip</th><th>Sales Person</th><th>Location</th><th>Purpose</th><th>Advance</th><th>Spent</th><th>Balance</th><th>Status</th>${canDelete?'<th>Action</th>':''}</tr></thead><tbody>`+
   list.map(t=>{
     const issued=tripIssued(t.id),expense=tripExpense(t.id),balance=issued-expense;
     const statusLabel=t.status==='closed'?'Closed':(t.status==='hisaab_submitted'?'To Verify':(isOverdue(t)?'Overdue':'Active'));
-    return `<tr onclick="openTripDetail('${esc(t.id)}')"><td>${esc(t.id)}</td><td>${esc(t.salesName)}</td><td>${esc(t.location)}</td><td>${esc(t.purpose||'-')}</td><td>${money(issued)}</td><td>${money(expense)}</td><td>${money(balance)}</td><td>${esc(statusLabel)}</td></tr>`;
+    const action=!canDelete?'':showDeleted
+      ?`<button class="btn" onclick="event.stopPropagation();restoreTrip('${esc(t.id)}')">↩ Restore</button>`
+      :`<button class="btn danger" onclick="event.stopPropagation();deleteTrip('${esc(t.id)}')">🗑</button>`;
+    return `<tr onclick="openTripDetail('${esc(t.id)}')"><td>${esc(t.id)}</td><td>${esc(t.salesName)}</td><td>${esc(t.location)}</td><td>${esc(t.purpose||'-')}</td><td>${money(issued)}</td><td>${money(expense)}</td><td>${money(balance)}</td><td>${esc(statusLabel)}</td>${canDelete?`<td>${action}</td>`:''}</tr>`;
   }).join('')+`</tbody></table></div>`;
+}
+async function deleteTrip(tripId){
+  if(!canDeleteTrips()){alert('Sirf Admin/Director trip delete kar sakte hain.');return}
+  const t=trips.find(x=>x.id===tripId);if(!t)return;
+  if(!confirm('Ye trip Deleted list me chala jayega (permanent delete nahi hoga).\n\nTrip: '+t.id+'\nSales Person: '+(t.salesName||'-')+'\n\nDelete karna hai?'))return;
+  const actor=myUserObj();
+  try{ await db.collection('te_trips').doc(tripId).update({deletedAt:new Date().toISOString(),deletedBy:actor?actor.name:'Unknown'}); }
+  catch(e){ console.error('delete trip failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
+  toast('Trip Deleted list me bhej diya: '+tripId);
+}
+async function restoreTrip(tripId){
+  if(!canDeleteTrips()){alert('Sirf Admin/Director trip restore kar sakte hain.');return}
+  try{ await db.collection('te_trips').doc(tripId).update({deletedAt:firebase.firestore.FieldValue.delete(),deletedBy:firebase.firestore.FieldValue.delete()}); }
+  catch(e){ console.error('restore trip failed',e); alert('Restore fail ho gaya, dobara try karein.'); return; }
+  toast('Trip restore ho gaya: '+tripId);
 }
 
 /* ===== Activity Log ===== */

@@ -1315,6 +1315,36 @@ async function updateAppsRegistry(headers,slug,name){
   if(!putRes.ok){ const err=await putRes.json().catch(()=>({})); throw new Error(err.message||putRes.status); }
 }
 
+async function toggleAppEnabled(slug,currentlyDisabled){
+  const token=localStorage.getItem('ghToken')||'';
+  if(!token){alert('पहले "🐙 GitHub Push" panel में अपना GitHub token save करें।');return;}
+  const willEnable=currentlyDisabled;
+  if(!confirm((willEnable?'"'+slug+'" ko wapas Enable kar dein?':'"'+slug+'" ko Disable kar dein? Ye sirf hub ki sidebar/dashboard se hata dega — koi data ya file delete nahi hogi, aur URL se direct access bhi chalta rahega.')))return;
+  const headers={Authorization:'token '+token,Accept:'application/vnd.github+json'};
+  try{
+    const apiUrl='https://api.github.com/repos/'+GH_OWNER+'/'+GH_REPO+'/contents/public/apps.json';
+    const getRes=await fetch(apiUrl+'?ref='+GH_BRANCH,{headers});
+    if(!getRes.ok)throw new Error('apps.json read fail');
+    const j=await getRes.json();
+    const sha=j.sha;
+    let list=JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\n/g,'')))));
+    const i=list.findIndex(a=>a.slug===slug);
+    if(i<0)throw new Error('App not found in registry');
+    list[i].enabled=willEnable;
+    const jsonStr=JSON.stringify(list,null,2);
+    const base64=btoa(unescape(encodeURIComponent(jsonStr)));
+    const putRes=await fetch(apiUrl,{
+      method:'PUT',
+      headers:{...headers,'Content-Type':'application/json'},
+      body:JSON.stringify({message:(willEnable?'Enable':'Disable')+' app "'+slug+'" via admin panel',content:base64,branch:GH_BRANCH,sha})
+    });
+    if(!putRes.ok){const err=await putRes.json().catch(()=>({}));throw new Error(err.message||putRes.status);}
+    alert('"'+slug+'" '+(willEnable?'enable':'disable')+' ho gaya. Ek minute me reflect hoga.');
+    setTimeout(loadLiveAppsRegistry,1500);
+  }catch(err){
+    alert('Toggle fail ho gaya: '+err.message);
+  }
+}
 let liveAppsList=[];
 async function loadLiveAppsRegistry(){
   try{
@@ -1328,20 +1358,25 @@ async function loadLiveAppsRegistry(){
     if(!wrap||!liveAppsList.length)return;
     wrap.innerHTML='';
     liveAppsList.forEach(a=>{
+      const disabled=a.enabled===false;
+      if(disabled&&!superAdminUnlocked)return;
       const card=document.createElement('div');
       card.className='appCard';
       card.innerHTML='<div class="appHead"><div class="appIcon">🌐</div><div><h4></h4><small>/'+a.slug+'/</small></div></div>'+
-        '<div><span class="badge"><span class="dot"></span> Live</span></div>'+
-        '<div class="cardActions"><button class="btn primary" style="grid-column:1/-1" type="button">🔗 Open App</button></div>';
+        '<div><span class="badge"'+(disabled?' style="background:#f3e2c9;color:#8a6d00"':'')+'><span class="dot"></span> '+(disabled?'Disabled':'Live')+'</span></div>'+
+        '<div class="cardActions"><button class="btn primary" style="grid-column:1/-1" type="button">🔗 Open App</button></div>'+
+        '<div class="cardActions superAdminOnly'+(superAdminUnlocked?'':' hidden')+'"><button class="btn" type="button" style="grid-column:1/-1">'+(disabled?'▶️ Enable':'⏸️ Disable')+'</button></div>';
       card.querySelector('h4').textContent=a.name;
-      card.querySelector('button').addEventListener('click',()=>openAppInline(a.slug,a.name));
+      card.querySelector('.btn.primary').addEventListener('click',()=>openAppInline(a.slug,a.name));
+      const toggleBtn=card.querySelectorAll('.cardActions')[1]?.querySelector('button');
+      if(toggleBtn)toggleBtn.addEventListener('click',()=>toggleAppEnabled(a.slug,disabled));
       wrap.appendChild(card);
     });
     document.getElementById('liveAppsSection')?.classList.remove('hidden');
     const hashMatch=/^#app=(.+)$/.exec(location.hash);
     if(hashMatch){
       const found=liveAppsList.find(a=>a.slug===decodeURIComponent(hashMatch[1]));
-      if(found)openAppInline(found.slug,found.name);
+      if(found&&found.enabled!==false)openAppInline(found.slug,found.name);
     }
   }catch(e){}
 }
@@ -1349,9 +1384,10 @@ async function loadLiveAppsRegistry(){
 function renderSidebarApps(list){
   const wrap=document.getElementById('sideAppsList');
   if(!wrap)return;
-  if(!list.length){wrap.innerHTML='<div class="sideEmpty">No live apps yet</div>';return;}
+  const visible=list.filter(a=>a.enabled!==false);
+  if(!visible.length){wrap.innerHTML='<div class="sideEmpty">No live apps yet</div>';return;}
   wrap.innerHTML='';
-  list.forEach(a=>{
+  visible.forEach(a=>{
     const item=document.createElement('div');
     item.className='sideItem';
     item.dataset.slug=a.slug;
