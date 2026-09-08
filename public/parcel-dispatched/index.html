@@ -305,7 +305,8 @@ if(window.self!==window.top){
 <div class="field hidden" id="dispatchPktByWrap"><label>PKT Change By <span class="req">*</span></label><select class="person" id="dispatchPktBy" data-time="dispatchPktTime" data-event="PKT Change By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('dispatchPktBy')">🔄 Transfer</button></div>
 <div class="field hidden" id="dispatchPktTimeWrap"><label>Time <span class="req">*</span></label><input id="dispatchPktTime" readonly></div>
 <div class="field"><label>Weight Checked By <span class="req">*</span></label><select class="person" id="weightCheckedBy" data-time="weightCheckedTime" data-event="Weight Checked By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="weightCheckedTime" readonly></div>
-<div class="field"><label>Lines & Tags Checked By <span class="req">*</span></label><select class="person" id="linesTagsCheckedBy" data-time="linesTagsTime" data-event="Lines & Tags Checked By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="linesTagsTime" readonly></div>
+<div class="field"><label>Lines &amp; Tags Required <span class="req">*</span></label><select id="linesTagsRequired" onchange="linesTagsRule()"><option value="">Select</option><option>YES</option><option>NO</option></select></div>
+<div class="field hidden" id="linesTagsByWrap"><label>Lines & Tags Checked By <span class="req">*</span></label><select class="person" id="linesTagsCheckedBy" data-time="linesTagsTime" data-event="Lines & Tags Checked By" onchange="personChanged(this)"></select></div><div class="field hidden" id="linesTagsTimeWrap"><label>Time <span class="req">*</span></label><input id="linesTagsTime" readonly></div>
 <div class="field"><label>Handover To Noting <span class="req">*</span></label><select class="person" id="handoverToNoting" data-time="notingTime" data-event="Handover To Noting" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToNoting')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="notingTime" readonly></div>
 
 </div></div></section>
@@ -341,6 +342,7 @@ if(window.self!==window.top){
 
 <div class="field"><label>Courier Slip No.</label><input id="courierSlipNo" placeholder="Slip / receipt no."></div>
 <div class="field"><label>AWB / Tracking No.</label><input id="awbNo" placeholder="AWB / tracking number"></div>
+<div class="field"><label>Courier Slip Amount</label><input type="number" id="courierSlipAmount" step="0.01"></div>
 
 <div class="field"><label>Parcel Taken / Scanned By</label><input id="courierPersonName" class="titleCaseField" placeholder="Courier person name"></div>
 <div class="field"><label>Handover By <span class="req">*</span></label>
@@ -351,14 +353,7 @@ if(window.self!==window.top){
 <select class="person" id="courierSlipReceivedBy" data-time="courierSlipReceivedTime" data-event="Courier Slip Received By" onchange="personChanged(this)"></select></div>
 <div class="field"><label>Slip Received Time</label><input id="courierSlipReceivedTime" readonly></div>
 
-<div class="field"><label>Final Status <span class="req">*</span></label>
-<select id="shippingFinalStatus">
-<option value="">Select</option>
-<option>Dispatched</option>
-<option>In Transit</option>
-<option>Delivered</option>
-<option>Closed</option>
-</select></div>
+<div class="field span2 no-print"><label>Courier Slip Photo</label><input type="hidden" id="courierSlipPhotoData"><input type="file" id="courierSlipPhotoInput" accept="image/*" capture="environment" onchange="handleCourierSlipPhoto(this)"><div class="note" id="courierSlipPhotoStatus"></div><img id="courierSlipPhotoPreview" class="hidden" style="max-width:160px;border-radius:8px;margin-top:6px;display:block"></div>
 
 <div class="field full"><label>Dispatch / Courier Remarks</label><textarea id="finalRemarks"></textarea></div>
 </div></div></section>
@@ -416,14 +411,15 @@ if(window.self!==window.top){
 <div class="field"><label>Return From <span class="req">*</span></label><select id="returnFrom"></select></div>
 <div class="field"><label>Return Through <span class="req">*</span></label><select id="returnThrough"><option value="">Select</option><option>Courier</option><option>Hand Delivery</option><option>Staff</option></select></div>
 <div class="field"><label>Parcel Receive By <span class="req">*</span></label><select class="returnPerson" id="returnReceiveBy" data-time="returnReceiveTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnReceiveTime" readonly></div>
-<div class="field"><label>Parcel Type <span class="req">*</span></label><select id="returnParcelType"><option value="">Select</option><option>Local</option><option>Paid</option><option>To Pay</option></select></div>
-<div class="field"><label>Amount <span class="req">*</span></label><input type="number" id="returnAmount"></div>
+<div class="field"><label>Parcel Type <span class="req">*</span></label><select id="returnParcelType" onchange="returnParcelTypeRule()"><option value="">Select</option><option>Local</option><option>Paid</option><option>To Pay</option></select></div>
+<div class="field"><label>Amount <span class="req hidden" id="returnAmountReq">*</span></label><input type="number" id="returnAmount"></div>
 <div class="field"><label>Handover for Checking <span class="req">*</span></label><select class="returnPerson" id="returnHandoverChecking" data-time="handoverCheckingTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="handoverCheckingTime" readonly></div>
 </div></div></section>
 
 <section class="card"><h3>2. Checking & Return Entry Handover</h3><div class="body"><div class="grid">
 <div class="field"><label>Weight Check Done By <span class="req">*</span></label><select class="returnPerson" id="returnWeightBy" data-time="returnWeightTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnWeightTime" readonly></div>
 <div class="field"><label>Lines & Tags Checked By <span class="req">*</span></label><select class="returnPerson" id="returnLinesBy" data-time="returnLinesTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnLinesTime" readonly></div>
+<div class="field"><label>No. of Items Received <span class="req">*</span></label><input type="number" id="returnItemsReceived"></div>
 <div class="field"><label>Handover for Return Entry - Name <span class="req">*</span></label><select class="returnPerson" id="returnEntryBy" data-time="returnEntryTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnEntryTime" readonly></div>
 </div></div></section>
 
@@ -441,13 +437,13 @@ if(window.self!==window.top){
 <div class="field"><label>Stock Goods Put in Boxes - Name <span class="req">*</span></label><select class="returnPerson" id="stockBoxesBy" data-time="stockBoxesTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="stockBoxesTime" readonly></div>
 <div class="field full"><label>Remarks</label><textarea id="returnRemarks"></textarea></div>
 </div></div></section>
-<div class="save"><button class="btn secondary" onclick="clearReturn()">Clear Return</button><button class="btn primary" onclick="printReturn()">🖨 Print Return Slip</button><button class="btn primary" onclick="saveReturn()">💾 SAVE RETURN</button></div>
+<div class="save"><span id="returnAutoSaveTag" class="note" style="margin-right:auto"></span><button class="btn primary" onclick="printReturn()">🖨 Print Return Slip</button></div>
 </div>
 
 </div>
 </div></main>
 
-<div class="modal hidden" id="manageModal"><div class="box"><div class="mh"><b>Admin / Backend Masters</b><button class="btn secondary small" onclick="closeManage()">✕</button></div><div class="mb"><div class="tabs"><button class="tab on" data-tab="users" onclick="tab(this,'users')">Universal Users</button><button class="tab" data-tab="shipto" onclick="tab(this,'shipto')">Ship To</button><button class="tab" data-tab="clients" onclick="tab(this,'clients')">Ship To</button><button class="tab" data-tab="brokers" onclick="tab(this,'brokers')">Brokers</button><button class="tab" data-tab="shipthrough" onclick="tab(this,'shipthrough')">Ship Through</button><button class="tab" data-tab="insh" onclick="tab(this,'insh')">INSH Amount</button><button class="tab" data-tab="messages" onclick="tab(this,'messages')">Message Settings</button><button class="tab" data-tab="watemplates" onclick="tab(this,'watemplates')">WhatsApp Templates</button><button class="tab" data-tab="privacy" onclick="tab(this,'privacy')">Self Remark Privacy</button><button class="tab" data-tab="api" onclick="tab(this,'api')">GREEN-API</button></div><div id="manageContent"></div></div><div class="mf"><span class="note">Data is saved in this browser.</span><button class="btn secondary" onclick="closeManage()">Close</button></div></div></div>
+<div class="modal hidden" id="manageModal"><div class="box"><div class="mh"><b>Admin / Backend Masters</b><button class="btn secondary small" onclick="closeManage()">✕</button></div><div class="mb"><div class="tabs"><button class="tab on" data-tab="users" onclick="tab(this,'users')">Universal Users</button><button class="tab" data-tab="shipto" onclick="tab(this,'shipto')">Ship To</button><button class="tab" data-tab="clients" onclick="tab(this,'clients')">Ship To</button><button class="tab" data-tab="brokers" onclick="tab(this,'brokers')">Brokers</button><button class="tab" data-tab="shipthrough" onclick="tab(this,'shipthrough')">Ship Through</button><button class="tab" data-tab="insh" onclick="tab(this,'insh')">INSH Amount</button><button class="tab" data-tab="couriername" onclick="tab(this,'couriername')">Courier Name</button><button class="tab" data-tab="messages" onclick="tab(this,'messages')">Message Settings</button><button class="tab" data-tab="watemplates" onclick="tab(this,'watemplates')">WhatsApp Templates</button><button class="tab" data-tab="privacy" onclick="tab(this,'privacy')">Self Remark Privacy</button><button class="tab" data-tab="api" onclick="tab(this,'api')">GREEN-API</button></div><div id="manageContent"></div></div><div class="mf"><span class="note">Data is saved in this browser.</span><button class="btn secondary" onclick="closeManage()">Close</button></div></div></div>
 
 
 <div class="modal hidden" id="allRecordsModal"><div class="box" style="width:min(1100px,100%)">
@@ -552,7 +548,7 @@ if(window.self!==window.top){
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
-const K={users:'pd_users_v2',shipto:'pd_shipto_v2',shipthrough:'pd_shipthrough_v2',api:'pd_greenapi_v2',records:'pd_records_v2',inshpresets:'pd_inshpresets_v1'};
+const K={users:'pd_users_v2',shipto:'pd_shipto_v2',shipthrough:'pd_shipthrough_v2',api:'pd_greenapi_v2',records:'pd_records_v2',inshpresets:'pd_inshpresets_v1',couriernames:'pd_couriernames_v1'};
 const ACTIVE_DRAFT_KEY='pd_active_draft_v1';
 let currentParcelId=null;
 
@@ -733,7 +729,7 @@ if(!Array.isArray(waTemplates)||!waTemplates.length){
 }
 function saveWaTemplates(){localStorage.setItem(WA_TEMPLATE_KEY,JSON.stringify(waTemplates));}
 
-let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(localStorage.getItem(K.shipto)||'[]');let shipThrough=JSON.parse(localStorage.getItem(K.shipthrough)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let inshAmountPresets=JSON.parse(localStorage.getItem(K.inshpresets)||'null')||['0.10','0.20','0.50','0.60','0.70','1.00','2.00','3.00'];let api=JSON.parse(localStorage.getItem(K.api)||'{}');let editing=null,currentTab='users',waTarget=null;
+let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(localStorage.getItem(K.shipto)||'[]');let shipThrough=JSON.parse(localStorage.getItem(K.shipthrough)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let inshAmountPresets=JSON.parse(localStorage.getItem(K.inshpresets)||'null')||['0.10','0.20','0.50','0.60','0.70','1.00','2.00','3.00'];let courierNames=JSON.parse(localStorage.getItem(K.couriernames)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let api=JSON.parse(localStorage.getItem(K.api)||'{}');let editing=null,currentTab='users',waTarget=null;
 const $=id=>document.getElementById(id);
 
 const DOER_MASTER_VERSION='20260819_doers_v3';
@@ -787,9 +783,9 @@ function openFromLink(parcelId){
   window._pendingOpenParcelId=null;
   if(history.replaceState)history.replaceState(null,'',location.pathname);
 }
-function saveMasters(){localStorage.setItem(K.users,JSON.stringify(users));localStorage.setItem(K.shipto,JSON.stringify(shipTo));localStorage.setItem(K.shipthrough,JSON.stringify(shipThrough));localStorage.setItem(K.inshpresets,JSON.stringify(inshAmountPresets));localStorage.setItem(K.api,JSON.stringify(api));pdSyncUsersToCloud();}
+function saveMasters(){localStorage.setItem(K.users,JSON.stringify(users));localStorage.setItem(K.shipto,JSON.stringify(shipTo));localStorage.setItem(K.shipthrough,JSON.stringify(shipThrough));localStorage.setItem(K.inshpresets,JSON.stringify(inshAmountPresets));localStorage.setItem(K.couriernames,JSON.stringify(courierNames));localStorage.setItem(K.api,JSON.stringify(api));pdSyncUsersToCloud();}
 function options(arr,val=x=>x,label=x=>x){return '<option value="">Select</option>'+arr.map(x=>`<option value="${esc(val(x))}">${esc(label(x))}</option>`).join('')}
-function populate(){ensureDoerMaster();document.querySelectorAll('.person').forEach(s=>{let old=s.value;let au=users.filter(u=>u.active!==false);s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});$('shipThroughList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('courierNameList'))$('courierNameList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('inshAmountList'))$('inshAmountList').innerHTML=inshAmountPresets.map(x=>`<option value="${esc(x)}"></option>`).join('');renderShipToMenu('')}
+function populate(){ensureDoerMaster();document.querySelectorAll('.person').forEach(s=>{let old=s.value;let au=users.filter(u=>u.active!==false);s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});$('shipThroughList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('courierNameList'))$('courierNameList').innerHTML=courierNames.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('inshAmountList'))$('inshAmountList').innerHTML=inshAmountPresets.map(x=>`<option value="${esc(x)}"></option>`).join('');renderShipToMenu('')}
 function now(){return new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}
 function personChanged(s){
   let t=$(s.dataset.time);
@@ -814,19 +810,111 @@ function personChanged(s){
   if(t)t.value=now();
   let u=users.find(x=>x.id===s.value);
   if(!u||!u.phone){console.warn('Selected user mobile number not saved.');return}
+  if(s.id==='parcelGivenBy')return; // Parcel Given By is the initiator, not someone a task is being handed to — no notification needed here.
   sendBackgroundWA(u,s.dataset.event).catch(err=>console.error('WhatsApp background send failed:',err));
 }
-async function sendBackgroundWA(u,eventName){
+async function sendRawWA(phone,message){
   let id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
   if(!id||!token){console.warn('GREEN-API settings missing');return false}
-  let phone=normalizePhone(u.phone); if(phone.length<11)return false;
-  let parcel=editing||currentParcelId||'(New Parcel)';
-  let client=$('shipTo').value||'-',st=$('shipThrough').value||'-',tm=now();
-  let message=`📦 Parcel Dispatch\n\nClient: ${client}\nParcel ID: ${parcel}\nShip Through: ${st}\n${eventName}: ${u.name}\nTime: ${tm}\n\nParcel update: ${eventName} completed/handed over to ${u.name}.\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(parcel)}`;
-  let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:phone+'@c.us',message})});
+  let p=normalizePhone(phone); if(p.length<11)return false;
+  let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
   if(!r.ok){let d=await r.json().catch(()=>({}));throw new Error(d.message||d.error||('HTTP '+r.status))}
   return true;
 }
+async function sendBackgroundWA(u,eventName){
+  let parcel=editing||currentParcelId||'(New Parcel)';
+  let client=$('shipTo').value||'-',st=$('shipThrough').value||'-',tm=now();
+  let message=`📦 Parcel Dispatch\n\nClient: ${client}\nParcel ID: ${parcel}\nShip Through: ${st}\n${eventName}: ${u.name}\nTime: ${tm}\n\nParcel update: ${eventName} completed/handed over to ${u.name}.\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(parcel)}`;
+  return sendRawWA(u.phone,message);
+}
+/* ===== Stuck-parcel delay alerts =====
+   Best-effort, client-side only (Spark plan has no server/cron): checked whenever this
+   browser has the app open. Detects a parcel whose current stage hasn't moved forward
+   in 2+ hours and WhatsApps the Parcel Given By + Slip Owner once per stuck stage. */
+function parseNowStr(s){
+  if(!s)return null;
+  const m=String(s).match(/(\d{1,2})\s+(\w{3})\w*\s+(\d{4}),?\s+(\d{1,2}):(\d{2})\s*([ap]m)/i);
+  if(!m)return null;
+  const months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  const mo=months[m[2].toLowerCase().slice(0,3)];
+  if(mo===undefined)return null;
+  let h=parseInt(m[4],10)%12;
+  if(/pm/i.test(m[6]))h+=12;
+  const d=new Date(parseInt(m[3],10),mo,parseInt(m[1],10),h,parseInt(m[5],10));
+  return isNaN(d.getTime())?null:d;
+}
+function stageFieldRequiredForRecord(fieldId,rec){
+  if(fieldId==='dispatchPktBy'||fieldId==='dispatchPktTime')return rec.dispatchPktRequired==='YES';
+  if(fieldId==='linesTagsCheckedBy'||fieldId==='linesTagsTime')return rec.linesTagsRequired==='YES';
+  return true;
+}
+function recordFieldFilled(rec,fieldId){
+  if(!stageFieldRequiredForRecord(fieldId,rec))return true;
+  return String(rec[fieldId]||'').trim()!=='';
+}
+function recordStageComplete(rec,stage){
+  return stage.fields.every(f=>recordFieldFilled(rec,f));
+}
+function currentActiveStageInfo(rec){
+  for(let i=0;i<STAGE_SEQUENCE.length;i++){
+    const st=STAGE_SEQUENCE[i];
+    if(!recordStageComplete(rec,st)){
+      let enteredAt=null;
+      if(i>0){
+        const prev=STAGE_SEQUENCE[i-1];
+        for(let j=prev.fields.length-1;j>=0;j--){
+          const fid=prev.fields[j],val=rec[fid];
+          if(val && /Time$/.test(fid)){enteredAt=val;break}
+        }
+      }
+      if(!enteredAt)enteredAt=rec.createdAt;
+      return {stage:st,index:i,enteredAt};
+    }
+  }
+  return null;
+}
+let _delayCheckRunning=false;
+async function checkStuckParcelsAndAlertDelays(){
+  if(_delayCheckRunning)return;
+  _delayCheckRunning=true;
+  try{
+    if(!String(api.idInstance||'').trim()||!String(api.apiToken||'').trim())return;
+    const all=JSON.parse(localStorage.getItem(K.records)||'[]');
+    const nowMs=Date.now();
+    let changed=false;
+    for(const rec of all){
+      if(rec.deletedAt)continue;
+      const info=currentActiveStageInfo(rec);
+      if(!info)continue;
+      let entered=parseNowStr(info.enteredAt);
+      if(!entered && info.enteredAt)entered=new Date(info.enteredAt);
+      if(!entered||isNaN(entered.getTime()))continue;
+      const hours=(nowMs-entered.getTime())/3600000;
+      if(hours<2)continue;
+      const alertKey='delayAlerted_'+info.stage.id;
+      if(rec[alertKey])continue;
+      const givenUser=users.find(u=>u.id===rec.parcelGivenBy);
+      const ownerUser=users.find(u=>u.id===rec.slipFillBy);
+      const targets=[givenUser,ownerUser].filter((u,i,arr)=>u&&u.phone&&arr.findIndex(x=>x&&x.id===u.id)===i);
+      if(!targets.length)continue;
+      const hrs=Math.floor(hours);
+      const msg=`⏰ Delay Alert\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nStuck at: ${info.stage.name}\nPending for: ${hrs}+ hours\n\n👉 ${parcelOpenLink(rec.parcelId)}`;
+      for(const u of targets){
+        try{await sendRawWA(u.phone,msg)}catch(e){console.error('delay WA failed',e)}
+      }
+      rec[alertKey]=true;changed=true;
+      try{await pdDb.collection('pd_records_cloud').doc(String(rec.parcelId)).update({[alertKey]:true})}catch(e){console.error('delay flag save failed',e)}
+    }
+    if(changed)localStorage.setItem(K.records,JSON.stringify(all));
+  }finally{_delayCheckRunning=false}
+}
+let _delayCheckStarted=false;
+function startDelayAlertWatch(){
+  if(_delayCheckStarted)return;_delayCheckStarted=true;
+  setTimeout(()=>checkStuckParcelsAndAlertDelays().catch(e=>console.error(e)),60*1000);
+  setInterval(()=>checkStuckParcelsAndAlertDelays().catch(e=>console.error(e)),30*60*1000);
+}
+document.addEventListener('DOMContentLoaded',startDelayAlertWatch);
 function mask(p){p=String(p);return p.length>4?'••••••'+p.slice(-4):p}
 function normalizePhone(p){let n=String(p||'').replace(/\D/g,'');if(n.length===10)n='91'+n;return n}
 function parcelOpenLink(parcelId){
@@ -908,8 +996,7 @@ document.addEventListener('click',e=>{
 });
 
 function syncShippingSection(){
-  if($('courierNameList')) $('courierNameList').innerHTML = (shipThrough||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
-  if($('courierName') && !$('courierName').value && $('shipThrough')) $('courierName').value = $('shipThrough').value || '';
+  if($('courierNameList')) $('courierNameList').innerHTML = (courierNames||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
 }
 function shippingInsuranceRule(){
   const yes = $('shippingInsurance') && $('shippingInsurance').value === 'YES';
@@ -919,7 +1006,7 @@ function shippingInsuranceRule(){
 
 function newParcel(){editing=null;currentParcelId=genId();localStorage.setItem(ACTIVE_DRAFT_KEY,currentParcelId);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';document.querySelectorAll('main input,main textarea').forEach(x=>{if(x.id!=='search')x.value=''});document.querySelectorAll('main select').forEach(x=>x.value='');let d=new Date();$('dispatchDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;if($('shippingDate'))$('shippingDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 if($('slipFillTime'))$('slipFillTime').value=now();
-shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();syncShippingSection();syncPackPhotoPreview();saveStageLocks({});applySequenceAndLocks();persistParcelRecord();markAutoSaved();assignDispatchSeqIfNeeded(currentParcelId)}
+shipChanged();priceChanged();dispatchPktRule();linesTagsRule();shippingInsuranceRule();syncShippingSection();syncPackPhotoPreview();syncCourierSlipPhotoPreview();saveStageLocks({});applySequenceAndLocks();persistParcelRecord();markAutoSaved();assignDispatchSeqIfNeeded(currentParcelId)}
 function formData(){let o={parcelId:editing||currentParcelId||genId(),createdAt:new Date().toISOString()};document.querySelectorAll('main input,main select,main textarea').forEach(e=>{if(e.id&&e.id!=='search')o[e.id]=e.value});return o}
 function fileToCompressedDataUri(file){
   return new Promise((resolve,reject)=>{
@@ -957,6 +1044,30 @@ async function handlePackPhoto(inputEl){
     const dataUri=await fileToCompressedDataUri(file);
     if($('packPhotoData'))$('packPhotoData').value=dataUri;
     syncPackPhotoPreview();
+    if(typeof scheduleAutoSave==='function')scheduleAutoSave();
+    if(typeof applySequenceAndLocks==='function')applySequenceAndLocks();
+  }catch(e){
+    console.error('photo compress failed',e);
+    if(statusEl)statusEl.textContent='⚠ Photo attach failed, try again';
+  }
+}
+function syncCourierSlipPhotoPreview(){
+  const val=$('courierSlipPhotoData')?$('courierSlipPhotoData').value:'';
+  const prev=$('courierSlipPhotoPreview');
+  if(!prev)return;
+  if(val){prev.src=val;prev.classList.remove('hidden')}
+  else{prev.src='';prev.classList.add('hidden')}
+  if($('courierSlipPhotoStatus'))$('courierSlipPhotoStatus').textContent=val?'✓ Photo attached':'';
+}
+async function handleCourierSlipPhoto(inputEl){
+  const file=inputEl.files&&inputEl.files[0];
+  if(!file)return;
+  const statusEl=$('courierSlipPhotoStatus');
+  if(statusEl)statusEl.textContent='Compressing photo…';
+  try{
+    const dataUri=await fileToCompressedDataUri(file);
+    if($('courierSlipPhotoData'))$('courierSlipPhotoData').value=dataUri;
+    syncCourierSlipPhotoPreview();
     if(typeof scheduleAutoSave==='function')scheduleAutoSave();
     if(typeof applySequenceAndLocks==='function')applySequenceAndLocks();
   }catch(e){
@@ -1177,7 +1288,7 @@ function isRecordPending(parcelId){
  const locks=(JSON.parse(localStorage.getItem(APPROVAL_LOCK_KEY)||'{}'))[parcelId]||{};
  return !STAGE_SEQUENCE.every(s=>locks[s.id]);
 }
-function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();shippingInsuranceRule();{const cm=findClientByParty($('shipTo').value);if(cm){$('broker').value=cm.broker||'';if(!r.deliveryAddress&&$('deliveryAddress'))$('deliveryAddress').value=cm.address||'';}}syncShippingSection();syncPackPhotoPreview();applySequenceAndLocks();if(!silent){showDispatchFormView();scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
+function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();linesTagsRule();shippingInsuranceRule();{const cm=findClientByParty($('shipTo').value);if(cm){$('broker').value=cm.broker||'';}}syncShippingSection();syncPackPhotoPreview();syncCourierSlipPhotoPreview();applySequenceAndLocks();if(!silent){showDispatchFormView();scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
 function openManage(){currentTab='users';$('manageModal').classList.remove('hidden');renderManage()}function closeManage(){$('manageModal').classList.add('hidden');populate();shipChanged()}function tab(b,t){currentTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));renderManage()}
 function renderManage(){let c=$('manageContent');if(currentTab==='users'){c.innerHTML=`<div class="grid"><div class="field"><label>User Name <span class="req">*</span></label><input id="mUserName"></div><div class="field"><label>Username <span class="req">*</span></label><input id="mUsername"></div><div class="field"><label>Mobile Number <span class="req">*</span></label><input id="mUserPhone" placeholder="10 digit or 91..."></div><div class="field"><label>Department <span class="req">*</span></label><input id="mDepartment"></div><div class="field"><label>&nbsp; <span class="req">*</span></label><button class="btn primary" onclick="addUser()">Add Universal User</button></div></div><div class="note">Handover dropdowns me sabhi active Doers dikhenge. Actual-work fields (Slip Fill, Weight Check, Lines & Tags, Noted By, Item Packed etc.) me logged-in user sirf apna naam fill kar sakta hai. Dusre Doer ka actual-work naam us Doer ki login ID se hi fill hoga. New user ka default password 1234 hai.</div><div style="margin:8px 0"><button class="btn secondary small" onclick="resetDefaultUsers()">↻ Reset Default Doers</button></div><div>${users.map((u,i)=>`<div class="item"><span><b>${esc(u.name)}</b> <small>(${esc(u.username||u.id)})</small><br><small>${esc(u.phone)} • ${esc(u.department||'No Department')} • ${u.active===false?'INACTIVE':'ACTIVE'}</small></span><span><button class="btn small secondary" onclick="toggleUser(${i})">${u.active===false?'Activate':'Deactivate'}</button> <button class="btn small secondary" onclick="editUser(${i})">Edit</button> <button class="btn small secondary" onclick="resetUserPassword(${i})">Reset Password</button> <button class="btn small danger" onclick="delUser(${i})">Delete</button></span></div>`).join('')}</div>`}
 else if(currentTab==='shipto'){c.innerHTML=`<div class="row"><input id="mShipTo" placeholder="Add Client / Ship To" style="flex:1"><button class="btn primary" onclick="addShipTo()">Add</button></div>${shipTo.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delShipTo(${i})">Delete</button></div>`).join('')}`}
@@ -1201,6 +1312,7 @@ else if(currentTab==='clients'){
 else if(currentTab==='brokers'){c.innerHTML=`<div class="row"><input id="mBroker" class="titleCaseField" placeholder="Add Broker" style="flex:1"><button class="btn primary" onclick="addBroker()">Add</button></div>${brokers.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delBroker(${i})">Delete</button></div>`).join('')}`}
 else if(currentTab==='shipthrough'){c.innerHTML=`<div class="row"><input id="mShipThrough" placeholder="Add Ship Through" style="flex:1"><button class="btn primary" onclick="addShipThrough()">Add</button></div><div class="note">Section 1-A केवल SECURE, SEQUEL/SQL और BVC पर दिखेगा.</div>${shipThrough.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delShipThrough(${i})">Delete</button></div>`).join('')}`}
 else if(currentTab==='insh'){c.innerHTML=`<div class="row"><input id="mInshAmount" placeholder="Add INSH Amount (e.g. 0.10)" style="flex:1"><button class="btn primary" onclick="addInshPreset()">Add</button></div><div class="note">Dispatch Section 1 ke INSH Amount field mein ye quick-pick suggestions ke roop mein dikhenge.</div>${inshAmountPresets.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delInshPreset(${i})">Delete</button></div>`).join('')}`}
+else if(currentTab==='couriername'){c.innerHTML=`<div class="row"><input id="mCourierName" placeholder="Add Courier Name" style="flex:1"><button class="btn primary" onclick="addCourierName()">Add</button></div><div class="note">Section 6 ke Courier Name field mein ye dropdown suggestions ke roop mein dikhenge.</div>${courierNames.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delCourierName(${i})">Delete</button></div>`).join('')}`}
 else if(currentTab==='messages'){
  let au=users.filter(u=>u.active!==false);
  c.innerHTML=`<h3 style="margin-top:0">DLC WhatsApp Rules</h3>
@@ -1344,7 +1456,7 @@ function waContext(){
     ShippingDate:$('shippingDate')?.value||'',ExpectedDeliveryDate:$('expectedDeliveryDate')?.value||'',CourierName:$('courierName')?.value||'',ShippingWeight:$('parcelWeight')?.value||'',
     Insurance:$('shippingInsurance')?.value||'',InsuranceAmount:$('shippingInsuranceAmount')?.value||'',CourierSlipNo:$('courierSlipNo')?.value||'',AWB:$('awbNo')?.value||'',CourierPerson:$('courierPersonName')?.value||'',
     ParcelHandoverBy:nameOfUserId($('parcelHandoverBy')?.value),ParcelHandoverTime:$('parcelHandoverTime')?.value||'',
-    CourierSlipReceivedBy:nameOfUserId($('courierSlipReceivedBy')?.value),CourierSlipReceivedTime:$('courierSlipReceivedTime')?.value||'',FinalStatus:$('shippingFinalStatus')?.value||'',
+    CourierSlipReceivedBy:nameOfUserId($('courierSlipReceivedBy')?.value),CourierSlipReceivedTime:$('courierSlipReceivedTime')?.value||'',CourierSlipAmount:$('courierSlipAmount')?.value||'',FinalStatus:'',
     ReturnFrom:$('returnFrom')?.value||'',ReturnThrough:$('returnThrough')?.value||'',ReturnReceiveBy:nameOfUserId($('returnReceiveBy')?.value),ReturnReceiveTime:$('returnReceiveTime')?.value||'',
     ReturnCheckingBy:nameOfUserId($('returnHandoverChecking')?.value),ReturnCheckingTime:$('handoverCheckingTime')?.value||'',
     ReturnWeightBy:nameOfUserId($('returnWeightBy')?.value),ReturnWeightTime:$('returnWeightTime')?.value||'',
@@ -1434,6 +1546,8 @@ function addShipTo(){let v=$('mShipTo').value.trim();if(v&&!shipTo.some(x=>x.toL
 function addShipThrough(){let v=$('mShipThrough').value.trim();if(v&&!shipThrough.some(x=>x.toLowerCase()===v.toLowerCase())){shipThrough.push(v);saveMasters();populate();renderManage()}}function delShipThrough(i){shipThrough.splice(i,1);saveMasters();populate();renderManage()}
 function addInshPreset(){let v=$('mInshAmount').value.trim();if(v&&!inshAmountPresets.includes(v)){inshAmountPresets.push(v);saveMasters();populate();renderManage()}}
 function delInshPreset(i){inshAmountPresets.splice(i,1);saveMasters();populate();renderManage()}
+function addCourierName(){let v=titleCase($('mCourierName').value);if(v&&!courierNames.some(x=>x.toLowerCase()===v.toLowerCase())){courierNames.push(v);saveMasters();syncShippingSection();renderManage()}}
+function delCourierName(i){courierNames.splice(i,1);saveMasters();syncShippingSection();renderManage()}
 function saveApi(){api={baseUrl:$('mBase').value.trim()||'https://api.green-api.com',idInstance:$('mId').value.trim(),apiToken:$('mToken').value.trim()};saveMasters();toast('GREEN-API settings saved')}
 let tt;function toast(m){
   console.log(m);
@@ -1571,6 +1685,7 @@ function saveReturn(silent=false){
  localStorage.setItem(RETURN_RECORDS_KEY,JSON.stringify(a));
  pdPushReturnToCloud(i>=0?a[i]:data);
  assignReturnSeqIfNeeded(data.returnId);
+ if($('returnAutoSaveTag'))$('returnAutoSaveTag').textContent='✓ Saved '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
  if(!silent){toast('Return saved: '+data.returnId);renderReturnHistory();}
 }
 function clearReturn(){
@@ -1579,9 +1694,15 @@ function clearReturn(){
  let x=$('returnDate');if(x)x.value=new Date().toISOString().slice(0,10);
  populateReturnUsers();
  if(typeof returnPktRule==='function')returnPktRule();
+ if(typeof returnParcelTypeRule==='function')returnParcelTypeRule();
  if(typeof syncAllComboInputs==='function')syncAllComboInputs();
  if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+currentReturnId;
+ if($('returnAutoSaveTag'))$('returnAutoSaveTag').textContent='';
  toast('New Return: '+currentReturnId);
+}
+function returnParcelTypeRule(){
+ const toPay=$('returnParcelType')&&$('returnParcelType').value==='To Pay';
+ if($('returnAmountReq'))$('returnAmountReq').classList.toggle('hidden',!toPay);
 }
 function restoreReturn(){
  let raw=localStorage.getItem(RETURN_KEY);if(!raw){if(!currentReturnId)currentReturnId=genReturnId();return}
@@ -1660,6 +1781,7 @@ function openReturnRecord(id){
  returnControls().forEach((e,i)=>{let k=e.dataset.rkey||('r_'+i);e.value=r[k]??''});
  localStorage.setItem(RETURN_KEY,JSON.stringify(r));
  if(typeof returnPktRule==='function')returnPktRule();
+ if(typeof returnParcelTypeRule==='function')returnParcelTypeRule();
  if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+slipLabel(r);
  showReturnFormView();
  toast('Return opened: '+id);
@@ -1668,7 +1790,7 @@ function openReturnRecord(id){
 function populateReturnUsers2(){let au=users.filter(u=>u.active!==false);document.querySelectorAll('#returnModule .returnPerson').forEach(s=>{let old=s.value;s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});let rf=$('returnFrom');if(rf){let old=rf.value;rf.innerHTML=options(shipTo);if(shipTo.includes(old))rf.value=old}}
 function returnPktRule(){let yes=$('returnPktRequired').value==='YES';$('returnPktByWrap').classList.toggle('hidden',!yes);$('returnPktTimeWrap').classList.toggle('hidden',!yes);if(!yes){$('returnPktBy').value='';$('returnPktTime').value=''}}
 
-document.addEventListener('DOMContentLoaded',()=>{populateReturnUsers2();returnPktRule();renderReturnHistory();let rd=$('returnDate');if(rd&&!rd.value)rd.value=new Date().toISOString().slice(0,10);pdStartReturnsSync();});
+document.addEventListener('DOMContentLoaded',()=>{populateReturnUsers2();returnPktRule();returnParcelTypeRule();renderReturnHistory();let rd=$('returnDate');if(rd&&!rd.value)rd.value=new Date().toISOString().slice(0,10);pdStartReturnsSync();});
 function saveSelfRemarkPrivacy(){
  selfRemarkPrivacy.allowedUsers=[...document.querySelectorAll('.privacyUser:checked')].map(x=>x.value).slice(0,4);
  localStorage.setItem('pd_selfremark_privacy_v1',JSON.stringify(selfRemarkPrivacy));
@@ -1891,7 +2013,7 @@ document.addEventListener('focusout',e=>{
 document.addEventListener('change',e=>{
  if(e.target.id==='dispatchPktBy' && $('dispatchPktTime'))$('dispatchPktTime').value=e.target.value?now():'';
 });
-document.addEventListener('DOMContentLoaded',()=>dispatchPktRule());
+document.addEventListener('DOMContentLoaded',()=>{dispatchPktRule();linesTagsRule();});
 
 function dispatchPktRule(){
  const req=document.getElementById('dispatchPktRequired');
@@ -1899,6 +2021,22 @@ function dispatchPktRule(){
  const timeWrap=document.getElementById('dispatchPktTimeWrap');
  const by=document.getElementById('dispatchPktBy');
  const tm=document.getElementById('dispatchPktTime');
+ if(!req||!byWrap||!timeWrap)return;
+ const show=req.value==='YES';
+ byWrap.classList.toggle('hidden',!show);
+ timeWrap.classList.toggle('hidden',!show);
+ if(!show){
+   if(by)by.value='';
+   if(tm)tm.value='';
+ }
+ if(show && typeof makeSingleSearchCombos==='function') setTimeout(makeSingleSearchCombos,20);
+}
+function linesTagsRule(){
+ const req=document.getElementById('linesTagsRequired');
+ const byWrap=document.getElementById('linesTagsByWrap');
+ const timeWrap=document.getElementById('linesTagsTimeWrap');
+ const by=document.getElementById('linesTagsCheckedBy');
+ const tm=document.getElementById('linesTagsTime');
  if(!req||!byWrap||!timeWrap)return;
  const show=req.value==='YES';
  byWrap.classList.toggle('hidden',!show);
@@ -1917,11 +2055,11 @@ const FIELD_AUDIT_KEY='pd_field_audit_v1';
 const APPROVAL_LOCK_KEY='pd_stage_approval_locks_v1';
 const STAGE_SEQUENCE=[
   {id:'stage1',name:'1. Basic Dispatch & Preparation',fields:['dispatchDate','shipTo','shipThrough','broker','inshAmount','priceFill','slipFillBy','slipFillTime','parcelGivenBy','parcelGivenTime','dispatchPktRequired','handoverToPrepare','prepareTime']},
-  {id:'stage2',name:'2. Weight & Checking',fields:['dispatchPktBy','dispatchPktTime','weightCheckedBy','weightCheckedTime','linesTagsCheckedBy','linesTagsTime','handoverToNoting','notingTime']},
+  {id:'stage2',name:'2. Weight & Checking',fields:['dispatchPktBy','dispatchPktTime','weightCheckedBy','weightCheckedTime','linesTagsRequired','linesTagsCheckedBy','linesTagsTime','handoverToNoting','notingTime']},
   {id:'stage3',name:'3. Noting',fields:['notedBy','notedTime','itemsNoted','handoverToRecheck','recheckTime']},
   {id:'stage4',name:'4. Recheck & Packing',fields:['recheckedBy','actualRecheckTime','handoverToPacking','packingHandoverTime']},
   {id:'stage5',name:'5. Final Packing',fields:['itemPackedBy','packedTime','itemsPacked','parcelWeight','packPhotoData']},
-  {id:'stage6',name:'6. Courier / Shipping Dispatch',fields:['shippingDate','courierName','shippingInsurance','parcelHandoverBy','parcelHandoverTime','shippingFinalStatus']}
+  {id:'stage6',name:'6. Courier / Shipping Dispatch',fields:['shippingDate','courierName','shippingInsurance','parcelHandoverBy','parcelHandoverTime']}
 ];
 
 const WA_QUEUE_KEY='pd_whatsapp_queue_v1';
