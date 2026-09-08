@@ -288,7 +288,7 @@ if(window.self!==window.top){
 </div></div>
 <div class="field"><label>Broker <span class="req">*</span></label><input id="broker" class="titleCaseField" autocomplete="off" readonly placeholder="Auto from Party Master"></div>
 <div class="field"><label>Ship Through <span class="req">*</span></label><input id="shipThrough" list="shipThroughList" class="titleCaseField" autocomplete="off" onchange="shipChanged();syncShippingSection()"><datalist id="shipThroughList"></datalist></div>
-<div class="field"><label>INSH Amount <span class="req">*</span></label><input type="number" id="inshAmount"></div>
+<div class="field"><label>INSH Amount <span class="req">*</span></label><input type="number" id="inshAmount" list="inshAmountList" step="0.01"><datalist id="inshAmountList"></datalist></div>
 <div class="field"><label>Price Fill <span class="req">*</span></label><select id="priceFill" onchange="priceChanged()"><option value="">Select</option><option>YES</option><option>NO</option></select></div>
 <div class="field hidden" id="priceWrap"><label>Price <span class="req">*</span></label><input type="number" id="price"></div>
 <div class="field span2"><label>Self Remark</label><textarea id="selfRemark" placeholder="Optional • Secret/Code"></textarea>
@@ -301,27 +301,25 @@ if(window.self!==window.top){
 <div class="field"><label>Delivery Challan Required <span class="req">*</span></label><select id="deliveryChallanRequired"><option>YES</option><option>NO</option></select></div><div class="field"><label>Item Name <span class="req">*</span></label><input id="dlcItem"></div><div class="field"><label>Price in DLC <span class="req">*</span></label><input type="number" id="dlcPrice"></div><div class="field"><label>Remark 1</label><input id="remark1"></div><div class="field"><label>Remark 2</label><input id="remark2"></div><div class="field"><label>Remark 3</label><input id="remark3"></div>
 </div></div></section>
 <section class="card"><h3>2. Weight & Checking</h3><div class="body"><div class="grid">
-<div class="field full"><label>Handed Over By (Section 1)</label><input id="handoverPrepareRef" readonly><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToPrepare')">🔄 Transfer</button></div>
+<div class="field full"><label>Handed Over By (Section 1)</label><input id="handoverPrepareRef" readonly></div>
 <div class="field hidden" id="dispatchPktByWrap"><label>PKT Change By <span class="req">*</span></label><select class="person" id="dispatchPktBy" data-time="dispatchPktTime" data-event="PKT Change By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('dispatchPktBy')">🔄 Transfer</button></div>
 <div class="field hidden" id="dispatchPktTimeWrap"><label>Time <span class="req">*</span></label><input id="dispatchPktTime" readonly></div>
-<div class="field"><label>Weight Checked By <span class="req">*</span></label><select class="person" id="weightCheckedBy" data-time="weightCheckedTime" data-event="Weight Checked By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('weightCheckedBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="weightCheckedTime" readonly></div>
-<div class="field"><label>Lines & Tags Checked By <span class="req">*</span></label><select class="person" id="linesTagsCheckedBy" data-time="linesTagsTime" data-event="Lines & Tags Checked By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('linesTagsCheckedBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="linesTagsTime" readonly></div>
+<div class="field"><label>Weight Checked By <span class="req">*</span></label><select class="person" id="weightCheckedBy" data-time="weightCheckedTime" data-event="Weight Checked By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="weightCheckedTime" readonly></div>
+<div class="field"><label>Lines & Tags Checked By <span class="req">*</span></label><select class="person" id="linesTagsCheckedBy" data-time="linesTagsTime" data-event="Lines & Tags Checked By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="linesTagsTime" readonly></div>
 <div class="field"><label>Handover To Noting <span class="req">*</span></label><select class="person" id="handoverToNoting" data-time="notingTime" data-event="Handover To Noting" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToNoting')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="notingTime" readonly></div>
 
 </div></div></section>
 <section class="card"><h3>3. Noting</h3><div class="body"><div class="grid">
-<div class="field full"><label>Handed Over By (Section 2)</label><input id="handoverNotingRef" readonly><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToNoting')">🔄 Transfer</button></div>
-<div class="field"><label>Noted By <span class="req">*</span></label><select class="person" id="notedBy" data-time="notedTime" data-event="Noted By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('notedBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="notedTime" readonly></div><div class="field"><label>No. of Items Noted <span class="req">*</span></label><input type="number" id="itemsNoted"></div><div class="field"><label>Handover To Recheck <span class="req">*</span></label><select class="person" id="handoverToRecheck" data-time="recheckTime" data-event="Handover To Recheck" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToRecheck')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="recheckTime" readonly></div></div></div></section>
+<div class="field full"><label>Handed Over By (Section 2)</label><input id="handoverNotingRef" readonly></div>
+<div class="field"><label>Noted By <span class="req">*</span></label><select class="person" id="notedBy" data-time="notedTime" data-event="Noted By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="notedTime" readonly></div><div class="field"><label>No. of Items Noted <span class="req">*</span></label><input type="number" id="itemsNoted"></div><div class="field"><label>Handover To Recheck <span class="req">*</span></label><select class="person" id="handoverToRecheck" data-time="recheckTime" data-event="Handover To Recheck" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToRecheck')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="recheckTime" readonly></div></div></div></section>
 <section class="card"><h3>4. Recheck & Packing</h3><div class="body"><div class="grid">
 <div class="field full"><label>Handed Over By (Section 3)</label><input id="handoverRecheckRef" readonly><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToRecheck')">🔄 Transfer</button></div>
 <div class="field"><label>Actual Recheck By <span class="req">*</span></label><select class="person" id="recheckedBy" data-time="actualRecheckTime" data-event="Actual Recheck By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('recheckedBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="actualRecheckTime" readonly></div><div class="field"><label>Handover To Packing <span class="req">*</span></label><select class="person" id="handoverToPacking" data-time="packingHandoverTime" data-event="Handover To Packing" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToPacking')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="packingHandoverTime" readonly></div></div></div></section>
 <section class="card"><h3>5. Final Packing</h3><div class="body"><div class="grid">
-<div class="field full"><label>Handed Over By (Section 4)</label><input id="handoverPackingRef" readonly><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToPacking')">🔄 Transfer</button></div>
-<div class="field"><label>Item Packed By <span class="req">*</span></label><select class="person" id="itemPackedBy" data-time="packedTime" data-event="Item Packed By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('itemPackedBy')">🔄 Transfer</button></div>
+<div class="field full"><label>Handed Over By (Section 4)</label><input id="handoverPackingRef" readonly></div>
+<div class="field"><label>Item Packed By <span class="req">*</span></label><select class="person" id="itemPackedBy" data-time="packedTime" data-event="Item Packed By" onchange="personChanged(this)"></select></div>
 <div class="field"><label>Time <span class="req">*</span></label><input id="packedTime" readonly></div>
-<div class="field"><label>No. Items Packed <span class="req">*</span></label><input type="number" id="itemsPacked"></div>
-<div class="field span2"><label>Delivery Address <span class="req">*</span></label><textarea id="deliveryAddress" readonly placeholder="Auto from Party Master — Ship To select karte hi aa jayega"></textarea></div>
-<div class="field"><label>Parcel Weight (GR) <span class="req">*</span></label><input type="number" id="parcelWeight" oninput="syncShippingSection()"></div>
+<div class="field"><label>No. Items Packed <span class="req">*</span></label><input type="number" id="itemsPacked"></div><div class="field"><label>Parcel Weight (GR) <span class="req">*</span></label><input type="number" id="parcelWeight" oninput="syncShippingSection()"></div>
 <div class="field span2 no-print"><label>Packed Parcel Photo <span class="req">*</span></label><input type="hidden" id="packPhotoData"><input type="file" id="packPhotoInput" accept="image/*" capture="environment" onchange="handlePackPhoto(this)"><div class="note" id="packPhotoStatus"></div><img id="packPhotoPreview" class="hidden" style="max-width:160px;border-radius:8px;margin-top:6px;display:block"></div>
 </div></div></section>
 
@@ -350,7 +348,7 @@ if(window.self!==window.top){
 <div class="field"><label>Handover Time <span class="req">*</span></label><input id="parcelHandoverTime" readonly></div>
 
 <div class="field"><label>Courier Slip Received By</label>
-<select class="person" id="courierSlipReceivedBy" data-time="courierSlipReceivedTime" data-event="Courier Slip Received By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('courierSlipReceivedBy')">🔄 Transfer</button></div>
+<select class="person" id="courierSlipReceivedBy" data-time="courierSlipReceivedTime" data-event="Courier Slip Received By" onchange="personChanged(this)"></select></div>
 <div class="field"><label>Slip Received Time</label><input id="courierSlipReceivedTime" readonly></div>
 
 <div class="field"><label>Final Status <span class="req">*</span></label>
@@ -449,7 +447,7 @@ if(window.self!==window.top){
 </div>
 </div></main>
 
-<div class="modal hidden" id="manageModal"><div class="box"><div class="mh"><b>Admin / Backend Masters</b><button class="btn secondary small" onclick="closeManage()">✕</button></div><div class="mb"><div class="tabs"><button class="tab on" data-tab="users" onclick="tab(this,'users')">Universal Users</button><button class="tab" data-tab="shipto" onclick="tab(this,'shipto')">Ship To</button><button class="tab" data-tab="clients" onclick="tab(this,'clients')">Ship To</button><button class="tab" data-tab="brokers" onclick="tab(this,'brokers')">Brokers</button><button class="tab" data-tab="shipthrough" onclick="tab(this,'shipthrough')">Ship Through</button><button class="tab" data-tab="messages" onclick="tab(this,'messages')">Message Settings</button><button class="tab" data-tab="watemplates" onclick="tab(this,'watemplates')">WhatsApp Templates</button><button class="tab" data-tab="privacy" onclick="tab(this,'privacy')">Self Remark Privacy</button><button class="tab" data-tab="api" onclick="tab(this,'api')">GREEN-API</button></div><div id="manageContent"></div></div><div class="mf"><span class="note">Data is saved in this browser.</span><button class="btn secondary" onclick="closeManage()">Close</button></div></div></div>
+<div class="modal hidden" id="manageModal"><div class="box"><div class="mh"><b>Admin / Backend Masters</b><button class="btn secondary small" onclick="closeManage()">✕</button></div><div class="mb"><div class="tabs"><button class="tab on" data-tab="users" onclick="tab(this,'users')">Universal Users</button><button class="tab" data-tab="shipto" onclick="tab(this,'shipto')">Ship To</button><button class="tab" data-tab="clients" onclick="tab(this,'clients')">Ship To</button><button class="tab" data-tab="brokers" onclick="tab(this,'brokers')">Brokers</button><button class="tab" data-tab="shipthrough" onclick="tab(this,'shipthrough')">Ship Through</button><button class="tab" data-tab="insh" onclick="tab(this,'insh')">INSH Amount</button><button class="tab" data-tab="messages" onclick="tab(this,'messages')">Message Settings</button><button class="tab" data-tab="watemplates" onclick="tab(this,'watemplates')">WhatsApp Templates</button><button class="tab" data-tab="privacy" onclick="tab(this,'privacy')">Self Remark Privacy</button><button class="tab" data-tab="api" onclick="tab(this,'api')">GREEN-API</button></div><div id="manageContent"></div></div><div class="mf"><span class="note">Data is saved in this browser.</span><button class="btn secondary" onclick="closeManage()">Close</button></div></div></div>
 
 
 <div class="modal hidden" id="allRecordsModal"><div class="box" style="width:min(1100px,100%)">
@@ -554,7 +552,7 @@ if(window.self!==window.top){
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
-const K={users:'pd_users_v2',shipto:'pd_shipto_v2',shipthrough:'pd_shipthrough_v2',api:'pd_greenapi_v2',records:'pd_records_v2'};
+const K={users:'pd_users_v2',shipto:'pd_shipto_v2',shipthrough:'pd_shipthrough_v2',api:'pd_greenapi_v2',records:'pd_records_v2',inshpresets:'pd_inshpresets_v1'};
 const ACTIVE_DRAFT_KEY='pd_active_draft_v1';
 let currentParcelId=null;
 
@@ -735,7 +733,7 @@ if(!Array.isArray(waTemplates)||!waTemplates.length){
 }
 function saveWaTemplates(){localStorage.setItem(WA_TEMPLATE_KEY,JSON.stringify(waTemplates));}
 
-let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(localStorage.getItem(K.shipto)||'[]');let shipThrough=JSON.parse(localStorage.getItem(K.shipthrough)||'null')||['SECURE','SEQUEL','BVC','DD','RJ AIR','PAR','GREEN DART'];let api=JSON.parse(localStorage.getItem(K.api)||'{}');let editing=null,currentTab='users',waTarget=null;
+let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(localStorage.getItem(K.shipto)||'[]');let shipThrough=JSON.parse(localStorage.getItem(K.shipthrough)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let inshAmountPresets=JSON.parse(localStorage.getItem(K.inshpresets)||'null')||['0.10','0.20','0.50','0.60','0.70','1.00','2.00','3.00'];let api=JSON.parse(localStorage.getItem(K.api)||'{}');let editing=null,currentTab='users',waTarget=null;
 const $=id=>document.getElementById(id);
 
 const DOER_MASTER_VERSION='20260819_doers_v3';
@@ -789,9 +787,9 @@ function openFromLink(parcelId){
   window._pendingOpenParcelId=null;
   if(history.replaceState)history.replaceState(null,'',location.pathname);
 }
-function saveMasters(){localStorage.setItem(K.users,JSON.stringify(users));localStorage.setItem(K.shipto,JSON.stringify(shipTo));localStorage.setItem(K.shipthrough,JSON.stringify(shipThrough));localStorage.setItem(K.api,JSON.stringify(api));pdSyncUsersToCloud();}
+function saveMasters(){localStorage.setItem(K.users,JSON.stringify(users));localStorage.setItem(K.shipto,JSON.stringify(shipTo));localStorage.setItem(K.shipthrough,JSON.stringify(shipThrough));localStorage.setItem(K.inshpresets,JSON.stringify(inshAmountPresets));localStorage.setItem(K.api,JSON.stringify(api));pdSyncUsersToCloud();}
 function options(arr,val=x=>x,label=x=>x){return '<option value="">Select</option>'+arr.map(x=>`<option value="${esc(val(x))}">${esc(label(x))}</option>`).join('')}
-function populate(){ensureDoerMaster();document.querySelectorAll('.person').forEach(s=>{let old=s.value;let au=users.filter(u=>u.active!==false);s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});$('shipThroughList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('courierNameList'))$('courierNameList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');renderShipToMenu('')}
+function populate(){ensureDoerMaster();document.querySelectorAll('.person').forEach(s=>{let old=s.value;let au=users.filter(u=>u.active!==false);s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});$('shipThroughList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('courierNameList'))$('courierNameList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('inshAmountList'))$('inshAmountList').innerHTML=inshAmountPresets.map(x=>`<option value="${esc(x)}"></option>`).join('');renderShipToMenu('')}
 function now(){return new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}
 function personChanged(s){
   let t=$(s.dataset.time);
@@ -1202,6 +1200,7 @@ else if(currentTab==='clients'){
 }
 else if(currentTab==='brokers'){c.innerHTML=`<div class="row"><input id="mBroker" class="titleCaseField" placeholder="Add Broker" style="flex:1"><button class="btn primary" onclick="addBroker()">Add</button></div>${brokers.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delBroker(${i})">Delete</button></div>`).join('')}`}
 else if(currentTab==='shipthrough'){c.innerHTML=`<div class="row"><input id="mShipThrough" placeholder="Add Ship Through" style="flex:1"><button class="btn primary" onclick="addShipThrough()">Add</button></div><div class="note">Section 1-A केवल SECURE, SEQUEL/SQL और BVC पर दिखेगा.</div>${shipThrough.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delShipThrough(${i})">Delete</button></div>`).join('')}`}
+else if(currentTab==='insh'){c.innerHTML=`<div class="row"><input id="mInshAmount" placeholder="Add INSH Amount (e.g. 0.10)" style="flex:1"><button class="btn primary" onclick="addInshPreset()">Add</button></div><div class="note">Dispatch Section 1 ke INSH Amount field mein ye quick-pick suggestions ke roop mein dikhenge.</div>${inshAmountPresets.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delInshPreset(${i})">Delete</button></div>`).join('')}`}
 else if(currentTab==='messages'){
  let au=users.filter(u=>u.active!==false);
  c.innerHTML=`<h3 style="margin-top:0">DLC WhatsApp Rules</h3>
@@ -1433,6 +1432,8 @@ function editUser(i){let n=prompt('User name',users[i].name);if(n===null)return;
 function delUser(i){if(confirm('Delete '+users[i].name+'?')){users.splice(i,1);saveMasters();populate();renderManage()}}
 function addShipTo(){let v=$('mShipTo').value.trim();if(v&&!shipTo.some(x=>x.toLowerCase()===v.toLowerCase())){shipTo.push(v);saveMasters();populate();renderManage()}}function delShipTo(i){shipTo.splice(i,1);saveMasters();populate();renderManage()}
 function addShipThrough(){let v=$('mShipThrough').value.trim();if(v&&!shipThrough.some(x=>x.toLowerCase()===v.toLowerCase())){shipThrough.push(v);saveMasters();populate();renderManage()}}function delShipThrough(i){shipThrough.splice(i,1);saveMasters();populate();renderManage()}
+function addInshPreset(){let v=$('mInshAmount').value.trim();if(v&&!inshAmountPresets.includes(v)){inshAmountPresets.push(v);saveMasters();populate();renderManage()}}
+function delInshPreset(i){inshAmountPresets.splice(i,1);saveMasters();populate();renderManage()}
 function saveApi(){api={baseUrl:$('mBase').value.trim()||'https://api.green-api.com',idInstance:$('mId').value.trim(),apiToken:$('mToken').value.trim()};saveMasters();toast('GREEN-API settings saved')}
 let tt;function toast(m){
   console.log(m);
@@ -1919,7 +1920,7 @@ const STAGE_SEQUENCE=[
   {id:'stage2',name:'2. Weight & Checking',fields:['dispatchPktBy','dispatchPktTime','weightCheckedBy','weightCheckedTime','linesTagsCheckedBy','linesTagsTime','handoverToNoting','notingTime']},
   {id:'stage3',name:'3. Noting',fields:['notedBy','notedTime','itemsNoted','handoverToRecheck','recheckTime']},
   {id:'stage4',name:'4. Recheck & Packing',fields:['recheckedBy','actualRecheckTime','handoverToPacking','packingHandoverTime']},
-  {id:'stage5',name:'5. Final Packing',fields:['itemPackedBy','packedTime','itemsPacked','deliveryAddress','parcelWeight','packPhotoData']},
+  {id:'stage5',name:'5. Final Packing',fields:['itemPackedBy','packedTime','itemsPacked','parcelWeight','packPhotoData']},
   {id:'stage6',name:'6. Courier / Shipping Dispatch',fields:['shippingDate','courierName','shippingInsurance','parcelHandoverBy','parcelHandoverTime','shippingFinalStatus']}
 ];
 
@@ -2051,7 +2052,7 @@ function refreshFieldStates(){
       el.disabled=!editable;
     }else{
       // Preserve native readonly fields like time/broker, but sequence can also lock.
-      const nativeReadonly=['slipFillTime','parcelGivenTime','prepareTime','dispatchPktTime','weightCheckedTime','linesTagsTime','notingTime','notedTime','recheckTime','actualRecheckTime','packingHandoverTime','packedTime','deliveryAddress','parcelHandoverTime','courierSlipReceivedTime'].includes(el.id);
+      const nativeReadonly=['slipFillTime','parcelGivenTime','prepareTime','dispatchPktTime','weightCheckedTime','linesTagsTime','notingTime','notedTime','recheckTime','actualRecheckTime','packingHandoverTime','packedTime','parcelHandoverTime','courierSlipReceivedTime'].includes(el.id);
       el.readOnly=nativeReadonly || !editable;
     }
   });
