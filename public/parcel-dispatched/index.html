@@ -461,6 +461,9 @@ if(window.self!==window.top){
 </div></div></div>
 
 
+<div id="secretBottomZone" style="position:fixed;left:0;right:0;bottom:0;height:16px;z-index:5"></div>
+<button type="button" id="secretAdminIcon" class="hidden" onclick="openSuperAdminLogin()" style="position:fixed;bottom:4px;right:4px;width:14px;height:14px;padding:0;border:0;background:transparent;color:#cfd6d1;font-size:10px;line-height:14px;cursor:pointer;z-index:999999">•</button>
+
 <div class="modal hidden" id="superAdminModal"><div class="box" style="width:min(440px,100%)">
 <div class="mh"><b>Private Access</b><button class="btn secondary small" onclick="closeSuperAdminLogin()">✕</button></div>
 <div class="mb">
@@ -2546,6 +2549,7 @@ function openSuperAdminLogin(){
 function closeSuperAdminLogin(){
   $('superAdminModal')?.classList.add('hidden');
   if($('superAdminPassword'))$('superAdminPassword').value='';
+  $('secretAdminIcon')?.classList.add('hidden');
 }
 function setSuperAdminVisibility(show){
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.toggle('hidden',!show));
@@ -2590,14 +2594,25 @@ function registerSuperAdminActivity(){
 }
 document.addEventListener('DOMContentLoaded',()=>{
   setSuperAdminVisibility(false);
-  const logo=$('secretAdminLogo');
-  if(logo){
-    logo.addEventListener('click',()=>{
+  // Two-stage entry: 6 taps on an invisible strip at the very bottom of the screen reveals
+  // a tiny dot in the corner — only clicking that dot opens the password box. Six accidental
+  // taps in the same spot within 1.5s is already unlikely; requiring a second deliberate tap
+  // on something near-invisible makes stumbling onto Super Admin by accident essentially
+  // impossible, while still letting whoever knows about it get in quickly.
+  let secretIconHideTimer=null;
+  const zone=$('secretBottomZone');
+  if(zone){
+    zone.addEventListener('click',()=>{
       secretLogoClicks++;
       clearTimeout(secretLogoClickTimer);
-      if(secretLogoClicks>=3){
+      if(secretLogoClicks>=6){
         secretLogoClicks=0;
-        openSuperAdminLogin();
+        const icon=$('secretAdminIcon');
+        if(icon){
+          icon.classList.remove('hidden');
+          clearTimeout(secretIconHideTimer);
+          secretIconHideTimer=setTimeout(()=>icon.classList.add('hidden'),20000);
+        }
         return;
       }
       secretLogoClickTimer=setTimeout(()=>{secretLogoClicks=0},1500);
