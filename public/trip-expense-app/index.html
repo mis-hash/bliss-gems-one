@@ -101,7 +101,7 @@ if(window.self!==window.top){
 <button class="on" data-role="admin,director" onclick="go('admin',this)">▦ Admin Control</button>
 <button data-role="admin,director,accounts" onclick="go('ledger',this)">₹ Advance Ledger</button>
 <button data-role="admin,director" onclick="go('pending',this)">⏱ Pending Hisaab</button>
-<button data-role="sales" onclick="go('sales',this)">👤 My Trip</button>
+<button onclick="go('sales',this)">👤 My Trip</button>
 <div class="grouplabel">Insights</div>
 <button data-role="admin,director" onclick="go('analytics',this)">📊 Analytics</button>
 <button data-role="admin,director,accounts" onclick="go('explorer',this)">🔎 Detailed Trips</button>
@@ -195,7 +195,7 @@ if(window.self!==window.top){
 <button class="on" data-role="admin,director" onclick="mgo('admin',this)"><span>▦</span>Admin</button>
 <button data-role="admin,director,accounts" onclick="mgo('ledger',this)"><span>₹</span>Ledger</button>
 <button data-role="admin,director" onclick="mgo('pending',this)"><span>⏱</span>Pending</button>
-<button data-role="sales" onclick="mgo('sales',this)"><span>👤</span>My Trip</button>
+<button onclick="mgo('sales',this)"><span>👤</span>My Trip</button>
 <button data-role="admin,director" onclick="mgo('analytics',this)"><span>📊</span>Analytics</button>
 <button data-role="admin,director,accounts" onclick="mgo('explorer',this)"><span>🔎</span>Trips</button>
 <button data-role="admin,accounts,director" onclick="mgo('accounts',this)"><span>📚</span>Books</button>
@@ -223,7 +223,7 @@ if(window.self!==window.top){
 </div></div>
 
 <div class="modal" id="issue"><div class="box"><h3>Issue Trip Amount</h3><div class="fields">
-<div class="field span2"><label>Sales Person *</label><select id="issueSales" onchange="updateIssueSuggestion()"></select></div>
+<div class="field span2"><label>Person *</label><select id="issueSales" onchange="updateIssueSuggestion()"></select></div>
 <div class="field"><label>Location *</label><select id="issueLocation" onchange="handleIssueLocPurposeChange(this,'issueLocation')"></select></div>
 <div class="field"><label>Trip Purpose *</label><select id="issuePurpose" onchange="handleIssueLocPurposeChange(this,'issuePurpose')"></select></div>
 <div class="field span2 hidden" id="issueAddNewRow" style="display:flex;gap:8px;align-items:flex-end">
@@ -597,7 +597,9 @@ function updateIssueSuggestion(){
   }
 }
 function openIssueModal(){
-  $('issueSales').innerHTML=users.filter(u=>u.appRoles&&u.appRoles[APP_SLUG]==='sales'&&u.active!==false).map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('')||'<option value="">No sales users. Director se role assign karwayein.</option>';
+  // Amount kisi ko bhi issue ho sakta hai — sirf 'sales' role tak seemit nahi, isliye
+  // yahan har active user dikhta hai (role kuch bhi ho).
+  $('issueSales').innerHTML=users.filter(u=>u.active!==false).map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('')||'<option value="">Koi active user nahi hai.</option>';
   $('issueStart').value=todayISO();
   $('issueDue').value='';$('issueAmount').value='';
   populateIssueSelects();
@@ -850,7 +852,10 @@ function renderLedgerPage(){
   const picker=$('ledgerTripPicker');
   const role=myRole();
   let visibleTrips=trips;
-  if(role==='sales'){const t=mySalesTrip();visibleTrips=t?[t]:[];}
+  // Finance-level roles see every trip; anyone else (sales, or now any other role that
+  // received an advance) sees only their own — was gated on role==='sales' specifically,
+  // which would have let a non-finance, non-sales recipient see everyone else's trips.
+  if(role!=='admin'&&role!=='director'&&role!=='accounts'){const t=mySalesTrip();visibleTrips=t?[t]:[];}
   if(picker.dataset.filled!=='1'||picker.options.length!==visibleTrips.length){
     picker.innerHTML=visibleTrips.map(t=>`<option value="${esc(t.id)}">${esc(t.salesName)} • ${esc(t.id)}</option>`).join('')||'<option value="">Koi trip nahi</option>';
     picker.dataset.filled='1';
