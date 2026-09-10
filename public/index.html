@@ -580,9 +580,32 @@ const firebaseConfig = {
   messagingSenderId: "702608135517",
   appId: "1:702608135517:web:d848197040efb3be5f04b4"
 };
-firebase.initializeApp(firebaseConfig);
-const fbAuth = firebase.auth();
-const fbDb = firebase.firestore();
+// If the Firebase SDK failed to load (slow network, blocked CDN, etc.), an unguarded
+// initializeApp()/auth()/firestore() here would throw and — since this is top-level
+// script code — silently stop every later const/function in this same <script> tag
+// from ever running, breaking the whole hub (not just cloud sync/login). Fall back to
+// harmless stubs instead, so the page still boots and local features still work.
+function hubOfflineDbStub(){
+  const noopQuery={limit:()=>noopQuery,where:()=>noopQuery,orderBy:()=>noopQuery,get:async()=>({empty:true,docs:[],forEach:()=>{}}),onSnapshot:(cb)=>{try{cb({forEach:()=>{},docs:[],empty:true});}catch(e){}return ()=>{};}};
+  const noopDoc={set:async()=>{},update:async()=>{},get:async()=>({exists:false,data:()=>({})}),collection:()=>noopCollection,delete:async()=>{}};
+  const noopCollection={...noopQuery,doc:()=>noopDoc};
+  return {collection:()=>noopCollection,batch:()=>({set:()=>{},update:()=>{},delete:()=>{},commit:async()=>{}})};
+}
+function hubOfflineAuthStub(){
+  const err=()=>Promise.reject(new Error('Firebase auth unavailable (SDK failed to load)'));
+  return {currentUser:null,onAuthStateChanged:()=>{},createUserWithEmailAndPassword:err,sendPasswordResetEmail:err,signInWithEmailAndPassword:err,signOut:err};
+}
+let fbAuth,fbDb;
+try{
+  if(typeof firebase==='undefined')throw new Error('firebase SDK not loaded');
+  firebase.initializeApp(firebaseConfig);
+  fbAuth=firebase.auth();
+  fbDb=firebase.firestore();
+}catch(e){
+  console.error('Firebase init failed, running offline (no cloud sync/login this session):',e);
+  fbAuth=hubOfflineAuthStub();
+  fbDb=hubOfflineDbStub();
+}
 const UU_COLLECTION='universal_users';
 // Only apps with their own internal role system need a role dropdown here (in addition
 // to the plain app-access checkbox every app gets) — Trip Expense is role-gated
@@ -1442,6 +1465,16 @@ function openAppInline(slug,name){
     frame.classList.add('loaded');
     loading?.classList.add('hidden');
     if(typeof syncHubDesktopViewBtn==='function')syncHubDesktopViewBtn();
+    // If Super Admin is already unlocked here in the hub, unlock it in the app too
+    // (same-origin iframe) instead of making the same person enter the same password
+    // a second time inside the app.
+    if(superAdminUnlocked){
+      try{
+        if(frame.contentWindow && typeof frame.contentWindow.silentUnlockSuperAdmin==='function'){
+          frame.contentWindow.silentUnlockSuperAdmin();
+        }
+      }catch(e){console.error('silent super admin propagation failed',e);}
+    }
   };
   frame.src='/'+slug+'/';
   document.getElementById('appViewerOpenNew').href='/'+slug+'/';

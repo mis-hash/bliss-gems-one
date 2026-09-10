@@ -401,6 +401,15 @@ function openSuperAdminModal(){
   setTimeout(()=>$('superAdminPassword')?.focus(),30);
 }
 function closeSuperAdminModal(){$('superAdminModal')?.classList.remove('show')}
+// Called by the Bliss One hub (same-origin iframe contentWindow) when its own Super
+// Admin is already unlocked, so opening this app from the hub doesn't ask for the
+// password a second time — same password, same person, one unlock. Still needs a
+// normal login first (Super Admin only bootstraps a role, not the login itself).
+function silentUnlockSuperAdmin(){
+  if(superAdminUnlocked)return;
+  superAdminUnlocked=true;
+  renderAll();
+}
 function unlockSuperAdmin(){
   const pw=$('superAdminPassword')?.value||'';
   if(pw!==SUPER_ADMIN_PASSWORD){alert('Galat password.');if($('superAdminPassword'))$('superAdminPassword').value='';return}

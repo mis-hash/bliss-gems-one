@@ -555,8 +555,26 @@ let currentParcelId=null;
 
 /* ===== Firebase cloud sync (shared across all doers/devices, instead of per-browser localStorage) ===== */
 const pdFirebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
-if(!firebase.apps.length)firebase.initializeApp(pdFirebaseConfig);
-const pdDb=firebase.firestore();
+// If the Firebase SDK failed to load (slow network, blocked CDN, etc.), an unguarded
+// initializeApp()/firestore() here would throw and — since this is top-level script
+// code — silently stop every later const/function in this same <script> tag from ever
+// running, breaking the whole app (not just cloud sync). Fall back to a harmless no-op
+// store instead, so the app still boots and works locally.
+function pdOfflineDbStub(){
+  const noopQuery={limit:()=>noopQuery,where:()=>noopQuery,orderBy:()=>noopQuery,get:async()=>({empty:true,docs:[],forEach:()=>{}}),onSnapshot:(cb)=>{try{cb({forEach:()=>{},docs:[],empty:true});}catch(e){}return ()=>{};}};
+  const noopDoc={set:async()=>{},update:async()=>{},get:async()=>({exists:false,data:()=>({})}),collection:()=>noopCollection};
+  const noopCollection={...noopQuery,doc:()=>noopDoc};
+  return {collection:()=>noopCollection,batch:()=>({set:()=>{},update:()=>{},delete:()=>{},commit:async()=>{}}),runTransaction:async(fn)=>fn({get:async()=>({exists:false,data:()=>({})}),set:()=>{},update:()=>{}})};
+}
+let pdDb;
+try{
+  if(typeof firebase==='undefined')throw new Error('firebase SDK not loaded');
+  if(!firebase.apps.length)firebase.initializeApp(pdFirebaseConfig);
+  pdDb=firebase.firestore();
+}catch(e){
+  console.error('Firebase init failed, running offline (no cloud sync this session):',e);
+  pdDb=pdOfflineDbStub();
+}
 let pdUsersSyncStarted=false,pdRecordsSyncStarted=false,pdReturnsSyncStarted=false,pdUsersSeedChecked=false;
 
 const PD_APP_SLUG='parcel-dispatched';
@@ -2751,6 +2769,18 @@ function unlockSuperAdmin(){
   if(typeof renderReturnHistory==='function')renderReturnHistory();
   resetSuperAdminIdleTimer();
   toast('Private Admin controls unlocked');
+}
+// Called by the Bliss One hub (same-origin iframe contentWindow) when its own Super
+// Admin is already unlocked, so opening this app from the hub doesn't ask for the
+// password a second time — same password, same person, one unlock.
+function silentUnlockSuperAdmin(){
+  if(superAdminUnlocked)return;
+  superAdminUnlocked=true;
+  setSuperAdminVisibility(true);
+  if(typeof pdRefreshStatusBar==='function')pdRefreshStatusBar();
+  if(typeof renderHistory==='function')renderHistory();
+  if(typeof renderReturnHistory==='function')renderReturnHistory();
+  resetSuperAdminIdleTimer();
 }
 function hideSuperAdminControls(reason=''){
   superAdminUnlocked=false;
