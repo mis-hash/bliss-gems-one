@@ -42,7 +42,7 @@ table.dtb td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px}tab
 .statusrow{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #edf1ee}.statusrow:last-child{border:0}
 .statusdot{width:9px;height:9px;border-radius:50%;flex:none}.statusdot.on{background:var(--g2)}.statusdot.off{background:var(--red)}
 .statusbadge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px}.statusbadge.on{background:var(--mint);color:var(--g)}.statusbadge.off{background:var(--redbg);color:var(--red)}
-@media(max-width:720px){header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:22px}.brand b{font-size:16px}.brand small,.live{display:none}.shell{display:block;padding:11px 10px 76px}nav{display:none}.hero{padding:17px}.hero h1{font-size:20px}.hero strong{font-size:23px}.cards{grid-template-columns:1fr 1fr}.money{grid-template-columns:1fr 1fr}.money .m:last-child{grid-column:1/-1}.analytics{grid-template-columns:1fr}.tripMoney{grid-template-columns:1fr 1fr}.tripMoney .tm:last-child{grid-column:1/-1}.salesActions{grid-template-columns:1fr}.big{min-height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;text-align:left}.big span{margin:0}.fields{grid-template-columns:1fr}.span2{grid-column:auto}.bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;justify-content:space-around;padding:6px}.bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold}.bottomNav button.hidden{display:none}.bottomNav span{display:block;font-size:19px}.bottomNav button.on{color:var(--g)}}
+@media(max-width:720px){header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:22px}.brand b{font-size:16px}.brand small,.live{display:none}.shell{display:block;padding:11px 10px 76px}nav{display:none}.hero{padding:17px}.hero h1{font-size:20px}.hero strong{font-size:23px}.cards{grid-template-columns:1fr 1fr}.money{grid-template-columns:1fr 1fr}.money .m:last-child{grid-column:1/-1}.analytics{grid-template-columns:1fr}.tripMoney{grid-template-columns:1fr 1fr}.tripMoney .tm:last-child{grid-column:1/-1}.salesActions{grid-template-columns:1fr}.big{min-height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;text-align:left}.big span{margin:0}.fields{grid-template-columns:1fr}.span2{grid-column:auto}.bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}.bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:0 0 auto;padding:2px 12px;white-space:nowrap}.bottomNav button.hidden{display:none}.bottomNav span{display:block;font-size:19px}.bottomNav button.on{color:var(--g)}}
 </style></head>
 <body>
 <header><div class="head"><div class="brand"><div class="logo" id="secretLogo">b</div><div><b>Bliss Gems & Minerals</b><small>Employee Advance & Trip Settlement</small></div></div>
@@ -162,9 +162,17 @@ if(window.self!==window.top){
 
 <div class="bottomNav" id="bottomNav">
 <button class="on" data-role="admin,director" onclick="mgo('admin',this)"><span>▦</span>Admin</button>
-<button data-role="director" onclick="mgo('director',this)"><span>★</span>Director</button>
-<button data-role="sales" onclick="mgo('sales',this)"><span>👤</span>My Trip</button>
+<button data-role="admin,director,accounts" onclick="mgo('ledger',this)"><span>₹</span>Ledger</button>
 <button data-role="admin,director" onclick="mgo('pending',this)"><span>⏱</span>Pending</button>
+<button data-role="sales" onclick="mgo('sales',this)"><span>👤</span>My Trip</button>
+<button data-role="admin,director" onclick="mgo('analytics',this)"><span>📊</span>Analytics</button>
+<button data-role="admin,director,accounts" onclick="mgo('explorer',this)"><span>🔎</span>Trips</button>
+<button data-role="admin,accounts,director" onclick="mgo('accounts',this)"><span>📚</span>Books</button>
+<button data-role="admin,director,accounts" onclick="mgo('activity',this)"><span>🕒</span>Activity</button>
+<button data-role="director" onclick="mgo('director',this)"><span>★</span>Director</button>
+<button data-role="director" onclick="mgo('notify',this)"><span>💬</span>Notify</button>
+<button data-role="director" onclick="mgo('templates',this)"><span>📝</span>Templates</button>
+<button data-role="director" onclick="mgo('teamroles',this)"><span>👥</span>Roles</button>
 </div>
 
 <div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
