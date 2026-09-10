@@ -455,7 +455,7 @@ if(window.self!==window.top){
 </div></div></div>
 
 
-<button type="button" id="secretAdminIcon" onclick="openSuperAdminLogin()" title="Private Access" style="position:fixed;bottom:12px;right:12px;width:34px;height:34px;padding:0;border:1px solid #d8e2dd;border-radius:50%;background:#fff;color:#6b7d74;font-size:16px;line-height:34px;cursor:pointer;z-index:999999;box-shadow:0 2px 8px #0002">•</button>
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:12px;right:14px;width:26px;height:26px;padding:0;border:0;background:transparent;color:#c3cdc7;font-size:15px;line-height:26px;cursor:default;z-index:999999">•</button>
 
 <div class="modal hidden" id="superAdminModal"><div class="box" style="width:min(440px,100%)">
 <div class="mh"><b>Private Access</b><button class="btn secondary small" onclick="closeSuperAdminLogin()">✕</button></div>
@@ -2674,6 +2674,18 @@ const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
 const SUPER_ADMIN_IDLE_MS=4*60*1000;
 let superAdminUnlocked=false;
 let superAdminIdleTimer=null;
+let secretAdminTapCount=0;
+let secretAdminTapTimer=null;
+function secretAdminTap(){
+  secretAdminTapCount++;
+  clearTimeout(secretAdminTapTimer);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2000);
+  if(secretAdminTapCount>=5){
+    secretAdminTapCount=0;
+    clearTimeout(secretAdminTapTimer);
+    openSuperAdminLogin();
+  }
+}
 function openSuperAdminLogin(){
   const m=$('superAdminModal');
   if(!m)return;

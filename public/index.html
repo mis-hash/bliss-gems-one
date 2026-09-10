@@ -420,7 +420,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
 </div>
 
 
-<button type="button" id="secretAdminIcon" onclick="openSuperAdminModal()" title="Private Access" style="position:fixed;bottom:12px;right:12px;width:34px;height:34px;padding:0;border:1px solid #d8e2dd;border-radius:50%;background:#fff;color:#6b7d74;font-size:16px;line-height:34px;cursor:pointer;z-index:999999;box-shadow:0 2px 8px #0002">•</button>
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:12px;right:14px;width:26px;height:26px;padding:0;border:0;background:transparent;color:#c3cdc7;font-size:15px;line-height:26px;cursor:default;z-index:999999">•</button>
 
 <div class="adminModal hidden" id="superAdminModal">
   <div class="adminBox">
@@ -1511,6 +1511,18 @@ let superAdminUnlocked=false;
 let adminIdleTimer=null;
 const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
 
+let secretAdminTapCount=0;
+let secretAdminTapTimer=null;
+function secretAdminTap(){
+  secretAdminTapCount++;
+  clearTimeout(secretAdminTapTimer);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2000);
+  if(secretAdminTapCount>=5){
+    secretAdminTapCount=0;
+    clearTimeout(secretAdminTapTimer);
+    openSuperAdminModal();
+  }
+}
 function openSuperAdminModal(){
   document.getElementById('superAdminModal')?.classList.remove('hidden');
   const p=document.getElementById('superAdminPassword');
