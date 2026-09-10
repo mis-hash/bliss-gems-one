@@ -214,7 +214,7 @@ if(window.self!==window.top){
 <div class="msg" id="loginMsg"></div>
 </div></div>
 
-<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:74px;right:14px;width:24px;height:24px;padding:0;border:0;background:transparent;color:#dde5e0;opacity:.6;font-size:13px;line-height:24px;cursor:default;z-index:999999">•</button>
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:62px;right:2px;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:transparent;color:#dde5e0;opacity:.6;font-size:13px;line-height:40px;cursor:default;z-index:999999;transition:background .15s">•</button>
 
 <div class="modal" id="superAdminModal"><div class="box" style="width:min(360px,100%)">
 <h3>Private Access</h3>
@@ -344,7 +344,7 @@ function myUserObj(){return users.find(x=>x.id===currentUser)||null}
 /* ===== Super Admin escape hatch (same shared password used across all Bliss apps) — lets a logged-in user reach the Director/Team Roles panel even before any role is assigned, so the first role can be bootstrapped. ===== */
 const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
 let superAdminUnlocked=false;
-let secretAdminTapCount=0,secretAdminTapTimer=null;
+let secretAdminTapCount=0,secretAdminTapTimer=null,secretAdminFlashTimer=null;
 function hardRefreshApp(){
   var btn=document.getElementById('hardRefreshBtn');
   if(btn)btn.textContent='⏳';
@@ -386,10 +386,20 @@ function syncDesktopViewBtn(){
 syncDesktopViewBtn();
 function secretAdminTap(){
   secretAdminTapCount++;
+  // Brief red flash on every registered tap — without this, a translucent 13px dot gives
+  // no feedback at all, so a tap that misses the (now much bigger) touch target looks
+  // identical to one that landed, and people over-tap trying to figure out what worked.
+  const dot=document.getElementById('secretAdminIcon');
+  if(dot){
+    dot.style.background='rgba(214,48,49,.45)';
+    clearTimeout(secretAdminFlashTimer);
+    secretAdminFlashTimer=setTimeout(()=>{dot.style.background='transparent'},200);
+  }
   clearTimeout(secretAdminTapTimer);
-  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2000);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2500);
   if(secretAdminTapCount>=5){
     secretAdminTapCount=0;
+    clearTimeout(secretAdminTapTimer);
     openSuperAdminModal();
   }
 }

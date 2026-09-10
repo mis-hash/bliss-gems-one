@@ -421,7 +421,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
 </div>
 
 
-<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:10px;right:12px;width:18px;height:18px;padding:0;border:0;background:transparent;color:#e2e7e4;opacity:.6;font-size:10px;line-height:18px;cursor:default;z-index:999999">•</button>
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:2px;right:2px;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:transparent;color:#e2e7e4;opacity:.6;font-size:10px;line-height:40px;cursor:default;z-index:999999;transition:background .15s">•</button>
 
 <div class="adminModal hidden" id="superAdminModal">
   <div class="adminBox">
@@ -1621,10 +1621,20 @@ const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
 
 let secretAdminTapCount=0;
 let secretAdminTapTimer=null;
+let secretAdminFlashTimer=null;
 function secretAdminTap(){
   secretAdminTapCount++;
+  // Brief red flash on every registered tap — without this, a translucent 10px dot gives
+  // no feedback at all, so a tap that misses the (now much bigger) touch target looks
+  // identical to one that landed, and people over-tap trying to figure out what worked.
+  const dot=document.getElementById('secretAdminIcon');
+  if(dot){
+    dot.style.background='rgba(214,48,49,.45)';
+    clearTimeout(secretAdminFlashTimer);
+    secretAdminFlashTimer=setTimeout(()=>{dot.style.background='transparent'},200);
+  }
   clearTimeout(secretAdminTapTimer);
-  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2000);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2500);
   if(secretAdminTapCount>=5){
     secretAdminTapCount=0;
     clearTimeout(secretAdminTapTimer);
