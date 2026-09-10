@@ -420,6 +420,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
 </div>
 
 
+<button type="button" id="secretAdminIcon" onclick="openSuperAdminModal()" title="Private Access" style="position:fixed;bottom:12px;right:12px;width:34px;height:34px;padding:0;border:1px solid #d8e2dd;border-radius:50%;background:#fff;color:#6b7d74;font-size:16px;line-height:34px;cursor:pointer;z-index:999999;box-shadow:0 2px 8px #0002">•</button>
+
 <div class="adminModal hidden" id="superAdminModal">
   <div class="adminBox">
     <div class="adminHead">
@@ -1506,8 +1508,6 @@ function cancelZipFileEdit(){
 
 /* ===== Hidden Super Admin Backend ===== */
 let superAdminUnlocked=false;
-let secretTapCount=0;
-let secretTapTimer=null;
 let adminIdleTimer=null;
 const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
 
@@ -1580,21 +1580,6 @@ function unlockSuperAdmin(){
 document.addEventListener('DOMContentLoaded',()=>{
   renderSavedApps();
   loadLiveAppsRegistry();
-  const logo=document.getElementById('secretBlissOneLogo');
-  if(logo){
-    const secretTap=()=>{
-      secretTapCount++;
-      clearTimeout(secretTapTimer);
-      secretTapTimer=setTimeout(()=>secretTapCount=0,1100);
-      if(secretTapCount>=3){
-        secretTapCount=0;
-        clearTimeout(secretTapTimer);
-        openSuperAdminModal();
-      }
-    };
-    logo.addEventListener('click',secretTap);
-    logo.addEventListener('touchend',secretTap,{passive:true});
-  }
   ['click','keydown','touchstart','mousemove'].forEach(evt=>{
     document.addEventListener(evt,()=>{if(superAdminUnlocked)resetAdminIdleTimer();},{passive:true});
   });
