@@ -224,8 +224,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
           <button class="btn" style="width:100%;border:none;border-radius:0;text-align:left" onclick="staffLogout()">Logout</button>
         </div>
       </div>
-      <button class="btn soft superAdminOnly hidden" onclick="document.getElementById('userManagePanel').scrollIntoView({behavior:'smooth'})">⚙ Manage</button>
-      <button class="btn primary superAdminOnly hidden" onclick="document.getElementById('uploadPanel').scrollIntoView({behavior:'smooth'})">＋ Add App</button>
+      <button class="btn soft superAdminOnly hidden" onclick="openManagePanel()">⚙ Manage</button>
+      <button class="btn primary superAdminOnly hidden" onclick="openAddAppPanel()">＋ Add App</button>
     </div>
   </div>
 </header>
@@ -1421,6 +1421,14 @@ function openAppInline(slug,name){
   history.replaceState(null,'',location.pathname+'#app='+encodeURIComponent(slug));
 }
 
+function openManagePanel(){
+  closeAppViewer();
+  document.getElementById('userManagePanel')?.scrollIntoView({behavior:'smooth'});
+}
+function openAddAppPanel(){
+  closeAppViewer();
+  document.getElementById('uploadPanel')?.scrollIntoView({behavior:'smooth'});
+}
 function closeAppViewer(){
   document.getElementById('appViewer')?.classList.add('hidden');
   document.getElementById('dashboardContent')?.classList.remove('hidden');
