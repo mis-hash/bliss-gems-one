@@ -388,7 +388,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
         <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">All Doers</h3><button class="btn" onclick="uuLoadList()">Refresh</button></div>
         <div class="tableWrap">
           <table>
-            <thead><tr><th>Name</th><th>Username</th><th>Mobile</th><th>Password</th><th>Status</th><th>App Access</th><th>Action</th></tr></thead>
+            <thead><tr><th>Name</th><th>Username</th><th>Mobile</th><th>Password</th><th>Status</th><th>App Access / Role</th><th>Action</th></tr></thead>
             <tbody id="uuTableBody"><tr><td colspan="7" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
           </table>
         </div>
@@ -584,6 +584,12 @@ firebase.initializeApp(firebaseConfig);
 const fbAuth = firebase.auth();
 const fbDb = firebase.firestore();
 const UU_COLLECTION='universal_users';
+// Only apps with their own internal role system need a role dropdown here (in addition
+// to the plain app-access checkbox every app gets) — Trip Expense is role-gated
+// (sales/admin/accounts/director); Parcel Dispatch has no such roles, just access on/off.
+const APP_ROLE_OPTIONS={
+  'trip-expense-app':[['','No Access'],['sales','Sales'],['admin','Admin'],['accounts','Accounts'],['director','Director']]
+};
 
 /* ===== Staff (public) login — shared Universal Users, same session key as Parcel Dispatch (same origin, so one login works everywhere) ===== */
 const PD_SESSION_KEY='pd_logged_user_v1';
@@ -1008,12 +1014,27 @@ async function uuLoadList(){
         tdApps.innerHTML='<small style="color:var(--muted)">No apps live yet</small>';
       }else{
         uuAppList.forEach(slug=>{
+          const row=document.createElement('div');
+          row.style.cssText='display:flex;align-items:center;gap:4px;margin-bottom:4px;font-size:12px';
           const lbl=document.createElement('label');
-          lbl.style.cssText='display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:12px';
+          lbl.style.cssText='display:inline-flex;align-items:center;gap:4px';
           const cb=document.createElement('input');cb.type='checkbox';cb.checked=(u.appAccess&&u.appAccess[slug])!==false;
           cb.onchange=()=>uuToggleAppAccess(id,slug,cb.checked);
           lbl.appendChild(cb);lbl.appendChild(document.createTextNode(' '+slug));
-          tdApps.appendChild(lbl);
+          row.appendChild(lbl);
+          const roleOpts=APP_ROLE_OPTIONS[slug];
+          if(roleOpts){
+            const curRole=(u.appRoles&&u.appRoles[slug])||'';
+            const sel=document.createElement('select');
+            sel.style.cssText='font-size:11px;padding:2px 4px;border:1px solid var(--line,#ccc);border-radius:5px';
+            roleOpts.forEach(([v,l])=>{
+              const opt=document.createElement('option');opt.value=v;opt.textContent=l;opt.selected=v===curRole;
+              sel.appendChild(opt);
+            });
+            sel.onchange=()=>uuSetUserAppRole(id,slug,sel.value);
+            row.appendChild(sel);
+          }
+          tdApps.appendChild(row);
         });
       }
       const tdAction=document.createElement('td');
@@ -1059,6 +1080,11 @@ async function uuToggleActive(id,makeActive){
 }
 async function uuToggleAppAccess(id,slug,allowed){
   await fbDb.collection(UU_COLLECTION).doc(id).update({['appAccess.'+slug]:allowed});
+}
+async function uuSetUserAppRole(id,slug,role){
+  const patch={};
+  patch['appRoles.'+slug]=role||firebase.firestore.FieldValue.delete();
+  await fbDb.collection(UU_COLLECTION).doc(id).update(patch);
 }
 async function uuDeleteUser(id){
   if(!confirm('Delete this user? This cannot be undone.'))return;
