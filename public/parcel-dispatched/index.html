@@ -257,7 +257,8 @@ if(window.self!==window.top){
     <b style="font-size:16px">Bliss Gems &amp; Minerals</b><br><small style="color:var(--m)">Parcel Dispatch &amp; Return</small>
   </div>
   <h3>📊 Dashboard <select id="dashboardRange" onchange="renderDashboard()" style="width:auto;display:inline-block;margin-left:8px;font-size:12px;padding:5px 8px;font-weight:400"><option value="today">Today</option><option value="week">This Week</option><option value="all">All Time</option></select></h3>
-  <div class="body"><div id="dashboardStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div></div>
+  <div class="body"><div id="dashboardStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div>
+  <div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:8px">🚚 Courier-wise Spend</div><div id="courierSpendBreakdown"></div></div></div>
 </section>
 <section class="card" id="historyCard" style="margin-top:0"><h3>Recent Dispatch Records</h3><div class="body">
 <div class="recordFilters">
@@ -1252,6 +1253,25 @@ function renderDashboard(){
     <div class="statTile"><small>Most Active Party (${rangeLabel})</small><strong>${party.top?esc(party.top):'—'}</strong>${party.top?`<span>${party.topN} parcels</span>`:''}</div>
     <div class="statTile${stuckCount?' danger':''}"><small>Stuck 24h+ (Overall)</small><strong>${stuckCount}</strong></div>
   `;
+  renderCourierSpendBreakdown(a);
+}
+function renderCourierSpendBreakdown(records){
+  const box=$('courierSpendBreakdown');if(!box)return;
+  const spend={};
+  records.forEach(x=>{
+    const c=(x.courierName||x.shipThrough||'').trim();
+    if(!c)return;
+    const amt=parseFloat(x.courierSlipAmount)||0;
+    if(!spend[c])spend[c]={amount:0,count:0};
+    spend[c].amount+=amt;
+    spend[c].count+=1;
+  });
+  const rows=Object.entries(spend).sort((a,b)=>b[1].amount-a[1].amount);
+  if(!rows.length){box.innerHTML='<div class="note">Is range me koi courier data nahi hai.</div>';return}
+  const total=rows.reduce((s,[,v])=>s+v.amount,0);
+  box.innerHTML=`<div class="table"><table><thead><tr><th>Courier</th><th>Parcels</th><th>Total Spend</th></tr></thead><tbody>${
+    rows.map(([name,v])=>`<tr><td>${esc(name)}</td><td>${v.count}</td><td>₹${v.amount.toFixed(2)}</td></tr>`).join('')
+  }<tr style="font-weight:700"><td>Total</td><td>${records.filter(x=>x.courierName||x.shipThrough).length}</td><td>₹${total.toFixed(2)}</td></tr></tbody></table></div>`;
 }
 function isEmptyDraft(x){
   return !x.shipTo && !x.courierName && !x.shipThrough && !x.broker && !x.awbNo;
@@ -1272,8 +1292,8 @@ function downloadCSV(filename,rows){
 function exportDispatchCSV(){
   const a=window._dispatchFiltered||[];
   if(!a.length){toast('Export karne ke liye koi record nahi hai (filters check karein).');return}
-  const header=['Slip No.','Parcel ID','Dispatch Date','Created At','Ship To / Party','Broker','Ship Through','Courier Name','AWB / Tracking','Final Status','Pending?'];
-  const rows=[header,...a.map(x=>[x.slipSeq?String(x.slipSeq).padStart(3,'0'):'',x.parcelId||'',x.shippingDate||x.dispatchDate||'',x.createdAt?new Date(x.createdAt).toLocaleString('en-IN'):'',x.shipTo||'',x.broker||'',x.shipThrough||'',x.courierName||'',x.awbNo||'',x.shippingFinalStatus||x.status||'',isRecordPending(x.parcelId)?'Yes':'No'])];
+  const header=['Slip No.','Parcel ID','Dispatch Date','Created At','Ship To / Party','Broker','Ship Through','Courier Name','AWB / Tracking','Courier Slip Amount','Final Status','Pending?'];
+  const rows=[header,...a.map(x=>[x.slipSeq?String(x.slipSeq).padStart(3,'0'):'',x.parcelId||'',x.shippingDate||x.dispatchDate||'',x.createdAt?new Date(x.createdAt).toLocaleString('en-IN'):'',x.shipTo||'',x.broker||'',x.shipThrough||'',x.courierName||'',x.awbNo||'',x.courierSlipAmount||'',x.shippingFinalStatus||x.status||'',isRecordPending(x.parcelId)?'Yes':'No'])];
   downloadCSV('Dispatch_Records_'+new Date().toISOString().slice(0,10)+'.csv',rows);
 }
 function exportReturnCSV(){
