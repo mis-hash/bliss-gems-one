@@ -1410,6 +1410,7 @@ function openAppInline(slug,name){
   frame.onload=()=>{
     frame.classList.add('loaded');
     loading?.classList.add('hidden');
+    if(typeof syncHubDesktopViewBtn==='function')syncHubDesktopViewBtn();
   };
   frame.src='/'+slug+'/';
   document.getElementById('appViewerOpenNew').href='/'+slug+'/';
@@ -1423,17 +1424,33 @@ function openAppInline(slug,name){
 }
 
 function toggleHubDesktopView(){
+  // When an app is open, proxy straight into its own toggleDesktopView() (same-origin
+  // iframe) instead of only flipping a shared localStorage key — on an actual desktop
+  // screen, each app's "mobile view" is a CSS-class preview toggled in-page, not
+  // something a reload of a stored key alone would ever trigger.
+  const frame=document.getElementById('appViewerFrame');
+  if(frame && frame.src && frame.src!=='about:blank'){
+    try{
+      if(frame.contentWindow && typeof frame.contentWindow.toggleDesktopView==='function'){
+        frame.contentWindow.toggleDesktopView();
+        syncHubDesktopViewBtn();
+        return;
+      }
+    }catch(e){console.error('proxy toggleDesktopView failed',e);}
+  }
   const forced=localStorage.getItem('bliss_force_desktop')==='1';
   if(forced)localStorage.removeItem('bliss_force_desktop');else localStorage.setItem('bliss_force_desktop','1');
   syncHubDesktopViewBtn();
-  const frame=document.getElementById('appViewerFrame');
-  if(frame && frame.src && frame.src!=='about:blank'){
-    const base=frame.src.split('?')[0].split('#')[0];
-    frame.src=base+'?_r='+Date.now();
-  }
 }
 function syncHubDesktopViewBtn(){
   const btn=document.getElementById('hubDesktopViewBtn');if(!btn)return;
+  const frame=document.getElementById('appViewerFrame');
+  if(frame && frame.src && frame.src!=='about:blank'){
+    try{
+      const innerBtn=frame.contentWindow && frame.contentWindow.document && frame.contentWindow.document.getElementById('desktopViewBtn');
+      if(innerBtn){btn.textContent=innerBtn.textContent;return}
+    }catch(e){}
+  }
   const forced=localStorage.getItem('bliss_force_desktop')==='1';
   btn.textContent=forced?'📱 Mobile View':'🖥 Desktop View';
 }
