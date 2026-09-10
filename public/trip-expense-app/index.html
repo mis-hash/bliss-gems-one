@@ -43,6 +43,10 @@ table.dtb td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px}tab
 .statusdot{width:9px;height:9px;border-radius:50%;flex:none}.statusdot.on{background:var(--g2)}.statusdot.off{background:var(--red)}
 .statusbadge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px}.statusbadge.on{background:var(--mint);color:var(--g)}.statusbadge.off{background:var(--redbg);color:var(--red)}
 @media(max-width:720px){header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:22px}.brand b{font-size:16px}.brand small,.live{display:none}.shell{display:block;padding:11px 10px 76px}nav{display:none}.hero{padding:17px}.hero h1{font-size:20px}.hero strong{font-size:23px}.cards{grid-template-columns:1fr 1fr}.money{grid-template-columns:1fr 1fr}.money .m:last-child{grid-column:1/-1}.analytics{grid-template-columns:1fr}.tripMoney{grid-template-columns:1fr 1fr}.tripMoney .tm:last-child{grid-column:1/-1}.salesActions{grid-template-columns:1fr}.big{min-height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;text-align:left}.big span{margin:0}.fields{grid-template-columns:1fr}.span2{grid-column:auto}.bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}.bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:0 0 auto;padding:2px 12px;white-space:nowrap}.bottomNav button.hidden{display:none}.bottomNav span{display:block;font-size:19px}.bottomNav button.on{color:var(--g)}}
+/* Same mobile-layout rules as above, but toggled by a class instead of actual viewport width —
+   lets "📱 Mobile View" preview mobile layout on a real desktop browser, where the viewport
+   meta tag hack has no visible effect at all. */
+body.te-force-mobile header{height:60px}body.te-force-mobile .head{padding:0 11px}body.te-force-mobile .logo{width:38px;height:38px;font-size:22px}body.te-force-mobile .brand b{font-size:16px}body.te-force-mobile .brand small,body.te-force-mobile .live{display:none}body.te-force-mobile .shell{display:block;padding:11px 10px 76px}body.te-force-mobile nav{display:none}body.te-force-mobile .hero{padding:17px}body.te-force-mobile .hero h1{font-size:20px}body.te-force-mobile .hero strong{font-size:23px}body.te-force-mobile .cards{grid-template-columns:1fr 1fr}body.te-force-mobile .money{grid-template-columns:1fr 1fr}body.te-force-mobile .money .m:last-child{grid-column:1/-1}body.te-force-mobile .analytics{grid-template-columns:1fr}body.te-force-mobile .tripMoney{grid-template-columns:1fr 1fr}body.te-force-mobile .tripMoney .tm:last-child{grid-column:1/-1}body.te-force-mobile .salesActions{grid-template-columns:1fr}body.te-force-mobile .big{min-height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;text-align:left}body.te-force-mobile .big span{margin:0}body.te-force-mobile .fields{grid-template-columns:1fr}body.te-force-mobile .span2{grid-column:auto}body.te-force-mobile .bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}body.te-force-mobile .bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:0 0 auto;padding:2px 12px;white-space:nowrap}body.te-force-mobile .bottomNav button.hidden{display:none}body.te-force-mobile .bottomNav span{display:block;font-size:19px}body.te-force-mobile .bottomNav button.on{color:var(--g)}
 </style></head>
 <body>
 <header><div class="head"><div class="brand"><div class="logo" id="secretLogo">b</div><div><b>Bliss Gems & Minerals</b><small>Employee Advance & Trip Settlement</small></div></div>
@@ -314,12 +318,28 @@ function hardRefreshApp(){
   }
 }
 function toggleDesktopView(){
+  // On an actual wide desktop screen, forcing the viewport meta tag does nothing (only
+  // mobile browsers respect it) — so give desktop a real CSS-only mobile-layout preview
+  // instead of reloading with a viewport hack that has no visible effect there.
+  if(window.innerWidth>900){
+    var previewOn=localStorage.getItem('te_force_mobile_preview')==='1';
+    if(previewOn)localStorage.removeItem('te_force_mobile_preview');else localStorage.setItem('te_force_mobile_preview','1');
+    document.body.classList.toggle('te-force-mobile',!previewOn);
+    syncDesktopViewBtn();
+    return;
+  }
   var forced=localStorage.getItem('bliss_force_desktop')==='1';
   if(forced)localStorage.removeItem('bliss_force_desktop');else localStorage.setItem('bliss_force_desktop','1');
   location.replace(location.pathname+'?_r='+Date.now()+location.hash);
 }
 function syncDesktopViewBtn(){
   var btn=document.getElementById('desktopViewBtn');if(!btn)return;
+  if(window.innerWidth>900){
+    var previewOn=localStorage.getItem('te_force_mobile_preview')==='1';
+    document.body.classList.toggle('te-force-mobile',previewOn);
+    btn.textContent=previewOn?'🖥 Desktop View':'📱 Mobile View';
+    return;
+  }
   var forced=localStorage.getItem('bliss_force_desktop')==='1';
   btn.textContent=forced?'📱 Mobile View':'🖥 Desktop View';
 }
