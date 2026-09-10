@@ -1402,6 +1402,11 @@ function renderSidebarApps(list){
 
 function openAppInline(slug,name){
   document.getElementById('dashboardContent')?.classList.add('hidden');
+  // Hub's own Super Admin dot sits at the same fixed screen corner as each app's own
+  // dot. Since it lives in the parent page (outside the iframe), it always paints above
+  // the iframe and swallows taps meant for the app's dot — hide it while an app is open
+  // so 5 taps in that corner reach the embedded app's Super Admin, not the hub's.
+  document.getElementById('secretAdminIcon')?.classList.add('hidden');
   document.getElementById('appViewerTitle').textContent=name;
   const frame=document.getElementById('appViewerFrame');
   const loading=document.getElementById('appViewerLoading');
@@ -1467,6 +1472,7 @@ function openAddAppPanel(){
 function closeAppViewer(){
   document.getElementById('appViewer')?.classList.add('hidden');
   document.getElementById('dashboardContent')?.classList.remove('hidden');
+  document.getElementById('secretAdminIcon')?.classList.remove('hidden');
   document.getElementById('staffLoginWrap')?.classList.remove('hidden');
   const frame=document.getElementById('appViewerFrame');
   if(frame){frame.src='about:blank';frame.classList.remove('loaded');}
