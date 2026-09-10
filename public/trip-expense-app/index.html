@@ -45,7 +45,7 @@ table.dtb td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px}tab
 @media(max-width:720px){header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:22px}.brand b{font-size:16px}.brand small,.live{display:none}.shell{display:block;padding:11px 10px 76px}nav{display:none}.hero{padding:17px}.hero h1{font-size:20px}.hero strong{font-size:23px}.cards{grid-template-columns:1fr 1fr}.money{grid-template-columns:1fr 1fr}.money .m:last-child{grid-column:1/-1}.analytics{grid-template-columns:1fr}.tripMoney{grid-template-columns:1fr 1fr}.tripMoney .tm:last-child{grid-column:1/-1}.salesActions{grid-template-columns:1fr}.big{min-height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;text-align:left}.big span{margin:0}.fields{grid-template-columns:1fr}.span2{grid-column:auto}.bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;justify-content:space-around;padding:6px}.bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold}.bottomNav button.hidden{display:none}.bottomNav span{display:block;font-size:19px}.bottomNav button.on{color:var(--g)}}
 </style></head>
 <body>
-<header><div class="head"><div class="brand"><div class="logo" id="secretLogo" onclick="tapLogo()">b</div><div><b>Bliss Gems & Minerals</b><small>Employee Advance & Trip Settlement</small></div></div>
+<header><div class="head"><div class="brand"><div class="logo" id="secretLogo">b</div><div><b>Bliss Gems & Minerals</b><small>Employee Advance & Trip Settlement</small></div></div>
 <div class="searchbox hidden" id="searchBoxWrap"><input id="globalSearch" type="text" placeholder="🔎 Search trip, sales person, location…" oninput="doGlobalSearch()"><div id="searchResults" class="searchresults hidden"></div></div>
 <div class="headRight">
 <button class="btn" id="desktopViewBtn" onclick="toggleDesktopView()" title="Switch between mobile and desktop layout">🖥 Desktop View</button>
@@ -175,6 +175,14 @@ if(window.self!==window.top){
 <div class="msg" id="loginMsg"></div>
 </div></div>
 
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:10px;right:12px;width:18px;height:18px;padding:0;border:0;background:transparent;color:#dde5e0;opacity:.6;font-size:10px;line-height:18px;cursor:default;z-index:999999">•</button>
+
+<div class="modal" id="superAdminModal"><div class="box" style="width:min(360px,100%)">
+<h3>Private Access</h3>
+<div class="field"><label>Super Admin Password</label><input id="superAdminPassword" type="password" onkeydown="if(event.key==='Enter')unlockSuperAdmin()"></div>
+<div class="actions"><button class="btn" onclick="closeSuperAdminModal()">Cancel</button><button class="btn primary" onclick="unlockSuperAdmin()">Unlock</button></div>
+</div></div>
+
 <div class="modal" id="issue"><div class="box"><h3>Issue Trip Amount</h3><div class="fields">
 <div class="field span2"><label>Sales Person *</label><select id="issueSales" onchange="updateIssueSuggestion()"></select></div>
 <div class="field"><label>Location *</label><select id="issueLocation" onchange="handleIssueLocPurposeChange(this,'issueLocation')"></select></div>
@@ -284,7 +292,7 @@ function myUserObj(){return users.find(x=>x.id===currentUser)||null}
 /* ===== Super Admin escape hatch (same shared password used across all Bliss apps) — lets a logged-in user reach the Director/Team Roles panel even before any role is assigned, so the first role can be bootstrapped. ===== */
 const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
 let superAdminUnlocked=false;
-let secretTapCount=0,secretTapTimer=null;
+let secretAdminTapCount=0,secretAdminTapTimer=null;
 function hardRefreshApp(){
   var btn=document.getElementById('hardRefreshBtn');
   if(btn)btn.textContent='⏳';
@@ -308,17 +316,29 @@ function syncDesktopViewBtn(){
   btn.textContent=forced?'📱 Mobile View':'🖥 Desktop View';
 }
 syncDesktopViewBtn();
-function tapLogo(){
-  secretTapCount++;
-  clearTimeout(secretTapTimer);
-  secretTapTimer=setTimeout(()=>secretTapCount=0,1100);
-  if(secretTapCount>=3){
-    secretTapCount=0;
-    if(superAdminUnlocked){renderAll();return}
-    const pw=prompt('Super Admin Password:');
-    if(pw===SUPER_ADMIN_PASSWORD){superAdminUnlocked=true;renderAll();}
-    else if(pw!==null)alert('Galat password.');
+function secretAdminTap(){
+  secretAdminTapCount++;
+  clearTimeout(secretAdminTapTimer);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2000);
+  if(secretAdminTapCount>=5){
+    secretAdminTapCount=0;
+    openSuperAdminModal();
   }
+}
+function openSuperAdminModal(){
+  if(superAdminUnlocked){renderAll();return}
+  const m=$('superAdminModal');if(!m)return;
+  $('superAdminPassword').value='';
+  m.classList.add('show');
+  setTimeout(()=>$('superAdminPassword')?.focus(),30);
+}
+function closeSuperAdminModal(){$('superAdminModal')?.classList.remove('show')}
+function unlockSuperAdmin(){
+  const pw=$('superAdminPassword')?.value||'';
+  if(pw!==SUPER_ADMIN_PASSWORD){alert('Galat password.');if($('superAdminPassword'))$('superAdminPassword').value='';return}
+  superAdminUnlocked=true;
+  closeSuperAdminModal();
+  renderAll();
 }
 function effectiveRole(){return superAdminUnlocked?'director':myRole()}
 
