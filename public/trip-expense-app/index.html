@@ -2,7 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" id="viewportMeta" content="width=device-width,initial-scale=1">
-<script>if(localStorage.getItem('bliss_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')</script>
+<script>
+/* Crash safety net — registered first, before any other script, so it can never itself
+   be skipped by a later error. A broken script tag still halts the rest of THAT tag, but
+   this at least turns a silent dead page into a visible, actionable message instead of the
+   user just clicking buttons that quietly do nothing. */
+(function(){
+  function showCrashBanner(msg){
+    if(document.getElementById('teCrashBanner'))return;
+    var b=document.createElement('div');
+    b.id='teCrashBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b42318;color:#fff;padding:10px 14px;font:600 13px Arial,sans-serif;text-align:center;box-shadow:0 2px 10px #0004';
+    b.innerHTML='⚠ App me error aa gaya hai. Page reload karein.'
+      +' <button type="button" style="margin-left:10px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#b42318;font-weight:700;cursor:pointer" onclick="location.reload()">Reload</button>'
+      +'<div style="font-weight:400;font-size:11px;opacity:.85;margin-top:3px">'+String(msg||'').slice(0,200).replace(/[<>]/g,'')+'</div>';
+    function attach(){document.body&&document.body.prepend(b)}
+    if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach);
+  }
+  window.addEventListener('error',function(e){
+    console.error('Uncaught error:',e.error||e.message);
+    showCrashBanner((e.error&&e.error.message)||e.message);
+  });
+  window.addEventListener('unhandledrejection',function(e){
+    console.error('Unhandled promise rejection:',e.reason);
+    showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));
+  });
+})();
+if(localStorage.getItem('bliss_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')
+</script>
 <title>Bliss Gems & Minerals - Trip Expense</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -256,8 +283,21 @@ if(window.self!==window.top){
 
 <script>
 const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
-if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
-const db=firebase.firestore();
+// If the firebase SDK failed to load (slow network, an ad/tracker blocker on gstatic.com,
+// a transient CDN hiccup), this must not throw here — a bare top-level throw would halt
+// every function defined below it in this script tag (toggleDesktopView, page renderers,
+// everything), leaving every button on the page silently doing nothing with no visible error.
+let db=null;
+try{
+  if(typeof firebase!=='undefined'){
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+  }else{
+    console.error('firebase SDK not loaded — cloud sync unavailable this session');
+  }
+}catch(e){
+  console.error('firebase init failed:',e);
+}
 const APP_SLUG='trip-expense-app';
 const UU_COLLECTION='universal_users';
 const SESSION_KEY='pd_logged_user_v1';
@@ -1243,7 +1283,11 @@ function renderAll(){
 }
 function boot(){
   currentUser=localStorage.getItem(SESSION_KEY)||null;
-  startUsersSync();startTripsSync();startLedgerSync();startSettingsSync();startOptionsSync();startLedgerHeadsSync();startActivitySync();startTemplatesSync();
+  // Each sync isolated so one failing (e.g. Firebase unavailable) can't stop the rest from
+  // starting or block renderAll() below — the page should still show local/cached data.
+  [startUsersSync,startTripsSync,startLedgerSync,startSettingsSync,startOptionsSync,startLedgerHeadsSync,startActivitySync,startTemplatesSync].forEach(fn=>{
+    try{fn();}catch(e){console.error(fn.name+' failed:',e);}
+  });
   renderAll();
 }
 document.addEventListener('DOMContentLoaded',boot);
