@@ -766,6 +766,7 @@ document.addEventListener('DOMContentLoaded',()=>{ensureDoerMaster();ensureUserP
   const openId=new URLSearchParams(location.search).get('open');
   if(openId){
     window._pendingOpenParcelId=openId;
+    window._pendingOpenFieldId=new URLSearchParams(location.search).get('f')||null;
     const existing=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===openId);
     if(existing){openFromLink(openId)}else{newParcel();toast('Slip load ho rahi hai…')}
   }else{
@@ -810,7 +811,7 @@ function personChanged(s){
   let u=users.find(x=>x.id===s.value);
   if(!u||!u.phone){console.warn('Selected user mobile number not saved.');return}
   if(s.id==='parcelGivenBy')return; // Parcel Given By is the initiator, not someone a task is being handed to — no notification needed here.
-  sendBackgroundWA(u,s.dataset.event).catch(err=>console.error('WhatsApp background send failed:',err));
+  sendBackgroundWA(u,s.dataset.event,s.id).catch(err=>console.error('WhatsApp background send failed:',err));
 }
 async function sendRawWA(phone,message){
   let id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
@@ -820,10 +821,10 @@ async function sendRawWA(phone,message){
   if(!r.ok){let d=await r.json().catch(()=>({}));throw new Error(d.message||d.error||('HTTP '+r.status))}
   return true;
 }
-async function sendBackgroundWA(u,eventName){
+async function sendBackgroundWA(u,eventName,fieldId){
   let parcel=editing||currentParcelId||'(New Parcel)';
   let client=$('shipTo').value||'-',st=$('shipThrough').value||'-',tm=now();
-  let message=`📦 Parcel Dispatch\n\nClient: ${client}\nParcel ID: ${parcel}\nShip Through: ${st}\n${eventName}: ${u.name}\nTime: ${tm}\n\nParcel update: ${eventName} completed/handed over to ${u.name}.\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(parcel)}`;
+  let message=`📦 Parcel Dispatch\n\nClient: ${client}\nParcel ID: ${parcel}\nShip Through: ${st}\n${eventName}: ${u.name}\nTime: ${tm}\n\nParcel update: ${eventName} completed/handed over to ${u.name}.\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(parcel,fieldId)}`;
   return sendRawWA(u.phone,message);
 }
 /* ===== Stuck-parcel delay alerts =====
@@ -916,8 +917,8 @@ function startDelayAlertWatch(){
 document.addEventListener('DOMContentLoaded',startDelayAlertWatch);
 function mask(p){p=String(p);return p.length>4?'••••••'+p.slice(-4):p}
 function normalizePhone(p){let n=String(p||'').replace(/\D/g,'');if(n.length===10)n='91'+n;return n}
-function parcelOpenLink(parcelId){
-  return 'https://bliss-gems-one.web.app/parcel-dispatched/?open='+encodeURIComponent(parcelId);
+function parcelOpenLink(parcelId,fieldId){
+  return 'https://bliss-gems-one.web.app/parcel-dispatched/?open='+encodeURIComponent(parcelId)+(fieldId?'&f='+encodeURIComponent(fieldId):'');
 }
 async function sendWA(){if(!waTarget)return;let id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');if(!id||!token){toast('Manage → GREEN-API me ID Instance aur API Token save karein.');return}let phone=normalizePhone(waTarget.user.phone);if(phone.length<11){toast('User mobile number valid nahi hai.');return}let btn=$('waSendBtn');btn.disabled=true;btn.textContent='Sending...';try{let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:phone+'@c.us',message:$('waMessage').value})});let data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.message||data.error||('HTTP '+r.status));closeWA();toast('WhatsApp message sent successfully.')}catch(e){toast('Message send failed: '+e.message)}finally{btn.disabled=false;btn.textContent='Send WhatsApp'}}
 function closeWA(){$('waModal').classList.add('hidden')}
@@ -1287,7 +1288,7 @@ function isRecordPending(parcelId){
  const locks=(JSON.parse(localStorage.getItem(APPROVAL_LOCK_KEY)||'{}'))[parcelId]||{};
  return !STAGE_SEQUENCE.every(s=>locks[s.id]);
 }
-function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();linesTagsRule();shippingInsuranceRule();{const cm=findClientByParty($('shipTo').value);if(cm){$('broker').value=cm.broker||'';}}syncShippingSection();syncPackPhotoPreview();syncCourierSlipPhotoPreview();applySequenceAndLocks();if(!silent){showDispatchFormView();scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
+function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();linesTagsRule();shippingInsuranceRule();{const cm=findClientByParty($('shipTo').value);if(cm){$('broker').value=cm.broker||'';}}syncShippingSection();syncPackPhotoPreview();syncCourierSlipPhotoPreview();applySequenceAndLocks();if(!silent){showDispatchFormView();const _fid=window._pendingOpenFieldId;window._pendingOpenFieldId=null;const _target=_fid?$(_fid):null;if(_target)_target.scrollIntoView({behavior:'smooth',block:'center'});else scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
 function openManage(){currentTab='users';$('manageModal').classList.remove('hidden');renderManage()}function closeManage(){$('manageModal').classList.add('hidden');populate();shipChanged()}function tab(b,t){currentTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));renderManage()}
 function renderManage(){let c=$('manageContent');if(currentTab==='users'){c.innerHTML=`<div class="grid"><div class="field"><label>User Name <span class="req">*</span></label><input id="mUserName"></div><div class="field"><label>Username <span class="req">*</span></label><input id="mUsername"></div><div class="field"><label>Mobile Number <span class="req">*</span></label><input id="mUserPhone" placeholder="10 digit or 91..."></div><div class="field"><label>Department <span class="req">*</span></label><input id="mDepartment"></div><div class="field"><label>&nbsp; <span class="req">*</span></label><button class="btn primary" onclick="addUser()">Add Universal User</button></div></div><div class="note">Handover dropdowns me sabhi active Doers dikhenge. Actual-work fields (Slip Fill, Weight Check, Lines & Tags, Noted By, Item Packed etc.) me logged-in user sirf apna naam fill kar sakta hai. Dusre Doer ka actual-work naam us Doer ki login ID se hi fill hoga. New user ka default password 1234 hai.</div><div style="margin:8px 0"><button class="btn secondary small" onclick="resetDefaultUsers()">↻ Reset Default Doers</button></div><div>${users.map((u,i)=>`<div class="item"><span><b>${esc(u.name)}</b> <small>(${esc(u.username||u.id)})</small><br><small>${esc(u.phone)} • ${esc(u.department||'No Department')} • ${u.active===false?'INACTIVE':'ACTIVE'}</small></span><span><button class="btn small secondary" onclick="toggleUser(${i})">${u.active===false?'Activate':'Deactivate'}</button> <button class="btn small secondary" onclick="editUser(${i})">Edit</button> <button class="btn small secondary" onclick="resetUserPassword(${i})">Reset Password</button> <button class="btn small danger" onclick="delUser(${i})">Delete</button></span></div>`).join('')}</div>`}
 else if(currentTab==='shipto'){c.innerHTML=`<div class="row"><input id="mShipTo" placeholder="Add Client / Ship To" style="flex:1"><button class="btn primary" onclick="addShipTo()">Add</button></div>${shipTo.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delShipTo(${i})">Delete</button></div>`).join('')}`}
@@ -1547,7 +1548,13 @@ function addInshPreset(){let v=$('mInshAmount').value.trim();if(v&&!inshAmountPr
 function delInshPreset(i){inshAmountPresets.splice(i,1);saveMasters();populate();renderManage()}
 function addCourierName(){let v=titleCase($('mCourierName').value);if(v&&!courierNames.some(x=>x.toLowerCase()===v.toLowerCase())){courierNames.push(v);saveMasters();syncShippingSection();renderManage()}}
 function delCourierName(i){courierNames.splice(i,1);saveMasters();syncShippingSection();renderManage()}
-function saveApi(){api={baseUrl:$('mBase').value.trim()||'https://api.green-api.com',idInstance:$('mId').value.trim(),apiToken:$('mToken').value.trim()};saveMasters();toast('GREEN-API settings saved')}
+function saveApi(){
+  api={baseUrl:$('mBase').value.trim()||'https://api.green-api.com',idInstance:$('mId').value.trim(),apiToken:$('mToken').value.trim()};
+  saveMasters();
+  // Shared across Bliss One hub + Trip Expense app too — save here once, usable everywhere.
+  pdDb.collection('app_config').doc('greenapi').set(api).catch(e=>console.error('greenapi cloud save failed',e));
+  toast('GREEN-API settings saved');
+}
 let tt;function toast(m){
   console.log(m);
   const el=$('toast');
