@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" id="viewportMeta" content="width=device-width,initial-scale=1">
-<script>if(localStorage.getItem('te_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')</script>
+<script>if(localStorage.getItem('bliss_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')</script>
 <title>Bliss Gems & Minerals - Trip Expense</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -314,13 +314,13 @@ function hardRefreshApp(){
   }
 }
 function toggleDesktopView(){
-  var forced=localStorage.getItem('te_force_desktop')==='1';
-  if(forced)localStorage.removeItem('te_force_desktop');else localStorage.setItem('te_force_desktop','1');
+  var forced=localStorage.getItem('bliss_force_desktop')==='1';
+  if(forced)localStorage.removeItem('bliss_force_desktop');else localStorage.setItem('bliss_force_desktop','1');
   location.replace(location.pathname+'?_r='+Date.now()+location.hash);
 }
 function syncDesktopViewBtn(){
   var btn=document.getElementById('desktopViewBtn');if(!btn)return;
-  var forced=localStorage.getItem('te_force_desktop')==='1';
+  var forced=localStorage.getItem('bliss_force_desktop')==='1';
   btn.textContent=forced?'📱 Mobile View':'🖥 Desktop View';
 }
 syncDesktopViewBtn();

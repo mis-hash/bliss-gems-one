@@ -28,7 +28,7 @@
     showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));
   });
 })();
-if(localStorage.getItem('pd_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')
+if(localStorage.getItem('bliss_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')
 </script>
 <title>Parcel Dispatch Slip</title>
 <style>
@@ -2440,8 +2440,8 @@ function toggleDesktopView(){
     syncDesktopViewBtn();
     return;
   }
-  var forced=localStorage.getItem('pd_force_desktop')==='1';
-  if(forced)localStorage.removeItem('pd_force_desktop');else localStorage.setItem('pd_force_desktop','1');
+  var forced=localStorage.getItem('bliss_force_desktop')==='1';
+  if(forced)localStorage.removeItem('bliss_force_desktop');else localStorage.setItem('bliss_force_desktop','1');
   location.replace(location.pathname+'?_r='+Date.now()+location.hash);
 }
 function syncDesktopViewBtn(){
@@ -2452,7 +2452,7 @@ function syncDesktopViewBtn(){
     btn.textContent=previewOn?'🖥 Desktop View':'📱 Mobile View';
     return;
   }
-  var forced=localStorage.getItem('pd_force_desktop')==='1';
+  var forced=localStorage.getItem('bliss_force_desktop')==='1';
   btn.textContent=forced?'📱 Mobile View':'🖥 Desktop View';
 }
 function toggleHeaderMore(){

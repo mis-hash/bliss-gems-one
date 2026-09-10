@@ -216,6 +216,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
     </div>
     <div class="actions">
       <button class="btn soft" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button>
+      <button class="btn soft" id="hubDesktopViewBtn" onclick="toggleHubDesktopView()" title="Switch between mobile and desktop layout — applies to whichever app is open">🖥 Desktop View</button>
       <div style="position:relative" id="staffLoginWrap">
         <button class="btn soft" id="staffLoginBtn" onclick="openStaffLoginModal()">👤 Staff Login</button>
         <div class="hidden" id="staffUserMenu" style="position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.15);min-width:180px;overflow:hidden;z-index:50">
@@ -1421,6 +1422,23 @@ function openAppInline(slug,name){
   history.replaceState(null,'',location.pathname+'#app='+encodeURIComponent(slug));
 }
 
+function toggleHubDesktopView(){
+  const forced=localStorage.getItem('bliss_force_desktop')==='1';
+  if(forced)localStorage.removeItem('bliss_force_desktop');else localStorage.setItem('bliss_force_desktop','1');
+  syncHubDesktopViewBtn();
+  const frame=document.getElementById('appViewerFrame');
+  if(frame && frame.src && frame.src!=='about:blank'){
+    const base=frame.src.split('?')[0].split('#')[0];
+    frame.src=base+'?_r='+Date.now();
+  }
+}
+function syncHubDesktopViewBtn(){
+  const btn=document.getElementById('hubDesktopViewBtn');if(!btn)return;
+  const forced=localStorage.getItem('bliss_force_desktop')==='1';
+  btn.textContent=forced?'📱 Mobile View':'🖥 Desktop View';
+}
+syncHubDesktopViewBtn();
+window.addEventListener('focus',syncHubDesktopViewBtn);
 function openManagePanel(){
   closeAppViewer();
   document.getElementById('userManagePanel')?.scrollIntoView({behavior:'smooth'});
