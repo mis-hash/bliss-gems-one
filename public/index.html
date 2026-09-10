@@ -338,8 +338,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
     </div>
   </section>
 
-  <section class="panel superAdminOnly hidden" id="userManagePanel">
-    <div class="panelHead"><h3>⚙ Manage — Users</h3><span class="badge">Super Admin</span></div>
+  <section class="panel" id="userManagePanel">
+    <div class="panelHead"><h3>⚙ Manage — Users</h3><span class="badge">Admin Login</span></div>
     <div class="panelBody">
       <div id="adminAuthStatus" class="deployBox">Checking admin login…</div>
 
@@ -348,9 +348,10 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
           <div><label>Name</label><input id="newUserName" placeholder="e.g. Ramesh Kumar"></div>
           <div><label>Email</label><input id="newUserEmail" type="email" placeholder="staff@example.com"></div>
           <div><label>Password</label><input id="newUserPassword" type="password" placeholder="min 6 characters"></div>
+          <div><label>Role</label><select id="newUserRole"><option value="doer">Doer (normal staff)</option><option value="admin">Admin</option></select></div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-          <button class="btn primary" type="button" onclick="createStaffUser()">Create Doer Account</button>
+          <button class="btn primary" type="button" onclick="createStaffUser()">Create Account</button>
         </div>
         <div id="createUserMsg" style="font-size:12px;margin-top:8px"></div>
       </div>
@@ -917,6 +918,7 @@ async function createStaffUser(){
   const name=document.getElementById('newUserName').value.trim();
   const email=document.getElementById('newUserEmail').value.trim();
   const pass=document.getElementById('newUserPassword').value;
+  const role=document.getElementById('newUserRole')?.value||'doer';
   const msg=document.getElementById('createUserMsg');
   if(!name||!email||pass.length<6){msg.style.color='#a12222';msg.textContent='Naam, email aur kam se kam 6-character password bharein.';return;}
   msg.style.color='';msg.textContent='Creating…';
@@ -924,10 +926,10 @@ async function createStaffUser(){
   try{
     const cred=await secondaryApp.auth().createUserWithEmailAndPassword(email,pass);
     await secondaryApp.firestore().collection('users').doc(cred.user.uid).set({
-      name,email,role:'doer',createdAt:Date.now()
+      name,email,role,createdAt:Date.now()
     });
     await secondaryApp.auth().signOut();
-    msg.style.color='#268F76';msg.textContent='"'+name+'" ka Doer account ban gaya.';
+    msg.style.color='#268F76';msg.textContent='"'+name+'" ka '+(role==='admin'?'Admin':'Doer')+' account ban gaya.';
     document.getElementById('newUserName').value='';
     document.getElementById('newUserEmail').value='';
     document.getElementById('newUserPassword').value='';
@@ -1710,6 +1712,12 @@ function unlockSuperAdmin(){
 document.addEventListener('DOMContentLoaded',()=>{
   renderSavedApps();
   loadLiveAppsRegistry();
+  // Staff Accounts (Manage — Users) has its own real Firebase Admin login gate
+  // (refreshAdminAuthStatus checks role==='admin'), so it no longer needs the separate
+  // Super Admin tap-gesture on top — just reflect the real login state on load and
+  // whenever it changes (covers a session already logged in from a previous visit).
+  try{fbAuth.onAuthStateChanged(()=>refreshAdminAuthStatus());}catch(e){}
+  refreshAdminAuthStatus();
   ['click','keydown','touchstart','mousemove'].forEach(evt=>{
     document.addEventListener(evt,()=>{if(superAdminUnlocked)resetAdminIdleTimer();},{passive:true});
   });
