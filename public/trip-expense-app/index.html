@@ -214,7 +214,7 @@ if(window.self!==window.top){
 <div class="msg" id="loginMsg"></div>
 </div></div>
 
-<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:74px;right:14px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:#dde5e0;opacity:.6;font-size:13px;line-height:26px;cursor:default;z-index:999999;transition:background .15s">•</button>
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:74px;right:14px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:13px;line-height:26px;cursor:default;z-index:999999;transition:background .15s">•</button>
 
 <div class="modal" id="superAdminModal"><div class="box" style="width:min(360px,100%)">
 <h3>Private Access</h3>
@@ -397,7 +397,7 @@ function secretAdminTap(){
   }
   clearTimeout(secretAdminTapTimer);
   secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2500);
-  if(secretAdminTapCount>=5){
+  if(secretAdminTapCount>=10){
     secretAdminTapCount=0;
     clearTimeout(secretAdminTapTimer);
     openSuperAdminModal();

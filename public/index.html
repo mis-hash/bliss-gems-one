@@ -421,7 +421,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
 </div>
 
 
-<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:10px;right:12px;width:22px;height:22px;padding:0;border:0;border-radius:50%;background:transparent;color:#e2e7e4;opacity:.6;font-size:10px;line-height:22px;cursor:default;z-index:999999;transition:background .15s">•</button>
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:10px;right:12px;width:22px;height:22px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:10px;line-height:22px;cursor:default;z-index:999999;transition:background .15s">•</button>
 
 <div class="adminModal hidden" id="superAdminModal">
   <div class="adminBox">
@@ -1454,7 +1454,7 @@ function openAppInline(slug,name){
   // Hub's own Super Admin dot sits at the same fixed screen corner as each app's own
   // dot. Since it lives in the parent page (outside the iframe), it always paints above
   // the iframe and swallows taps meant for the app's dot — hide it while an app is open
-  // so 5 taps in that corner reach the embedded app's Super Admin, not the hub's.
+  // so 10 taps in that corner reach the embedded app's Super Admin, not the hub's.
   document.getElementById('secretAdminIcon')?.classList.add('hidden');
   document.getElementById('appViewerTitle').textContent=name;
   const frame=document.getElementById('appViewerFrame');
@@ -1635,7 +1635,7 @@ function secretAdminTap(){
   }
   clearTimeout(secretAdminTapTimer);
   secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2500);
-  if(secretAdminTapCount>=5){
+  if(secretAdminTapCount>=10){
     secretAdminTapCount=0;
     clearTimeout(secretAdminTapTimer);
     openSuperAdminModal();
