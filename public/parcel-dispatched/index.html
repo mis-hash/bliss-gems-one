@@ -444,7 +444,7 @@ if(window.self!==window.top){
 </div>
 </div></main>
 
-<div class="modal hidden" id="manageModal"><div class="box"><div class="mh"><b>Admin / Backend Masters</b><button class="btn secondary small" onclick="closeManage()">✕</button></div><div class="mb"><div class="tabs"><button class="tab on" data-tab="users" onclick="tab(this,'users')">Universal Users</button><button class="tab" data-tab="shipto" onclick="tab(this,'shipto')">Ship To</button><button class="tab" data-tab="clients" onclick="tab(this,'clients')">Ship To</button><button class="tab" data-tab="brokers" onclick="tab(this,'brokers')">Brokers</button><button class="tab" data-tab="shipthrough" onclick="tab(this,'shipthrough')">Ship Through</button><button class="tab" data-tab="insh" onclick="tab(this,'insh')">INSH Amount</button><button class="tab" data-tab="couriername" onclick="tab(this,'couriername')">Courier Name</button><button class="tab" data-tab="messages" onclick="tab(this,'messages')">Message Settings</button><button class="tab" data-tab="watemplates" onclick="tab(this,'watemplates')">WhatsApp Templates</button><button class="tab" data-tab="privacy" onclick="tab(this,'privacy')">Self Remark Privacy</button><button class="tab" data-tab="api" onclick="tab(this,'api')">GREEN-API</button></div><div id="manageContent"></div></div><div class="mf"><span class="note">Data is saved in this browser.</span><button class="btn secondary" onclick="closeManage()">Close</button></div></div></div>
+<div class="modal hidden" id="manageModal"><div class="box"><div class="mh"><b>Admin / Backend Masters</b><button class="btn secondary small" onclick="closeManage()">✕</button></div><div class="mb"><div class="tabs"><button class="tab on" data-tab="users" onclick="tab(this,'users')">Universal Users</button><button class="tab" data-tab="shipto" onclick="tab(this,'shipto')">Ship To</button><button class="tab" data-tab="clients" onclick="tab(this,'clients')">Ship To</button><button class="tab" data-tab="brokers" onclick="tab(this,'brokers')">Brokers</button><button class="tab" data-tab="shipthrough" onclick="tab(this,'shipthrough')">Ship Through</button><button class="tab" data-tab="insh" onclick="tab(this,'insh')">INSH Amount</button><button class="tab" data-tab="couriername" onclick="tab(this,'couriername')">Courier Name</button><button class="tab" data-tab="notifycontrol" onclick="tab(this,'notifycontrol')">Notification Control</button><button class="tab" data-tab="messages" onclick="tab(this,'messages')">Message Settings</button><button class="tab" data-tab="watemplates" onclick="tab(this,'watemplates')">WhatsApp Templates</button><button class="tab" data-tab="privacy" onclick="tab(this,'privacy')">Self Remark Privacy</button><button class="tab" data-tab="api" onclick="tab(this,'api')">GREEN-API</button></div><div id="manageContent"></div></div><div class="mf"><span class="note">Data is saved in this browser.</span><button class="btn secondary" onclick="closeManage()">Close</button></div></div></div>
 
 
 <div class="modal hidden" id="allRecordsModal"><div class="box" style="width:min(1100px,100%)">
@@ -548,7 +548,8 @@ if(window.self!==window.top){
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
-const K={users:'pd_users_v2',shipto:'pd_shipto_v2',shipthrough:'pd_shipthrough_v2',api:'pd_greenapi_v2',records:'pd_records_v2',inshpresets:'pd_inshpresets_v1',couriernames:'pd_couriernames_v1'};
+const K={users:'pd_users_v2',shipto:'pd_shipto_v2',shipthrough:'pd_shipthrough_v2',api:'pd_greenapi_v2',records:'pd_records_v2',inshpresets:'pd_inshpresets_v1',couriernames:'pd_couriernames_v1',notifysettings:'pd_notify_settings_v1'};
+const NOTIFY_EVENTS=['Slip Owner','Handover To Weight Check & PKT Change','PKT Change By','Weight Checked By','Lines & Tags Checked By','Handover To Noting','Noted By','Handover To Recheck','Actual Recheck By','Handover To Packing','Item Packed By','Parcel Handover By','Courier Slip Received By'];
 const ACTIVE_DRAFT_KEY='pd_active_draft_v1';
 let currentParcelId=null;
 
@@ -729,7 +730,7 @@ if(!Array.isArray(waTemplates)||!waTemplates.length){
 }
 function saveWaTemplates(){localStorage.setItem(WA_TEMPLATE_KEY,JSON.stringify(waTemplates));}
 
-let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(localStorage.getItem(K.shipto)||'[]');let shipThrough=JSON.parse(localStorage.getItem(K.shipthrough)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let inshAmountPresets=JSON.parse(localStorage.getItem(K.inshpresets)||'null')||['0.10','0.20','0.50','0.60','0.70','1.00','2.00','3.00'];let courierNames=JSON.parse(localStorage.getItem(K.couriernames)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let api=JSON.parse(localStorage.getItem(K.api)||'{}');let editing=null,currentTab='users',waTarget=null;
+let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(localStorage.getItem(K.shipto)||'[]');let shipThrough=JSON.parse(localStorage.getItem(K.shipthrough)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let inshAmountPresets=JSON.parse(localStorage.getItem(K.inshpresets)||'null')||['0.10','0.20','0.50','0.60','0.70','1.00','2.00','3.00'];let courierNames=JSON.parse(localStorage.getItem(K.couriernames)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let api=JSON.parse(localStorage.getItem(K.api)||'{}');let notifySettings=JSON.parse(localStorage.getItem(K.notifysettings)||'{}');let editing=null,currentTab='users',waTarget=null;
 const $=id=>document.getElementById(id);
 
 const DOER_MASTER_VERSION='20260819_doers_v3';
@@ -784,7 +785,7 @@ function openFromLink(parcelId){
   window._pendingOpenParcelId=null;
   if(history.replaceState)history.replaceState(null,'',location.pathname);
 }
-function saveMasters(){localStorage.setItem(K.users,JSON.stringify(users));localStorage.setItem(K.shipto,JSON.stringify(shipTo));localStorage.setItem(K.shipthrough,JSON.stringify(shipThrough));localStorage.setItem(K.inshpresets,JSON.stringify(inshAmountPresets));localStorage.setItem(K.couriernames,JSON.stringify(courierNames));localStorage.setItem(K.api,JSON.stringify(api));pdSyncUsersToCloud();}
+function saveMasters(){localStorage.setItem(K.users,JSON.stringify(users));localStorage.setItem(K.shipto,JSON.stringify(shipTo));localStorage.setItem(K.shipthrough,JSON.stringify(shipThrough));localStorage.setItem(K.inshpresets,JSON.stringify(inshAmountPresets));localStorage.setItem(K.couriernames,JSON.stringify(courierNames));localStorage.setItem(K.api,JSON.stringify(api));localStorage.setItem(K.notifysettings,JSON.stringify(notifySettings));pdSyncUsersToCloud();}
 function options(arr,val=x=>x,label=x=>x){return '<option value="">Select</option>'+arr.map(x=>`<option value="${esc(val(x))}">${esc(label(x))}</option>`).join('')}
 function populate(){ensureDoerMaster();document.querySelectorAll('.person').forEach(s=>{let old=s.value;let au=users.filter(u=>u.active!==false);s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});$('shipThroughList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('courierNameList'))$('courierNameList').innerHTML=courierNames.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('inshAmountList'))$('inshAmountList').innerHTML=inshAmountPresets.map(x=>`<option value="${esc(x)}"></option>`).join('');renderShipToMenu('')}
 function now(){return new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}
@@ -812,6 +813,7 @@ function personChanged(s){
   let u=users.find(x=>x.id===s.value);
   if(!u||!u.phone){console.warn('Selected user mobile number not saved.');return}
   if(s.id==='parcelGivenBy')return; // Parcel Given By is the initiator, not someone a task is being handed to — no notification needed here.
+  if(notifySettings[s.dataset.event]===false)return; // Super Admin turned this event's notification off.
   sendBackgroundWA(u,s.dataset.event,s.id).catch(err=>console.error('WhatsApp background send failed:',err));
 }
 async function sendRawWA(phone,message){
@@ -1333,6 +1335,7 @@ else if(currentTab==='brokers'){c.innerHTML=`<div class="row"><input id="mBroker
 else if(currentTab==='shipthrough'){c.innerHTML=`<div class="row"><input id="mShipThrough" placeholder="Add Ship Through" style="flex:1"><button class="btn primary" onclick="addShipThrough()">Add</button></div><div class="note">Section 1-A केवल SECURE, SEQUEL/SQL और BVC पर दिखेगा.</div>${shipThrough.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delShipThrough(${i})">Delete</button></div>`).join('')}`}
 else if(currentTab==='insh'){c.innerHTML=`<div class="row"><input id="mInshAmount" placeholder="Add INSH Amount (e.g. 0.10)" style="flex:1"><button class="btn primary" onclick="addInshPreset()">Add</button></div><div class="note">Dispatch Section 1 ke INSH Amount field mein ye quick-pick suggestions ke roop mein dikhenge.</div>${inshAmountPresets.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delInshPreset(${i})">Delete</button></div>`).join('')}`}
 else if(currentTab==='couriername'){c.innerHTML=`<div class="row"><input id="mCourierName" placeholder="Add Courier Name" style="flex:1"><button class="btn primary" onclick="addCourierName()">Add</button></div><div class="note">Section 6 ke Courier Name field mein ye dropdown suggestions ke roop mein dikhenge.</div>${courierNames.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delCourierName(${i})">Delete</button></div>`).join('')}`}
+else if(currentTab==='notifycontrol'){c.innerHTML=`<h3 style="margin-top:0">💬 Notification Control</h3><div class="note">Kis handover event par WhatsApp message jaye, ye yahan se on/off karein. Default sabhi ON hain.</div>${NOTIFY_EVENTS.map((ev,i)=>`<div class="item"><span>${esc(ev)}</span><select onchange="setNotifyEvent(${i},this.value)" style="width:auto"><option value="YES"${notifySettings[ev]!==false?' selected':''}>ON</option><option value="NO"${notifySettings[ev]===false?' selected':''}>OFF</option></select></div>`).join('')}`}
 else if(currentTab==='messages'){
  let au=users.filter(u=>u.active!==false);
  c.innerHTML=`<h3 style="margin-top:0">DLC WhatsApp Rules</h3>
@@ -1566,6 +1569,7 @@ function addShipTo(){let v=$('mShipTo').value.trim();if(v&&!shipTo.some(x=>x.toL
 function addShipThrough(){let v=$('mShipThrough').value.trim();if(v&&!shipThrough.some(x=>x.toLowerCase()===v.toLowerCase())){shipThrough.push(v);saveMasters();populate();renderManage()}}function delShipThrough(i){shipThrough.splice(i,1);saveMasters();populate();renderManage()}
 function addInshPreset(){let v=$('mInshAmount').value.trim();if(v&&!inshAmountPresets.includes(v)){inshAmountPresets.push(v);saveMasters();populate();renderManage()}}
 function delInshPreset(i){inshAmountPresets.splice(i,1);saveMasters();populate();renderManage()}
+function setNotifyEvent(i,value){notifySettings[NOTIFY_EVENTS[i]]=value==='YES';saveMasters()}
 function addCourierName(){let v=titleCase($('mCourierName').value);if(v&&!courierNames.some(x=>x.toLowerCase()===v.toLowerCase())){courierNames.push(v);saveMasters();syncShippingSection();renderManage()}}
 function delCourierName(i){courierNames.splice(i,1);saveMasters();syncShippingSection();renderManage()}
 function saveApi(){
