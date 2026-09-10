@@ -274,7 +274,7 @@ if(window.self!==window.top){
 <div class="recordSummary" id="dispatchRecordSummary"></div>
 <label id="hideEmptyDraftsWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="hideEmptyDrafts" onchange="renderHistory()" style="width:auto"> Hide empty drafts (<span id="hideEmptyDraftsCount">0</span>)</label>
 <label id="showDeletedDispatchWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="showDeletedDispatch" onchange="renderHistory()" style="width:auto"> 🗑 Show Deleted (<span id="deletedDispatchCount">0</span>)</label>
-<div class="table desktopRecords"><table><thead><tr><th>Parcel ID</th><th>Date</th><th>Ship To</th><th>Courier</th><th>Broker</th><th>AWB</th><th>Status</th><th>Action</th></tr></thead><tbody id="history"></tbody></table></div>
+<div class="table desktopRecords"><table><thead><tr><th>Parcel ID</th><th>Date</th><th>Ship To</th><th>Slip Owner</th><th>Courier</th><th>Broker</th><th>AWB</th><th>Status</th><th>Action</th></tr></thead><tbody id="history"></tbody></table></div>
 <div id="dispatchMobileCards" class="mobileRecordCards"></div>
 </div></section>
 </div>
@@ -1009,7 +1009,10 @@ function shippingInsuranceRule(){
 
 function newParcel(){editing=null;currentParcelId=genId();localStorage.setItem(ACTIVE_DRAFT_KEY,currentParcelId);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';document.querySelectorAll('main input,main textarea').forEach(x=>{if(x.id!=='search')x.value=''});document.querySelectorAll('main select').forEach(x=>x.value='');let d=new Date();$('dispatchDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;if($('shippingDate'))$('shippingDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 if($('slipFillTime'))$('slipFillTime').value=now();
-shipChanged();priceChanged();dispatchPktRule();linesTagsRule();shippingInsuranceRule();syncShippingSection();syncPackPhotoPreview();syncCourierSlipPhotoPreview();saveStageLocks({});applySequenceAndLocks();persistParcelRecord();markAutoSaved();assignDispatchSeqIfNeeded(currentParcelId)}
+shipChanged();priceChanged();dispatchPktRule();linesTagsRule();shippingInsuranceRule();syncShippingSection();syncPackPhotoPreview();syncCourierSlipPhotoPreview();saveStageLocks({});applySequenceAndLocks();
+// Deliberately NOT persisting/pushing to cloud here — a blank slip with nothing filled in
+// yet shouldn't create a record. It only saves once autoSaveParcel() sees a real field filled.
+}
 function formData(){let o={parcelId:editing||currentParcelId||genId(),createdAt:new Date().toISOString()};document.querySelectorAll('main input,main select,main textarea').forEach(e=>{if(e.id&&e.id!=='search')o[e.id]=e.value});return o}
 function fileToCompressedDataUri(file){
   return new Promise((resolve,reject)=>{
@@ -1146,6 +1149,7 @@ function autoSaveParcel(){
   if(!$('dispatchDate').value && !$('shipTo').value && !$('shipThrough').value)return;
   persistParcelRecord();
   markAutoSaved();
+  assignDispatchSeqIfNeeded(currentParcelId);
 }
 function updateSlipNoTag(){
   let t=$('slipNoTag');if(!t)return;
@@ -1217,8 +1221,9 @@ function renderHistory(){
  const dispatchActionCard=x=>x.deletedAt
    ?`<button class="btn secondary" style="margin-top:6px" onclick="restoreDispatchRecord('${esc(x.parcelId||'')}')">↩ Restore</button>`
    :`<button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button>${loggedUser()?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑 Delete</button>`:''}`;
- $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td>${dispatchAction(x)}</td></tr>`}).join(''):'<tr><td colspan="8">No records.</td></tr>';
- if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div>${dispatchActionCard(x)}</div>`}).join(''):'<div class="note">No records.</div>';
+ const slipOwnerName=x=>{const u=users.find(u=>u.id===x.slipFillBy);return u?u.name:''};
+ $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(slipOwnerName(x))}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td>${dispatchAction(x)}</td></tr>`}).join(''):'<tr><td colspan="9">No records.</td></tr>';
+ if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Slip Owner</small><strong>${esc(slipOwnerName(x)||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div>${dispatchActionCard(x)}</div>`}).join(''):'<div class="note">No records.</div>';
  renderDashboard();
 }
 function renderDashboard(){
