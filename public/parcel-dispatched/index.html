@@ -443,6 +443,9 @@ if(window.self!==window.top){
   </div>
   <h3>📊 Analytics Dashboard <select id="dashboardRange" onchange="renderDashboard()" style="width:auto;display:inline-block;margin-left:8px;font-size:12px;padding:5px 8px;font-weight:400"><option value="today">Today</option><option value="week">This Week</option><option value="all">All Time</option></select></h3>
   <div class="body"><div id="dashboardStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div>
+  <div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:8px">🧭 Stage-wise Pending Breakdown</div>
+  <div class="note" style="margin-bottom:8px">Abhi jo parcels pending hain, wo kis stage par atke hain — yahan se pata chalega kaunsa stage bottleneck hai (Overall, koi date range nahi).</div>
+  <div id="stagePendingBreakdown"></div></div>
   <div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:8px">🚚 Courier-wise Spend</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
     <select id="courierSpendFilter" onchange="renderCourierSpendBreakdown()" style="font-size:12px;padding:5px 8px"><option value="">All Couriers</option></select>
@@ -451,7 +454,16 @@ if(window.self!==window.top){
     <input type="date" id="courierSpendTo" onchange="renderCourierSpendBreakdown()" style="font-size:12px;padding:5px 8px" title="To Date">
     <button class="btn secondary small" type="button" onclick="clearCourierSpendFilters()">Clear</button>
   </div>
-  <div id="courierSpendBreakdown"></div></div></div>
+  <div id="courierSpendBreakdown"></div></div>
+  <div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:8px">🏢 Party-wise Spend</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <select id="partySpendFilter" onchange="renderPartySpendBreakdown()" style="font-size:12px;padding:5px 8px"><option value="">All Parties</option></select>
+    <input type="month" id="partySpendMonth" onchange="partySpendMonthChanged()" style="font-size:12px;padding:5px 8px" title="Quick pick: pura mahina">
+    <input type="date" id="partySpendFrom" onchange="renderPartySpendBreakdown()" style="font-size:12px;padding:5px 8px" title="From Date">
+    <input type="date" id="partySpendTo" onchange="renderPartySpendBreakdown()" style="font-size:12px;padding:5px 8px" title="To Date">
+    <button class="btn secondary small" type="button" onclick="clearPartySpendFilters()">Clear</button>
+  </div>
+  <div id="partySpendBreakdown"></div></div></div>
 </section>
 </div>
 </div></main>
@@ -1309,7 +1321,9 @@ function renderDashboard(){
     <div class="statTile${stuckCount?' danger':''}"><small>Stuck 24h+ (Overall)</small><strong>${stuckCount}</strong></div>
     <div class="statTile"><small>${rangeLabel} Returns</small><strong>${returnsInRange.length}</strong></div>
   `;
+  renderStagePendingBreakdown();
   renderCourierSpendBreakdown();
+  renderPartySpendBreakdown();
 }
 // Courier-wise Spend has its own independent filters (courier name + date range) instead
 // of following the Dashboard's Today/Week/All range — accounting needs to look at any
@@ -1366,6 +1380,83 @@ function renderCourierSpendBreakdown(){
   box.innerHTML=`<div class="table"><table><thead><tr><th>Courier</th><th>Parcels</th><th>Total Spend</th></tr></thead><tbody>${
     rows.map(([name,v])=>`<tr><td>${esc(name)}</td><td>${v.count}</td><td>₹${v.amount.toFixed(2)}</td></tr>`).join('')
   }<tr style="font-weight:700"><td>Total</td><td>${records.filter(x=>x.courierName||x.shipThrough).length}</td><td>₹${total.toFixed(2)}</td></tr></tbody></table></div>`;
+}
+// Party-wise Spend mirrors Courier-wise Spend exactly, grouped by Ship To / Party instead
+// of Courier — same independent filter pattern (party + custom date range / month picker).
+function fillPartySpendFilterOptions(){
+  const sel=$('partySpendFilter');if(!sel)return;
+  const cur=sel.value;
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>!isEmptyDraft(x)&&!x.deletedAt);
+  const names=uniqueSorted(all.map(x=>x.shipTo));
+  sel.innerHTML='<option value="">All Parties</option>'+names.map(n=>`<option value="${esc(n)}"${n===cur?' selected':''}>${esc(n)}</option>`).join('');
+}
+function partySpendMonthChanged(){
+  const m=$('partySpendMonth').value;
+  if(m){
+    const [y,mo]=m.split('-').map(Number);
+    const lastDay=new Date(y,mo,0).getDate();
+    $('partySpendFrom').value=`${m}-01`;
+    $('partySpendTo').value=`${m}-${String(lastDay).padStart(2,'0')}`;
+  }
+  renderPartySpendBreakdown();
+}
+function clearPartySpendFilters(){
+  $('partySpendFilter').value='';
+  $('partySpendMonth').value='';
+  $('partySpendFrom').value='';
+  $('partySpendTo').value='';
+  renderPartySpendBreakdown();
+}
+function renderPartySpendBreakdown(){
+  const box=$('partySpendBreakdown');if(!box)return;
+  fillPartySpendFilterOptions();
+  const partyFilter=$('partySpendFilter')?.value||'';
+  const from=$('partySpendFrom')?.value||'';
+  const to=$('partySpendTo')?.value||'';
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>!isEmptyDraft(x)&&!x.deletedAt);
+  const records=all.filter(x=>{
+    const p=(x.shipTo||'').trim();
+    if(partyFilter&&p!==partyFilter)return false;
+    const d=x.shippingDate||x.dispatchDate||'';
+    return inDateRange(d,from,to);
+  });
+  const spend={};
+  records.forEach(x=>{
+    const p=(x.shipTo||'').trim();
+    if(!p)return;
+    const amt=parseFloat(x.courierSlipAmount)||0;
+    if(!spend[p])spend[p]={amount:0,count:0};
+    spend[p].amount+=amt;
+    spend[p].count+=1;
+  });
+  const rows=Object.entries(spend).sort((a,b)=>b[1].amount-a[1].amount);
+  if(!rows.length){box.innerHTML='<div class="note">Is filter me koi party data nahi hai.</div>';return}
+  const total=rows.reduce((s,[,v])=>s+v.amount,0);
+  box.innerHTML=`<div class="table"><table><thead><tr><th>Party</th><th>Parcels</th><th>Total Spend</th></tr></thead><tbody>${
+    rows.map(([name,v])=>`<tr><td>${esc(name)}</td><td>${v.count}</td><td>₹${v.amount.toFixed(2)}</td></tr>`).join('')
+  }<tr style="font-weight:700"><td>Total</td><td>${records.filter(x=>x.shipTo).length}</td><td>₹${total.toFixed(2)}</td></tr></tbody></table></div>`;
+}
+// Stage-wise Pending Breakdown: for every currently-pending (not fully locked) dispatch
+// record, find the first stage in the mandatory sequence that isn't locked yet — that's
+// where it's actually stuck. Counting these per stage shows the real bottleneck at a
+// glance, independent of the Dashboard's Today/Week/All range (it's a live snapshot).
+function renderStagePendingBreakdown(){
+  const box=$('stagePendingBreakdown');if(!box)return;
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>!isEmptyDraft(x)&&!x.deletedAt);
+  const locksAll=JSON.parse(localStorage.getItem(APPROVAL_LOCK_KEY)||'{}');
+  const counts={};
+  STAGE_SEQUENCE.forEach(s=>counts[s.id]=0);
+  let pendingTotal=0;
+  all.forEach(x=>{
+    const locks=locksAll[x.parcelId]||{};
+    const stuckStage=STAGE_SEQUENCE.find(s=>!locks[s.id]);
+    if(stuckStage){counts[stuckStage.id]++;pendingTotal++}
+  });
+  if(!pendingTotal){box.innerHTML='<div class="note">Abhi koi parcel pending nahi hai — sab clear hain.</div>';return}
+  const maxCount=Math.max(...STAGE_SEQUENCE.map(s=>counts[s.id]));
+  box.innerHTML=`<div class="table"><table><thead><tr><th>Stage</th><th>Pending Parcels</th></tr></thead><tbody>${
+    STAGE_SEQUENCE.map(s=>`<tr${counts[s.id]&&counts[s.id]===maxCount?' style="font-weight:700;color:#9b1c1c"':''}><td>${esc(s.name)}</td><td>${counts[s.id]}${counts[s.id]&&counts[s.id]===maxCount?' 🚨':''}</td></tr>`).join('')
+  }<tr style="font-weight:700"><td>Total Pending</td><td>${pendingTotal}</td></tr></tbody></table></div>`;
 }
 function isEmptyDraft(x){
   return !x.shipTo && !x.courierName && !x.shipThrough && !x.broker && !x.awbNo;
