@@ -381,19 +381,31 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
             <div><label>Username</label><input id="uuUsername" placeholder="e.g. Ramesh"></div>
             <div><label>Mobile Number</label><input id="uuPhone" placeholder="10 digit or 91..."></div>
             <div><label>Department</label><input id="uuDepartment" placeholder="optional"></div>
+            <div><label>Email</label><input id="uuEmail" type="email" placeholder="optional"></div>
             <div><label>Password</label><input id="uuPassword" type="password" placeholder="default 1234"></div>
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
             <button class="btn primary" type="button" onclick="uuAddUser()">Add Universal User</button>
           </div>
           <div id="uuCreateMsg" style="font-size:12px;margin-top:8px"></div>
+
+          <div style="margin-top:22px;border-top:1px solid var(--line,#e5e5e5);padding-top:14px">
+            <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">Bulk Import (Name / Department / Email)</h3></div>
+            <div class="deployBox">Har line mein <b>Name</b>, <b>Department</b>, <b>Email</b> — TAB se separate karke paste karein. Sirf woh log match honge jinka Name yahan exactly wahi hai jo neeche list mein pehle se hai (case-insensitive) — unka Department aur Email update ho jayega. Jo match nahi honge unke naam neeche result mein dikha diye jayenge.</div>
+            <textarea id="uuBulkImportBox" rows="8" style="width:100%;margin-top:8px;font-family:monospace;font-size:12px;padding:8px;border:1px solid var(--line,#ccc);border-radius:8px"></textarea>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+              <button class="btn" type="button" onclick="uuFillBulkImportSample()">Sample Bhariye</button>
+              <button class="btn primary" type="button" onclick="uuBulkImportEmails()">Bulk Import Chalayein</button>
+            </div>
+            <div id="uuBulkImportMsg" style="font-size:12px;margin-top:8px;white-space:pre-line"></div>
+          </div>
         </div>
         <div style="margin-top:18px">
           <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">All Doers</h3><button class="btn" onclick="uuLoadList()">Refresh</button></div>
           <div class="tableWrap">
             <table>
-              <thead><tr><th>Name</th><th>Username</th><th>Mobile</th><th>Password</th><th>Status</th><th>App Access / Role</th><th>Action</th></tr></thead>
-              <tbody id="uuTableBody"><tr><td colspan="7" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
+              <thead><tr><th>Name</th><th>Username</th><th>Mobile</th><th>Email</th><th>Password</th><th>Status</th><th>App Access / Role</th><th>Action</th></tr></thead>
+              <tbody id="uuTableBody"><tr><td colspan="8" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -1039,6 +1051,7 @@ async function uuAddUser(){
   const username=document.getElementById('uuUsername').value.trim();
   const phone=document.getElementById('uuPhone').value.trim();
   const department=document.getElementById('uuDepartment').value.trim();
+  const email=document.getElementById('uuEmail').value.trim();
   const password=document.getElementById('uuPassword').value.trim()||'1234';
   const msg=document.getElementById('uuCreateMsg');
   msg.style.color='#b3261e';
@@ -1050,11 +1063,75 @@ async function uuAddUser(){
     if(existing.exists){msg.textContent='Yeh username pehle se maujood hai.';return;}
     await uuLoadAppList();
     const appAccess={};uuAppList.forEach(slug=>appAccess[slug]=true);
-    await ref.set({id:username,username,name,phone,department,password,role:'Doer',active:true,appAccess});
+    await ref.set({id:username,username,name,phone,department,email,password,role:'Doer',active:true,appAccess});
     msg.style.color='#268F76';msg.textContent='User added.';
-    ['uuName','uuUsername','uuPhone','uuDepartment','uuPassword'].forEach(id=>document.getElementById(id).value='');
+    ['uuName','uuUsername','uuPhone','uuDepartment','uuEmail','uuPassword'].forEach(id=>document.getElementById(id).value='');
     uuLoadList();
   }catch(e){msg.textContent='Error: '+e.message;}
+}
+// Master checklist se Name/Department/Email ek saath paste karke, existing Universal Users
+// (jo already Parcel Dispatch me kaam kar rahe hain, phone number ke saath) ko unke email se
+// match karke update karne ke liye — taaki dobara se 25 log manually type na karne padein.
+const UU_BULK_IMPORT_SAMPLE=[
+  ['Amit Sharma','Admin','admin@teambgmjaipur.com'],
+  ['Dharmendra Kumar','Maintenance','dharmendrakumar464666@gmail.com'],
+  ['Vijay Saini','Operations','vijaysaini5004@gmail.com'],
+  ['Anil Saini','Maintenance','anilsainiamer@gmail.com'],
+  ['Praveen Saini','MIS','mis@teambgmjaipur.com'],
+  ['Vansh Khandelwal','Operations','khandelwalvansh321@gmail.com'],
+  ['Riddhi Gupta','CRM','crm@teambgmjaipur.com'],
+  ['Saaransh Jain','Operations','salesbgm.sj@gmail.com'],
+  ['Babita Doriya','MDO','ea@teambgmjaipur.com'],
+  ['Ritika Gupta','Accounts','accountshead@teambgmjaipur.com'],
+  ['Akhilesh Sharma','Accounts','financehead@teambgmjaipur.com'],
+  ['Amit Yogi','Accounts','amit777yogi@gmail.com'],
+  ['Mukund Bhukhmaria','Sales','sales.mb@teambgmjaipur.com'],
+  ['Sneha Sahu','Inventory','inventoryhead@teambgmjaipur.com'],
+  ['Tarun Khandelwal','Sales','sales.tk@teambgmjaipur.com'],
+  ['Himanshu Saini','Sales','sales.hs@teambgmjaipur.com'],
+  ['Kamal Badaya','Production','Kamalbadaya1970@gmail.com'],
+  ['Tarun Kushwah','Maintenance','aartifcjt@gmail.com'],
+  ['Sunil Shirmal','Manufacturing','bgmmanufacturing7@gmail.com'],
+  ['Rahul Kumar Vyas','Maintenance','rahulkumarvyas82@gmail.com'],
+  ['Payal Saini','Office Assistant','bgmpc5321@gmail.com'],
+  ['Satish Gupta','Sales','bgmsales.sg@gmail.com'],
+  ['Jitendra Sharma','Accounts','js6503578@gmail.com'],
+  ['Kadu Saini','Office Assistant','kadusaini4@gmail.com'],
+  ['Vikash Prajapat','Maintenance','vikashprajapatv6@gmail.com'],
+];
+function uuFillBulkImportSample(){
+  document.getElementById('uuBulkImportBox').value=UU_BULK_IMPORT_SAMPLE.map(r=>r.join('\t')).join('\n');
+}
+async function uuBulkImportEmails(){
+  const raw=document.getElementById('uuBulkImportBox').value;
+  const msg=document.getElementById('uuBulkImportMsg');
+  const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!lines.length){msg.style.color='#a12222';msg.textContent='Pehle list paste karein ya "Sample Bhariye" dabayein.';return;}
+  msg.style.color='';msg.textContent='Import ho raha hai…';
+  try{
+    const snap=await fbDb.collection(UU_COLLECTION).get();
+    const existingByName={};
+    snap.forEach(doc=>{
+      const u=doc.data();
+      if(u.name)existingByName[u.name.trim().toLowerCase()]={id:doc.id,data:u};
+    });
+    const updated=[],notFound=[];
+    for(const line of lines){
+      const cols=line.split('\t').map(c=>c.trim());
+      if(cols.length<3){notFound.push(line+' (format galat — 3 columns tab se separate chahiye)');continue;}
+      const [name,department,email]=cols;
+      const match=existingByName[name.trim().toLowerCase()];
+      if(!match){notFound.push(name);continue;}
+      await fbDb.collection(UU_COLLECTION).doc(match.id).update({email,department});
+      updated.push(name);
+    }
+    msg.style.color='#268F76';
+    msg.textContent=`${updated.length} user update ho gaye: ${updated.join(', ')||'-'}`+
+      (notFound.length?`\n\n${notFound.length} match nahi hue (naam check karein): ${notFound.join(', ')}`:'');
+    uuLoadList();
+  }catch(e){
+    msg.style.color='#a12222';msg.textContent='Error: '+e.message;
+  }
 }
 async function uuLoadList(){
   await uuLoadAppList();
@@ -1064,7 +1141,7 @@ async function uuLoadList(){
   try{
     const snap=await fbDb.collection(UU_COLLECTION).get();
     if(snap.empty){
-      body.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted)">Koi user nahi hai</td></tr>';
+      body.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted)">Koi user nahi hai</td></tr>';
       return;
     }
     snap.forEach(doc=>{
@@ -1073,6 +1150,7 @@ async function uuLoadList(){
       const tdName=document.createElement('td');tdName.textContent=u.name||'';
       const tdUser=document.createElement('td');tdUser.textContent=u.username||id;
       const tdPhone=document.createElement('td');tdPhone.textContent=u.phone||'-';
+      const tdEmail=document.createElement('td');tdEmail.textContent=u.email||'-';
       const tdPw=document.createElement('td');tdPw.textContent=u.password||'1234';tdPw.style.fontFamily='monospace';
       const tdStatus=document.createElement('td');tdStatus.textContent=u.active===false?'INACTIVE':'ACTIVE';
       const tdApps=document.createElement('td');
@@ -1113,12 +1191,12 @@ async function uuLoadList(){
       const btnDel=document.createElement('button');btnDel.className='btn small danger';btnDel.style.marginLeft='6px';btnDel.textContent='Delete';
       btnDel.onclick=()=>uuDeleteUser(id);
       tdAction.appendChild(btnEdit);tdAction.appendChild(btnPw);tdAction.appendChild(btnToggle);tdAction.appendChild(btnDel);
-      tr.appendChild(tdName);tr.appendChild(tdUser);tr.appendChild(tdPhone);tr.appendChild(tdPw);tr.appendChild(tdStatus);tr.appendChild(tdApps);tr.appendChild(tdAction);
+      tr.appendChild(tdName);tr.appendChild(tdUser);tr.appendChild(tdPhone);tr.appendChild(tdEmail);tr.appendChild(tdPw);tr.appendChild(tdStatus);tr.appendChild(tdApps);tr.appendChild(tdAction);
       body.appendChild(tr);
     });
   }catch(e){
     body.innerHTML='';
-    const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=7;td.style.color='#b3261e';td.style.textAlign='center';td.textContent='Error: '+e.message;
+    const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=8;td.style.color='#b3261e';td.style.textAlign='center';td.textContent='Error: '+e.message;
     tr.appendChild(td);body.appendChild(tr);
   }
 }
@@ -1126,10 +1204,12 @@ async function uuEditUser(id,u){
   const name=prompt('Name',u.name||''); if(name===null)return;
   const phone=prompt('Mobile Number',u.phone||''); if(phone===null)return;
   const department=prompt('Department',u.department||''); if(department===null)return;
+  const email=prompt('Email',u.email||''); if(email===null)return;
   await fbDb.collection(UU_COLLECTION).doc(id).update({
     name:name.trim()||u.name||id,
     phone:phone.trim(),
-    department:department.trim()
+    department:department.trim(),
+    email:email.trim()
   });
   uuLoadList();
 }
