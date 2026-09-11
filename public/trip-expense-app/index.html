@@ -215,7 +215,7 @@ if(window.self!==window.top){
 </div></div>
 
 <button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:74px;right:14px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:13px;line-height:26px;cursor:default;z-index:999999;transition:background .15s">•</button>
-<input type="password" id="blindSuperAdminInput" autocomplete="off" style="position:fixed;bottom:74px;right:44px;width:1px;height:1px;opacity:0;border:0;padding:0;z-index:999999;pointer-events:none" oninput="checkBlindSuperAdminInput(this)">
+<input type="password" id="blindSuperAdminInput" autocomplete="off" style="position:fixed;bottom:74px;right:14px;width:160px;height:40px;opacity:0;border:0;padding:0;z-index:999999;pointer-events:none" oninput="checkBlindSuperAdminInput(this)">
 
 <div class="modal" id="superAdminModal"><div class="box" style="width:min(360px,100%)">
 <h3>Private Access</h3>
@@ -421,9 +421,14 @@ function silentUnlockSuperAdmin(){
   superAdminUnlocked=true;
   renderAll();
 }
-// No visible password box at all — after the 10-tap gesture, an invisible 1x1 input
-// gets focus (still a real <input>, so the mobile keyboard opens reliably, unlike a
-// bare keydown listener which many Android keyboards don't fire per-character for).
+// No visible password box at all — after the 10-tap gesture, an invisible input gets
+// focus (still a real <input>, so the mobile keyboard opens reliably, unlike a bare
+// keydown listener which many Android keyboards don't fire per-character for). It's
+// sized 160x40 rather than 1x1 — several mobile browsers (notably iOS Safari) simply
+// refuse to raise the on-screen keyboard for a near-zero-size input even once focused,
+// so a 1x1 box silently failed to let you type anything. Still fully invisible
+// (opacity:0) and untappable (pointer-events:none), size only matters for the keyboard
+// heuristic, not for what's visibly on screen.
 // Typing the correct password into it unlocks directly (reusing the same silent unlock
 // the hub uses to propagate its own unlock); nothing is ever shown on screen.
 let blindSuperAdminTimer=null;
