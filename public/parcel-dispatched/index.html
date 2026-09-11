@@ -251,12 +251,12 @@ if(window.self!==window.top){
 <div id="dispatchModule">
 <div id="dispatchListView">
 <div class="no-print" style="margin-bottom:14px"><button class="btn primary" style="font-size:15px;padding:14px 18px" onclick="startNewDispatch()">＋ New Dispatch Slip</button></div>
-<section class="card" id="dashboardCard">
+<section class="card hidden" id="dashboardCard">
   <div style="text-align:center;padding:16px 15px 2px">
     <div class="logo" style="margin:0 auto 8px">b</div>
     <b style="font-size:16px">Bliss Gems &amp; Minerals</b><br><small style="color:var(--m)">Parcel Dispatch &amp; Return</small>
   </div>
-  <h3>📊 Dashboard <select id="dashboardRange" onchange="renderDashboard()" style="width:auto;display:inline-block;margin-left:8px;font-size:12px;padding:5px 8px;font-weight:400"><option value="today">Today</option><option value="week">This Week</option><option value="all">All Time</option></select></h3>
+  <h3>📊 Analytics Dashboard <select id="dashboardRange" onchange="renderDashboard()" style="width:auto;display:inline-block;margin-left:8px;font-size:12px;padding:5px 8px;font-weight:400"><option value="today">Today</option><option value="week">This Week</option><option value="all">All Time</option></select></h3>
   <div class="body"><div id="dashboardStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div>
   <div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:8px">🚚 Courier-wise Spend</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
@@ -1252,10 +1252,27 @@ function renderHistory(){
  if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Slip Owner</small><strong>${esc(slipOwnerName(x)||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div>${dispatchActionCard(x)}</div>`}).join(''):'<div class="note">No records.</div>';
  renderDashboard();
 }
+// Analytics Dashboard is Admin/Director-only — either the shared Super Admin unlock, or
+// a per-app "parcel-dispatched" role set on the logged-in Doer's Universal User record
+// (same appRoles mechanism already used for Trip Expense, assignable from either Bliss
+// One's Universal Users table or this app's own Manage panel).
+function parcelDashboardAccessAllowed(){
+  if(superAdminUnlocked)return true;
+  const u=loggedUser();
+  const role=u&&u.appRoles&&u.appRoles['parcel-dispatched'];
+  return role==='admin'||role==='director';
+}
 function renderDashboard(){
+  const card=$('dashboardCard');
+  if(!parcelDashboardAccessAllowed()){
+    if(card)card.classList.add('hidden');
+    return;
+  }
+  if(card)card.classList.remove('hidden');
   const box=$('dashboardStats'); if(!box)return;
   const range=$('dashboardRange')?.value||'today';
   const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>!isEmptyDraft(x)&&!x.deletedAt);
+  const allReturns=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').filter(x=>!x.deletedAt);
   const now=Date.now();
   const inRange=x=>{
     if(range==='all')return true;
@@ -1267,6 +1284,7 @@ function renderDashboard(){
     return (now-new Date(x.createdAt).getTime())<=7*24*36e5;
   };
   const a=all.filter(inRange);
+  const returnsInRange=allReturns.filter(inRange);
   const topOf=fn=>{
     const m={};
     a.forEach(x=>{const v=(fn(x)||'').trim();if(v)m[v]=(m[v]||0)+1});
@@ -1285,6 +1303,7 @@ function renderDashboard(){
     <div class="statTile"><small>Top Courier (${rangeLabel})</small><strong>${courier.top?esc(courier.top):'—'}</strong>${courier.top?`<span>${courier.topN} parcels</span>`:''}</div>
     <div class="statTile"><small>Most Active Party (${rangeLabel})</small><strong>${party.top?esc(party.top):'—'}</strong>${party.top?`<span>${party.topN} parcels</span>`:''}</div>
     <div class="statTile${stuckCount?' danger':''}"><small>Stuck 24h+ (Overall)</small><strong>${stuckCount}</strong></div>
+    <div class="statTile"><small>${rangeLabel} Returns</small><strong>${returnsInRange.length}</strong></div>
   `;
   renderCourierSpendBreakdown();
 }
@@ -1381,7 +1400,7 @@ function isRecordPending(parcelId){
 }
 function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e)e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();linesTagsRule();shippingInsuranceRule();{const cm=findClientByParty($('shipTo').value);if(cm){$('broker').value=cm.broker||'';}}syncShippingSection();syncPackPhotoPreview();syncCourierSlipPhotoPreview();applySequenceAndLocks();if(!silent){showDispatchFormView();const _fid=window._pendingOpenFieldId;window._pendingOpenFieldId=null;const _target=_fid?$(_fid):null;if(_target)_target.scrollIntoView({behavior:'smooth',block:'center'});else scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
 function openManage(){currentTab='users';$('manageModal').classList.remove('hidden');renderManage()}function closeManage(){$('manageModal').classList.add('hidden');populate();shipChanged()}function tab(b,t){currentTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));renderManage()}
-function renderManage(){let c=$('manageContent');if(currentTab==='users'){c.innerHTML=`<div class="grid"><div class="field"><label>User Name <span class="req">*</span></label><input id="mUserName"></div><div class="field"><label>Username <span class="req">*</span></label><input id="mUsername"></div><div class="field"><label>Mobile Number <span class="req">*</span></label><input id="mUserPhone" placeholder="10 digit or 91..."></div><div class="field"><label>Department <span class="req">*</span></label><input id="mDepartment"></div><div class="field"><label>&nbsp; <span class="req">*</span></label><button class="btn primary" onclick="addUser()">Add Universal User</button></div></div><div class="note">Handover dropdowns me sabhi active Doers dikhenge. Actual-work fields (Slip Fill, Weight Check, Lines & Tags, Noted By, Item Packed etc.) me logged-in user sirf apna naam fill kar sakta hai. Dusre Doer ka actual-work naam us Doer ki login ID se hi fill hoga. New user ka default password 1234 hai.</div><div style="margin:8px 0"><button class="btn secondary small" onclick="resetDefaultUsers()">↻ Reset Default Doers</button></div><div>${users.map((u,i)=>`<div class="item"><span><b>${esc(u.name)}</b> <small>(${esc(u.username||u.id)})</small><br><small>${esc(u.phone)} • ${esc(u.department||'No Department')} • ${u.active===false?'INACTIVE':'ACTIVE'}</small></span><span><button class="btn small secondary" onclick="toggleUser(${i})">${u.active===false?'Activate':'Deactivate'}</button> <button class="btn small secondary" onclick="editUser(${i})">Edit</button> <button class="btn small secondary" onclick="resetUserPassword(${i})">Reset Password</button> <button class="btn small danger" onclick="delUser(${i})">Delete</button></span></div>`).join('')}</div>`}
+function renderManage(){let c=$('manageContent');if(currentTab==='users'){c.innerHTML=`<div class="grid"><div class="field"><label>User Name <span class="req">*</span></label><input id="mUserName"></div><div class="field"><label>Username <span class="req">*</span></label><input id="mUsername"></div><div class="field"><label>Mobile Number <span class="req">*</span></label><input id="mUserPhone" placeholder="10 digit or 91..."></div><div class="field"><label>Department <span class="req">*</span></label><input id="mDepartment"></div><div class="field"><label>&nbsp; <span class="req">*</span></label><button class="btn primary" onclick="addUser()">Add Universal User</button></div></div><div class="note">Handover dropdowns me sabhi active Doers dikhenge. Actual-work fields (Slip Fill, Weight Check, Lines & Tags, Noted By, Item Packed etc.) me logged-in user sirf apna naam fill kar sakta hai. Dusre Doer ka actual-work naam us Doer ki login ID se hi fill hoga. New user ka default password 1234 hai.</div><div style="margin:8px 0"><button class="btn secondary small" onclick="resetDefaultUsers()">↻ Reset Default Doers</button></div><div>${users.map((u,i)=>`<div class="item"><span><b>${esc(u.name)}</b> <small>(${esc(u.username||u.id)})</small><br><small>${esc(u.phone)} • ${esc(u.department||'No Department')} • ${u.active===false?'INACTIVE':'ACTIVE'}</small><br><small>Analytics Dashboard: <select onchange="setParcelDashboardRole(${i},this.value)" style="font-size:11px;padding:2px 4px"><option value=""${!(u.appRoles&&u.appRoles['parcel-dispatched'])?' selected':''}>No Access</option><option value="admin"${u.appRoles&&u.appRoles['parcel-dispatched']==='admin'?' selected':''}>Admin</option><option value="director"${u.appRoles&&u.appRoles['parcel-dispatched']==='director'?' selected':''}>Director</option></select></small></span><span><button class="btn small secondary" onclick="toggleUser(${i})">${u.active===false?'Activate':'Deactivate'}</button> <button class="btn small secondary" onclick="editUser(${i})">Edit</button> <button class="btn small secondary" onclick="resetUserPassword(${i})">Reset Password</button> <button class="btn small danger" onclick="delUser(${i})">Delete</button></span></div>`).join('')}</div>`}
 else if(currentTab==='shipto'){c.innerHTML=`<div class="row"><input id="mShipTo" placeholder="Add Client / Ship To" style="flex:1"><button class="btn primary" onclick="addShipTo()">Add</button></div>${shipTo.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delShipTo(${i})">Delete</button></div>`).join('')}`}
 
 else if(currentTab==='clients'){
@@ -1625,6 +1644,13 @@ document.addEventListener('input',e=>{
 
 function addUser(){let n=$('mUserName').value.trim(),un=$('mUsername').value.trim()||('u'+Date.now()),p=normalizePhone($('mUserPhone').value),dep=$('mDepartment').value.trim();if(!n||!p){toast('Name aur mobile dono dalein.');return}users.push({id:un,name:n,username:un,phone:p,department:dep,active:true,password:'1234'});saveMasters();populate();renderManage();toast('Universal user added')}
 function toggleUser(i){users[i].active=users[i].active===false?true:false;saveMasters();populate();renderManage();toast(users[i].active?'User activated':'User removed from dropdowns')}
+function setParcelDashboardRole(i,value){
+  users[i].appRoles=users[i].appRoles||{};
+  if(value)users[i].appRoles['parcel-dispatched']=value;
+  else delete users[i].appRoles['parcel-dispatched'];
+  saveMasters();
+  if(typeof renderDashboard==='function')renderDashboard();
+}
 function saveMessageSettings(){msgSettings={dlcEnabled:$('mDlcEnabled').value,dlcRecipient:$('mDlcRecipient').value,dlcSecondEnabled:$('mDlc2Enabled').value,dlcSecondRecipient:$('mDlc2Recipient').value};localStorage.setItem('pd_message_settings_v1',JSON.stringify(msgSettings));toast('DLC message rules saved')}
 function resetUserPassword(i){
   if(!users[i])return;

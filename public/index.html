@@ -626,9 +626,11 @@ try{
 const UU_COLLECTION='universal_users';
 // Only apps with their own internal role system need a role dropdown here (in addition
 // to the plain app-access checkbox every app gets) — Trip Expense is role-gated
-// (sales/admin/accounts/director); Parcel Dispatch has no such roles, just access on/off.
+// (sales/admin/accounts/director); Parcel Dispatch's own Analytics Dashboard is gated on
+// an admin/director role too (assignable here or from Parcel Dispatch's own Manage panel).
 const APP_ROLE_OPTIONS={
-  'trip-expense-app':[['','No Access'],['sales','Sales'],['admin','Admin'],['accounts','Accounts'],['director','Director']]
+  'trip-expense-app':[['','No Access'],['sales','Sales'],['admin','Admin'],['accounts','Accounts'],['director','Director']],
+  'parcel-dispatched':[['','No Access'],['admin','Admin'],['director','Director']]
 };
 
 /* ===== Staff (public) login — shared Universal Users, same session key as Parcel Dispatch (same origin, so one login works everywhere) ===== */
