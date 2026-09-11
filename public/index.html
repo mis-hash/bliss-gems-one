@@ -882,8 +882,22 @@ function adminFirebaseSignUp(){
     // The very first account ever created bootstraps straight to admin — no manual
     // Firestore console edit needed. Every account after that defaults to 'doer'; an
     // existing admin promotes further accounts from the "Manage — Users" panel.
-    const existing=await fbDb.collection('users').limit(1).get();
-    const role=existing.empty?'admin':'doer';
+    // Deliberately checking a single sentinel doc in app_config (not querying the whole
+    // `users` collection) — security rules here commonly require an existing admin just
+    // to list/query `users` at all, which would make the very bootstrap check itself
+    // fail for the first-ever signup. A single doc get()/set() in app_config has no such
+    // chicken-and-egg problem.
+    let role='doer';
+    try{
+      const sentinelRef=fbDb.collection('app_config').doc('first_admin_bootstrap');
+      const sentinel=await sentinelRef.get();
+      if(!sentinel.exists){
+        await sentinelRef.set({uid:cred.user.uid,email,claimedAt:Date.now()});
+        role='admin';
+      }
+    }catch(e){
+      console.error('bootstrap sentinel check failed:',e);
+    }
     await fbDb.collection('users').doc(cred.user.uid).set({
       name:email.split('@')[0],email,role,createdAt:Date.now()
     });
