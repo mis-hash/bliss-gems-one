@@ -426,7 +426,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
 </div>
 
 
-<input type="password" id="secretAdminIcon" autocomplete="off" onclick="secretAdminTap()" oninput="checkBlindSuperAdminInput(this)" onfocus="armBlindSuperAdminTimeout()" onblur="clearTimeout(blindSuperAdminTimer)" style="position:fixed;bottom:10px;right:12px;width:90px;height:40px;padding:0;margin:0;border:0;outline:none;background:transparent;color:transparent;caret-color:transparent;font-size:16px;z-index:999999;transition:background .15s">
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:10px;right:12px;width:22px;height:22px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:10px;line-height:22px;cursor:default;z-index:999999;transition:background .15s">•</button>
 
 <div class="adminModal hidden" id="superAdminModal">
   <div class="adminBox">
@@ -1662,15 +1662,24 @@ let superAdminUnlocked=false;
 let adminIdleTimer=null;
 const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
 
+let secretAdminTapCount=0;
+let secretAdminTapTimer=null;
 let secretAdminFlashTimer=null;
 function secretAdminTap(){
-  // Brief red flash on every tap — the only feedback this ever gives, since the element
-  // itself is invisible.
+  secretAdminTapCount++;
+  // Brief red flash on every registered tap — feedback that a tap landed on the target.
   const dot=document.getElementById('secretAdminIcon');
   if(dot){
     dot.style.background='rgba(214,48,49,.45)';
     clearTimeout(secretAdminFlashTimer);
     secretAdminFlashTimer=setTimeout(()=>{dot.style.background='transparent'},200);
+  }
+  clearTimeout(secretAdminTapTimer);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2500);
+  if(secretAdminTapCount>=10){
+    secretAdminTapCount=0;
+    clearTimeout(secretAdminTapTimer);
+    openSuperAdminModal();
   }
 }
 function openSuperAdminModal(){
@@ -1743,37 +1752,6 @@ function unlockSuperAdmin(){
     return;
   }
   doUnlockSuperAdmin();
-}
-// No visible password box at all — the dot IS a real invisible <input> (id
-// secretAdminIcon), not a button with a separate hidden field. That distinction matters:
-// several mobile browsers (notably iOS Safari) only raise the on-screen keyboard for an
-// input that receives a genuine, direct user tap — calling .focus() on a hidden input
-// from a *different* element's click handler doesn't reliably work on those browsers,
-// even with the input sized normally. Making the tapped element itself the input side-
-// steps that entirely: tapping it is a completely ordinary, real focus event, so the
-// keyboard opens the same way it would for any text field. Typing the correct password
-// into it unlocks directly (checked on every keystroke, see below); nothing is ever
-// shown on screen — text color, caret and background are all transparent, and the
-// browser's default focus outline is suppressed too.
-let blindSuperAdminTimer=null;
-function armBlindSuperAdminTimeout(){
-  clearTimeout(blindSuperAdminTimer);
-  blindSuperAdminTimer=setTimeout(()=>{
-    const el=document.getElementById('secretAdminIcon');
-    if(el){el.value='';el.blur();}
-  },15000);
-}
-function checkBlindSuperAdminInput(el){
-  // Keep only the last N characters (N = password length) so mistyped characters
-  // before the real password don't block the match — the field just acts as a
-  // sliding window, like blind-typing a hotkey sequence.
-  if(el.value.length>SUPER_ADMIN_PASSWORD.length)el.value=el.value.slice(-SUPER_ADMIN_PASSWORD.length);
-  if(el.value===SUPER_ADMIN_PASSWORD){
-    el.value='';
-    el.blur();
-    clearTimeout(blindSuperAdminTimer);
-    doUnlockSuperAdmin();
-  }
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
