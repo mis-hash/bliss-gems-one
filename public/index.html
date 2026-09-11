@@ -951,6 +951,7 @@ function umShowTab(tab){
 async function refreshAdminAuthStatus(){
   const box=document.getElementById('adminAuthStatus');
   if(!box)return;
+  box.classList.remove('hidden');
   const user=fbAuth.currentUser;
   // Super Admin (the shared secret-password unlock) already grants access to everything
   // else on this page — GreenAPI, app management — so it grants access to Staff Accounts
@@ -976,7 +977,8 @@ async function refreshAdminAuthStatus(){
         const su=staffDoc.data();
         const hubRole=su.appRoles&&su.appRoles['bliss-one'];
         if(hubRole==='admin'||hubRole==='director'){
-          box.innerHTML='Staff Login se unlocked: <b>'+(su.name||staffId)+'</b> (Bliss One role: '+hubRole+')';
+          box.innerHTML='';
+          box.classList.add('hidden');
           setHubAdminPanelsVisible(true);
           return;
         }
