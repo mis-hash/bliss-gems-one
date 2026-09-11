@@ -348,7 +348,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
           <div><label>Name</label><input id="newUserName" placeholder="e.g. Ramesh Kumar"></div>
           <div><label>Email</label><input id="newUserEmail" type="email" placeholder="staff@example.com"></div>
           <div><label>Password</label><input id="newUserPassword" type="password" placeholder="min 6 characters"></div>
-          <div><label>Role</label><select id="newUserRole"><option value="doer">Doer (normal staff)</option><option value="admin">Admin</option></select></div>
+          <div><label>Role</label><select id="newUserRole"><option value="doer">Doer (normal staff)</option><option value="admin">Admin</option><option value="director">Director</option></select></div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
           <button class="btn primary" type="button" onclick="createStaffUser()">Create Account</button>
@@ -368,8 +368,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
     </div>
   </section>
 
-  <section class="panel superAdminOnly hidden" id="universalUsersPanel">
-    <div class="panelHead"><h3>🌐 Universal Users (Doers — All Apps)</h3><span class="badge">Super Admin</span></div>
+  <section class="panel hidden" id="universalUsersPanel">
+    <div class="panelHead"><h3>🌐 Universal Users (Doers — All Apps)</h3><span class="badge">Admin / Director</span></div>
     <div class="panelBody">
       <div class="deployBox">Yeh ek hi shared user list hai jo Parcel Dispatch aur future ki har app use karegi (username/password se login — yeh upar wale Firebase Staff Accounts se alag hai). Yahan se decide karein ki kaun-sa doer kaun-si app khol sakta hai.</div>
       <div id="uuCreateBox" style="margin-top:14px">
@@ -899,36 +899,44 @@ function adminFirebaseForgotPassword(){
     msg.style.color='#268F76';msg.textContent='"'+email+'" पर password reset link भेज दिया गया है — inbox check करें।';
   }).catch(err=>{msg.style.color='#a12222';msg.textContent=err.message;});
 }
+function setHubAdminPanelsVisible(show){
+  const uuPanel=document.getElementById('universalUsersPanel');
+  if(uuPanel){
+    uuPanel.classList.toggle('hidden',!show);
+    if(show)uuLoadList();
+  }
+  document.getElementById('createUserBox')?.classList.toggle('hidden',!show);
+  if(show)loadUsersList();
+}
 async function refreshAdminAuthStatus(){
   const box=document.getElementById('adminAuthStatus');
   if(!box)return;
   const user=fbAuth.currentUser;
   // Super Admin (the shared secret-password unlock) already grants access to everything
-  // else on this page — Universal Users, GreenAPI, app management — so it grants access
-  // here too. A separate Firebase email/password login stays available as an optional,
-  // persistent alternative (so you don't have to re-type the Super Admin password every
-  // visit), but isn't required on top of Super Admin.
+  // else on this page — GreenAPI, app management — so it grants access to Staff Accounts
+  // and Universal Users here too. A real Firebase Admin/Director login is a separate,
+  // independent path to the same two panels (useful for someone who wants a named,
+  // persistent login instead of re-typing the shared Super Admin password) — neither one
+  // is required on top of the other.
   if(superAdminUnlocked){
-    box.innerHTML='Super Admin se unlocked — Staff Accounts manage kar sakte hain.'+(user?' &nbsp; Firebase Admin bhi login hai: <b>'+user.email+'</b> <button class="btn" type="button" onclick="fbAuth.signOut().then(refreshAdminAuthStatus)">Sign out</button>':' &nbsp; <button class="btn" type="button" onclick="openAdminFirebaseModal()">Firebase Admin Login (optional)</button>');
-    document.getElementById('createUserBox').classList.remove('hidden');
-    loadUsersList();
+    box.innerHTML='Super Admin se unlocked — Staff Accounts aur Universal Users dono manage kar sakte hain.'+(user?' &nbsp; Firebase login bhi hai: <b>'+user.email+'</b> <button class="btn" type="button" onclick="fbAuth.signOut().then(refreshAdminAuthStatus)">Sign out</button>':' &nbsp; <button class="btn" type="button" onclick="openAdminFirebaseModal()">Firebase Admin Login (optional)</button>');
+    setHubAdminPanelsVisible(true);
     return;
   }
   if(!user){
     box.innerHTML='आप अभी Firebase से admin login नहीं हैं। <button class="btn primary" type="button" onclick="openAdminFirebaseModal()">Admin Firebase Login</button>';
-    document.getElementById('createUserBox').classList.add('hidden');
+    setHubAdminPanelsVisible(false);
     document.getElementById('usersTableBody').innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted)">Admin login karein pehle</td></tr>';
     return;
   }
   const doc=await fbDb.collection('users').doc(user.uid).get();
   const role=doc.exists?doc.data().role:'(no profile)';
-  if(role==='admin'){
-    box.innerHTML='Firebase Admin: <b>'+user.email+'</b> (role: admin) &nbsp; <button class="btn" type="button" onclick="fbAuth.signOut().then(refreshAdminAuthStatus)">Sign out</button>';
-    document.getElementById('createUserBox').classList.remove('hidden');
-    loadUsersList();
+  if(role==='admin'||role==='director'){
+    box.innerHTML='Firebase Login: <b>'+user.email+'</b> (role: '+role+') &nbsp; <button class="btn" type="button" onclick="fbAuth.signOut().then(refreshAdminAuthStatus)">Sign out</button>';
+    setHubAdminPanelsVisible(true);
   } else {
-    box.innerHTML='Signed in as <b>'+user.email+'</b> लेकिन role "admin" नहीं है (अभी: '+role+')। Firestore console में role बदलें, फिर page reload करें।';
-    document.getElementById('createUserBox').classList.add('hidden');
+    box.innerHTML='Signed in as <b>'+user.email+'</b> लेकिन role "admin" ya "director" नहीं है (अभी: '+role+')। Manage — Users se kisi Admin/Director se apna role badalwayein.';
+    setHubAdminPanelsVisible(false);
     document.getElementById('usersTableBody').innerHTML='';
   }
 }
@@ -948,7 +956,7 @@ async function createStaffUser(){
       name,email,role,createdAt:Date.now()
     });
     await secondaryApp.auth().signOut();
-    msg.style.color='#268F76';msg.textContent='"'+name+'" ka '+(role==='admin'?'Admin':'Doer')+' account ban gaya.';
+    msg.style.color='#268F76';msg.textContent='"'+name+'" ka '+(role==='admin'?'Admin':role==='director'?'Director':'Doer')+' account ban gaya.';
     document.getElementById('newUserName').value='';
     document.getElementById('newUserEmail').value='';
     document.getElementById('newUserPassword').value='';
@@ -1677,7 +1685,6 @@ function showSuperAdminControls(){
   loadGreenApiCreds();
   loadGithubToken();
   refreshAdminAuthStatus();
-  uuLoadList();
 }
 function saveGreenApiCreds(){
   const instance=document.getElementById('greenApiInstance')?.value||'';
@@ -1706,6 +1713,10 @@ function hideSuperAdminControls(){
   superAdminUnlocked=false;
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.add('hidden'));
   closeSuperAdminModal();
+  // Staff Accounts / Universal Users aren't tied to superAdminOnly directly anymore —
+  // recompute their visibility so a real Firebase Admin/Director login (independent of
+  // Super Admin) keeps its access after Super Admin idle-locks.
+  refreshAdminAuthStatus();
 }
 function resetAdminIdleTimer(){
   if(!superAdminUnlocked)return;
