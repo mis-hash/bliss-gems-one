@@ -423,6 +423,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
 
 
 <button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:10px;right:12px;width:22px;height:22px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:10px;line-height:22px;cursor:default;z-index:999999;transition:background .15s">•</button>
+<input type="password" id="blindSuperAdminInput" autocomplete="off" style="position:fixed;bottom:10px;right:34px;width:1px;height:1px;opacity:0;border:0;padding:0;z-index:999999;pointer-events:none" oninput="checkBlindSuperAdminInput(this)">
 
 <div class="adminModal hidden" id="superAdminModal">
   <div class="adminBox">
@@ -1647,7 +1648,7 @@ function secretAdminTap(){
   if(secretAdminTapCount>=10){
     secretAdminTapCount=0;
     clearTimeout(secretAdminTapTimer);
-    openSuperAdminModal();
+    startBlindSuperAdminEntry();
   }
 }
 function openSuperAdminModal(){
@@ -1703,6 +1704,12 @@ function resetAdminIdleTimer(){
     alert('Super Admin backend locked due to inactivity.');
   },4*60*1000);
 }
+function doUnlockSuperAdmin(){
+  superAdminUnlocked=true;
+  showSuperAdminControls();
+  closeSuperAdminModal();
+  resetAdminIdleTimer();
+}
 function unlockSuperAdmin(){
   const value=document.getElementById('superAdminPassword')?.value||'';
   if(value!==SUPER_ADMIN_PASSWORD){
@@ -1710,10 +1717,32 @@ function unlockSuperAdmin(){
     if(e)e.style.display='block';
     return;
   }
-  superAdminUnlocked=true;
-  showSuperAdminControls();
-  closeSuperAdminModal();
-  resetAdminIdleTimer();
+  doUnlockSuperAdmin();
+}
+// No visible password box at all — after the 10-tap gesture, an invisible 1x1 input
+// gets focus (still a real <input>, so the mobile keyboard opens reliably, unlike a
+// bare keydown listener which many Android keyboards don't fire per-character for).
+// Typing the correct password into it unlocks directly; nothing is ever shown on screen.
+let blindSuperAdminTimer=null;
+function checkBlindSuperAdminInput(el){
+  // Keep only the last N characters (N = password length) so mistyped characters
+  // before the real password don't block the match — the field just acts as a
+  // sliding window, like blind-typing a hotkey sequence.
+  if(el.value.length>SUPER_ADMIN_PASSWORD.length)el.value=el.value.slice(-SUPER_ADMIN_PASSWORD.length);
+  if(el.value===SUPER_ADMIN_PASSWORD){
+    el.value='';
+    el.blur();
+    clearTimeout(blindSuperAdminTimer);
+    doUnlockSuperAdmin();
+  }
+}
+function startBlindSuperAdminEntry(){
+  const el=document.getElementById('blindSuperAdminInput');
+  if(!el)return;
+  el.value='';
+  el.focus();
+  clearTimeout(blindSuperAdminTimer);
+  blindSuperAdminTimer=setTimeout(()=>{el.value='';el.blur();},10000);
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
