@@ -246,28 +246,12 @@ if(window.self!==window.top){
 <div class="no-print" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
   <button type="button" id="dispatchTabBtn" class="btn primary" style="font-size:17px;padding:16px" onclick="switchModule('dispatch')">📦 PARCEL DISPATCH</button>
   <button type="button" id="returnTabBtn" class="btn secondary" style="font-size:17px;padding:16px" onclick="switchModule('return')">↩ PARCEL RETURN</button>
-  
+
 </div>
+<div class="no-print hidden" id="openDashboardBtnWrap" style="margin-bottom:14px"><button class="btn secondary" id="openDashboardBtn" style="font-size:15px;padding:14px 18px;width:100%" onclick="showDashboardView()">📊 Analytics Dashboard</button></div>
 <div id="dispatchModule">
 <div id="dispatchListView">
 <div class="no-print" style="margin-bottom:14px"><button class="btn primary" style="font-size:15px;padding:14px 18px" onclick="startNewDispatch()">＋ New Dispatch Slip</button></div>
-<section class="card hidden" id="dashboardCard">
-  <div style="text-align:center;padding:16px 15px 2px">
-    <div class="logo" style="margin:0 auto 8px">b</div>
-    <b style="font-size:16px">Bliss Gems &amp; Minerals</b><br><small style="color:var(--m)">Parcel Dispatch &amp; Return</small>
-  </div>
-  <h3>📊 Analytics Dashboard <select id="dashboardRange" onchange="renderDashboard()" style="width:auto;display:inline-block;margin-left:8px;font-size:12px;padding:5px 8px;font-weight:400"><option value="today">Today</option><option value="week">This Week</option><option value="all">All Time</option></select></h3>
-  <div class="body"><div id="dashboardStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div>
-  <div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:8px">🚚 Courier-wise Spend</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-    <select id="courierSpendFilter" onchange="renderCourierSpendBreakdown()" style="font-size:12px;padding:5px 8px"><option value="">All Couriers</option></select>
-    <input type="month" id="courierSpendMonth" onchange="courierSpendMonthChanged()" style="font-size:12px;padding:5px 8px" title="Quick pick: pura mahina">
-    <input type="date" id="courierSpendFrom" onchange="renderCourierSpendBreakdown()" style="font-size:12px;padding:5px 8px" title="From Date">
-    <input type="date" id="courierSpendTo" onchange="renderCourierSpendBreakdown()" style="font-size:12px;padding:5px 8px" title="To Date">
-    <button class="btn secondary small" type="button" onclick="clearCourierSpendFilters()">Clear</button>
-  </div>
-  <div id="courierSpendBreakdown"></div></div></div>
-</section>
 <section class="card" id="historyCard" style="margin-top:0"><h3>Recent Dispatch Records</h3><div class="body">
 <div class="recordFilters">
 <input id="search" placeholder="Search Parcel / Party / Courier / AWB / Broker" oninput="renderHistory()">
@@ -449,6 +433,26 @@ if(window.self!==window.top){
 <div class="save"><span id="returnAutoSaveTag" class="note" style="margin-right:auto"></span><button class="btn primary" onclick="printReturn()">🖨 Print Return Slip</button></div>
 </div>
 
+</div>
+<div id="dashboardView" class="hidden">
+<div class="no-print" style="margin-bottom:12px"><button class="btn secondary" onclick="closeDashboardView()">← Back to Records</button></div>
+<section class="card" id="dashboardCard">
+  <div style="text-align:center;padding:16px 15px 2px">
+    <div class="logo" style="margin:0 auto 8px">b</div>
+    <b style="font-size:16px">Bliss Gems &amp; Minerals</b><br><small style="color:var(--m)">Parcel Dispatch &amp; Return</small>
+  </div>
+  <h3>📊 Analytics Dashboard <select id="dashboardRange" onchange="renderDashboard()" style="width:auto;display:inline-block;margin-left:8px;font-size:12px;padding:5px 8px;font-weight:400"><option value="today">Today</option><option value="week">This Week</option><option value="all">All Time</option></select></h3>
+  <div class="body"><div id="dashboardStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div>
+  <div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:8px">🚚 Courier-wise Spend</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <select id="courierSpendFilter" onchange="renderCourierSpendBreakdown()" style="font-size:12px;padding:5px 8px"><option value="">All Couriers</option></select>
+    <input type="month" id="courierSpendMonth" onchange="courierSpendMonthChanged()" style="font-size:12px;padding:5px 8px" title="Quick pick: pura mahina">
+    <input type="date" id="courierSpendFrom" onchange="renderCourierSpendBreakdown()" style="font-size:12px;padding:5px 8px" title="From Date">
+    <input type="date" id="courierSpendTo" onchange="renderCourierSpendBreakdown()" style="font-size:12px;padding:5px 8px" title="To Date">
+    <button class="btn secondary small" type="button" onclick="clearCourierSpendFilters()">Clear</button>
+  </div>
+  <div id="courierSpendBreakdown"></div></div></div>
+</section>
 </div>
 </div></main>
 
@@ -1205,6 +1209,7 @@ function clearDispatchFilters(){
  renderHistory();
 }
 function renderHistory(){
+ refreshDashboardButtonVisibility();
  let all=JSON.parse(localStorage.getItem(K.records)||'[]');
  const deletedCount=all.filter(x=>x.deletedAt).length;
  if($('showDeletedDispatchWrap'))$('showDeletedDispatchWrap').classList.toggle('hidden',!deletedCount);
@@ -1263,12 +1268,11 @@ function parcelDashboardAccessAllowed(){
   return role==='admin'||role==='director';
 }
 function renderDashboard(){
-  const card=$('dashboardCard');
+  refreshDashboardButtonVisibility();
   if(!parcelDashboardAccessAllowed()){
-    if(card)card.classList.add('hidden');
+    if($('dashboardView'))$('dashboardView').classList.add('hidden');
     return;
   }
-  if(card)card.classList.remove('hidden');
   const box=$('dashboardStats'); if(!box)return;
   const range=$('dashboardRange')?.value||'today';
   const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>!isEmptyDraft(x)&&!x.deletedAt);
@@ -1713,6 +1717,23 @@ function showDispatchListView(){
   if($('dispatchFormView'))$('dispatchFormView').classList.add('hidden');
   renderHistory();
 }
+let pdDashboardReturnModule='dispatch';
+function showDashboardView(){
+  if(!parcelDashboardAccessAllowed())return;
+  pdDashboardReturnModule=$('returnModule')&&!$('returnModule').classList.contains('hidden')?'return':'dispatch';
+  if($('dispatchModule'))$('dispatchModule').classList.add('hidden');
+  if($('returnModule'))$('returnModule').classList.add('hidden');
+  if($('dashboardView'))$('dashboardView').classList.remove('hidden');
+  renderDashboard();
+}
+function closeDashboardView(){
+  if($('dashboardView'))$('dashboardView').classList.add('hidden');
+  switchModule(pdDashboardReturnModule);
+}
+function refreshDashboardButtonVisibility(){
+  const wrap=$('openDashboardBtnWrap');
+  if(wrap)wrap.classList.toggle('hidden',!parcelDashboardAccessAllowed());
+}
 function showDispatchFormView(){
   if($('dispatchListView'))$('dispatchListView').classList.add('hidden');
   if($('dispatchFormView'))$('dispatchFormView').classList.remove('hidden');
@@ -1846,6 +1867,7 @@ function clearReturnFilters(){
  renderReturnHistory();
 }
 function renderReturnHistory(){
+ refreshDashboardButtonVisibility();
  let body=$('returnHistory');if(!body)return;
  let all=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]');
  const deletedCount=all.filter(r=>r.deletedAt).length;
