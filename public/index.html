@@ -535,7 +535,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <button class="btn" type="button" onclick="adminFirebaseForgotPassword()" style="width:100%;margin-top:8px">Forgot Password?</button>
       <div id="adminFbMsg" style="font-size:12px;margin-top:8px"></div>
       <div class="deployBox" style="margin-top:12px">
-        पहली बार account बनाने के बाद, Firebase Console → Firestore Database → <code>users</code> collection → अपने account वाले document में जाकर <code>role</code> field को <code>"doer"</code> से <code>"admin"</code> कर दें (सिर्फ़ एक बार करना है)।
+        सबसे पहला account जो बनाया जाता है वो अपने-आप Admin बन जाता है — किसी manual Firestore edit की ज़रूरत नहीं। उसके बाद के accounts "Doer" से शुरू होते हैं; किसी existing Admin को उन्हें "Manage — Users" panel से Admin बनाना होगा।
       </div>
     </div>
   </div>
@@ -863,11 +863,18 @@ function adminFirebaseSignUp(){
   if(!email||pass.length<6){msg.style.color='#a12222';msg.textContent='Valid email aur kam se kam 6 character ka password daalein.';return;}
   msg.style.color='';msg.textContent='Creating account…';
   fbAuth.createUserWithEmailAndPassword(email,pass).then(async cred=>{
+    // The very first account ever created bootstraps straight to admin — no manual
+    // Firestore console edit needed. Every account after that defaults to 'doer'; an
+    // existing admin promotes further accounts from the "Manage — Users" panel.
+    const existing=await fbDb.collection('users').limit(1).get();
+    const role=existing.empty?'admin':'doer';
     await fbDb.collection('users').doc(cred.user.uid).set({
-      name:email.split('@')[0],email,role:'doer',createdAt:Date.now()
+      name:email.split('@')[0],email,role,createdAt:Date.now()
     });
     msg.style.color='#268F76';
-    msg.textContent='Account ban gaya. Ab Firestore console me is account ka role "doer" se "admin" karein, phir dobara login karein.';
+    msg.textContent=role==='admin'
+      ?'Admin account ban gaya — ab seedha login karein.'
+      :'Account ban gaya (role: doer). Kisi existing Admin se apna role "Manage — Users" panel se "admin" karwayein.';
     refreshAdminAuthStatus();
   }).catch(err=>{msg.style.color='#a12222';msg.textContent=err.message;});
 }
