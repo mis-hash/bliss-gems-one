@@ -404,8 +404,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
           <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">All Doers</h3><button class="btn" onclick="uuLoadList()">Refresh</button></div>
           <div class="tableWrap">
             <table>
-              <thead><tr><th>Name</th><th>Username</th><th>Mobile</th><th>Email</th><th>Password</th><th>Status</th><th>App Access / Role</th><th>Action</th></tr></thead>
-              <tbody id="uuTableBody"><tr><td colspan="8" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
+              <thead><tr><th>Name</th><th>Username</th><th>Mobile</th><th>Email</th><th>Password</th><th>Status</th><th>App Access / Role</th><th>Bliss One Role</th><th>Action</th></tr></thead>
+              <tbody id="uuTableBody"><tr><td colspan="9" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -963,6 +963,26 @@ async function refreshAdminAuthStatus(){
     setHubAdminPanelsVisible(true);
     return;
   }
+  // Third, independent path: the same everyday Staff Login (Universal Users username/
+  // password, shared with Parcel Dispatch/Trip Expense) can also carry hub access — via
+  // a dedicated "Bliss One Role" set per Universal User — so someone doesn't need a
+  // separate Firebase email/password account (with its own password-reset hassles) just
+  // to manage Staff Accounts / Universal Users.
+  const staffId=pdLoggedUserId();
+  if(staffId){
+    try{
+      const staffDoc=await fbDb.collection(UU_COLLECTION).doc(staffId).get();
+      if(staffDoc.exists){
+        const su=staffDoc.data();
+        const hubRole=su.appRoles&&su.appRoles['bliss-one'];
+        if(hubRole==='admin'||hubRole==='director'){
+          box.innerHTML='Staff Login se unlocked: <b>'+(su.name||staffId)+'</b> (Bliss One role: '+hubRole+')';
+          setHubAdminPanelsVisible(true);
+          return;
+        }
+      }
+    }catch(e){console.error('staff-login hub access check failed:',e);}
+  }
   if(!user){
     box.innerHTML='आप अभी Firebase से admin login नहीं हैं। <button class="btn primary" type="button" onclick="openAdminFirebaseModal()">Admin Firebase Login</button>';
     setHubAdminPanelsVisible(false);
@@ -1155,7 +1175,7 @@ async function uuLoadList(){
   try{
     const snap=await fbDb.collection(UU_COLLECTION).get();
     if(snap.empty){
-      body.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted)">Koi user nahi hai</td></tr>';
+      body.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted)">Koi user nahi hai</td></tr>';
       return;
     }
     snap.forEach(doc=>{
@@ -1195,6 +1215,20 @@ async function uuLoadList(){
           tdApps.appendChild(row);
         });
       }
+      // A Universal User's own Staff Login can carry Bliss One hub access too (see
+      // refreshAdminAuthStatus) — this is separate from their per-app roles above, so it
+      // gets its own dedicated control rather than living inside the App Access loop
+      // (which only lists live operational apps, not the hub itself).
+      const tdHubRole=document.createElement('td');
+      const hubSel=document.createElement('select');
+      hubSel.style.cssText='font-size:12px;padding:3px 6px;border:1px solid var(--line,#ccc);border-radius:5px';
+      const curHubRole=(u.appRoles&&u.appRoles['bliss-one'])||'';
+      [['','No Access'],['admin','Admin'],['director','Director']].forEach(([v,l])=>{
+        const opt=document.createElement('option');opt.value=v;opt.textContent=l;opt.selected=v===curHubRole;
+        hubSel.appendChild(opt);
+      });
+      hubSel.onchange=()=>uuSetUserAppRole(id,'bliss-one',hubSel.value);
+      tdHubRole.appendChild(hubSel);
       const tdAction=document.createElement('td');
       const btnEdit=document.createElement('button');btnEdit.className='btn small secondary';btnEdit.textContent='✏️ Edit';
       btnEdit.onclick=()=>uuEditUser(id,u);
@@ -1205,12 +1239,12 @@ async function uuLoadList(){
       const btnDel=document.createElement('button');btnDel.className='btn small danger';btnDel.style.marginLeft='6px';btnDel.textContent='Delete';
       btnDel.onclick=()=>uuDeleteUser(id);
       tdAction.appendChild(btnEdit);tdAction.appendChild(btnPw);tdAction.appendChild(btnToggle);tdAction.appendChild(btnDel);
-      tr.appendChild(tdName);tr.appendChild(tdUser);tr.appendChild(tdPhone);tr.appendChild(tdEmail);tr.appendChild(tdPw);tr.appendChild(tdStatus);tr.appendChild(tdApps);tr.appendChild(tdAction);
+      tr.appendChild(tdName);tr.appendChild(tdUser);tr.appendChild(tdPhone);tr.appendChild(tdEmail);tr.appendChild(tdPw);tr.appendChild(tdStatus);tr.appendChild(tdApps);tr.appendChild(tdHubRole);tr.appendChild(tdAction);
       body.appendChild(tr);
     });
   }catch(e){
     body.innerHTML='';
-    const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=8;td.style.color='#b3261e';td.style.textAlign='center';td.textContent='Error: '+e.message;
+    const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=9;td.style.color='#b3261e';td.style.textAlign='center';td.textContent='Error: '+e.message;
     tr.appendChild(td);body.appendChild(tr);
   }
 }
