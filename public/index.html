@@ -903,6 +903,17 @@ async function refreshAdminAuthStatus(){
   const box=document.getElementById('adminAuthStatus');
   if(!box)return;
   const user=fbAuth.currentUser;
+  // Super Admin (the shared secret-password unlock) already grants access to everything
+  // else on this page — Universal Users, GreenAPI, app management — so it grants access
+  // here too. A separate Firebase email/password login stays available as an optional,
+  // persistent alternative (so you don't have to re-type the Super Admin password every
+  // visit), but isn't required on top of Super Admin.
+  if(superAdminUnlocked){
+    box.innerHTML='Super Admin se unlocked — Staff Accounts manage kar sakte hain.'+(user?' &nbsp; Firebase Admin bhi login hai: <b>'+user.email+'</b> <button class="btn" type="button" onclick="fbAuth.signOut().then(refreshAdminAuthStatus)">Sign out</button>':' &nbsp; <button class="btn" type="button" onclick="openAdminFirebaseModal()">Firebase Admin Login (optional)</button>');
+    document.getElementById('createUserBox').classList.remove('hidden');
+    loadUsersList();
+    return;
+  }
   if(!user){
     box.innerHTML='आप अभी Firebase से admin login नहीं हैं। <button class="btn primary" type="button" onclick="openAdminFirebaseModal()">Admin Firebase Login</button>';
     document.getElementById('createUserBox').classList.add('hidden');
