@@ -339,59 +339,63 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
   </section>
 
   <section class="panel" id="userManagePanel">
-    <div class="panelHead"><h3>⚙ Manage — Users</h3><span class="badge">Admin Login</span></div>
+    <div class="panelHead"><h3>⚙ Manage — Users</h3><span class="badge">Admin / Director</span></div>
     <div class="panelBody">
       <div id="adminAuthStatus" class="deployBox">Checking admin login…</div>
 
-      <div id="createUserBox" style="margin-top:14px">
-        <div class="uploadGrid">
-          <div><label>Name</label><input id="newUserName" placeholder="e.g. Ramesh Kumar"></div>
-          <div><label>Email</label><input id="newUserEmail" type="email" placeholder="staff@example.com"></div>
-          <div><label>Password</label><input id="newUserPassword" type="password" placeholder="min 6 characters"></div>
-          <div><label>Role</label><select id="newUserRole"><option value="doer">Doer (normal staff)</option><option value="admin">Admin</option><option value="director">Director</option></select></div>
-        </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-          <button class="btn primary" type="button" onclick="createStaffUser()">Create Account</button>
-        </div>
-        <div id="createUserMsg" style="font-size:12px;margin-top:8px"></div>
+      <div id="umTabsRow" class="hidden" style="display:flex;gap:8px;margin:14px 0">
+        <button class="btn primary" type="button" id="umTabStaffBtn" onclick="umShowTab('staff')">Staff Accounts</button>
+        <button class="btn" type="button" id="umTabUniversalBtn" onclick="umShowTab('universal')">Universal Users (Doers)</button>
       </div>
 
-      <div style="margin-top:18px">
-        <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">Staff Accounts</h3><button class="btn" onclick="loadUsersList()">Refresh</button></div>
-        <div class="tableWrap">
-          <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
-            <tbody id="usersTableBody"><tr><td colspan="4" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
-          </table>
+      <div id="umTabStaff">
+        <div id="createUserBox">
+          <div class="uploadGrid">
+            <div><label>Name</label><input id="newUserName" placeholder="e.g. Ramesh Kumar"></div>
+            <div><label>Email</label><input id="newUserEmail" type="email" placeholder="staff@example.com"></div>
+            <div><label>Password</label><input id="newUserPassword" type="password" placeholder="min 6 characters"></div>
+            <div><label>Role</label><select id="newUserRole"><option value="doer">Doer (normal staff)</option><option value="admin">Admin</option><option value="director">Director</option></select></div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+            <button class="btn primary" type="button" onclick="createStaffUser()">Create Account</button>
+          </div>
+          <div id="createUserMsg" style="font-size:12px;margin-top:8px"></div>
         </div>
-      </div>
-    </div>
-  </section>
 
-  <section class="panel hidden" id="universalUsersPanel">
-    <div class="panelHead"><h3>🌐 Universal Users (Doers — All Apps)</h3><span class="badge">Admin / Director</span></div>
-    <div class="panelBody">
-      <div class="deployBox">Yeh ek hi shared user list hai jo Parcel Dispatch aur future ki har app use karegi (username/password se login — yeh upar wale Firebase Staff Accounts se alag hai). Yahan se decide karein ki kaun-sa doer kaun-si app khol sakta hai.</div>
-      <div id="uuCreateBox" style="margin-top:14px">
-        <div class="uploadGrid">
-          <div><label>Name</label><input id="uuName" placeholder="e.g. Ramesh Kumar"></div>
-          <div><label>Username</label><input id="uuUsername" placeholder="e.g. Ramesh"></div>
-          <div><label>Mobile Number</label><input id="uuPhone" placeholder="10 digit or 91..."></div>
-          <div><label>Department</label><input id="uuDepartment" placeholder="optional"></div>
-          <div><label>Password</label><input id="uuPassword" type="password" placeholder="default 1234"></div>
+        <div style="margin-top:18px">
+          <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">Staff Accounts</h3><button class="btn" onclick="loadUsersList()">Refresh</button></div>
+          <div class="tableWrap">
+            <table>
+              <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
+              <tbody id="usersTableBody"><tr><td colspan="4" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
+            </table>
+          </div>
         </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-          <button class="btn primary" type="button" onclick="uuAddUser()">Add Universal User</button>
-        </div>
-        <div id="uuCreateMsg" style="font-size:12px;margin-top:8px"></div>
       </div>
-      <div style="margin-top:18px">
-        <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">All Doers</h3><button class="btn" onclick="uuLoadList()">Refresh</button></div>
-        <div class="tableWrap">
-          <table>
-            <thead><tr><th>Name</th><th>Username</th><th>Mobile</th><th>Password</th><th>Status</th><th>App Access / Role</th><th>Action</th></tr></thead>
-            <tbody id="uuTableBody"><tr><td colspan="7" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
-          </table>
+
+      <div id="umTabUniversal" class="hidden">
+        <div class="deployBox">Yeh ek hi shared user list hai jo Parcel Dispatch aur future ki har app use karegi (username/password se login — yeh Staff Accounts se alag hai). Yahan se decide karein ki kaun-sa doer kaun-si app khol sakta hai.</div>
+        <div id="uuCreateBox" style="margin-top:14px">
+          <div class="uploadGrid">
+            <div><label>Name</label><input id="uuName" placeholder="e.g. Ramesh Kumar"></div>
+            <div><label>Username</label><input id="uuUsername" placeholder="e.g. Ramesh"></div>
+            <div><label>Mobile Number</label><input id="uuPhone" placeholder="10 digit or 91..."></div>
+            <div><label>Department</label><input id="uuDepartment" placeholder="optional"></div>
+            <div><label>Password</label><input id="uuPassword" type="password" placeholder="default 1234"></div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+            <button class="btn primary" type="button" onclick="uuAddUser()">Add Universal User</button>
+          </div>
+          <div id="uuCreateMsg" style="font-size:12px;margin-top:8px"></div>
+        </div>
+        <div style="margin-top:18px">
+          <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">All Doers</h3><button class="btn" onclick="uuLoadList()">Refresh</button></div>
+          <div class="tableWrap">
+            <table>
+              <thead><tr><th>Name</th><th>Username</th><th>Mobile</th><th>Password</th><th>Status</th><th>App Access / Role</th><th>Action</th></tr></thead>
+              <tbody id="uuTableBody"><tr><td colspan="7" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -900,13 +904,24 @@ function adminFirebaseForgotPassword(){
   }).catch(err=>{msg.style.color='#a12222';msg.textContent=err.message;});
 }
 function setHubAdminPanelsVisible(show){
-  const uuPanel=document.getElementById('universalUsersPanel');
-  if(uuPanel){
-    uuPanel.classList.toggle('hidden',!show);
-    if(show)uuLoadList();
-  }
+  document.getElementById('umTabsRow')?.classList.toggle('hidden',!show);
   document.getElementById('createUserBox')?.classList.toggle('hidden',!show);
-  if(show)loadUsersList();
+  document.getElementById('uuCreateBox')?.classList.toggle('hidden',!show);
+  if(show){
+    loadUsersList();
+    uuLoadList();
+  }else{
+    const staffBody=document.getElementById('usersTableBody');
+    const uuBody=document.getElementById('uuTableBody');
+    if(staffBody)staffBody.innerHTML='';
+    if(uuBody)uuBody.innerHTML='';
+  }
+}
+function umShowTab(tab){
+  document.getElementById('umTabStaff')?.classList.toggle('hidden',tab!=='staff');
+  document.getElementById('umTabUniversal')?.classList.toggle('hidden',tab!=='universal');
+  document.getElementById('umTabStaffBtn')?.classList.toggle('primary',tab==='staff');
+  document.getElementById('umTabUniversalBtn')?.classList.toggle('primary',tab==='universal');
 }
 async function refreshAdminAuthStatus(){
   const box=document.getElementById('adminAuthStatus');
