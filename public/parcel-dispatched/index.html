@@ -258,7 +258,15 @@ if(window.self!==window.top){
   </div>
   <h3>📊 Dashboard <select id="dashboardRange" onchange="renderDashboard()" style="width:auto;display:inline-block;margin-left:8px;font-size:12px;padding:5px 8px;font-weight:400"><option value="today">Today</option><option value="week">This Week</option><option value="all">All Time</option></select></h3>
   <div class="body"><div id="dashboardStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div>
-  <div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:8px">🚚 Courier-wise Spend</div><div id="courierSpendBreakdown"></div></div></div>
+  <div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:8px">🚚 Courier-wise Spend</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <select id="courierSpendFilter" onchange="renderCourierSpendBreakdown()" style="font-size:12px;padding:5px 8px"><option value="">All Couriers</option></select>
+    <input type="month" id="courierSpendMonth" onchange="courierSpendMonthChanged()" style="font-size:12px;padding:5px 8px" title="Quick pick: pura mahina">
+    <input type="date" id="courierSpendFrom" onchange="renderCourierSpendBreakdown()" style="font-size:12px;padding:5px 8px" title="From Date">
+    <input type="date" id="courierSpendTo" onchange="renderCourierSpendBreakdown()" style="font-size:12px;padding:5px 8px" title="To Date">
+    <button class="btn secondary small" type="button" onclick="clearCourierSpendFilters()">Clear</button>
+  </div>
+  <div id="courierSpendBreakdown"></div></div></div>
 </section>
 <section class="card" id="historyCard" style="margin-top:0"><h3>Recent Dispatch Records</h3><div class="body">
 <div class="recordFilters">
@@ -1278,10 +1286,48 @@ function renderDashboard(){
     <div class="statTile"><small>Most Active Party (${rangeLabel})</small><strong>${party.top?esc(party.top):'—'}</strong>${party.top?`<span>${party.topN} parcels</span>`:''}</div>
     <div class="statTile${stuckCount?' danger':''}"><small>Stuck 24h+ (Overall)</small><strong>${stuckCount}</strong></div>
   `;
-  renderCourierSpendBreakdown(a);
+  renderCourierSpendBreakdown();
 }
-function renderCourierSpendBreakdown(records){
+// Courier-wise Spend has its own independent filters (courier name + date range) instead
+// of following the Dashboard's Today/Week/All range — accounting needs to look at any
+// courier over any custom period, not just the quick dashboard presets.
+function fillCourierSpendFilterOptions(){
+  const sel=$('courierSpendFilter');if(!sel)return;
+  const cur=sel.value;
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>!isEmptyDraft(x)&&!x.deletedAt);
+  const names=uniqueSorted(all.map(x=>x.courierName||x.shipThrough));
+  sel.innerHTML='<option value="">All Couriers</option>'+names.map(n=>`<option value="${esc(n)}"${n===cur?' selected':''}>${esc(n)}</option>`).join('');
+}
+function courierSpendMonthChanged(){
+  const m=$('courierSpendMonth').value;
+  if(m){
+    const [y,mo]=m.split('-').map(Number);
+    const lastDay=new Date(y,mo,0).getDate();
+    $('courierSpendFrom').value=`${m}-01`;
+    $('courierSpendTo').value=`${m}-${String(lastDay).padStart(2,'0')}`;
+  }
+  renderCourierSpendBreakdown();
+}
+function clearCourierSpendFilters(){
+  $('courierSpendFilter').value='';
+  $('courierSpendMonth').value='';
+  $('courierSpendFrom').value='';
+  $('courierSpendTo').value='';
+  renderCourierSpendBreakdown();
+}
+function renderCourierSpendBreakdown(){
   const box=$('courierSpendBreakdown');if(!box)return;
+  fillCourierSpendFilterOptions();
+  const courierFilter=$('courierSpendFilter')?.value||'';
+  const from=$('courierSpendFrom')?.value||'';
+  const to=$('courierSpendTo')?.value||'';
+  const all=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>!isEmptyDraft(x)&&!x.deletedAt);
+  const records=all.filter(x=>{
+    const c=(x.courierName||x.shipThrough||'').trim();
+    if(courierFilter&&c!==courierFilter)return false;
+    const d=x.shippingDate||x.dispatchDate||'';
+    return inDateRange(d,from,to);
+  });
   const spend={};
   records.forEach(x=>{
     const c=(x.courierName||x.shipThrough||'').trim();
@@ -1292,7 +1338,7 @@ function renderCourierSpendBreakdown(records){
     spend[c].count+=1;
   });
   const rows=Object.entries(spend).sort((a,b)=>b[1].amount-a[1].amount);
-  if(!rows.length){box.innerHTML='<div class="note">Is range me koi courier data nahi hai.</div>';return}
+  if(!rows.length){box.innerHTML='<div class="note">Is filter me koi courier data nahi hai.</div>';return}
   const total=rows.reduce((s,[,v])=>s+v.amount,0);
   box.innerHTML=`<div class="table"><table><thead><tr><th>Courier</th><th>Parcels</th><th>Total Spend</th></tr></thead><tbody>${
     rows.map(([name,v])=>`<tr><td>${esc(name)}</td><td>${v.count}</td><td>₹${v.amount.toFixed(2)}</td></tr>`).join('')
