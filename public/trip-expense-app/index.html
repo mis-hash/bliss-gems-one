@@ -105,13 +105,13 @@ if(window.self!==window.top){
 <div class="grouplabel">Insights</div>
 <button data-role="admin,director" onclick="go('analytics',this)">📊 Analytics</button>
 <button data-role="admin,director,accounts" onclick="go('explorer',this)">🔎 Detailed Trips</button>
-<button data-role="admin,accounts,director" onclick="go('accounts',this)">📚 Bookkeeping</button>
+<button data-role="admin,accounts,director,sales" onclick="go('accounts',this)">📚 Bookkeeping</button>
 <button data-role="admin,director,accounts" onclick="go('activity',this)">🕒 Activity Log</button>
 <div class="grouplabel">System</div>
 <button data-role="director" onclick="go('director',this)">★ Directors</button>
 <button data-role="director" onclick="go('notify',this)">💬 Notifications</button>
 <button data-role="director" onclick="go('templates',this)">📝 Message Templates</button>
-<button data-role="director" onclick="go('teamroles',this)">👥 Team &amp; Roles</button>
+<button data-role="admin,director" onclick="go('teamroles',this)">👥 Team &amp; Roles</button>
 </nav><main>
 
 <section id="admin" class="page on">
@@ -132,7 +132,7 @@ if(window.self!==window.top){
 <div class="panel"><div class="ph"><span>💰 Idle Advance<small>capital tied up unnecessarily</small></span></div><div class="pb" id="dirIdleAdvance"></div></div>
 <div class="panel"><div class="ph"><span>🏆 Cost Efficiency Ranking<small>vs. company benchmark</small></span></div><div class="pb" id="dirEfficiency"></div></div>
 <div class="panel"><div class="ph"><span>Location × Purpose Benchmark<small>avg. per trip</small></span></div><div class="pb" id="dirBenchmark"></div></div>
-<div class="panel"><div class="ph"><span>Team Roles</span><span class="tag">DIRECTORS ONLY</span></div><div class="pb"><div class="note" style="font-size:12px;color:var(--muted)">Role assign karne ke liye <b style="color:var(--txt)">Team &amp; Roles</b> page par jaayein.</div><div style="margin-top:10px"><button class="btn primary" onclick="go('teamroles')">👥 Open Team &amp; Roles</button></div></div></div>
+<div class="panel"><div class="ph"><span>Team Roles</span><span class="tag">ADMIN &amp; DIRECTORS</span></div><div class="pb"><div class="note" style="font-size:12px;color:var(--muted)">Role assign karne ke liye <b style="color:var(--txt)">Team &amp; Roles</b> page par jaayein.</div><div style="margin-top:10px"><button class="btn primary" onclick="go('teamroles')">👥 Open Team &amp; Roles</button></div></div></div>
 </section>
 
 <section id="sales" class="page"><div class="salesWrap" id="salesWrap"><div class="row"><small>Loading…</small></div></div></section>
@@ -198,12 +198,12 @@ if(window.self!==window.top){
 <button onclick="mgo('sales',this)"><span>👤</span>My Trip</button>
 <button data-role="admin,director" onclick="mgo('analytics',this)"><span>📊</span>Analytics</button>
 <button data-role="admin,director,accounts" onclick="mgo('explorer',this)"><span>🔎</span>Trips</button>
-<button data-role="admin,accounts,director" onclick="mgo('accounts',this)"><span>📚</span>Books</button>
+<button data-role="admin,accounts,director,sales" onclick="mgo('accounts',this)"><span>📚</span>Books</button>
 <button data-role="admin,director,accounts" onclick="mgo('activity',this)"><span>🕒</span>Activity</button>
 <button data-role="director" onclick="mgo('director',this)"><span>★</span>Director</button>
 <button data-role="director" onclick="mgo('notify',this)"><span>💬</span>Notify</button>
 <button data-role="director" onclick="mgo('templates',this)"><span>📝</span>Templates</button>
-<button data-role="director" onclick="mgo('teamroles',this)"><span>👥</span>Roles</button>
+<button data-role="admin,director" onclick="mgo('teamroles',this)"><span>👥</span>Roles</button>
 </div>
 
 <div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
