@@ -431,6 +431,16 @@ if(window.self!==window.top){
 <div class="field"><label>Stock Goods Put in Boxes - Name <span class="req">*</span></label><select class="returnPerson" id="stockBoxesBy" data-time="stockBoxesTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="stockBoxesTime" readonly></div>
 <div class="field full"><label>Remarks</label><textarea id="returnRemarks"></textarea></div>
 </div></div></section>
+<section class="card no-print" id="returnWorkflowControlCard"><h3>🔒 Workflow Control</h3><div class="body">
+<div class="row" style="justify-content:space-between">
+<div class="note">Mandatory sequence enabled. Previous section complete &amp; locked hone ke baad hi next section editable hoga.</div>
+<div class="row">
+<button class="btn primary" type="button" onclick="lockCurrentReturnStage()">🔒 Lock Current Stage</button>
+<button class="btn secondary superAdminOnly hidden" type="button" onclick="unlockReturnStageAsAdmin()">🔓 Admin Unlock</button>
+</div>
+</div>
+<div id="returnWorkflowStatus" class="note" style="margin-top:10px"></div>
+</div></section>
 <div class="save"><span id="returnAutoSaveTag" class="note" style="margin-right:auto"></span><button class="btn primary" onclick="printReturn()">🖨 Print Return Slip</button></div>
 </div>
 
@@ -1875,7 +1885,7 @@ function switchModule(which){
   $('dispatchTabBtn').className='btn '+(which==='dispatch'?'primary':'secondary');
   $('returnTabBtn').className='btn '+(which==='return'?'primary':'secondary');
   if(which==='dispatch'){ showDispatchListView(); }
-  if(which==='return'){ populateReturnUsers(); restoreReturn(); renderReturnHistory(); showReturnListView(); setTimeout(()=>{makeSingleSearchCombos();syncAllComboInputs();},30); }
+  if(which==='return'){ populateReturnUsers(); restoreReturn(); renderReturnHistory(); showReturnListView(); applyReturnSequenceAndLocks(); setTimeout(()=>{makeSingleSearchCombos();syncAllComboInputs();applyReturnSequenceAndLocks();},30); }
 }
 function showReturnListView(){
   if($('returnListView'))$('returnListView').classList.remove('hidden');
@@ -1889,6 +1899,7 @@ function showReturnFormView(){
 function startNewReturn(){
   clearReturn();
   showReturnFormView();
+  applyReturnSequenceAndLocks();
 }
 function showDispatchListView(){
   if($('dispatchListView'))$('dispatchListView').classList.remove('hidden');
@@ -1945,6 +1956,133 @@ function populateReturnUsers(){
     if(au.some(u=>u.id===old))s.value=old;
   });
 }
+const RETURN_STAGE_SEQUENCE=[
+  {id:'rstage1',name:'1. Parcel Receive & Handover',fields:['returnDate','returnFrom','returnThrough','returnReceiveBy','returnReceiveTime','returnParcelType','returnAmount','returnItemsReceived','returnHandoverChecking','handoverCheckingTime']},
+  {id:'rstage2',name:'2. Checking & Return Entry Handover',fields:['handoverToWeightCheck','handoverToWeightCheckTime','returnWeightBy','returnWeightTime','returnLinesBy','returnLinesTime','returnEntryBy','returnEntryTime']},
+  {id:'rstage3',name:'3. Return Entry',fields:['approvalReturnBy','approvalReturnTime','returnItemCount','notFoundReason','returnToBroker','handover506By','handover506Time']},
+  {id:'rstage4',name:'4. PKT / Tag Change & Stock Closing',fields:['returnPktRequired','returnPktBy','returnPktTime','stockBoxesBy','stockBoxesTime']}
+];
+const RETURN_APPROVAL_LOCK_KEY='pd_return_stage_locks_v1';
+function getReturnStageLocks(){
+  const all=JSON.parse(localStorage.getItem(RETURN_APPROVAL_LOCK_KEY)||'{}');
+  return all[currentReturnId||'NEW']||{};
+}
+function saveReturnStageLocks(locks){
+  const all=JSON.parse(localStorage.getItem(RETURN_APPROVAL_LOCK_KEY)||'{}');
+  all[currentReturnId||'NEW']=locks;
+  localStorage.setItem(RETURN_APPROVAL_LOCK_KEY,JSON.stringify(all));
+}
+function returnStageForElement(el){
+  if(!el||!el.id)return null;
+  return RETURN_STAGE_SEQUENCE.find(s=>s.fields.includes(el.id))||null;
+}
+// Amount is only actually required for "To Pay" parcels (mirrors returnAmountReq's own
+// show/hide rule) - everything else in the list is unconditionally required.
+function returnFieldRequired(fieldId){
+  if(fieldId==='returnAmount')return $('returnParcelType')&&$('returnParcelType').value==='To Pay';
+  return true;
+}
+function isReturnFieldFilled(id){
+  const e=$(id);
+  if(!e)return true;
+  if(e.classList.contains('hidden')||e.closest('.hidden'))return true;
+  if(!returnFieldRequired(id))return true;
+  return String(e.value||'').trim()!=='';
+}
+function returnStageComplete(stage){
+  return stage.fields.every(isReturnFieldFilled);
+}
+function previousReturnStagesLocked(stage){
+  const idx=RETURN_STAGE_SEQUENCE.findIndex(s=>s.id===stage.id);
+  const locks=getReturnStageLocks();
+  for(let i=0;i<idx;i++){
+    if(!locks[RETURN_STAGE_SEQUENCE[i].id])return false;
+  }
+  return true;
+}
+function canEditReturnField(el){
+  const stage=returnStageForElement(el);
+  if(!stage)return true;
+  const locks=getReturnStageLocks();
+  // Locked = closed to everyone, including whoever locked it. Only Admin Unlock reopens it
+  // (matches Dispatch - no self-correction window). Transfer is the one deliberate exception,
+  // gated separately in openReturnTransferTask() before it ever gets here.
+  if(locks[stage.id])return false;
+  return previousReturnStagesLocked(stage);
+}
+function currentEditableReturnStage(){
+  const locks=getReturnStageLocks();
+  for(const s of RETURN_STAGE_SEQUENCE){
+    if(!locks[s.id] && previousReturnStagesLocked(s))return s;
+  }
+  return null;
+}
+function autoLockCompletedReturnStage(){
+  const stage=currentEditableReturnStage();
+  if(!stage||!returnStageComplete(stage))return;
+  if(!loggedUser())return;
+  lockCurrentReturnStage(true);
+}
+function lockCurrentReturnStage(silent){
+  const actor=loggedUser();
+  if(!actor){if(!silent)alert('Stage lock karne ke liye login required hai.');return}
+  const stage=currentEditableReturnStage();
+  if(!stage){if(!silent)alert('Koi editable stage available nahi hai.');return}
+  if(!returnStageComplete(stage)){
+    if(!silent)alert(stage.name+' complete nahi hai. Sab mandatory fields fill karein.');
+    return;
+  }
+  const locks=getReturnStageLocks();
+  locks[stage.id]={lockedAt:new Date().toISOString(),lockedBy:actor.id,lockedByName:actor.name};
+  saveReturnStageLocks(locks);
+  refreshReturnFieldStates();
+  toast(stage.name+(silent?' auto-locked — next section unlocked':' locked'));
+}
+function unlockReturnStageAsAdmin(){
+  if(!isAdminUser()){alert('Sirf Admin stage unlock kar sakta hai.');return}
+  const locks=getReturnStageLocks();
+  const locked=RETURN_STAGE_SEQUENCE.filter(s=>locks[s.id]);
+  if(!locked.length){alert('Koi locked stage nahi hai.');return}
+  const labels=locked.map((s,i)=>`${i+1}. ${s.name}`).join('\n');
+  const pick=prompt('Kaunsa stage unlock karna hai?\n'+labels+'\n\nNumber enter karein:');
+  if(pick===null)return;
+  const idx=Number(pick)-1;
+  const stage=locked[idx];
+  if(!stage){alert('Invalid selection');return}
+  delete locks[stage.id];
+  saveReturnStageLocks(locks);
+  refreshReturnFieldStates();
+  toast(stage.name+' unlocked by Admin');
+}
+function renderReturnWorkflowStatus(){
+  const box=$('returnWorkflowStatus');if(!box)return;
+  const locks=getReturnStageLocks();
+  box.innerHTML=RETURN_STAGE_SEQUENCE.map(s=>{
+    const done=returnStageComplete(s),locked=!!locks[s.id],prev=previousReturnStagesLocked(s);
+    let st=locked?'🔒 LOCKED':(done?'✅ COMPLETE':(prev?'🟡 IN PROGRESS':'⛔ WAITING'));
+    return `<span style="display:inline-block;margin:4px 10px 4px 0"><b>${esc(s.name)}</b>: ${st}</span>`;
+  }).join('');
+}
+function refreshReturnFieldStates(){
+  document.querySelectorAll('#returnModule input,#returnModule select,#returnModule textarea').forEach(el=>{
+    if(!el.id)return;
+    const stage=returnStageForElement(el);
+    if(!stage)return;
+    const editable=canEditReturnField(el);
+    if(el.tagName==='SELECT'){el.disabled=!editable}
+    else{
+      const nativeReadonly=el.classList.contains('returnTime');
+      el.readOnly=nativeReadonly||!editable;
+    }
+  });
+  renderReturnWorkflowStatus();
+}
+function applyReturnSequenceAndLocks(){
+  const fv=$('returnFormView');
+  if(fv&&fv.classList.contains('hidden'))return;
+  refreshReturnFieldStates();
+  autoLockCompletedReturnStage();
+}
 function returnNow(){
   return new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
 }
@@ -1981,6 +2119,16 @@ function openReturnTransferTask(fieldId){
   if(!el)return;
   const actor=loggedUser();
   if(!actor){alert('Task transfer karne ke liye pehle login karein.');return}
+  const stage=returnStageForElement(el);
+  const locks=getReturnStageLocks();
+  if(stage && !locks[stage.id] && !previousReturnStagesLocked(stage)){
+    alert('Ye task abhi transfer ke liye available nahi hai — sequence me pichla stage lock nahi hua hai.');
+    return;
+  }
+  if(stage && locks[stage.id] && !superAdminUnlocked && locks[stage.id].lockedBy!==actor.id){
+    alert('Ye section lock ho chuka hai. Sirf jisne is section ko lock kiya tha (ya Super Admin), wahi ab bhi task transfer kar sakta hai.');
+    return;
+  }
   if(el.value && el.value!==actor.id && !superAdminUnlocked){
     alert('Sirf jis Doer ko ye task currently assigned hai (ya Super Admin), wahi ise transfer kar sakta hai.');
     return;
@@ -1999,17 +2147,35 @@ function openReturnTransferTask(fieldId){
 
 function printReturn(){ saveReturn(true); window.print(); }
 
+const _returnAuditPrev=new WeakMap();
+document.addEventListener('focusin',e=>{
+  const el=e.target;
+  if(el && el.matches('#returnModule input,#returnModule select,#returnModule textarea'))_returnAuditPrev.set(el,el.value);
+},true);
 document.addEventListener('DOMContentLoaded',()=>{
   returnControls().forEach((e,i)=>{
     e.dataset.rkey=e.id||('r_'+i);
     e.addEventListener('change',()=>{
+      if(!canEditReturnField(e) && !window.__transferInProgress){
+        alert('Mandatory sequence / approval lock ke karan ye field editable nahi hai.');
+        if(e.type==='file'){e.value=''}
+        else{const old=_returnAuditPrev.get(e);if(old!==undefined)e.value=old}
+        return;
+      }
       if(e.classList.contains('returnPerson')){
         returnPersonSelected(e);
+      }else{
+        saveReturn(true);
+      }
+      applyReturnSequenceAndLocks();
+    });
+    e.addEventListener('input',()=>{
+      if(!canEditReturnField(e) && !window.__transferInProgress){
+        const old=_returnAuditPrev.get(e);if(old!==undefined)e.value=old;
         return;
       }
       saveReturn(true);
     });
-    e.addEventListener('input',()=>saveReturn(true));
   });
   populateReturnUsers();
   restoreReturn();
@@ -2056,6 +2222,7 @@ function saveReturn(silent=false){
 function clearReturn(){
  returnControls().forEach(e=>e.value='');
  currentReturnId=genReturnId(); localStorage.removeItem(RETURN_KEY);
+ saveReturnStageLocks({});
  let x=$('returnDate');if(x)x.value=new Date().toISOString().slice(0,10);
  populateReturnUsers();
  if(typeof returnPktRule==='function')returnPktRule();
@@ -2150,6 +2317,7 @@ function openReturnRecord(id){
  if(typeof returnParcelTypeRule==='function')returnParcelTypeRule();
  if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+slipLabel(r);
  showReturnFormView();
+ applyReturnSequenceAndLocks();
  toast('Return opened: '+id);
 }
 
@@ -2569,18 +2737,9 @@ function canEditField(el){
   const stage=stageForElement(el);
   if(!stage)return true;
   const locks=getStageLocks();
-  if(locks[stage.id]){
-    // The doer who actually locked this section can still go back and correct their own
-    // entries — but only until the NEXT section also locks. Once work has moved past it,
-    // self-correction closes and only Admin (via unlockStageAsAdmin) can reopen it — this
-    // keeps corrections happening close to when the mistake is made instead of being
-    // editable indefinitely.
-    const idx=STAGE_SEQUENCE.findIndex(s=>s.id===stage.id);
-    const nextStage=STAGE_SEQUENCE[idx+1];
-    if(nextStage && locks[nextStage.id])return false;
-    const actor=loggedUser();
-    return !!(actor && locks[stage.id].lockedBy===actor.id);
-  }
+  // Once a section is locked, it is closed to everyone — including the Doer who locked it.
+  // Only Admin Unlock (unlockStageAsAdmin) can reopen it. No self-correction window.
+  if(locks[stage.id])return false;
   return previousStagesLocked(stage);
 }
 function applySequenceAndLocks(){
@@ -2998,7 +3157,16 @@ function openTransferTask(fieldId){
   if(!el)return;
   const actor=loggedUser();
   if(!actor){alert('Task transfer karne ke liye pehle login karein.');return}
-  if(el.disabled){alert('Ye task abhi transfer ke liye available nahi hai — sequence me pichla stage lock nahi hua ya ye stage already locked hai.');return}
+  const stage=stageForElement(el);
+  const locks=getStageLocks();
+  if(stage && !locks[stage.id] && !previousStagesLocked(stage)){
+    alert('Ye task abhi transfer ke liye available nahi hai — sequence me pichla stage lock nahi hua hai.');
+    return;
+  }
+  if(stage && locks[stage.id] && !superAdminUnlocked && locks[stage.id].lockedBy!==actor.id){
+    alert('Ye section lock ho chuka hai. Sirf jisne is section ko lock kiya tha (ya Super Admin), wahi ab bhi task transfer kar sakta hai.');
+    return;
+  }
   if(el.value && el.value!==actor.id && !superAdminUnlocked){
     alert('Sirf jis Doer ko ye task currently assigned hai (ya Super Admin), wahi ise transfer kar sakta hai.');
     return;
@@ -3067,7 +3235,10 @@ document.addEventListener('focusin',e=>{
 document.addEventListener('change',e=>{
   const el=e.target;
   if(!el || !el.matches('#dispatchModule input,#dispatchModule select,#dispatchModule textarea'))return;
-  if(!canEditField(el)){
+  // A Transfer (window.__transferInProgress) is the one deliberate exception: it's allowed to
+  // write into a locked section's field, but only by whoever locked that section - already
+  // enforced in openTransferTask() before this event ever fires.
+  if(!canEditField(el) && !window.__transferInProgress){
     alert('Mandatory sequence / approval lock ke karan ye field editable nahi hai.');
     // File inputs only ever accept '' when set programmatically (browser restriction) -
     // setting them back to a remembered filename throws and crashes the app.
@@ -3078,15 +3249,15 @@ document.addEventListener('change',e=>{
   const old=_auditPrev.has(el)?_auditPrev.get(el):'';
   const stageOfEl=stageForElement(el);
   const isPostLockEdit=stageOfEl && getStageLocks()[stageOfEl.id];
-  auditFieldChange(el,old,el.value,isPostLockEdit?'POST_LOCK_EDIT':'CHANGE');
-  if(isPostLockEdit)toast('⚠ Locked section me correction — ye Audit Trail me record ho gaya hai.');
+  auditFieldChange(el,old,el.value,isPostLockEdit?'TRANSFER_ON_LOCKED':'CHANGE');
+  if(isPostLockEdit)toast('🔄 Locked section me task transfer hua — Audit Trail me record ho gaya hai.');
   _auditPrev.set(el,el.value);
   applySequenceAndLocks();
 },true);
 document.addEventListener('input',e=>{
   const el=e.target;
   if(!el || !el.matches('#dispatchModule input,#dispatchModule textarea'))return;
-  if(!canEditField(el)){
+  if(!canEditField(el) && !window.__transferInProgress){
     if(el.type==='file'){el.value=''}
     else{const old=_auditPrev.get(el);if(old!==undefined)el.value=old}
     return;
