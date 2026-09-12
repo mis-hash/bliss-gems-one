@@ -283,7 +283,7 @@ if(window.self!==window.top){
 <div class="field"><label>Ship Through <span class="req">*</span></label><input id="shipThrough" list="shipThroughList" class="titleCaseField" autocomplete="off" onchange="shipChanged();syncShippingSection()"><datalist id="shipThroughList"></datalist></div>
 <div class="field"><label>INSH Amount <span class="req">*</span></label><input type="number" id="inshAmount" list="inshAmountList" step="0.01"><datalist id="inshAmountList"></datalist></div>
 <div class="field"><label>Price Fill <span class="req">*</span></label><select id="priceFill" onchange="priceChanged()"><option value="">Select</option><option>YES</option><option>NO</option></select></div>
-<div class="field hidden" id="priceWrap"><label>Price <span class="req">*</span></label><input type="number" id="price"></div>
+<div class="field hidden" id="priceWrap"><label>Price <span class="req">*</span></label><input type="text" id="price" placeholder="Numeric ya word, jo bhi likhna ho"></div>
 <div class="field span2"><label>Self Remark</label><textarea id="selfRemark" placeholder="Optional • Secret/Code"></textarea>
 </div><div class="field span2"><label>Client Remark</label><textarea id="clientRemark"></textarea></div>
 <div class="field"><label>Slip Owner <span class="req">*</span></label><select class="person" id="slipFillBy" data-time="slipFillTime" data-event="Slip Owner" onchange="personChanged(this)"></select></div><div class="field"><label>Slip Start Time <span class="req">*</span></label><input id="slipFillTime" readonly></div>
@@ -325,19 +325,17 @@ if(window.self!==window.top){
 <input id="courierName" list="courierNameList" class="titleCaseField" autocomplete="off">
 <datalist id="courierNameList"></datalist></div>
 
-<div class="field"><label>Location / Destination</label><input id="shippingLocation" class="titleCaseField" placeholder="City / destination"></div>
+<div class="field"><label>City / Destination</label><input id="shippingLocation" list="shippingCityList" class="titleCaseField" autocomplete="off" placeholder="Select ya type karein">
+<datalist id="shippingCityList"><option>Mumbai</option><option>Hyderabad</option><option>Bangalore</option><option>Delhi</option><option>Gurgaon</option><option>Chennai</option><option>Surat</option><option>Jaipur</option><option>Kolkata</option></datalist></div>
 
 <div class="field"><label>Insurance <span class="req">*</span></label>
 <select id="shippingInsurance" onchange="shippingInsuranceRule()">
 <option value="">Select</option><option>YES</option><option>NO</option>
 </select></div>
-<div class="field hidden" id="shippingInsuranceAmountWrap"><label>Insurance Amount</label><input type="number" id="shippingInsuranceAmount"></div>
 
 <div class="field"><label>Courier Slip No.</label><input id="courierSlipNo" placeholder="Slip / receipt no."></div>
-<div class="field"><label>AWB / Tracking No.</label><input id="awbNo" placeholder="AWB / tracking number"></div>
 <div class="field"><label>Courier Slip Amount</label><input type="number" id="courierSlipAmount" step="0.01"></div>
 
-<div class="field"><label>Parcel Taken / Scanned By</label><input id="courierPersonName" class="titleCaseField" placeholder="Courier person name"></div>
 <div class="field"><label>Handover By <span class="req">*</span></label>
 <select class="person" id="parcelHandoverBy" data-time="parcelHandoverTime" data-event="Parcel Handover By" onchange="personChanged(this)"></select></div>
 <div class="field"><label>Handover Time <span class="req">*</span></label><input id="parcelHandoverTime" readonly></div>
@@ -857,6 +855,18 @@ function personChanged(s){
   if(s.id==='parcelGivenBy')return; // Parcel Given By is the initiator, not someone a task is being handed to — no notification needed here.
   if(notifySettings[s.dataset.event]===false)return; // Super Admin turned this event's notification off.
   sendBackgroundWA(u,s.dataset.event,s.id).catch(err=>console.error('WhatsApp background send failed:',err));
+  // Slip Owner gets pinged at the two milestones they actually care about, separately from
+  // the generic per-field notification above (which goes to whoever was just selected).
+  if(s.id==='itemPackedBy'||s.id==='parcelHandoverBy'){
+    const owner=users.find(x=>x.id===$('slipFillBy')?.value);
+    if(owner&&owner.phone&&owner.id!==u.id){
+      const parcel=editing||currentParcelId||'(New Parcel)',party=$('shipTo')?.value||'-';
+      const msg=s.id==='itemPackedBy'
+        ?`📦 Parcel Pack Ho Gaya\n\nParcel ID: ${parcel}\nParty: ${party}\nPacked By: ${u.name}\nTime: ${now()}\n\n👉 ${parcelOpenLink(parcel)}`
+        :`🚚 Parcel Dispatch Ho Gaya\n\nParcel ID: ${parcel}\nParty: ${party}\nCourier: ${$('courierName')?.value||'-'}\nHandover By: ${u.name}\nTime: ${now()}\n\n👉 ${parcelOpenLink(parcel)}`;
+      sendRawWA(owner.phone,msg).catch(err=>console.error('Slip owner milestone WA failed:',err));
+    }
+  }
 }
 async function sendRawWA(phone,message){
   let id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
@@ -904,16 +914,20 @@ function currentActiveStageInfo(rec){
   for(let i=0;i<STAGE_SEQUENCE.length;i++){
     const st=STAGE_SEQUENCE[i];
     if(!recordStageComplete(rec,st)){
-      let enteredAt=null;
+      let enteredAt=null,responsibleDoerId=null;
       if(i>0){
         const prev=STAGE_SEQUENCE[i-1];
         for(let j=prev.fields.length-1;j>=0;j--){
           const fid=prev.fields[j],val=rec[fid];
-          if(val && /Time$/.test(fid)){enteredAt=val;break}
+          // Each stage's fields are laid out as [person, ...,'personTime'] pairs, so the
+          // field right before the matched Time field is who this work is currently sitting
+          // with - i.e. who to ping that their work is pending.
+          if(val && /Time$/.test(fid)){enteredAt=val;responsibleDoerId=rec[prev.fields[j-1]]||null;break}
         }
       }
       if(!enteredAt)enteredAt=rec.createdAt;
-      return {stage:st,index:i,enteredAt};
+      if(!responsibleDoerId)responsibleDoerId=rec.slipFillBy||null;
+      return {stage:st,index:i,enteredAt,responsibleDoerId};
     }
   }
   return null;
@@ -940,12 +954,20 @@ async function checkStuckParcelsAndAlertDelays(){
       if(rec[alertKey])continue;
       const givenUser=users.find(u=>u.id===rec.parcelGivenBy);
       const ownerUser=users.find(u=>u.id===rec.slipFillBy);
+      const doerUser=users.find(u=>u.id===info.responsibleDoerId);
       const targets=[givenUser,ownerUser].filter((u,i,arr)=>u&&u.phone&&arr.findIndex(x=>x&&x.id===u.id)===i);
-      if(!targets.length)continue;
+      const doerTarget=(doerUser&&doerUser.phone&&!targets.some(t=>t.id===doerUser.id))?doerUser:null;
+      if(!targets.length&&!doerTarget)continue;
       const hrs=Math.floor(hours);
-      const msg=`⏰ Delay Alert\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nStuck at: ${info.stage.name}\nPending for: ${hrs}+ hours\n\n👉 ${parcelOpenLink(rec.parcelId)}`;
-      for(const u of targets){
-        try{await sendRawWA(u.phone,msg)}catch(e){console.error('delay WA failed',e)}
+      if(targets.length){
+        const msg=`⏰ Delay Alert\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nStuck at: ${info.stage.name}\nPending for: ${hrs}+ hours\n\n👉 ${parcelOpenLink(rec.parcelId)}`;
+        for(const u of targets){
+          try{await sendRawWA(u.phone,msg)}catch(e){console.error('delay WA failed',e)}
+        }
+      }
+      if(doerTarget){
+        const doerMsg=`⏰ Aapka Kaam Pending Hai\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nSection: ${info.stage.name}\nPending for: ${hrs}+ hours\n\n👉 Turant complete karein: ${parcelOpenLink(rec.parcelId)}`;
+        try{await sendRawWA(doerTarget.phone,doerMsg)}catch(e){console.error('doer delay WA failed',e)}
       }
       rec[alertKey]=true;changed=true;
       try{await pdDb.collection('pd_records_cloud').doc(String(rec.parcelId)).update({[alertKey]:true})}catch(e){console.error('delay flag save failed',e)}
