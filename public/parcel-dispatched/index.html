@@ -2881,8 +2881,10 @@ document.addEventListener('change',e=>{
   if(!el || !el.matches('#dispatchModule input,#dispatchModule select,#dispatchModule textarea'))return;
   if(!canEditField(el)){
     alert('Mandatory sequence / approval lock ke karan ye field editable nahi hai.');
-    const old=_auditPrev.get(el);
-    if(old!==undefined)el.value=old;
+    // File inputs only ever accept '' when set programmatically (browser restriction) -
+    // setting them back to a remembered filename throws and crashes the app.
+    if(el.type==='file'){el.value=''}
+    else{const old=_auditPrev.get(el);if(old!==undefined)el.value=old}
     return;
   }
   const old=_auditPrev.has(el)?_auditPrev.get(el):'';
@@ -2897,8 +2899,8 @@ document.addEventListener('input',e=>{
   const el=e.target;
   if(!el || !el.matches('#dispatchModule input,#dispatchModule textarea'))return;
   if(!canEditField(el)){
-    const old=_auditPrev.get(el);
-    if(old!==undefined)el.value=old;
+    if(el.type==='file'){el.value=''}
+    else{const old=_auditPrev.get(el);if(old!==undefined)el.value=old}
     return;
   }
 },true);
