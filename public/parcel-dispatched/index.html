@@ -3083,6 +3083,7 @@ function getComboInput(select){
 }
 function applyWorkerPermissions(){
   applyFeatureAccessRestrictions();
+  if(typeof refreshSuperAdminOnlyVisibility==='function')refreshSuperAdminOnlyVisibility();
   const actor=loggedUser();
   document.querySelectorAll('select.person,select.returnPerson').forEach(s=>{
     const inp=getComboInput(s);
@@ -3307,6 +3308,18 @@ function closeSuperAdminLogin(){
 }
 function setSuperAdminVisibility(show){
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.toggle('hidden',!show));
+}
+// Universal Users / Masters panel: Super Admin always sees it, and so does any Doer whose
+// own parcel-dispatched role is admin or director - same role check already used to gate the
+// Analytics Dashboard, so it doesn't need the 10-tap Super Admin gesture separately.
+function canAccessManagePanel(){
+  if(superAdminUnlocked)return true;
+  const u=loggedUser();
+  const role=u&&u.appRoles&&u.appRoles['parcel-dispatched'];
+  return role==='admin'||role==='director';
+}
+function refreshSuperAdminOnlyVisibility(){
+  setSuperAdminVisibility(canAccessManagePanel());
 }
 function unlockSuperAdmin(){
   const pw=$('superAdminPassword')?.value||'';
