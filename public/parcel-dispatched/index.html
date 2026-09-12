@@ -272,7 +272,7 @@ if(window.self!==window.top){
 </div>
 <div id="dispatchFormView" class="hidden">
 <div class="no-print" style="margin-bottom:12px"><button class="btn secondary" onclick="closeDispatchForm()">← Back to Records</button></div>
-<section class="card"><h3>1. Basic Dispatch & Preparation<span id="slipNoTag" style="float:right;font-size:12px;font-weight:700;color:var(--p)"></span></h3><div class="body"><div class="grid">
+<section class="card" id="dispatchSec1"><h3>1. Basic Dispatch & Preparation<span id="slipNoTag" style="float:right;font-size:12px;font-weight:700;color:var(--p)"></span></h3><div class="body"><div class="grid">
 <div class="field"><label>Dispatch Date <span class="req">*</span></label><input type="date" id="dispatchDate"></div>
 <div class="field"><label>Ship To / Party Name <span class="req">*</span></label>
 <div class="comboBox" id="shipToCombo">
@@ -293,7 +293,7 @@ if(window.self!==window.top){
 <section class="card hidden" id="section1A"><h3>1-A. DLC / Delivery Challan</h3><div class="body"><div class="grid">
 <div class="field"><label>Delivery Challan Required <span class="req">*</span></label><select id="deliveryChallanRequired"><option>YES</option><option>NO</option></select></div><div class="field"><label>Item Name <span class="req">*</span></label><input id="dlcItem"></div><div class="field"><label>Price in DLC <span class="req">*</span></label><input type="number" id="dlcPrice"></div><div class="field"><label>Remark 1</label><input id="remark1"></div><div class="field"><label>Remark 2</label><input id="remark2"></div><div class="field"><label>Remark 3</label><input id="remark3"></div>
 </div></div></section>
-<section class="card"><h3>2. Weight & Checking</h3><div class="body"><div class="grid">
+<section class="card" id="dispatchSec2"><h3>2. Weight & Checking</h3><div class="body"><div class="grid">
 <div class="field full"><label>Handed Over By (Section 1)</label><input id="handoverPrepareRef" readonly></div>
 <div class="field hidden" id="dispatchPktByWrap"><label>PKT Change By <span class="req">*</span></label><select class="person" id="dispatchPktBy" data-time="dispatchPktTime" data-event="PKT Change By" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('dispatchPktBy')">🔄 Transfer</button></div>
 <div class="field hidden" id="dispatchPktTimeWrap"><label>Time <span class="req">*</span></label><input id="dispatchPktTime" readonly></div>
@@ -303,13 +303,13 @@ if(window.self!==window.top){
 <div class="field"><label>Handover To Noting <span class="req">*</span></label><select class="person" id="handoverToNoting" data-time="notingTime" data-event="Handover To Noting" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToNoting')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="notingTime" readonly></div>
 
 </div></div></section>
-<section class="card"><h3>3. Noting</h3><div class="body"><div class="grid">
+<section class="card" id="dispatchSec3"><h3>3. Noting</h3><div class="body"><div class="grid">
 <div class="field full"><label>Handed Over By (Section 2)</label><input id="handoverNotingRef" readonly></div>
 <div class="field"><label>Noted By <span class="req">*</span></label><select class="person" id="notedBy" data-time="notedTime" data-event="Noted By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="notedTime" readonly></div><div class="field"><label>No. of Items Noted <span class="req">*</span></label><input type="number" id="itemsNoted"></div><div class="field"><label>Handover To Recheck <span class="req">*</span></label><select class="person" id="handoverToRecheck" data-time="recheckTime" data-event="Handover To Recheck" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToRecheck')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="recheckTime" readonly></div></div></div></section>
-<section class="card"><h3>4. Recheck & Packing</h3><div class="body"><div class="grid">
+<section class="card" id="dispatchSec4"><h3>4. Recheck & Packing</h3><div class="body"><div class="grid">
 <div class="field full"><label>Handed Over By (Section 3)</label><input id="handoverRecheckRef" readonly></div>
 <div class="field"><label>Actual Recheck By <span class="req">*</span></label><select class="person" id="recheckedBy" data-time="actualRecheckTime" data-event="Actual Recheck By" onchange="personChanged(this)"></select></div><div class="field"><label>Time <span class="req">*</span></label><input id="actualRecheckTime" readonly></div><div class="field"><label>Handover To Packing <span class="req">*</span></label><select class="person" id="handoverToPacking" data-time="packingHandoverTime" data-event="Handover To Packing" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToPacking')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="packingHandoverTime" readonly></div></div></div></section>
-<section class="card"><h3>5. Final Packing</h3><div class="body"><div class="grid">
+<section class="card" id="dispatchSec5"><h3>5. Final Packing</h3><div class="body"><div class="grid">
 <div class="field full"><label>Handed Over By (Section 4)</label><input id="handoverPackingRef" readonly></div>
 <div class="field"><label>Item Packed By <span class="req">*</span></label><select class="person" id="itemPackedBy" data-time="packedTime" data-event="Item Packed By" onchange="personChanged(this)"></select></div>
 <div class="field"><label>Time <span class="req">*</span></label><input id="packedTime" readonly></div>
@@ -317,7 +317,7 @@ if(window.self!==window.top){
 <div class="field span2 no-print"><label>Packed Parcel Photo <span class="req">*</span></label><input type="hidden" id="packPhotoData"><input type="file" id="packPhotoInput" accept="image/*" capture="environment" onchange="handlePackPhoto(this)"><div class="note" id="packPhotoStatus"></div><img id="packPhotoPreview" class="hidden" style="max-width:160px;border-radius:8px;margin-top:6px;display:block"></div>
 </div></div></section>
 
-<section class="card"><h3>6. Courier / Shipping Dispatch</h3><div class="body"><div class="grid">
+<section class="card" id="dispatchSec6"><h3>6. Courier / Shipping Dispatch</h3><div class="body"><div class="grid">
 <div class="field"><label>Shipping Date <span class="req">*</span></label><input type="date" id="shippingDate"></div>
 <div class="field"><label>Expected Delivery Date</label><input type="date" id="expectedDeliveryDate"></div>
 
@@ -397,7 +397,7 @@ if(window.self!==window.top){
 <div class="no-print" style="margin-bottom:12px"><button class="btn secondary" onclick="showReturnListView()">← Back to Records</button></div>
 <section class="card"><h3>↩ PARCEL RETURN RECORD<span id="returnIdTag" style="float:right;font-size:12px;font-weight:700;color:var(--p)"></span></h3><div class="body"><div class="note">Separate Return Module • Universal Users • Auto Time</div></div></section>
 
-<section class="card"><h3>1. Parcel Receive & Handover</h3><div class="body"><div class="grid">
+<section class="card" id="returnSec1"><h3>1. Parcel Receive & Handover</h3><div class="body"><div class="grid">
 <div class="field"><label>Date <span class="req">*</span></label><input type="date" id="returnDate"></div>
 <div class="field"><label>Return From <span class="req">*</span></label><select id="returnFrom"></select></div>
 <div class="field"><label>Return Through <span class="req">*</span></label><select id="returnThrough"><option value="">Select</option><option>Courier</option><option>Hand Delivery</option><option>Staff</option></select></div>
@@ -409,14 +409,14 @@ if(window.self!==window.top){
 <div class="field"><label>Handover for Checking <span class="req">*</span></label><select class="returnPerson" id="returnHandoverChecking" data-time="handoverCheckingTime"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openReturnTransferTask('returnHandoverChecking')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="handoverCheckingTime" readonly></div>
 </div></div></section>
 
-<section class="card"><h3>2. Checking & Return Entry Handover</h3><div class="body"><div class="grid">
+<section class="card" id="returnSec2"><h3>2. Checking & Return Entry Handover</h3><div class="body"><div class="grid">
 <div class="field"><label>Handover to Weight Check &amp; Lines Tag <span class="req">*</span></label><select class="returnPerson" id="handoverToWeightCheck" data-time="handoverToWeightCheckTime"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openReturnTransferTask('handoverToWeightCheck')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="handoverToWeightCheckTime" readonly></div>
 <div class="field"><label>Weight Check Done By <span class="req">*</span></label><select class="returnPerson" id="returnWeightBy" data-time="returnWeightTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnWeightTime" readonly></div>
 <div class="field"><label>Lines & Tags Checked By <span class="req">*</span></label><select class="returnPerson" id="returnLinesBy" data-time="returnLinesTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnLinesTime" readonly></div>
 <div class="field"><label>Handover for Return Entry - Name <span class="req">*</span></label><select class="returnPerson" id="returnEntryBy" data-time="returnEntryTime"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openReturnTransferTask('returnEntryBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnEntryTime" readonly></div>
 </div></div></section>
 
-<section class="card"><h3>3. Return Entry</h3><div class="body"><div class="grid">
+<section class="card" id="returnSec3"><h3>3. Return Entry</h3><div class="body"><div class="grid">
 <div class="field"><label>Item Return in Approval By <span class="req">*</span></label><select class="returnPerson" id="approvalReturnBy" data-time="approvalReturnTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="approvalReturnTime" readonly></div>
 <div class="field"><label>No. of Items Return <span class="req">*</span></label><input type="number" id="returnItemCount"></div>
 <div class="field"><label>Not Found Reason <span class="req">*</span></label><select id="notFoundReason"><option value="">Select</option><option>Sample</option><option>Collet</option><option>Party Goods</option><option>Other</option></select></div>
@@ -424,7 +424,7 @@ if(window.self!==window.top){
 <div class="field"><label>Handover to 506 - Name <span class="req">*</span></label><select class="returnPerson" id="handover506By" data-time="handover506Time"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openReturnTransferTask('handover506By')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="handover506Time" readonly></div>
 </div></div></section>
 
-<section class="card"><h3>4. PKT / Tag Change & Stock Closing</h3><div class="body"><div class="grid">
+<section class="card" id="returnSec4"><h3>4. PKT / Tag Change & Stock Closing</h3><div class="body"><div class="grid">
 <div class="field"><label>PKT Change Required <span class="req">*</span></label><select id="returnPktRequired" onchange="returnPktRule()"><option value="">Select</option><option>YES</option><option>NO</option></select></div>
 <div class="field hidden" id="returnPktByWrap"><label>PKT/Tag Change By <span class="req">*</span></label><select class="returnPerson" id="returnPktBy" data-time="returnPktTime"></select></div>
 <div class="field hidden" id="returnPktTimeWrap"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnPktTime" readonly></div>
@@ -469,7 +469,7 @@ if(window.self!==window.top){
 </div>
 </div></main>
 
-<div class="modal hidden" id="manageModal"><div class="box"><div class="mh"><b>Admin / Backend Masters</b><button class="btn secondary small" onclick="closeManage()">✕</button></div><div class="mb"><div class="tabs"><button class="tab on" data-tab="users" onclick="tab(this,'users')">Universal Users</button><button class="tab" data-tab="shipto" onclick="tab(this,'shipto')">Ship To</button><button class="tab" data-tab="clients" onclick="tab(this,'clients')">Ship To</button><button class="tab" data-tab="brokers" onclick="tab(this,'brokers')">Brokers</button><button class="tab" data-tab="shipthrough" onclick="tab(this,'shipthrough')">Ship Through</button><button class="tab" data-tab="insh" onclick="tab(this,'insh')">INSH Amount</button><button class="tab" data-tab="couriername" onclick="tab(this,'couriername')">Courier Name</button><button class="tab" data-tab="notifycontrol" onclick="tab(this,'notifycontrol')">Notification Control</button><button class="tab" data-tab="messages" onclick="tab(this,'messages')">Message Settings</button><button class="tab" data-tab="watemplates" onclick="tab(this,'watemplates')">WhatsApp Templates</button><button class="tab" data-tab="privacy" onclick="tab(this,'privacy')">Self Remark Privacy</button><button class="tab" data-tab="api" onclick="tab(this,'api')">GREEN-API</button></div><div id="manageContent"></div></div><div class="mf"><span class="note">Data is saved in this browser.</span><button class="btn secondary" onclick="closeManage()">Close</button></div></div></div>
+<div class="modal hidden" id="manageModal"><div class="box"><div class="mh"><b>Admin / Backend Masters</b><button class="btn secondary small" onclick="closeManage()">✕</button></div><div class="mb"><div class="tabs"><button class="tab on" data-tab="users" onclick="tab(this,'users')">Universal Users</button><button class="tab" data-tab="shipto" onclick="tab(this,'shipto')">Ship To</button><button class="tab" data-tab="clients" onclick="tab(this,'clients')">Ship To</button><button class="tab" data-tab="brokers" onclick="tab(this,'brokers')">Brokers</button><button class="tab" data-tab="shipthrough" onclick="tab(this,'shipthrough')">Ship Through</button><button class="tab" data-tab="insh" onclick="tab(this,'insh')">INSH Amount</button><button class="tab" data-tab="couriername" onclick="tab(this,'couriername')">Courier Name</button><button class="tab" data-tab="notifycontrol" onclick="tab(this,'notifycontrol')">Notification Control</button><button class="tab" data-tab="messages" onclick="tab(this,'messages')">Message Settings</button><button class="tab" data-tab="watemplates" onclick="tab(this,'watemplates')">WhatsApp Templates</button><button class="tab" data-tab="privacy" onclick="tab(this,'privacy')">Self Remark Privacy</button><button class="tab" data-tab="api" onclick="tab(this,'api')">GREEN-API</button><button class="tab" data-tab="feataccess" onclick="tab(this,'feataccess')">Feature Access Control</button></div><div id="manageContent"></div></div><div class="mf"><span class="note">Data is saved in this browser.</span><button class="btn secondary" onclick="closeManage()">Close</button></div></div></div>
 
 
 <div class="modal hidden" id="allRecordsModal"><div class="box" style="width:min(1100px,100%)">
@@ -573,7 +573,19 @@ if(window.self!==window.top){
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
-const K={users:'pd_users_v2',shipto:'pd_shipto_v2',shipthrough:'pd_shipthrough_v2',api:'pd_greenapi_v2',records:'pd_records_v2',inshpresets:'pd_inshpresets_v1',couriernames:'pd_couriernames_v1',notifysettings:'pd_notify_settings_v1'};
+const K={users:'pd_users_v2',shipto:'pd_shipto_v2',shipthrough:'pd_shipthrough_v2',api:'pd_greenapi_v2',records:'pd_records_v2',inshpresets:'pd_inshpresets_v1',couriernames:'pd_couriernames_v1',notifysettings:'pd_notify_settings_v1',featureaccess:'pd_feature_access_v1'};
+const FEATURE_LIST=[
+  {id:'dispatchSec1',name:'Dispatch — 1. Basic Dispatch & Preparation'},
+  {id:'dispatchSec2',name:'Dispatch — 2. Weight & Checking'},
+  {id:'dispatchSec3',name:'Dispatch — 3. Noting'},
+  {id:'dispatchSec4',name:'Dispatch — 4. Recheck & Packing'},
+  {id:'dispatchSec5',name:'Dispatch — 5. Final Packing'},
+  {id:'dispatchSec6',name:'Dispatch — 6. Courier / Shipping Dispatch'},
+  {id:'returnSec1',name:'Return — 1. Parcel Receive & Handover'},
+  {id:'returnSec2',name:'Return — 2. Checking & Return Entry Handover'},
+  {id:'returnSec3',name:'Return — 3. Return Entry'},
+  {id:'returnSec4',name:'Return — 4. PKT / Tag Change & Stock Closing'}
+];
 const NOTIFY_EVENTS=['Slip Owner','Handover To Weight Check & PKT Change','PKT Change By','Weight Checked By','Lines & Tags Checked By','Handover To Noting','Noted By','Handover To Recheck','Actual Recheck By','Handover To Packing','Item Packed By','Parcel Handover By','Courier Slip Received By'];
 const ACTIVE_DRAFT_KEY='pd_active_draft_v1';
 let currentParcelId=null;
@@ -773,7 +785,7 @@ if(!Array.isArray(waTemplates)||!waTemplates.length){
 }
 function saveWaTemplates(){localStorage.setItem(WA_TEMPLATE_KEY,JSON.stringify(waTemplates));}
 
-let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(localStorage.getItem(K.shipto)||'[]');let shipThrough=JSON.parse(localStorage.getItem(K.shipthrough)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let inshAmountPresets=JSON.parse(localStorage.getItem(K.inshpresets)||'null')||['0.10','0.20','0.50','0.60','0.70','1.00','2.00','3.00'];let courierNames=JSON.parse(localStorage.getItem(K.couriernames)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let api=JSON.parse(localStorage.getItem(K.api)||'{}');let notifySettings=JSON.parse(localStorage.getItem(K.notifysettings)||'{}');let editing=null,currentTab='users',waTarget=null;
+let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(localStorage.getItem(K.shipto)||'[]');let shipThrough=JSON.parse(localStorage.getItem(K.shipthrough)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let inshAmountPresets=JSON.parse(localStorage.getItem(K.inshpresets)||'null')||['0.10','0.20','0.50','0.60','0.70','1.00','2.00','3.00'];let courierNames=JSON.parse(localStorage.getItem(K.couriernames)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let api=JSON.parse(localStorage.getItem(K.api)||'{}');let notifySettings=JSON.parse(localStorage.getItem(K.notifysettings)||'{}');let featureAccess=JSON.parse(localStorage.getItem(K.featureaccess)||'{}');let editing=null,currentTab='users',waTarget=null;
 // One-time additive merge: bring in courier names asked for, without touching anyone's
 // existing custom list (only appends names that aren't already there in some form).
 (function mergeDefaultCourierNames(){
@@ -840,7 +852,30 @@ function openFromLink(parcelId){
   window._pendingOpenParcelId=null;
   if(history.replaceState)history.replaceState(null,'',location.pathname);
 }
-function saveMasters(){localStorage.setItem(K.users,JSON.stringify(users));localStorage.setItem(K.shipto,JSON.stringify(shipTo));localStorage.setItem(K.shipthrough,JSON.stringify(shipThrough));localStorage.setItem(K.inshpresets,JSON.stringify(inshAmountPresets));localStorage.setItem(K.couriernames,JSON.stringify(courierNames));localStorage.setItem(K.api,JSON.stringify(api));localStorage.setItem(K.notifysettings,JSON.stringify(notifySettings));pdSyncUsersToCloud();}
+function saveMasters(){localStorage.setItem(K.users,JSON.stringify(users));localStorage.setItem(K.shipto,JSON.stringify(shipTo));localStorage.setItem(K.shipthrough,JSON.stringify(shipThrough));localStorage.setItem(K.inshpresets,JSON.stringify(inshAmountPresets));localStorage.setItem(K.couriernames,JSON.stringify(courierNames));localStorage.setItem(K.api,JSON.stringify(api));localStorage.setItem(K.notifysettings,JSON.stringify(notifySettings));localStorage.setItem(K.featureaccess,JSON.stringify(featureAccess));pdSyncUsersToCloud();}
+// Empty/missing list for a feature = open to everyone (safe default, nothing pre-existing
+// gets locked out until Super Admin explicitly restricts it). Super Admin always sees everything.
+function canAccessFeature(featureId){
+  if(superAdminUnlocked)return true;
+  const allowed=featureAccess[featureId];
+  if(!allowed||!allowed.length)return true;
+  const actor=loggedUser();
+  return !!(actor&&allowed.includes(actor.id));
+}
+function toggleFeatureDoerAccess(featureId,doerId,checked){
+  const list=new Set(featureAccess[featureId]||[]);
+  if(checked)list.add(doerId);else list.delete(doerId);
+  featureAccess[featureId]=[...list];
+  saveMasters();
+  applyFeatureAccessRestrictions();
+}
+function resetFeatureAccess(featureId){featureAccess[featureId]=[];saveMasters();applyFeatureAccessRestrictions();renderManage()}
+function applyFeatureAccessRestrictions(){
+  FEATURE_LIST.forEach(f=>{
+    const el=$(f.id);
+    if(el)el.classList.toggle('hidden',!canAccessFeature(f.id));
+  });
+}
 function options(arr,val=x=>x,label=x=>x){return '<option value="">Select</option>'+arr.map(x=>`<option value="${esc(val(x))}">${esc(label(x))}</option>`).join('')}
 function populate(){ensureDoerMaster();document.querySelectorAll('.person').forEach(s=>{let old=s.value;let au=users.filter(u=>u.active!==false);s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});$('shipThroughList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('courierNameList'))$('courierNameList').innerHTML=courierNames.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('inshAmountList'))$('inshAmountList').innerHTML=inshAmountPresets.map(x=>`<option value="${esc(x)}"></option>`).join('');renderShipToMenu('')}
 function now(){return new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}
@@ -997,6 +1032,7 @@ function startDelayAlertWatch(){
   setInterval(()=>checkStuckParcelsAndAlertDelays().catch(e=>console.error(e)),30*60*1000);
 }
 document.addEventListener('DOMContentLoaded',startDelayAlertWatch);
+document.addEventListener('DOMContentLoaded',()=>{if(typeof startWaReminderWatch==='function')startWaReminderWatch()});
 function mask(p){p=String(p);return p.length>4?'••••••'+p.slice(-4):p}
 function normalizePhone(p){let n=String(p||'').replace(/\D/g,'');if(n.length===10)n='91'+n;return n}
 function parcelOpenLink(parcelId,fieldId){
@@ -1555,7 +1591,12 @@ else if(currentTab==='brokers'){c.innerHTML=`<div class="row"><input id="mBroker
 else if(currentTab==='shipthrough'){c.innerHTML=`<div class="row"><input id="mShipThrough" placeholder="Add Ship Through" style="flex:1"><button class="btn primary" onclick="addShipThrough()">Add</button></div><div class="note">Section 1-A केवल SECURE, SEQUEL/SQL और BVC पर दिखेगा.</div>${shipThrough.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delShipThrough(${i})">Delete</button></div>`).join('')}`}
 else if(currentTab==='insh'){c.innerHTML=`<div class="row"><input id="mInshAmount" placeholder="Add INSH Amount (e.g. 0.10)" style="flex:1"><button class="btn primary" onclick="addInshPreset()">Add</button></div><div class="note">Dispatch Section 1 ke INSH Amount field mein ye quick-pick suggestions ke roop mein dikhenge.</div>${inshAmountPresets.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delInshPreset(${i})">Delete</button></div>`).join('')}`}
 else if(currentTab==='couriername'){c.innerHTML=`<div class="row"><input id="mCourierName" placeholder="Add Courier Name" style="flex:1"><button class="btn primary" onclick="addCourierName()">Add</button></div><div class="note">Section 6 ke Courier Name field mein ye dropdown suggestions ke roop mein dikhenge.</div>${courierNames.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delCourierName(${i})">Delete</button></div>`).join('')}`}
-else if(currentTab==='notifycontrol'){c.innerHTML=`<h3 style="margin-top:0">💬 Notification Control</h3><div class="note">Kis handover event par WhatsApp message jaye, ye yahan se on/off karein. Default sabhi ON hain.</div>${NOTIFY_EVENTS.map((ev,i)=>`<div class="item"><span>${esc(ev)}</span><select onchange="setNotifyEvent(${i},this.value)" style="width:auto"><option value="YES"${notifySettings[ev]!==false?' selected':''}>ON</option><option value="NO"${notifySettings[ev]===false?' selected':''}>OFF</option></select></div>`).join('')}`}
+else if(currentTab==='notifycontrol'){c.innerHTML=`<h3 style="margin-top:0">💬 Notification Control</h3><div class="note">Kis handover event par WhatsApp message jaye, ye yahan se on/off karein. Default sabhi ON hain.</div>${NOTIFY_EVENTS.map((ev,i)=>`<div class="item"><span>${esc(ev)}</span><select onchange="setNotifyEvent(${i},this.value)" style="width:auto"><option value="YES"${notifySettings[ev]!==false?' selected':''}>ON</option><option value="NO"${notifySettings[ev]===false?' selected':''}>OFF</option></select></div>`).join('')}
+<h3>⏰ Transfer Reminder Frequency</h3>
+<div class="note">Jab tak transfer kiya hua task pending rehta hai, us Doer ko kitni der mein reminder WhatsApp message jaata rahega.</div>
+<select onchange="setTransferReminderMinutes(this.value)" style="width:auto">
+${WA_REMINDER_FREQUENCIES.map(f=>`<option value="${f.minutes}"${(notifySettings.transferReminderMinutes||30)===f.minutes?' selected':''}>${esc(f.label)}</option>`).join('')}
+</select>`}
 else if(currentTab==='messages'){
  let au=users.filter(u=>u.active!==false);
  c.innerHTML=`<h3 style="margin-top:0">DLC WhatsApp Rules</h3>
@@ -1589,6 +1630,15 @@ else if(currentTab==='privacy'){
  c.innerHTML=`<h3 style="margin-top:0">🔒 Self Remark Privacy</h3><div class="note">Self Remark भरने वाला user हमेशा देख सकेगा. इसके अलावा नीचे सिर्फ 3–4 authorized users select करें.</div>
  <div style="margin-top:12px">${au.map(u=>`<label style="display:block;padding:8px;border-bottom:1px solid #eee"><input type="checkbox" class="privacyUser" value="${esc(u.id)}" ${selfRemarkPrivacy.allowedUsers.includes(u.id)?'checked':''} style="width:auto;margin-right:8px"> ${esc(u.name)} — ${esc(u.department||'')}</label>`).join('')}</div>
  <button class="btn primary" style="margin-top:12px" onclick="saveSelfRemarkPrivacy()">Save Authorized Users</button>`;
+}
+else if(currentTab==='feataccess'){
+ let au=users.filter(u=>u.active!==false);
+ c.innerHTML=`<h3 style="margin-top:0">🔐 Feature Access Control</h3><div class="note">Har section ke saamne jo Doers select honge, sirf unhi ko wo section dikhega. Koi Doer select na ho to wo section sabko dikhta hai (default). Super Admin ko hamesha sab kuch dikhta hai.</div>
+ ${FEATURE_LIST.map(f=>{
+   const allowed=featureAccess[f.id]||[];
+   return `<div class="item" style="display:block"><b>${esc(f.name)}</b> ${allowed.length?`<button class="btn small secondary" onclick="resetFeatureAccess('${f.id}')">Reset to All</button>`:'<span class="note" style="display:inline">(abhi: sabko visible)</span>'}
+   <div style="margin-top:6px;max-height:140px;overflow:auto;border:1px solid #eee;border-radius:6px;padding:6px">${au.map(u=>`<label style="display:block;padding:4px"><input type="checkbox" onchange="toggleFeatureDoerAccess('${f.id}','${esc(u.id)}',this.checked)" ${allowed.includes(u.id)?'checked':''} style="width:auto;margin-right:8px"> ${esc(u.name)}</label>`).join('')}</div></div>`;
+ }).join('')}`;
 }
 else{c.innerHTML=`<div class="grid"><div class="field span2"><label>GREEN-API Base URL <span class="req">*</span></label><input id="mBase" value="${esc(api.baseUrl||'https://api.green-api.com')}"></div><div class="field"><label>ID Instance <span class="req">*</span></label><input id="mId" value="${esc(api.idInstance||'')}"></div><div class="field"><label>API Token Instance <span class="req">*</span></label><input type="password" id="mToken" value="${esc(api.apiToken||'')}"></div><div class="field full"><button class="btn primary" onclick="saveApi()">Save GREEN-API Settings</button></div></div><div class="note">Simple single-file mode में credentials इस browser के localStorage में save होंगे. Production/public hosting में token server-side रखना ज्यादा सुरक्षित है.</div>`}}
 
@@ -2379,6 +2429,51 @@ const STAGE_SEQUENCE=[
 ];
 
 const WA_QUEUE_KEY='pd_whatsapp_queue_v1';
+const WA_REMINDER_FREQUENCIES=[
+  {label:'Every 2 Hours',minutes:120},
+  {label:'Hourly',minutes:60},
+  {label:'Daily',minutes:1440},
+  {label:'Weekly',minutes:10080}
+];
+function setTransferReminderMinutes(v){notifySettings.transferReminderMinutes=parseInt(v,10)||30;saveMasters()}
+// Actually sends the queued transfer reminders (previously this queue was written but never
+// read - reminders were silently going nowhere). Sends the first message immediately, then
+// re-sends every reminderEveryMinutes until the task moves off the doer it was assigned to.
+let _waReminderRunning=false;
+function waQueueTargetStillPending(item){
+  const isReturn=String(item.parcelId||'').startsWith('PR-');
+  const list=JSON.parse(localStorage.getItem(isReturn?RETURN_RECORDS_KEY:K.records)||'[]');
+  const rec=list.find(x=>(isReturn?x.returnId:x.parcelId)===item.parcelId);
+  if(!rec)return false;
+  return rec[item.stage]===item.toUserId;
+}
+async function processWaReminderQueue(){
+  if(_waReminderRunning)return;
+  _waReminderRunning=true;
+  try{
+    let q=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
+    if(!q.length)return;
+    const nowMs=Date.now();
+    let changed=false;
+    for(const item of q){
+      if(item.status!=='PENDING')continue;
+      if(!waQueueTargetStillPending(item)){item.status='DONE';changed=true;continue}
+      const lastSent=item.lastSentAt?new Date(item.lastSentAt).getTime():0;
+      const everyMs=(item.reminderEveryMinutes||30)*60*1000;
+      if(nowMs-lastSent<everyMs)continue;
+      if(!item.toPhone)continue;
+      try{await sendRawWA(item.toPhone,item.message);item.lastSentAt=new Date().toISOString();changed=true}
+      catch(e){console.error('Reminder WA failed:',e)}
+    }
+    if(changed)localStorage.setItem(WA_QUEUE_KEY,JSON.stringify(q.filter(x=>x.status==='PENDING'||Date.now()-new Date(x.at||x.createdAt).getTime()<7*86400000)));
+  }finally{_waReminderRunning=false}
+}
+let _waReminderStarted=false;
+function startWaReminderWatch(){
+  if(_waReminderStarted)return;_waReminderStarted=true;
+  setTimeout(()=>processWaReminderQueue().catch(e=>console.error(e)),90*1000);
+  setInterval(()=>processWaReminderQueue().catch(e=>console.error(e)),10*60*1000);
+}
 
 /*
   SELF-ONLY / VERIFIED WORK fields:
@@ -2828,6 +2923,7 @@ function getComboInput(select){
   return (wrap&&wrap.classList&&wrap.classList.contains('comboBox')) ? wrap.querySelector('input') : null;
 }
 function applyWorkerPermissions(){
+  applyFeatureAccessRestrictions();
   const actor=loggedUser();
   document.querySelectorAll('select.person,select.returnPerson').forEach(s=>{
     const inp=getComboInput(s);
@@ -2879,13 +2975,22 @@ function logWorkerSelection(field,selectedId,el){
  if(!worker)return;
  let reason=window.__transferReason||'';
  let pid=el?recordKeyForElement(el):(currentParcelId||'');
+ let fieldId=el?el.id:'';
  let row={at:new Date().toISOString(),parcelId:pid,field,enteredBy:actor?actor.name:'Unknown',workBy:worker.name};
  let a=JSON.parse(localStorage.getItem(WORK_AUDIT_KEY)||'[]');a.unshift(row);localStorage.setItem(WORK_AUDIT_KEY,JSON.stringify(a));
  if(actor && actor.id!==worker.id){
+   const everyMin=notifySettings.transferReminderMinutes||30;
+   const msg=(reason?`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} ka task aapko transfer kiya hai. Reason: ${reason}.`:`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} me aapka naam select kiya hai.`)+` Task pending hone tak reminder har ${everyMin} minute.`+`\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(row.parcelId)}`;
    let q=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
-   q.unshift({createdAt:row.at,toUserId:worker.id,toPhone:worker.phone,parcelId:row.parcelId,stage:field,status:'PENDING',reminderEveryMinutes:30,
-     message:(reason?`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} ka task aapko transfer kiya hai. Reason: ${reason}. Task pending hone tak reminder har 30 minute.`:`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} me aapka naam select kiya hai. Task pending hone tak reminder har 30 minute.`)+`\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(row.parcelId)}`});
+   q.unshift({createdAt:row.at,toUserId:worker.id,toPhone:worker.phone,parcelId:row.parcelId,stage:fieldId,status:'PENDING',reminderEveryMinutes:everyMin,message:msg,lastSentAt:''});
    localStorage.setItem(WA_QUEUE_KEY,JSON.stringify(q));
+   if(worker.phone){
+     sendRawWA(worker.phone,msg).then(()=>{
+       let q2=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
+       const it=q2.find(x=>x.createdAt===row.at&&x.toUserId===worker.id&&x.stage===fieldId&&x.status==='PENDING');
+       if(it){it.lastSentAt=new Date().toISOString();localStorage.setItem(WA_QUEUE_KEY,JSON.stringify(q2))}
+     }).catch(err=>console.error('Immediate transfer WA failed:',err));
+   }
  }
 }
 function openTransferTask(fieldId){
