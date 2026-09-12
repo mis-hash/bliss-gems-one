@@ -401,24 +401,27 @@ if(window.self!==window.top){
 <div class="field"><label>Date <span class="req">*</span></label><input type="date" id="returnDate"></div>
 <div class="field"><label>Return From <span class="req">*</span></label><select id="returnFrom"></select></div>
 <div class="field"><label>Return Through <span class="req">*</span></label><select id="returnThrough"><option value="">Select</option><option>Courier</option><option>Hand Delivery</option><option>Staff</option></select></div>
+<div class="field"><label>Courier Name</label><input id="returnCourierName" list="courierNameList" class="titleCaseField" autocomplete="off" placeholder="Select ya type karein"></div>
 <div class="field"><label>Parcel Receive By <span class="req">*</span></label><select class="returnPerson" id="returnReceiveBy" data-time="returnReceiveTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnReceiveTime" readonly></div>
 <div class="field"><label>Parcel Type <span class="req">*</span></label><select id="returnParcelType" onchange="returnParcelTypeRule()"><option value="">Select</option><option>Local</option><option>Paid</option><option>To Pay</option></select></div>
 <div class="field"><label>Amount <span class="req hidden" id="returnAmountReq">*</span></label><input type="number" id="returnAmount"></div>
-<div class="field"><label>Handover for Checking <span class="req">*</span></label><select class="returnPerson" id="returnHandoverChecking" data-time="handoverCheckingTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="handoverCheckingTime" readonly></div>
+<div class="field"><label>No. of Items Received <span class="req">*</span></label><input type="number" id="returnItemsReceived"></div>
+<div class="field"><label>Handover for Checking <span class="req">*</span></label><select class="returnPerson" id="returnHandoverChecking" data-time="handoverCheckingTime"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openReturnTransferTask('returnHandoverChecking')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="handoverCheckingTime" readonly></div>
 </div></div></section>
 
 <section class="card"><h3>2. Checking & Return Entry Handover</h3><div class="body"><div class="grid">
+<div class="field"><label>Handover to Weight Check &amp; Lines Tag <span class="req">*</span></label><select class="returnPerson" id="handoverToWeightCheck" data-time="handoverToWeightCheckTime"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openReturnTransferTask('handoverToWeightCheck')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="handoverToWeightCheckTime" readonly></div>
 <div class="field"><label>Weight Check Done By <span class="req">*</span></label><select class="returnPerson" id="returnWeightBy" data-time="returnWeightTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnWeightTime" readonly></div>
 <div class="field"><label>Lines & Tags Checked By <span class="req">*</span></label><select class="returnPerson" id="returnLinesBy" data-time="returnLinesTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnLinesTime" readonly></div>
-<div class="field"><label>No. of Items Received <span class="req">*</span></label><input type="number" id="returnItemsReceived"></div>
-<div class="field"><label>Handover for Return Entry - Name <span class="req">*</span></label><select class="returnPerson" id="returnEntryBy" data-time="returnEntryTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnEntryTime" readonly></div>
+<div class="field"><label>Handover for Return Entry - Name <span class="req">*</span></label><select class="returnPerson" id="returnEntryBy" data-time="returnEntryTime"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openReturnTransferTask('returnEntryBy')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnEntryTime" readonly></div>
 </div></div></section>
 
 <section class="card"><h3>3. Return Entry</h3><div class="body"><div class="grid">
 <div class="field"><label>Item Return in Approval By <span class="req">*</span></label><select class="returnPerson" id="approvalReturnBy" data-time="approvalReturnTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="approvalReturnTime" readonly></div>
 <div class="field"><label>No. of Items Return <span class="req">*</span></label><input type="number" id="returnItemCount"></div>
 <div class="field"><label>Not Found Reason <span class="req">*</span></label><select id="notFoundReason"><option value="">Select</option><option>Sample</option><option>Collet</option><option>Party Goods</option><option>Other</option></select></div>
-<div class="field"><label>Handover to 506 - Name <span class="req">*</span></label><select class="returnPerson" id="handover506By" data-time="handover506Time"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="handover506Time" readonly></div>
+<div class="field"><label>Return to Broker <span class="req">*</span></label><select id="returnToBroker"><option value="">Select</option><option>Done</option><option>Not Required</option></select></div>
+<div class="field"><label>Handover to 506 - Name <span class="req">*</span></label><select class="returnPerson" id="handover506By" data-time="handover506Time"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openReturnTransferTask('handover506By')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="handover506Time" readonly></div>
 </div></div></section>
 
 <section class="card"><h3>4. PKT / Tag Change & Stock Closing</h3><div class="body"><div class="grid">
@@ -771,6 +774,15 @@ if(!Array.isArray(waTemplates)||!waTemplates.length){
 function saveWaTemplates(){localStorage.setItem(WA_TEMPLATE_KEY,JSON.stringify(waTemplates));}
 
 let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(localStorage.getItem(K.shipto)||'[]');let shipThrough=JSON.parse(localStorage.getItem(K.shipthrough)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let inshAmountPresets=JSON.parse(localStorage.getItem(K.inshpresets)||'null')||['0.10','0.20','0.50','0.60','0.70','1.00','2.00','3.00'];let courierNames=JSON.parse(localStorage.getItem(K.couriernames)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let api=JSON.parse(localStorage.getItem(K.api)||'{}');let notifySettings=JSON.parse(localStorage.getItem(K.notifysettings)||'{}');let editing=null,currentTab='users',waTarget=null;
+// One-time additive merge: bring in courier names asked for, without touching anyone's
+// existing custom list (only appends names that aren't already there in some form).
+(function mergeDefaultCourierNames(){
+  let added=false;
+  ['Secure','Sequel','BVC','RJ','Green Dart','Air Parcel','Neplog','Jai Mata Di','Garud','Balaji','Yogita'].forEach(n=>{
+    if(!courierNames.some(x=>String(x).trim().toLowerCase()===n.toLowerCase())){courierNames.push(n);added=true}
+  });
+  if(added)localStorage.setItem(K.couriernames,JSON.stringify(courierNames));
+})();
 const $=id=>document.getElementById(id);
 
 const DOER_MASTER_VERSION='20260819_doers_v3';
@@ -806,7 +818,10 @@ document.addEventListener('DOMContentLoaded',()=>{ensureDoerMaster();ensureUserP
   shipTo=clientMaster.map(x=>x.party);
   populate();
   const openId=new URLSearchParams(location.search).get('open');
-  if(openId){
+  if(openId && String(openId).startsWith('PR-')){
+    if(typeof openReturnRecord==='function')openReturnRecord(openId);
+    if(history.replaceState)history.replaceState(null,'',location.pathname);
+  }else if(openId){
     window._pendingOpenParcelId=openId;
     window._pendingOpenFieldId=new URLSearchParams(location.search).get('f')||null;
     const existing=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===openId);
@@ -1889,6 +1904,47 @@ function returnControls(){
 }
 function returnKey(e,i){ return e.id || e.dataset.rkey || ('r_'+i); }
 
+function returnPersonSelected(s){
+  const t=s.dataset.time?$(s.dataset.time):null;
+  if(!s.value){if(t)t.value='';saveReturn(true);return}
+  if(!canSelectWorker(s,s.value)){
+    const actor=loggedUser();
+    if(actor && isSelfOnlyField(s)){s.value=actor.id;if(t)t.value=returnNow()}
+    else{s.value='';if(t)t.value=''}
+    saveReturn(true);
+    return;
+  }
+  if(t)t.value=returnNow();
+  saveReturn(true);
+  const u=users.find(x=>x.id===s.value);
+  if(!u||!u.phone)return;
+  const label=s.closest('.field')?.querySelector('label')?.textContent.replace('*','').trim()||'Return Task';
+  sendReturnWA(u,label).catch(err=>console.error('Return WhatsApp send failed:',err));
+}
+async function sendReturnWA(u,eventName){
+  const party=$('returnFrom')?.value||'-',tm=returnNow(),rid=currentReturnId||'(New Return)';
+  const message=`↩ Parcel Return\n\nParty: ${party}\nReturn ID: ${rid}\n${eventName}: ${u.name}\nTime: ${tm}\n\nReturn update: ${eventName} completed/handed over to ${u.name}.\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(rid)}`;
+  return sendRawWA(u.phone,message);
+}
+function openReturnTransferTask(fieldId){
+  const el=$(fieldId);
+  if(!el)return;
+  const actor=loggedUser();
+  if(!actor){alert('Task transfer karne ke liye pehle login karein.');return}
+  if(el.value && el.value!==actor.id && !superAdminUnlocked){
+    alert('Sirf jis Doer ko ye task currently assigned hai (ya Super Admin), wahi ise transfer kar sakta hai.');
+    return;
+  }
+  window._transferFieldId=fieldId;
+  const label=el.closest('.field')?.querySelector('label')?.textContent.replace('*','').trim()||'Task';
+  $('transferTaskTitle').textContent='🔄 Transfer: '+label;
+  const au=users.filter(u=>u.active!==false && u.id!==el.value);
+  $('transferNewDoer').innerHTML=options(au,u=>u.id,u=>u.name);
+  $('transferReason').value='';
+  renderTransferHistoryFor(fieldId);
+  $('transferTaskModal').classList.remove('hidden');
+}
+
 
 
 function printReturn(){ saveReturn(true); window.print(); }
@@ -1898,8 +1954,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     e.dataset.rkey=e.id||('r_'+i);
     e.addEventListener('change',()=>{
       if(e.classList.contains('returnPerson')){
-        const t=e.dataset.time ? $(e.dataset.time) : null;
-        if(t)t.value=e.value?now():'';
+        returnPersonSelected(e);
+        return;
       }
       saveReturn(true);
     });
@@ -2370,12 +2426,16 @@ function fieldLabel(el){
   const lab=f&&f.querySelector('label');
   return lab?lab.textContent.replace('*','').trim():el.id;
 }
+function recordKeyForElement(el){
+  if(el && el.closest && el.closest('#returnModule'))return currentReturnId||'NEW';
+  return currentRecordKey();
+}
 function auditFieldChange(el,oldVal,newVal,action='CHANGE',reason=''){
   if(!el || oldVal===newVal)return;
   const actor=loggedUser();
   const row={
     at:new Date().toISOString(),
-    parcelId:currentRecordKey(),
+    parcelId:recordKeyForElement(el),
     userId:actor?actor.id:'',
     userName:actor?actor.name:'Not Logged In',
     fieldId:el.id||'',
@@ -2814,11 +2874,12 @@ function canSelectWorker(select,selectedId){
   }
   return true;
 }
-function logWorkerSelection(field,selectedId){
+function logWorkerSelection(field,selectedId,el){
  let actor=loggedUser(),worker=users.find(u=>u.id===selectedId);
  if(!worker)return;
  let reason=window.__transferReason||'';
- let row={at:new Date().toISOString(),parcelId:currentParcelId||'',field,enteredBy:actor?actor.name:'Unknown',workBy:worker.name};
+ let pid=el?recordKeyForElement(el):(currentParcelId||'');
+ let row={at:new Date().toISOString(),parcelId:pid,field,enteredBy:actor?actor.name:'Unknown',workBy:worker.name};
  let a=JSON.parse(localStorage.getItem(WORK_AUDIT_KEY)||'[]');a.unshift(row);localStorage.setItem(WORK_AUDIT_KEY,JSON.stringify(a));
  if(actor && actor.id!==worker.id){
    let q=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
@@ -2850,7 +2911,7 @@ function renderTransferHistoryFor(fieldId){
   const box=$('transferHistoryList');
   if(!box)return;
   const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
-  const rows=a.filter(x=>x.action==='TRANSFER'&&x.parcelId===currentRecordKey()&&x.fieldId===fieldId);
+  const rows=a.filter(x=>x.action==='TRANSFER'&&x.parcelId===recordKeyForElement($(fieldId))&&x.fieldId===fieldId);
   if(!rows.length){box.innerHTML='';return}
   box.innerHTML='<div class="note" style="margin-top:10px"><b>🔄 Pehle ke transfers is task ke liye:</b><br>'+rows.map(x=>{
     const from=users.find(u=>u.id===x.oldValue),to=users.find(u=>u.id===x.newValue);
@@ -2888,7 +2949,7 @@ document.addEventListener('change',e=>{
      return;
    }
    let label=e.target.closest('.field')?.querySelector('label')?.textContent.replace('*','').trim()||'Work By';
-   logWorkerSelection(label,e.target.value);
+   logWorkerSelection(label,e.target.value,e.target);
    applyWorkerPermissions();
  }
 });
