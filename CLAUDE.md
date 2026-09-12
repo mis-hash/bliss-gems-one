@@ -18,6 +18,15 @@ lost) can pick up exactly where the previous session left off. Read this first.
 - When asked for "link" with no other context, give the Bliss One hub link:
   https://bliss-gems-one.web.app/
 - Must stay on the Firebase **Spark (free)** plan — no paid features/APIs.
+- **Standing rule, explicitly repeated by the user multiple times — treat as inviolable:**
+  any change must be scoped ONLY to what was explicitly asked. Never touch, reset, or
+  "clean up" existing Users, Doers, Roles, or any other data as a side effect of an
+  unrelated change. Never let a change crash the app or lose data — test the actual
+  change (jsdom/vm harness at minimum) before pushing, specifically checking that
+  existing records/users/roles still load and behave exactly as before. If a change
+  risks touching shared data (Universal Users, appRoles, localStorage keys, Firestore
+  collections) beyond its own narrow feature, stop and confirm with the user first
+  instead of assuming it's fine.
 - `bliss-gems-one.web.app` itself is blocked by this environment's agent proxy, so you
   cannot browse the live site directly. Verify changes via: (a) jsdom unit tests, (b) a
   local `python3 -m http.server` serving `public/` + Playwright screenshots, (c) GitHub
