@@ -798,6 +798,7 @@ function renderTeamRolesPage(){
     return `<div class="rolerow" style="flex-wrap:wrap"><div class="avatar">${esc(teamRoleInitials(u.name))}</div><div style="flex:1;font-size:13px;font-weight:700">${esc(u.name)}<br><small style="font-weight:500;color:var(--muted)">${esc(u.username||u.id)}</small></div>
     <select class="rolesel" style="border:1px solid var(--line);background:#fff;color:var(--txt);padding:7px 9px;border-radius:6px;font-size:13px" onchange="setUserAppRole('${esc(u.id)}',this.value)">
       <option value=""${role===''?' selected':''}>No Access</option>
+      <option value="employee"${role==='employee'?' selected':''}>Employee</option>
       <option value="sales"${role==='sales'?' selected':''}>Sales</option>
       <option value="admin"${role==='admin'?' selected':''}>Admin</option>
       <option value="accounts"${role==='accounts'?' selected':''}>Accounts</option>
