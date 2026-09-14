@@ -27,6 +27,15 @@ lost) can pick up exactly where the previous session left off. Read this first.
   risks touching shared data (Universal Users, appRoles, localStorage keys, Firestore
   collections) beyond its own narrow feature, stop and confirm with the user first
   instead of assuming it's fine.
+- **Lesson from a real incident (Sept 2026, Stationery Inventory app):** removed a
+  function during a cleanup/simplification pass but missed one remaining call site to
+  it, plus one orphaned function still referencing deleted state — both were syntactically
+  valid (passed a `new Function(s)` syntax check) but threw `ReferenceError` at runtime on
+  every page load. **Whenever you remove or rename a function/variable/constant, grep the
+  ENTIRE file for that identifier afterward** to confirm nothing else still references
+  it — a syntax check alone does not catch a dangling reference to something you just
+  deleted. Do this before considering any refactor/cleanup done, every time, no
+  exceptions.
 - `bliss-gems-one.web.app` itself is blocked by this environment's agent proxy, so you
   cannot browse the live site directly. Verify changes via: (a) jsdom unit tests, (b) a
   local `python3 -m http.server` serving `public/` + Playwright screenshots, (c) GitHub
