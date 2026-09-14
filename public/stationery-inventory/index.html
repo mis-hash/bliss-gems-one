@@ -348,7 +348,7 @@ function renderGate(){
   const hasAccess=superAdminUnlocked||role==='admin'||role==='director';
   if(!hasAccess || (u.appAccess && u.appAccess[APP_SLUG]===false)){
     gateWrap.style.display='flex';appWrap.style.display='none';
-    gateBox.innerHTML=`<h3>No Access</h3><p class="note">Ye app sirf Admin ya Director role wale users ke liye hai. Access ke liye Bliss One admin se contact karein.</p>`;
+    gateBox.innerHTML=`<h3>No Access</h3>`;
     return;
   }
   gateWrap.style.display='none';appWrap.style.display='';

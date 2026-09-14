@@ -1316,13 +1316,13 @@ function renderGate(){
   const role=effectiveRole();
   if(u.appAccess && u.appAccess[APP_SLUG]===false){
     gateWrap.style.display='block';appWrap.style.display='none';
-    gateBox.innerHTML=`<h3>Access Nahi Hai</h3><p style="font-size:13px;color:var(--muted)">Aapko is app ka access nahi diya gaya hai. Bliss One admin se contact karein.</p>`;
+    gateBox.innerHTML=`<h3>No Access</h3>`;
     return;
   }
   const extraFeatures=(u.appFeatureAccess&&u.appFeatureAccess[APP_SLUG])||[];
   if(!role && !extraFeatures.length){
     gateWrap.style.display='block';appWrap.style.display='none';
-    gateBox.innerHTML=`<h3>No Access</h3><p style="font-size:13px;color:var(--muted)">Aapko is app ka access nahi diya gaya hai. Bliss One admin se contact karein.</p>`;
+    gateBox.innerHTML=`<h3>No Access</h3>`;
     return;
   }
   gateWrap.style.display='none';appWrap.style.display='';
