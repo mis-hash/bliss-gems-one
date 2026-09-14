@@ -142,6 +142,7 @@ tbody tr:hover td{background:#f7faf8}
 <button data-page="in" onclick="go('in',this)">⬇ Stock In</button>
 <button data-page="out" onclick="go('out',this)">⬆ Stock Out / Issue</button>
 <button class="superAdminOnly hidden" data-page="items" onclick="go('items',this)">🗂 Item Master</button>
+<button data-page="reports" onclick="go('reports',this)">📈 Reports</button>
 </nav>
 
 <main>
@@ -224,6 +225,37 @@ tbody tr:hover td{background:#f7faf8}
       <div class="pb" id="itemList"></div>
     </div>
   </section>
+
+  <section class="page" id="page-reports">
+    <div class="panel">
+      <div class="ph"><span>Reports &amp; Insights</span></div>
+      <div class="pb">
+        <div class="grid">
+          <div class="field"><label>From</label><input type="date" id="repFrom" onchange="renderReports()"></div>
+          <div class="field"><label>To</label><input type="date" id="repTo" onchange="renderReports()"></div>
+        </div>
+        <div id="repSummary" style="margin-top:10px"></div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" onclick="exportStockInCSV()">⬇ Export Stock In CSV</button>
+          <button class="btn" onclick="exportStockOutCSV()">⬆ Export Stock Out CSV</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span>Item-wise Issue Breakdown</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Item</th><th class="num">Qty Issued</th></tr></thead>
+        <tbody id="repItemTable"></tbody>
+      </table></div></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span>Category-wise Issue Breakdown</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Category</th><th class="num">Qty Issued</th></tr></thead>
+        <tbody id="repCatTable"></tbody>
+      </table></div></div>
+    </div>
+  </section>
 </main>
 </div>
 </div>
@@ -233,6 +265,7 @@ tbody tr:hover td{background:#f7faf8}
 <button data-page="in" onclick="go('in',this)"><span>⬇</span>Stock In</button>
 <button data-page="out" onclick="go('out',this)"><span>⬆</span>Stock Out</button>
 <button class="superAdminOnly hidden" data-page="items" onclick="go('items',this)"><span>🗂</span>Items</button>
+<button data-page="reports" onclick="go('reports',this)"><span>📈</span>Reports</button>
 </div>
 
 <!-- Login modal -->
@@ -346,8 +379,22 @@ function startUsersSync(){
   if(usersStarted||!db)return;usersStarted=true;
   db.collection(UU_COLLECTION).onSnapshot(snap=>{users=[];snap.forEach(d=>users.push(d.data()));renderAll();},err=>console.error('users sync error',err));
 }
+let itemsSeedChecked=false;
+function seedStarterItemsIfEmpty(){
+  if(itemsSeedChecked||!db)return;itemsSeedChecked=true;
+  db.collection('si_items').limit(1).get().then(snap=>{
+    if(!snap.empty)return; // already has real data - never overwrite
+    const starters=[
+      {name:'Pen',category:'Writing',unit:'Pcs',min:20,stock:0},
+      {name:'Pencil',category:'Writing',unit:'Pcs',min:20,stock:0},
+      {name:'Notepad',category:'Paper',unit:'Pcs',min:10,stock:0}
+    ];
+    starters.forEach(it=>db.collection('si_items').add(it).catch(e=>console.error('starter item seed failed',e)));
+  }).catch(e=>console.error('items seed check failed',e));
+}
 function startItemsSync(){
   if(itemsStarted||!db)return;itemsStarted=true;
+  seedStarterItemsIfEmpty();
   db.collection('si_items').onSnapshot(snap=>{items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));renderAll();},err=>console.error('items sync error',err));
 }
 function startLogsSync(){
@@ -355,8 +402,17 @@ function startLogsSync(){
   db.collection('si_stock_in').orderBy('date','desc').limit(200).onSnapshot(snap=>{inLog=[];snap.forEach(d=>inLog.push({id:d.id,...d.data()}));renderAll();},err=>console.error('stock-in sync error',err));
   db.collection('si_stock_out').orderBy('date','desc').limit(200).onSnapshot(snap=>{outLog=[];snap.forEach(d=>outLog.push({id:d.id,...d.data()}));renderAll();},err=>console.error('stock-out sync error',err));
 }
+let mastersSeedChecked=false;
+function seedStarterMastersIfEmpty(){
+  if(mastersSeedChecked||!db)return;mastersSeedChecked=true;
+  db.collection('si_settings').doc('masters').get().then(doc=>{
+    if(doc.exists)return; // already configured - never overwrite
+    db.collection('si_settings').doc('masters').set({categories:['Writing','Paper'],units:['Pcs','Box','Ream','Packet'],vendors:[]}).catch(e=>console.error('masters seed failed',e));
+  }).catch(e=>console.error('masters seed check failed',e));
+}
 function startMastersSync(){
   if(mastersStarted||!db)return;mastersStarted=true;
+  seedStarterMastersIfEmpty();
   db.collection('si_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={categories:[],units:[],vendors:[],...doc.data()};renderAll();},err=>console.error('masters sync error',err));
   db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed',e));
 }
@@ -377,6 +433,11 @@ function notifyLowStock(item){
   const admins=users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
   const msg=`⚠ Low Stock Alert\n\nItem: ${item.name}\nIn Hand: ${item.stock} ${item.unit||''}\nMinimum Level: ${item.min}\n\nRestock karwana zaroori hai.`;
   admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('low stock WA failed:',e)));
+}
+function notifyIssue(item,qty,toUserId,byUserId){
+  const admins=users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
+  const msg=`📦 Stock Issued\n\nItem: ${item.name}\nQty: ${qty} ${item.unit||''}\nIssued To: ${nameOfUserId(toUserId)}\nBy: ${nameOfUserId(byUserId)}`;
+  admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('issue WA failed:',e)));
 }
 
 /* ===== Nav / gate ===== */
@@ -477,6 +538,7 @@ async function addStockOut(){
   await db.collection('si_items').doc(item).update({stock:firebase.firestore.FieldValue.increment(-qty)});
   $('outQty').value='';$('outPurpose').value='';
   toast('Stock issued');
+  if(it)notifyIssue(it,qty,to,actor?actor.id:'');
   if(it && (it.stock||0)-qty<=(it.min||0))notifyLowStock({...it,stock:(it.stock||0)-qty});
 }
 async function addItem(){
@@ -531,6 +593,47 @@ function setUserRole(userId,role){
   db.collection(UU_COLLECTION).doc(userId).update(patch).catch(e=>console.error('role save failed',e));
 }
 
+/* ===== Reports ===== */
+function reportRange(){ return {from:$('repFrom')?.value||'',to:$('repTo')?.value||''}; }
+function inRange(dateStr,from,to){
+  if(from && dateStr<from)return false;
+  if(to && dateStr>to)return false;
+  return true;
+}
+function renderReports(){
+  if(!$('repItemTable'))return;
+  const {from,to}=reportRange();
+  const outF=outLog.filter(x=>inRange(String(x.date||''),from,to));
+  const inF=inLog.filter(x=>inRange(String(x.date||''),from,to));
+  $('repSummary').innerHTML=`<div class="cards"><div class="card"><small>STOCK IN</small><b>${inF.reduce((s,x)=>s+(x.qty||0),0)}</b></div><div class="card"><small>STOCK OUT</small><b>${outF.reduce((s,x)=>s+(x.qty||0),0)}</b></div></div>`;
+  const byItem={};
+  outF.forEach(x=>{const n=itemName(x.item);byItem[n]=(byItem[n]||0)+(x.qty||0);});
+  const itemRows=Object.entries(byItem).sort((a,b)=>b[1]-a[1]);
+  $('repItemTable').innerHTML=itemRows.map(([n,q])=>`<tr><td>${esc(n)}</td><td class="num">${q}</td></tr>`).join('')||`<tr><td colspan="2"><div class="emptystate">📈<p>Is range mein koi issue nahi hua.</p></div></td></tr>`;
+  const byCat={};
+  outF.forEach(x=>{const it=items.find(i=>i.id===x.item);const cat=(it&&it.category)||'Other';byCat[cat]=(byCat[cat]||0)+(x.qty||0);});
+  const catRows=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  $('repCatTable').innerHTML=catRows.map(([c,q])=>`<tr><td>${esc(c)}</td><td class="num">${q}</td></tr>`).join('')||`<tr><td colspan="2"><div class="emptystate">📈<p>Is range mein koi issue nahi hua.</p></div></td></tr>`;
+}
+function downloadCSV(filename,rows){
+  const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+function exportStockInCSV(){
+  const {from,to}=reportRange();
+  const rows=[['Date','Item','Qty','Vendor','By']];
+  inLog.filter(x=>inRange(String(x.date||''),from,to)).forEach(x=>rows.push([x.date,itemName(x.item),x.qty,x.vendor||'',nameOfUserId(x.by)]));
+  downloadCSV('stock-in-report.csv',rows);
+}
+function exportStockOutCSV(){
+  const {from,to}=reportRange();
+  const rows=[['Date','Item','Qty','Issued To','By','Purpose']];
+  outLog.filter(x=>inRange(String(x.date||''),from,to)).forEach(x=>rows.push([x.date,itemName(x.item),x.qty,nameOfUserId(x.to),nameOfUserId(x.by),x.purpose||'']));
+  downloadCSV('stock-out-report.csv',rows);
+}
+
 /* ===== Toast ===== */
 let toastTimer=null;
 function toast(msg){
@@ -548,12 +651,15 @@ function renderAll(){
   renderSelects();
   renderLogs();
   renderItems();
+  renderReports();
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
   currentUser=localStorage.getItem(SESSION_KEY)||null;
   if($('inDate'))$('inDate').value=todayISO();
   if($('outDate'))$('outDate').value=todayISO();
+  if($('repFrom'))$('repFrom').value=todayISO().slice(0,8)+'01';
+  if($('repTo'))$('repTo').value=todayISO();
   startUsersSync();
   startItemsSync();
   startLogsSync();
