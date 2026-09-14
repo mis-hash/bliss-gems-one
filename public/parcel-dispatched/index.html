@@ -3207,6 +3207,10 @@ function logWorkerSelection(field,selectedId,el){
  let fieldId=el?el.id:'';
  let row={at:new Date().toISOString(),parcelId:pid,field,enteredBy:actor?actor.name:'Unknown',workBy:worker.name};
  let a=JSON.parse(localStorage.getItem(WORK_AUDIT_KEY)||'[]');a.unshift(row);localStorage.setItem(WORK_AUDIT_KEY,JSON.stringify(a));
+ // Parcel Given By is the initiator, not someone a task is being handed to - same exclusion
+ // personChanged()/sendBackgroundWA() already applies, missing here until now, which is why
+ // this field was still queuing/sending its own "select kiya hai" reminder message.
+ if(fieldId==='parcelGivenBy')return;
  if(actor && actor.id!==worker.id){
    const everyMin=notifySettings.transferReminderMinutes||30;
    const intro=reason
