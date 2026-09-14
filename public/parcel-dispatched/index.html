@@ -259,6 +259,7 @@ if(window.self!==window.top){
 <select id="dispatchPartyFilter" onchange="renderHistory()"><option value="">All Parties</option></select>
 <select id="dispatchCourierFilter" onchange="renderHistory()"><option value="">All Couriers</option></select>
 <select id="dispatchStatusFilter" onchange="renderHistory()"><option value="">All Status</option></select>
+<select id="dispatchDoerFilter" onchange="renderHistory()"><option value="">All Doers (Pending With)</option></select>
 <input type="date" id="dispatchDateFrom" onchange="renderHistory()" title="From Date">
 <input type="date" id="dispatchDateTo" onchange="renderHistory()" title="To Date">
 <button class="btn secondary small" type="button" onclick="clearDispatchFilters()">Clear Filters</button>
@@ -267,7 +268,7 @@ if(window.self!==window.top){
 <div class="recordSummary" id="dispatchRecordSummary"></div>
 <label id="hideEmptyDraftsWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="hideEmptyDrafts" onchange="renderHistory()" style="width:auto"> Hide empty drafts (<span id="hideEmptyDraftsCount">0</span>)</label>
 <label id="showDeletedDispatchWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="showDeletedDispatch" onchange="renderHistory()" style="width:auto"> 🗑 Show Deleted (<span id="deletedDispatchCount">0</span>)</label>
-<div class="table desktopRecords"><table><thead><tr><th>Parcel ID</th><th>Date</th><th>Ship To</th><th>Slip Owner</th><th>Courier</th><th>Broker</th><th>AWB</th><th>Status</th><th>Action</th></tr></thead><tbody id="history"></tbody></table></div>
+<div class="table desktopRecords"><table><thead><tr><th>Parcel ID</th><th>Date</th><th>Ship To</th><th>Slip Owner</th><th>Courier</th><th>Broker</th><th>AWB</th><th>Pending With</th><th>Status</th><th>Action</th></tr></thead><tbody id="history"></tbody></table></div>
 <div id="dispatchMobileCards" class="mobileRecordCards"></div>
 </div></section>
 </div>
@@ -842,7 +843,8 @@ document.addEventListener('DOMContentLoaded',()=>{ensureDoerMaster();ensureUserP
   populate();
   const openId=new URLSearchParams(location.search).get('open');
   if(openId && String(openId).startsWith('PR-')){
-    if(typeof openReturnRecord==='function')openReturnRecord(openId);
+    const openFieldId=new URLSearchParams(location.search).get('f')||null;
+    if(typeof openReturnRecord==='function')openReturnRecord(openId,openFieldId);
     if(history.replaceState)history.replaceState(null,'',location.pathname);
   }else if(openId){
     window._pendingOpenParcelId=openId;
@@ -923,8 +925,8 @@ function personChanged(s){
     if(owner&&owner.phone&&owner.id!==u.id){
       const parcel=editing||currentParcelId||'(New Parcel)',party=$('shipTo')?.value||'-';
       const msg=s.id==='itemPackedBy'
-        ?`📦 Parcel Pack Ho Gaya\n\nParcel ID: ${parcel}\nParty: ${party}\nPacked By: ${u.name}\nTime: ${now()}\n\n👉 ${parcelOpenLink(parcel)}`
-        :`🚚 Parcel Dispatch Ho Gaya\n\nParcel ID: ${parcel}\nParty: ${party}\nCourier: ${$('courierName')?.value||'-'}\nHandover By: ${u.name}\nTime: ${now()}\n\n👉 ${parcelOpenLink(parcel)}`;
+        ?`📦 Parcel Pack Ho Gaya\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nPacked By: ${u.name}\nTime: ${now()}\n\n👉 ${parcelOpenLink(parcel)}`
+        :`🚚 Parcel Dispatch Ho Gaya\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nCourier: ${$('courierName')?.value||'-'}\nShip Through: ${$('shipThrough')?.value||'-'}\nAWB No: ${$('awbNo')?.value||'-'}\nInsurance Amount: ${$('inshAmount')?.value||'-'}\nHandover By: ${u.name}\nTime: ${now()}\n\n👉 ${parcelOpenLink(parcel)}`;
       sendRawWA(owner.phone,msg).catch(err=>console.error('Slip owner milestone WA failed:',err));
     }
   }
@@ -1301,8 +1303,25 @@ function inDateRange(v,from,to){
   return true;
 }
 function clearDispatchFilters(){
- ['search','dispatchPartyFilter','dispatchCourierFilter','dispatchStatusFilter','dispatchDateFrom','dispatchDateTo'].forEach(id=>{if($(id))$(id).value=''});
+ ['search','dispatchPartyFilter','dispatchCourierFilter','dispatchStatusFilter','dispatchDoerFilter','dispatchDateFrom','dispatchDateTo'].forEach(id=>{if($(id))$(id).value=''});
  renderHistory();
+}
+// Which Doer a still-pending record is currently waiting on, derived from the live WhatsApp
+// transfer-reminder queue (pd_whatsapp_queue_v1) - the same queue that drives the recurring
+// reminders, so "pending with" here always matches who's actually being reminded. Falls back
+// to nothing (no badge) for records with no active queue entry (e.g. very old records from
+// before this queue existed, or a stage that isn't a worker-selection field).
+function pendingWithMap(){
+  const q=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
+  const map={};
+  q.forEach(item=>{
+    if(item.status!=='PENDING')return;
+    const existing=map[item.parcelId];
+    if(!existing||new Date(item.createdAt||0)>new Date(existing.createdAt||0)){
+      map[item.parcelId]={toUserId:item.toUserId,createdAt:item.createdAt};
+    }
+  });
+  return map;
 }
 function renderHistory(){
  refreshDashboardButtonVisibility();
@@ -1312,19 +1331,25 @@ function renderHistory(){
  if($('deletedDispatchCount'))$('deletedDispatchCount').textContent=deletedCount;
  const showDeleted=$('showDeletedDispatch')&&$('showDeletedDispatch').checked;
  all=showDeleted?all.filter(x=>x.deletedAt):all.filter(x=>!x.deletedAt);
- let partyCur=$('dispatchPartyFilter')?.value||'',courierCur=$('dispatchCourierFilter')?.value||'',statusCur=$('dispatchStatusFilter')?.value||'';
+ let partyCur=$('dispatchPartyFilter')?.value||'',courierCur=$('dispatchCourierFilter')?.value||'',statusCur=$('dispatchStatusFilter')?.value||'',doerCur=$('dispatchDoerFilter')?.value||'';
  fillRecordFilter('dispatchPartyFilter',uniqueSorted(all.map(x=>x.shipTo)),partyCur,'All Parties');
  fillRecordFilter('dispatchCourierFilter',uniqueSorted(all.map(x=>x.courierName||x.shipThrough)),courierCur,'All Couriers');
  fillRecordFilter('dispatchStatusFilter',uniqueSorted(all.map(x=>x.shippingFinalStatus||x.status)),statusCur,'All Status');
+ const pendingWith=pendingWithMap();
+ if($('dispatchDoerFilter')){
+   const au=users.filter(u=>u.active!==false);
+   $('dispatchDoerFilter').innerHTML='<option value="">All Doers (Pending With)</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===doerCur?' selected':''}>${esc(u.name)}</option>`).join('');
+ }
 
  let q=($('search')?.value||'').trim().toLowerCase();
- let party=$('dispatchPartyFilter')?.value||'',courier=$('dispatchCourierFilter')?.value||'',status=$('dispatchStatusFilter')?.value||'';
+ let party=$('dispatchPartyFilter')?.value||'',courier=$('dispatchCourierFilter')?.value||'',status=$('dispatchStatusFilter')?.value||'',doer=$('dispatchDoerFilter')?.value||'';
  let from=$('dispatchDateFrom')?.value||'',to=$('dispatchDateTo')?.value||'';
 
  let a=all.filter(x=>{
    let c=x.courierName||x.shipThrough||'',s=x.shippingFinalStatus||x.status||'',d=x.shippingDate||x.dispatchDate||'';
    let text=`${x.parcelId||''} ${slipLabel(x)} ${x.shipTo||''} ${c} ${x.broker||''} ${x.awbNo||''} ${s}`.toLowerCase();
-   return (!q||text.includes(q))&&(!party||x.shipTo===party)&&(!courier||c===courier)&&(!status||s===status)&&inDateRange(d,from,to);
+   const pw=pendingWith[x.parcelId];
+   return (!q||text.includes(q))&&(!party||x.shipTo===party)&&(!courier||c===courier)&&(!status||s===status)&&(!doer||(pw&&pw.toUserId===doer))&&inDateRange(d,from,to);
  });
  a.sort((x,y)=>(isRecordPending(x.parcelId)?0:1)-(isRecordPending(y.parcelId)?0:1));
  let pendingCount=a.filter(x=>isRecordPending(x.parcelId)).length;
@@ -1349,8 +1374,9 @@ function renderHistory(){
    ?`<button class="btn secondary" style="margin-top:6px" onclick="restoreDispatchRecord('${esc(x.parcelId||'')}')">↩ Restore</button>`
    :`<button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button>${loggedUser()?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑 Delete</button>`:''}`;
  const slipOwnerName=x=>{const u=users.find(u=>u.id===x.slipFillBy);return u?u.name:''};
- $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(slipOwnerName(x))}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td>${dispatchAction(x)}</td></tr>`}).join(''):'<tr><td colspan="9">No records.</td></tr>';
- if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Slip Owner</small><strong>${esc(slipOwnerName(x)||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div></div>${dispatchActionCard(x)}</div>`}).join(''):'<div class="note">No records.</div>';
+ const pendingWithName=x=>{const pw=pendingWith[x.parcelId];if(!pw)return'';const u=users.find(u=>u.id===pw.toUserId);return u?u.name:''};
+ $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);const pwName=pendingWithName(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(slipOwnerName(x))}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend&&pwName?`<b>${esc(pwName)}</b>`:dash(pwName)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td>${dispatchAction(x)}</td></tr>`}).join(''):'<tr><td colspan="10">No records.</td></tr>';
+ if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);const pwName=pendingWithName(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Slip Owner</small><strong>${esc(slipOwnerName(x)||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div>${pwName?`<div><small>Pending With</small><strong>${esc(pwName)}</strong></div>`:''}</div>${dispatchActionCard(x)}</div>`}).join(''):'<div class="note">No records.</div>';
  renderDashboard();
 }
 // Analytics Dashboard is Admin/Director-only — either the shared Super Admin unlock, or
@@ -2108,11 +2134,11 @@ function returnPersonSelected(s){
   const u=users.find(x=>x.id===s.value);
   if(!u||!u.phone)return;
   const label=s.closest('.field')?.querySelector('label')?.textContent.replace('*','').trim()||'Return Task';
-  sendReturnWA(u,label).catch(err=>console.error('Return WhatsApp send failed:',err));
+  sendReturnWA(u,label,s.id).catch(err=>console.error('Return WhatsApp send failed:',err));
 }
-async function sendReturnWA(u,eventName){
+async function sendReturnWA(u,eventName,fieldId){
   const party=$('returnFrom')?.value||'-',tm=returnNow(),rid=currentReturnId||'(New Return)';
-  const message=`↩ Parcel Return\n\nParty: ${party}\nReturn ID: ${rid}\n${eventName}: ${u.name}\nTime: ${tm}\n\nReturn update: ${eventName} completed/handed over to ${u.name}.\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(rid)}`;
+  const message=`↩ Naya Task — Parcel Return\n\nParty: ${party}\nReturn ID: ${rid}\nTask: ${eventName}\nAssign kiya gaya: ${u.name}\nTime: ${tm}\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(rid,fieldId)}`;
   return sendRawWA(u.phone,message);
 }
 function openReturnTransferTask(fieldId){
@@ -2313,7 +2339,7 @@ function renderAllRecords(filter){
  $('allRecordsBody').innerHTML=a.length?a.map(x=>`<tr><td><b>${x.type}</b></td><td>${esc(x.label||'')}</td><td>${esc(x.date||'')}</td><td>${esc(x.party||'')}</td><td>${esc(x.status||'')}</td><td>${x.saved?new Date(x.saved).toLocaleString('en-IN'):''}</td><td><button class="btn small secondary" onclick="${x.type==='DISPATCH'?`openDispatchRecord('${x.id}')`:`openReturnRecord('${x.id}')`}">Open</button></td></tr>`).join(''):'<tr><td colspan="7">No saved records.</td></tr>';
 }
 function openDispatchRecord(id){closeAllRecords();switchModule('dispatch');editRecord(id)}
-function openReturnRecord(id){
+function openReturnRecord(id,fieldId){
  let a=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]'),r=a.find(x=>x.returnId===id);if(!r)return;
  closeAllRecords();switchModule('return');currentReturnId=id;
  returnControls().forEach((e,i)=>{let k=e.dataset.rkey||('r_'+i);e.value=r[k]??''});
@@ -2323,6 +2349,8 @@ function openReturnRecord(id){
  if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+slipLabel(r);
  showReturnFormView();
  applyReturnSequenceAndLocks();
+ const target=fieldId?$(fieldId):null;
+ if(target)target.scrollIntoView({behavior:'smooth',block:'center'});else scrollTo({top:0,behavior:'smooth'});
  toast('Return opened: '+id);
 }
 
@@ -3145,7 +3173,10 @@ function logWorkerSelection(field,selectedId,el){
  let a=JSON.parse(localStorage.getItem(WORK_AUDIT_KEY)||'[]');a.unshift(row);localStorage.setItem(WORK_AUDIT_KEY,JSON.stringify(a));
  if(actor && actor.id!==worker.id){
    const everyMin=notifySettings.transferReminderMinutes||30;
-   const msg=(reason?`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} ka task aapko transfer kiya hai. Reason: ${reason}.`:`Parcel ${row.parcelId||''}: ${actor.name} ne ${field} me aapka naam select kiya hai.`)+` Task pending hone tak reminder har ${everyMin} minute.`+`\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(row.parcelId)}`;
+   const intro=reason
+     ? `${actor.name} ne aapko '${field}' ka task transfer kiya hai.\nReason: ${reason}`
+     : `${actor.name} ne aapko '${field}' ka naya task assign kiya hai.`;
+   const msg=`📦 Naya Task — Parcel ${row.parcelId||''}\n\n${intro}\n\n⏰ Jab tak task pending rahega, har ${everyMin} minute reminder aayega.\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(row.parcelId,fieldId)}`;
    let q=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
    q.unshift({createdAt:row.at,toUserId:worker.id,toPhone:worker.phone,parcelId:row.parcelId,stage:fieldId,status:'PENDING',reminderEveryMinutes:everyMin,message:msg,lastSentAt:''});
    localStorage.setItem(WA_QUEUE_KEY,JSON.stringify(q));
