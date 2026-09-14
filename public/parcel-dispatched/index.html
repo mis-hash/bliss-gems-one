@@ -132,6 +132,7 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 <style id="super-admin-privacy-style">
 #secretAdminLogo{cursor:default;user-select:none}
 .superAdminOnly.hidden{display:none!important}
+.superAdminStrict.hidden{display:none!important}
 #superAdminModal input{letter-spacing:.08em}
 </style>
 
@@ -217,7 +218,7 @@ body.pd-force-mobile #headerMoreMenu .btn{width:100%;text-align:left}
 <button class="btn secondary" id="desktopViewBtn" onclick="toggleDesktopView()" title="Switch between mobile and desktop layout">🖥 Desktop View</button>
 <button class="btn secondary" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄 Refresh</button>
 <button class="btn secondary hidden" id="changePasswordBtn" onclick="openChangePassword()">🔑 Change Password</button>
-<button class="btn secondary superAdminOnly hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button>
+<button class="btn secondary superAdminStrict hidden" onclick="openWhatsAppCenter()">💬 WhatsApp</button>
 <button class="btn secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button>
 <button class="btn secondary superAdminOnly hidden" onclick="openAuditTrail()">📜 Audit Trail</button>
 </div>
@@ -3308,6 +3309,10 @@ function closeSuperAdminLogin(){
 }
 function setSuperAdminVisibility(show){
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.toggle('hidden',!show));
+  // .superAdminStrict is a stricter tier than .superAdminOnly: it never opens up to the
+  // Admin/Director role bypass (e.g. WhatsApp Message Center's bulk-broadcast capability) -
+  // always keyed to the real superAdminUnlocked flag, regardless of what "show" was passed.
+  document.querySelectorAll('.superAdminStrict').forEach(el=>el.classList.toggle('hidden',!superAdminUnlocked));
 }
 // Universal Users / Masters panel: Super Admin always sees it, and so does any Doer whose
 // own parcel-dispatched role is admin or director - same role check already used to gate the
