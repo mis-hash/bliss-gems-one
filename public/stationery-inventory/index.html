@@ -42,6 +42,10 @@
 body{background:var(--bg);color:var(--t);font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;margin:0;-webkit-font-smoothing:antialiased}
 h1,h2,h3{text-wrap:balance}
 .wrap{max-width:1040px;margin:0 auto;padding:24px 20px 100px}
+.pagehead{margin-bottom:18px}
+.pagehead h1{font-size:23px;font-weight:800;margin:0 0 4px;letter-spacing:-.02em}
+.pagehead p{margin:0;color:var(--m);font-size:13.5px}
+.tabicon{display:inline-block;margin-right:2px}
 header{display:flex;align-items:center;gap:14px;padding:14px 22px;background:var(--surface);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:20;box-shadow:var(--shadow-sm)}
 .logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;font-size:19px;color:#fff;font-weight:800;flex:none;box-shadow:0 3px 8px rgba(38,143,118,.35)}
 .brandtext b{font-size:16px;display:block;font-weight:700;letter-spacing:-.01em}
@@ -65,11 +69,16 @@ header{display:flex;align-items:center;gap:14px;padding:14px 22px;background:var
 .page.on{display:block;animation:fadeIn .25s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px}
-.stat{background:var(--surface);border:1px solid var(--b);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card)}
+.stat{background:var(--surface);border:1px solid var(--b);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card);position:relative}
+.staticon{width:34px;height:34px;border-radius:10px;background:var(--mint);color:var(--p-dark);display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:12px}
 .stat small{color:var(--m);font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .stat b{display:block;font-size:30px;margin-top:8px;font-variant-numeric:tabular-nums;font-weight:800;letter-spacing:-.02em}
 .stat.warn{background:var(--warn-bg);border-color:#f0dfa8}
+.stat.warn .staticon{background:#f5e5a8;color:var(--warn)}
 .stat.warn b{color:var(--warn)}
+.emptystate{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;text-align:center;font-size:24px}
+.emptystate p{font-size:13.5px;font-weight:600;color:var(--t);margin:10px 0 2px}
+.emptystate small{color:var(--m);font-size:12px}
 .card{background:var(--surface);border:1px solid var(--b);border-radius:var(--radius);margin-bottom:20px;overflow:hidden;box-shadow:var(--shadow-card)}
 .card h3{margin:0;padding:18px 22px;font-size:15px;font-weight:700;border-bottom:1px solid var(--b-soft);letter-spacing:-.01em}
 .card .body{padding:22px}
@@ -123,11 +132,15 @@ tbody tr:hover{background:var(--mint2)}
 </header>
 
 <div class="wrap">
+  <div class="pagehead">
+    <h1 id="pageTitle">Dashboard</h1>
+    <p id="pageDesc">Live stock levels aur is mahine ki activity, ek nazar mein.</p>
+  </div>
   <div class="tabs">
-    <button class="tab on" data-page="dash" onclick="go('dash',this)">📊 Dashboard</button>
-    <button class="tab" data-page="in" onclick="go('in',this)">⬇ Stock In</button>
-    <button class="tab" data-page="out" onclick="go('out',this)">⬆ Stock Out / Issue</button>
-    <button class="tab superAdminOnly hidden" data-page="items" onclick="go('items',this)">🗂 Item Master</button>
+    <button class="tab on" data-page="dash" data-title="Dashboard" data-desc="Live stock levels aur is mahine ki activity, ek nazar mein." onclick="go('dash',this)"><span class="tabicon">📊</span> Dashboard</button>
+    <button class="tab" data-page="in" data-title="Stock In" data-desc="Naya stock aane par yahan entry karein." onclick="go('in',this)"><span class="tabicon">⬇</span> Stock In</button>
+    <button class="tab" data-page="out" data-title="Stock Out / Issue" data-desc="Kisi Doer ko item issue karte waqt yahan entry karein." onclick="go('out',this)"><span class="tabicon">⬆</span> Stock Out / Issue</button>
+    <button class="tab superAdminOnly hidden" data-page="items" data-title="Item Master" data-desc="Naye items add karein aur minimum stock level set karein." onclick="go('items',this)"><span class="tabicon">🗂</span> Item Master</button>
   </div>
 
   <section class="page on" id="page-dash">
@@ -357,7 +370,11 @@ function go(id,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tab[data-page]').forEach(t=>t.classList.remove('on'));
   $('page-'+id).classList.add('on');
-  if(btn)btn.classList.add('on');
+  if(btn){
+    btn.classList.add('on');
+    if($('pageTitle'))$('pageTitle').textContent=btn.dataset.title||'';
+    if($('pageDesc'))$('pageDesc').textContent=btn.dataset.desc||'';
+  }
 }
 function renderGate(){
   const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
@@ -397,16 +414,16 @@ function renderDash(){
   const inThisMonth=inLog.filter(x=>String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
   const outThisMonth=outLog.filter(x=>String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
   const tiles=[
-    {label:'Total Items',val:items.length},
-    {label:'Low Stock Alerts',val:low,warn:low>0},
-    {label:'Stock In (This Month)',val:inThisMonth},
-    {label:'Stock Out (This Month)',val:outThisMonth}
+    {label:'Total Items',val:items.length,icon:'🗂'},
+    {label:'Low Stock Alerts',val:low,warn:low>0,icon:'⚠'},
+    {label:'Stock In (This Month)',val:inThisMonth,icon:'⬇'},
+    {label:'Stock Out (This Month)',val:outThisMonth,icon:'⬆'}
   ];
-  $('statTiles').innerHTML=tiles.map(t=>`<div class="stat${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+  $('statTiles').innerHTML=tiles.map(t=>`<div class="stat${t.warn?' warn':''}"><div class="staticon">${t.icon}</div><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
   $('stockTable').innerHTML=items.map(x=>{
     const isLow=x.stock<=x.min;
     return `<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category||'-')}</td><td class="num">${x.stock||0} ${esc(x.unit||'')}</td><td class="num">${x.min||0}</td><td><span class="pill ${isLow?'low':'ok'}">${isLow?'⚠ Low Stock':'✓ OK'}</span></td></tr>`;
-  }).join('')||'<tr><td colspan="5" class="note">Koi item nahi hai. Item Master se add karein.</td></tr>';
+  }).join('')||`<tr><td colspan="5"><div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Item Master se naya item add karein.</small></div></td></tr>`;
 }
 function renderSelects(){
   const opts=items.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
@@ -420,14 +437,14 @@ function renderSelects(){
 }
 function nameOfUserId(id){return (users.find(x=>x.id===id)||{}).name||id}
 function renderLogs(){
-  $('inHistory').innerHTML=inLog.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(itemName(x.item))}</td><td class="num">+${x.qty}</td><td>${esc(x.vendor||'-')}</td><td>${esc(nameOfUserId(x.by))}</td></tr>`).join('')||'<tr><td colspan="5" class="note">Koi entry nahi.</td></tr>';
-  $('outHistory').innerHTML=outLog.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(itemName(x.item))}</td><td class="num">-${x.qty}</td><td>${esc(nameOfUserId(x.to))}</td><td>${esc(nameOfUserId(x.by))}</td></tr>`).join('')||'<tr><td colspan="5" class="note">Koi entry nahi.</td></tr>';
+  $('inHistory').innerHTML=inLog.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(itemName(x.item))}</td><td class="num">+${x.qty}</td><td>${esc(x.vendor||'-')}</td><td>${esc(nameOfUserId(x.by))}</td></tr>`).join('')||`<tr><td colspan="5"><div class="emptystate">⬇<p>Koi Stock In entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
+  $('outHistory').innerHTML=outLog.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(itemName(x.item))}</td><td class="num">-${x.qty}</td><td>${esc(nameOfUserId(x.to))}</td><td>${esc(nameOfUserId(x.by))}</td></tr>`).join('')||`<tr><td colspan="5"><div class="emptystate">⬆<p>Koi Stock Out entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
 }
 function renderItems(){
   $('itemList').innerHTML=items.map(x=>{
     const isLow=x.stock<=x.min;
     return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span></div>`;
-  }).join('')||'<div class="note" style="padding:14px">Koi item nahi hai.</div>';
+  }).join('')||`<div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Upar se pehla item add karein.</small></div>`;
 }
 
 async function addStockIn(){
