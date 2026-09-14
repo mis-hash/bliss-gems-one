@@ -26,141 +26,147 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{
-  --p:#268F76;--p2:#3FAF93;--p-dark:#1B6E58;--mint:#E8F8F2;--mint2:#F3FBF8;
-  --bg:#F3F6F4;--surface:#ffffff;--b:#E2E9E5;--b-soft:#EDF2EF;
-  --t:#17211B;--m:#6B7A72;--m2:#8B978F;
-  --danger:#C0392B;--danger-bg:#FCEBE9;--warn:#B8860B;--warn-bg:#FDF3D9;
-  --shadow-sm:0 1px 2px rgba(23,33,27,.05);
-  --shadow-card:0 1px 3px rgba(23,33,27,.06),0 1px 2px rgba(23,33,27,.04);
-  --shadow-lift:0 10px 30px rgba(23,33,27,.10);
-  --radius:16px;--radius-sm:10px
-}
-*{box-sizing:border-box}
-body{background:var(--bg);color:var(--t);font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;margin:0;-webkit-font-smoothing:antialiased}
-h1,h2,h3{text-wrap:balance}
-.wrap{max-width:1040px;margin:0 auto;padding:24px 20px 100px}
-.pagehead{margin-bottom:18px}
-.pagehead h1{font-size:23px;font-weight:800;margin:0 0 4px;letter-spacing:-.02em}
-.pagehead p{margin:0;color:var(--m);font-size:13.5px}
-.tabicon{display:inline-block;margin-right:2px}
-header{display:flex;align-items:center;gap:14px;padding:14px 22px;background:var(--surface);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:20;box-shadow:var(--shadow-sm)}
-.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;font-size:19px;color:#fff;font-weight:800;flex:none;box-shadow:0 3px 8px rgba(38,143,118,.35)}
-.brandtext b{font-size:16px;display:block;font-weight:700;letter-spacing:-.01em}
-.brandtext small{color:var(--m);font-size:12px}
-#loginBadge{font-size:13px;font-weight:600;color:var(--p-dark);background:var(--mint);padding:6px 12px;border-radius:20px}
-.btn{border:1px solid var(--b);background:var(--surface);color:var(--t);padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s,box-shadow .15s}
-.btn:hover{box-shadow:var(--shadow-sm)}
-.btn.primary{background:var(--p);border-color:var(--p);color:#fff}
-.btn.primary:hover{background:var(--p-dark);border-color:var(--p-dark)}
-.btn.secondary{background:var(--surface)}
-.btn.small{padding:6px 11px;font-size:12px;border-radius:8px}
-.btn.danger{background:var(--surface);color:var(--danger);border-color:var(--danger-bg)}
-.btn.danger:hover{background:var(--danger-bg)}
+/* Same design system as the Trip Expense app, so all Bliss apps read as one family. */
+:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
+*{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit}
+h1,h2,h3,.card b,.tabular{font-family:'Manrope',sans-serif}
 .hidden{display:none!important}
-.tabs{display:flex;gap:8px;overflow-x:auto;margin:0 0 22px;padding-bottom:2px}
-.tab{border:1px solid var(--b);background:var(--surface);color:var(--m);padding:10px 18px;border-radius:11px;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;flex:none;transition:background .15s,color .15s,border-color .15s}
-.tab:hover{border-color:var(--p2);color:var(--p-dark)}
-.tab.on{background:var(--p);border-color:var(--p);color:#fff;box-shadow:0 4px 10px rgba(38,143,118,.25)}
-.tab.on:hover{color:#fff}
+header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.head{height:100%;max-width:1100px;margin:auto;padding:0 18px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:28px;font-weight:900;color:var(--g2)}
+.brand b{color:var(--g);font-size:20px;font-family:'Manrope',sans-serif}
+.brand small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.headRight{display:flex;align-items:center;gap:10px}
+.pillbadge{font-size:13px;font-weight:700;background:var(--mint);color:var(--g);padding:7px 12px;border-radius:999px}
+.btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--g);color:#fff}
+.btn.danger{background:var(--redbg);color:var(--red)}
+.btn.small{padding:7px 11px;font-size:12px}
+.shell{max-width:1100px;margin:auto;display:grid;grid-template-columns:220px 1fr;gap:16px;padding:17px 18px 60px}
+nav{background:#fff;border:1px solid var(--line);border-radius:14px;padding:9px;height:max-content;position:sticky;top:85px}
+nav button{width:100%;border:0;background:transparent;text-align:left;padding:12px 11px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin:2px 0;display:flex;align-items:center;gap:9px;border-left:3px solid transparent}
+nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
+nav button.hidden{display:none}
+.grouplabel{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:14px 11px 6px}
+.grouplabel:first-child{padding-top:4px}
 .page{display:none}
 .page.on{display:block;animation:fadeIn .25s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px}
-.stat{background:var(--surface);border:1px solid var(--b);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card);position:relative}
-.staticon{width:34px;height:34px;border-radius:10px;background:var(--mint);color:var(--p-dark);display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:12px}
-.stat small{color:var(--m);font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-.stat b{display:block;font-size:30px;margin-top:8px;font-variant-numeric:tabular-nums;font-weight:800;letter-spacing:-.02em}
-.stat.warn{background:var(--warn-bg);border-color:#f0dfa8}
-.stat.warn .staticon{background:#f5e5a8;color:var(--warn)}
-.stat.warn b{color:var(--warn)}
-.emptystate{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;text-align:center;font-size:24px}
-.emptystate p{font-size:13.5px;font-weight:600;color:var(--t);margin:10px 0 2px}
-.emptystate small{color:var(--m);font-size:12px}
-.card{background:var(--surface);border:1px solid var(--b);border-radius:var(--radius);margin-bottom:20px;overflow:hidden;box-shadow:var(--shadow-card)}
-.card h3{margin:0;padding:18px 22px;font-size:15px;font-weight:700;border-bottom:1px solid var(--b-soft);letter-spacing:-.01em}
-.card .body{padding:22px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:520px){.grid{grid-template-columns:1fr}.wrap{padding:16px 14px 100px}.card .body{padding:18px}}
-.field label{display:block;font-size:12px;font-weight:700;color:var(--m);margin-bottom:6px;letter-spacing:.01em}
-.field input,.field select{width:100%;padding:11px 13px;border:1.5px solid var(--b);border-radius:10px;font-size:14px;background:var(--surface);color:var(--t);font-family:inherit;transition:border-color .15s,box-shadow .15s}
-.field input:focus,.field select:focus{outline:none;border-color:var(--p2);box-shadow:0 0 0 3px rgba(63,175,147,.15)}
+.hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px;display:flex;justify-content:space-between;gap:12px}
+.hero h1{font-size:26px;margin:0 0 5px}
+.hero p{font-size:13px;margin:0;opacity:.9}
+.hero .heroStat{text-align:right}
+.hero .heroStat small{display:block;font-size:11px;opacity:.85}
+.hero .heroStat strong{font-size:30px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+.card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px}
+.card small{font-size:11px;color:var(--muted)}
+.card b{display:block;font-size:22px;margin-top:6px}
+.card.warn{background:var(--amberbg)!important;color:var(--amber)!important}
+.panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:12px}
+.ph{padding:14px 16px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.pb{padding:15px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field label{display:block;font-size:11px;font-weight:bold;margin-bottom:5px}
+.field input,.field select{width:100%;padding:10px;border:1px solid var(--line);border-radius:7px;font-size:14px;background:#fff;color:var(--txt)}
 .span2{grid-column:1/-1}
-table{width:100%;border-collapse:collapse;font-size:13.5px}
-th{text-align:left;color:var(--m);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;padding:12px 22px;border-bottom:1.5px solid var(--b-soft);background:var(--mint2)}
-td{padding:13px 22px;border-bottom:1px solid var(--b-soft)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 0 9px;border-bottom:1px solid var(--line)}
+td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px}
 tr:last-child td{border-bottom:0}
-tbody tr{transition:background .1s}
-tbody tr:hover{background:var(--mint2)}
+tbody tr:hover td{background:#f7faf8}
 .tablewrap{overflow-x:auto}
-.pill{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;font-size:11.5px;font-weight:700}
-.pill.ok{background:var(--mint);color:var(--p-dark)}
-.pill.low{background:var(--warn-bg);color:var(--warn)}
-.num{font-variant-numeric:tabular-nums;text-align:right}
-.itemrow{display:flex;justify-content:space-between;align-items:center;padding:14px 22px;border-bottom:1px solid var(--b-soft);gap:12px}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font-size:11px;font-weight:700}
+.pill.ok{background:var(--mint);color:var(--g)}
+.pill.low{background:var(--amberbg);color:var(--amber)}
+.itemrow{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #edf1ee;gap:12px}
 .itemrow:last-child{border-bottom:0}
-.itemrow:hover{background:var(--mint2)}
 .itemrow b{font-size:13.5px;font-weight:600}
-.itemrow small{color:var(--m);display:block;font-size:11.5px;margin-top:3px}
-.item{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--b-soft)}
+.itemrow small{color:var(--muted);display:block;font-size:11.5px;margin-top:3px}
+.item{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #edf1ee}
 .item:last-child{border-bottom:0}
-.modal{position:fixed;inset:0;background:rgba(23,33,27,.45);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;padding:16px;z-index:9999}
+.emptystate{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;text-align:center;font-size:24px}
+.emptystate p{font-size:13.5px;font-weight:600;color:var(--txt);margin:10px 0 2px;font-family:'Work Sans',sans-serif}
+.emptystate small{color:var(--muted);font-size:12px}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:50}
 .modal.show{display:flex}
-.box{width:min(460px,100%);background:var(--surface);border-radius:18px;padding:26px;max-height:90vh;overflow:auto;box-shadow:var(--shadow-lift)}
-.box h3{margin:0 0 18px;font-size:19px;font-weight:700;letter-spacing:-.01em}
-.note{font-size:12.5px;color:var(--m);line-height:1.5}
-#gateWrap{display:flex;align-items:center;justify-content:center;min-height:80vh;padding:20px}
-#gateBox{text-align:center;max-width:380px;background:var(--surface);border:1px solid var(--b);border-radius:var(--radius);padding:36px 30px;box-shadow:var(--shadow-card)}
-#gateBox h3{font-size:19px;margin:0 0 8px;font-weight:700}
-#gateBox .btn{margin-top:12px}
+.box{width:min(500px,100%);background:#fff;border-radius:14px;padding:19px;max-height:90vh;overflow:auto}
+.box h3{margin:0 0 14px;font-size:19px}
+.note{font-size:12px;color:var(--muted)}
+.gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px}
+.gate h3{font-size:19px}
+.gate p{font-size:13px;color:var(--muted)}
+.gate .btn{margin-top:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:#fff;color:var(--muted);padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--g);border-color:var(--g);color:#fff}
+.bottomNav{display:none}
 .superAdminOnly.hidden{display:none!important}
+@media(max-width:720px){
+  header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:22px}.brand b{font-size:16px}.brand small{display:none}
+  .shell{display:block;padding:11px 10px 76px}nav{display:none}
+  .hero{padding:17px}.hero h1{font-size:20px}.hero .heroStat strong{font-size:23px}
+  .cards{grid-template-columns:1fr 1fr}
+  .grid{grid-template-columns:1fr}
+  .bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}
+  .bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:0 0 auto;padding:2px 12px;white-space:nowrap}
+  .bottomNav button.hidden{display:none}
+  .bottomNav span{display:block;font-size:19px}
+  .bottomNav button.on{color:var(--g)}
+}
 </style>
 </head>
 <body>
 
-<div id="gateWrap" style="display:none"><div id="gateBox"></div></div>
+<div id="gateWrap" style="display:none"><div class="gate" id="gateBox"></div></div>
 
 <div id="appWrap" style="display:none">
-<header>
-  <div class="logo">b</div>
-  <div class="brandtext"><b>Stationery Inventory</b><small>Bliss Gems &amp; Minerals</small></div>
-  <span id="loginBadge" style="margin-left:auto">Not Logged In</span>
-  <button class="btn small secondary hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
-  <button class="btn small secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button>
-</header>
-
-<div class="wrap">
-  <div class="pagehead">
-    <h1 id="pageTitle">Dashboard</h1>
-    <p id="pageDesc">Live stock levels aur is mahine ki activity, ek nazar mein.</p>
+<header><div class="head">
+  <div class="brand"><div class="logo">b</div><div><b>Stationery Inventory</b><small>Bliss Gems &amp; Minerals</small></div></div>
+  <div class="headRight">
+    <span class="pillbadge" id="loginBadge">Not Logged In</span>
+    <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
+    <button class="btn superAdminOnly hidden" onclick="openManage()">⚙ Manage</button>
   </div>
-  <div class="tabs">
-    <button class="tab on" data-page="dash" data-title="Dashboard" data-desc="Live stock levels aur is mahine ki activity, ek nazar mein." onclick="go('dash',this)"><span class="tabicon">📊</span> Dashboard</button>
-    <button class="tab" data-page="in" data-title="Stock In" data-desc="Naya stock aane par yahan entry karein." onclick="go('in',this)"><span class="tabicon">⬇</span> Stock In</button>
-    <button class="tab" data-page="out" data-title="Stock Out / Issue" data-desc="Kisi Doer ko item issue karte waqt yahan entry karein." onclick="go('out',this)"><span class="tabicon">⬆</span> Stock Out / Issue</button>
-    <button class="tab superAdminOnly hidden" data-page="items" data-title="Item Master" data-desc="Naye items add karein aur minimum stock level set karein." onclick="go('items',this)"><span class="tabicon">🗂</span> Item Master</button>
-  </div>
+</div></header>
 
+<div class="shell">
+<nav>
+<div class="grouplabel">Inventory</div>
+<button class="on" data-page="dash" onclick="go('dash',this)">📊 Dashboard</button>
+<button data-page="in" onclick="go('in',this)">⬇ Stock In</button>
+<button data-page="out" onclick="go('out',this)">⬆ Stock Out / Issue</button>
+<button class="superAdminOnly hidden" data-page="items" onclick="go('items',this)">🗂 Item Master</button>
+</nav>
+
+<main>
   <section class="page on" id="page-dash">
-    <div class="stats" id="statTiles"></div>
-    <div class="card">
-      <h3>Current Stock</h3>
-      <div class="tablewrap"><table>
+    <div class="hero">
+      <div><h1>Stationery Inventory</h1><p>Live stock levels aur is mahine ki activity, ek nazar mein.</p></div>
+      <div class="heroStat"><small>TOTAL ITEMS</small><strong id="heroTotalItems">0</strong></div>
+    </div>
+    <div class="cards" id="statTiles"></div>
+    <div class="panel">
+      <div class="ph"><span>Current Stock</span></div>
+      <div class="pb"><div class="tablewrap"><table>
         <thead><tr><th>Item</th><th>Category</th><th class="num">In Hand</th><th class="num">Min Level</th><th>Status</th></tr></thead>
         <tbody id="stockTable"></tbody>
-      </table></div>
+      </table></div></div>
     </div>
   </section>
 
   <section class="page" id="page-in">
-    <div class="card">
-      <h3>New Stock In Entry</h3>
-      <div class="body">
+    <div class="panel">
+      <div class="ph"><span>New Stock In Entry</span></div>
+      <div class="pb">
         <div class="grid">
-          <div class="field"><label>Item <span style="color:var(--danger)">*</span></label><select id="inItem"></select></div>
-          <div class="field"><label>Quantity <span style="color:var(--danger)">*</span></label><input type="number" id="inQty"></div>
+          <div class="field"><label>Item <span style="color:var(--red)">*</span></label><select id="inItem"></select></div>
+          <div class="field"><label>Quantity <span style="color:var(--red)">*</span></label><input type="number" id="inQty"></div>
           <div class="field"><label>Date</label><input type="date" id="inDate"></div>
           <div class="field"><label>Vendor / Source</label><input id="inVendor" list="vendorList" placeholder="Select ya type karein"><datalist id="vendorList"></datalist></div>
           <div class="field span2"><label>Remark</label><input id="inRemark" placeholder="Optional"></div>
@@ -168,44 +174,44 @@ tbody tr:hover{background:var(--mint2)}
         <div style="margin-top:14px;text-align:right"><button class="btn primary" onclick="addStockIn()">＋ Add Stock In</button></div>
       </div>
     </div>
-    <div class="card">
-      <h3>Recent Stock In</h3>
-      <div class="tablewrap"><table>
+    <div class="panel">
+      <div class="ph"><span>Recent Stock In</span></div>
+      <div class="pb"><div class="tablewrap"><table>
         <thead><tr><th>Date</th><th>Item</th><th class="num">Qty</th><th>Vendor</th><th>By</th></tr></thead>
         <tbody id="inHistory"></tbody>
-      </table></div>
+      </table></div></div>
     </div>
   </section>
 
   <section class="page" id="page-out">
-    <div class="card">
-      <h3>New Stock Out / Issue Entry</h3>
-      <div class="body">
+    <div class="panel">
+      <div class="ph"><span>New Stock Out / Issue Entry</span></div>
+      <div class="pb">
         <div class="grid">
-          <div class="field"><label>Item <span style="color:var(--danger)">*</span></label><select id="outItem"></select></div>
-          <div class="field"><label>Quantity <span style="color:var(--danger)">*</span></label><input type="number" id="outQty"></div>
-          <div class="field"><label>Issued To <span style="color:var(--danger)">*</span></label><select id="outTo"></select></div>
+          <div class="field"><label>Item <span style="color:var(--red)">*</span></label><select id="outItem"></select></div>
+          <div class="field"><label>Quantity <span style="color:var(--red)">*</span></label><input type="number" id="outQty"></div>
+          <div class="field"><label>Issued To <span style="color:var(--red)">*</span></label><select id="outTo"></select></div>
           <div class="field"><label>Date</label><input type="date" id="outDate"></div>
           <div class="field span2"><label>Purpose</label><input id="outPurpose" placeholder="Optional"></div>
         </div>
         <div style="margin-top:14px;text-align:right"><button class="btn primary" onclick="addStockOut()">＋ Issue Stock</button></div>
       </div>
     </div>
-    <div class="card">
-      <h3>Recent Stock Out</h3>
-      <div class="tablewrap"><table>
+    <div class="panel">
+      <div class="ph"><span>Recent Stock Out</span></div>
+      <div class="pb"><div class="tablewrap"><table>
         <thead><tr><th>Date</th><th>Item</th><th class="num">Qty</th><th>Issued To</th><th>By</th></tr></thead>
         <tbody id="outHistory"></tbody>
-      </table></div>
+      </table></div></div>
     </div>
   </section>
 
   <section class="page" id="page-items">
-    <div class="card">
-      <h3>Add New Item</h3>
-      <div class="body">
+    <div class="panel">
+      <div class="ph"><span>Add New Item</span></div>
+      <div class="pb">
         <div class="grid">
-          <div class="field"><label>Item Name <span style="color:var(--danger)">*</span></label><input id="mItemName"></div>
+          <div class="field"><label>Item Name <span style="color:var(--red)">*</span></label><input id="mItemName"></div>
           <div class="field"><label>Category</label><input id="mItemCat" list="categoryList" placeholder="Select ya type karein"><datalist id="categoryList"></datalist></div>
           <div class="field"><label>Unit</label><input id="mItemUnit" list="unitList" placeholder="Select ya type karein"><datalist id="unitList"></datalist></div>
           <div class="field"><label>Minimum Stock Level</label><input type="number" id="mItemMin"></div>
@@ -213,12 +219,20 @@ tbody tr:hover{background:var(--mint2)}
         <div style="margin-top:14px;text-align:right"><button class="btn primary" onclick="addItem()">＋ Add Item</button></div>
       </div>
     </div>
-    <div class="card">
-      <h3>All Items</h3>
-      <div id="itemList"></div>
+    <div class="panel">
+      <div class="ph"><span>All Items</span></div>
+      <div class="pb" id="itemList"></div>
     </div>
   </section>
+</main>
 </div>
+</div>
+
+<div class="bottomNav" id="bottomNav">
+<button class="on" data-page="dash" onclick="go('dash',this)"><span>📊</span>Dashboard</button>
+<button data-page="in" onclick="go('in',this)"><span>⬇</span>Stock In</button>
+<button data-page="out" onclick="go('out',this)"><span>⬆</span>Stock Out</button>
+<button class="superAdminOnly hidden" data-page="items" onclick="go('items',this)"><span>🗂</span>Items</button>
 </div>
 
 <!-- Login modal -->
@@ -368,13 +382,9 @@ function notifyLowStock(item){
 /* ===== Nav / gate ===== */
 function go(id,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.tab[data-page]').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('nav button[data-page],.bottomNav button[data-page]').forEach(b=>b.classList.remove('on'));
   $('page-'+id).classList.add('on');
-  if(btn){
-    btn.classList.add('on');
-    if($('pageTitle'))$('pageTitle').textContent=btn.dataset.title||'';
-    if($('pageDesc'))$('pageDesc').textContent=btn.dataset.desc||'';
-  }
+  document.querySelectorAll('[data-page="'+id+'"]').forEach(b=>b.classList.add('on'));
 }
 function renderGate(){
   const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
@@ -414,12 +424,13 @@ function renderDash(){
   const inThisMonth=inLog.filter(x=>String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
   const outThisMonth=outLog.filter(x=>String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
   const tiles=[
-    {label:'Total Items',val:items.length,icon:'🗂'},
-    {label:'Low Stock Alerts',val:low,warn:low>0,icon:'⚠'},
-    {label:'Stock In (This Month)',val:inThisMonth,icon:'⬇'},
-    {label:'Stock Out (This Month)',val:outThisMonth,icon:'⬆'}
+    {label:'TOTAL ITEMS',val:items.length},
+    {label:'LOW STOCK ALERTS',val:low,warn:low>0},
+    {label:'STOCK IN (THIS MONTH)',val:inThisMonth},
+    {label:'STOCK OUT (THIS MONTH)',val:outThisMonth}
   ];
-  $('statTiles').innerHTML=tiles.map(t=>`<div class="stat${t.warn?' warn':''}"><div class="staticon">${t.icon}</div><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+  $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+  if($('heroTotalItems'))$('heroTotalItems').textContent=items.length;
   $('stockTable').innerHTML=items.map(x=>{
     const isLow=x.stock<=x.min;
     return `<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category||'-')}</td><td class="num">${x.stock||0} ${esc(x.unit||'')}</td><td class="num">${x.min||0}</td><td><span class="pill ${isLow?'low':'ok'}">${isLow?'⚠ Low Stock':'✓ OK'}</span></td></tr>`;
