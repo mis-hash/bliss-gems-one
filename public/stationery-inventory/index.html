@@ -292,8 +292,21 @@ tbody tr:hover td{background:#f7faf8}
 <button class="tab" data-tab="unit" onclick="mtab(this,'unit')">Unit</button>
 <button class="tab" data-tab="vendor" onclick="mtab(this,'vendor')">Vendor</button>
 <button class="tab" data-tab="roles" onclick="mtab(this,'roles')">Team &amp; Access</button>
+<button class="tab" data-tab="notify" onclick="mtab(this,'notify')">Low Stock Alerts</button>
 </div>
 <div id="manageContent"></div>
+</div></div>
+
+<!-- Edit Item modal -->
+<div class="modal" id="editItemModal"><div class="box" style="width:min(420px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Edit Item</h3><button class="btn small" onclick="closeEditItem()">✕</button></div>
+<div class="grid">
+  <div class="field span2"><label>Item Name <span style="color:var(--red)">*</span></label><input id="eiName"></div>
+  <div class="field"><label>Category</label><input id="eiCat" list="editCategoryList"><datalist id="editCategoryList"></datalist></div>
+  <div class="field"><label>Unit</label><input id="eiUnit" list="editUnitList"><datalist id="editUnitList"></datalist></div>
+  <div class="field span2"><label>Minimum Stock Level (Low Stock Limit)</label><input type="number" id="eiMin"></div>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditItem()">Cancel</button><button class="btn primary" onclick="saveEditItem()">Save</button></div>
 </div></div>
 
 <button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:14px;right:14px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:13px;line-height:26px;cursor:default;z-index:999999;transition:background .15s">•</button>
@@ -316,7 +329,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const todayISO=()=>new Date().toISOString().slice(0,10);
 
 let users=[],items=[],inLog=[],outLog=[];
-let masters={categories:[],units:[],vendors:[]};
+let masters={categories:[],units:[],vendors:[],lowStockRecipients:[]};
 let api={};
 let currentUser=null,currentTab='category';
 let usersStarted=false,itemsStarted=false,inStarted=false,outStarted=false,mastersStarted=false;
@@ -413,7 +426,7 @@ function seedStarterMastersIfEmpty(){
 function startMastersSync(){
   if(mastersStarted||!db)return;mastersStarted=true;
   seedStarterMastersIfEmpty();
-  db.collection('si_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={categories:[],units:[],vendors:[],...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  db.collection('si_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={categories:[],units:[],vendors:[],lowStockRecipients:[],...doc.data()};renderAll();},err=>console.error('masters sync error',err));
   db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed',e));
 }
 function saveMasters(){ if(db) db.collection('si_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
@@ -430,7 +443,10 @@ async function sendRawWA(phone,message){
   }catch(e){console.error('WA send failed:',e);return false}
 }
 function notifyLowStock(item){
-  const admins=users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
+  const configured=(masters.lowStockRecipients||[]).length>0;
+  const admins=configured
+    ? users.filter(u=>u.active!==false && u.phone && masters.lowStockRecipients.includes(u.id))
+    : users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
   const msg=`⚠ Low Stock Alert\n\nItem: ${item.name}\nIn Hand: ${item.stock} ${item.unit||''}\nMinimum Level: ${item.min}\n\nRestock karwana zaroori hai.`;
   admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('low stock WA failed:',e)));
 }
@@ -506,6 +522,8 @@ function renderSelects(){
   if($('vendorList'))$('vendorList').innerHTML=(masters.vendors||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
   if($('categoryList'))$('categoryList').innerHTML=(masters.categories||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
   if($('unitList'))$('unitList').innerHTML=(masters.units||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+  if($('editCategoryList'))$('editCategoryList').innerHTML=(masters.categories||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+  if($('editUnitList'))$('editUnitList').innerHTML=(masters.units||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
 }
 function nameOfUserId(id){return (users.find(x=>x.id===id)||{}).name||id}
 function renderLogs(){
@@ -515,8 +533,30 @@ function renderLogs(){
 function renderItems(){
   $('itemList').innerHTML=items.map(x=>{
     const isLow=x.stock<=x.min;
-    return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span></div>`;
+    return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span><button class="btn small" onclick="openEditItem('${x.id}')">✎ Edit</button></div>`;
   }).join('')||`<div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Upar se pehla item add karein.</small></div>`;
+}
+let editItemTarget=null;
+function openEditItem(id){
+  const it=items.find(x=>x.id===id);
+  if(!it)return;
+  editItemTarget=id;
+  $('eiName').value=it.name||'';
+  $('eiCat').value=it.category||'';
+  $('eiUnit').value=it.unit||'';
+  $('eiMin').value=it.min||0;
+  $('editItemModal').classList.add('show');
+}
+function closeEditItem(){$('editItemModal').classList.remove('show');editItemTarget=null;}
+async function saveEditItem(){
+  if(!editItemTarget)return;
+  const name=$('eiName').value.trim(),category=$('eiCat').value.trim(),unit=$('eiUnit').value.trim(),min=parseInt($('eiMin').value,10)||0;
+  if(!name){alert('Item Name zaroori hai.');return}
+  await db.collection('si_items').doc(editItemTarget).update({name,category,unit,min});
+  if(category && !masters.categories.includes(category)){masters.categories.push(category);saveMasters();}
+  if(unit && !masters.units.includes(unit)){masters.units.push(unit);saveMasters();}
+  closeEditItem();
+  toast('Item updated');
 }
 
 async function addStockIn(){
@@ -586,6 +626,18 @@ function renderManage(){
       </div>`;
     }).join('');
   }
+  else if(currentTab==='notify'){
+    const withPhone=users.filter(u=>u.active!==false && u.phone);
+    const selected=masters.lowStockRecipients||[];
+    c.innerHTML=`<p class="note">Low Stock Alert WhatsApp message kisko jaye, yahan se select karein. Kuch bhi select na karein to default Admin/Director (jinke paas phone number hai) ko jayega.</p>`+
+      (withPhone.map(u=>`<div class="item"><span>${esc(u.name)}</span><input type="checkbox" ${selected.includes(u.id)?'checked':''} onchange="toggleLowStockRecipient('${esc(u.id)}')"></div>`).join('')||'<div class="note" style="padding:8px 0">Koi active user ka phone number save nahi hai.</div>');
+  }
+}
+function toggleLowStockRecipient(userId){
+  if(!masters.lowStockRecipients)masters.lowStockRecipients=[];
+  const i=masters.lowStockRecipients.indexOf(userId);
+  if(i===-1)masters.lowStockRecipients.push(userId);else masters.lowStockRecipients.splice(i,1);
+  saveMasters();renderManage();
 }
 function setUserRole(userId,role){
   if(!db)return;
