@@ -361,10 +361,6 @@ function refreshLoginBadge(){
 }
 function applyFeatureVisibility(){
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.toggle('hidden',!isAdminRole()));
-  document.querySelectorAll('.tab[data-page]').forEach(t=>{
-    if(t.classList.contains('superAdminOnly'))return; // already handled above
-    t.classList.toggle('hidden',!canAccessFeature(t.dataset.page));
-  });
 }
 
 /* ===== Dashboard / stock ===== */
@@ -479,12 +475,6 @@ function setUserRole(userId,role){
   if(!db)return;
   const patch={};patch['appRoles.'+APP_SLUG]=role||firebase.firestore.FieldValue.delete();
   db.collection(UU_COLLECTION).doc(userId).update(patch).catch(e=>console.error('role save failed',e));
-}
-function toggleFeature(pageId,userId,checked){
-  const list=new Set(featureAccess[pageId]||[]);
-  if(checked)list.add(userId);else list.delete(userId);
-  featureAccess[pageId]=[...list];
-  saveFeatureAccess();
 }
 
 /* ===== Toast ===== */
