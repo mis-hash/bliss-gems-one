@@ -2130,7 +2130,11 @@ function openReturnTransferTask(fieldId){
     alert('Ye section lock ho chuka hai. Sirf jisne is section ko lock kiya tha (ya Super Admin), wahi ab bhi task transfer kar sakta hai.');
     return;
   }
-  if(el.value && el.value!==actor.id && !superAdminUnlocked){
+  // If this field's stage is already locked, the check above already confirmed the actor
+  // owns that lock (or is Super Admin) — that authorizes transferring every field in the
+  // section, so skip the narrower per-field "only the current assignee" check below.
+  const stageLockCoversIt=stage && locks[stage.id];
+  if(!stageLockCoversIt && el.value && el.value!==actor.id && !superAdminUnlocked){
     alert('Sirf jis Doer ko ye task currently assigned hai (ya Super Admin), wahi ise transfer kar sakta hai.');
     return;
   }
@@ -3169,7 +3173,11 @@ function openTransferTask(fieldId){
     alert('Ye section lock ho chuka hai. Sirf jisne is section ko lock kiya tha (ya Super Admin), wahi ab bhi task transfer kar sakta hai.');
     return;
   }
-  if(el.value && el.value!==actor.id && !superAdminUnlocked){
+  // If this field's stage is already locked, the check above already confirmed the actor
+  // owns that lock (or is Super Admin) — that authorizes transferring every field in the
+  // section, so skip the narrower per-field "only the current assignee" check below.
+  const stageLockCoversIt=stage && locks[stage.id];
+  if(!stageLockCoversIt && el.value && el.value!==actor.id && !superAdminUnlocked){
     alert('Sirf jis Doer ko ye task currently assigned hai (ya Super Admin), wahi ise transfer kar sakta hai.');
     return;
   }
