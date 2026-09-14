@@ -1385,6 +1385,11 @@ function renderHistory(){
    :`<button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button>${loggedUser()?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑 Delete</button>`:''}`;
  const slipOwnerName=x=>{const u=users.find(u=>u.id===x.slipFillBy);return u?u.name:''};
  const pendingWithInfo=x=>{
+   // Once every stage is locked, the record is no longer pending - even if some field
+   // (e.g. an early "Handover To" that got bypassed by someone else finishing the work
+   // directly) still literally holds the last-queued doer's name. isRecordPending is the
+   // real source of truth here, not whether a stale reminder-queue entry exists.
+   if(!isRecordPending(x.parcelId))return null;
    const pw=pendingWith[x.parcelId];
    if(!pw)return null;
    const u=users.find(u=>u.id===pw.toUserId);
