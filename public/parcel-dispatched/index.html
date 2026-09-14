@@ -1328,7 +1328,7 @@ function pendingWithMap(){
     if(item.status!=='PENDING')return;
     const existing=map[item.parcelId];
     if(!existing||new Date(item.createdAt||0)>new Date(existing.createdAt||0)){
-      map[item.parcelId]={toUserId:item.toUserId,createdAt:item.createdAt};
+      map[item.parcelId]={toUserId:item.toUserId,createdAt:item.createdAt,fieldId:item.stage||''};
     }
   });
   return map;
@@ -1384,9 +1384,15 @@ function renderHistory(){
    ?`<button class="btn secondary" style="margin-top:6px" onclick="restoreDispatchRecord('${esc(x.parcelId||'')}')">↩ Restore</button>`
    :`<button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button>${loggedUser()?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑 Delete</button>`:''}`;
  const slipOwnerName=x=>{const u=users.find(u=>u.id===x.slipFillBy);return u?u.name:''};
- const pendingWithName=x=>{const pw=pendingWith[x.parcelId];if(!pw)return'';const u=users.find(u=>u.id===pw.toUserId);return u?u.name:''};
- $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);const pwName=pendingWithName(x);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(slipOwnerName(x))}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pend&&pwName?`<b>${esc(pwName)}</b>`:dash(pwName)}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td>${dispatchAction(x)}</td></tr>`}).join(''):'<tr><td colspan="10">No records.</td></tr>';
- if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);const pwName=pendingWithName(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Slip Owner</small><strong>${esc(slipOwnerName(x)||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div>${pwName?`<div><small>Pending With</small><strong>${esc(pwName)}</strong></div>`:''}</div>${dispatchActionCard(x)}</div>`}).join(''):'<div class="note">No records.</div>';
+ const pendingWithInfo=x=>{
+   const pw=pendingWith[x.parcelId];
+   if(!pw)return null;
+   const u=users.find(u=>u.id===pw.toUserId);
+   const field=pw.fieldId?fieldLabel($(pw.fieldId)):'';
+   return {name:u?u.name:'',field};
+ };
+ $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);const pw=pendingWithInfo(x);const pwCell=pend&&pw&&pw.name?`<b>${esc(pw.name)}</b>${pw.field?`<br><small class="cellSub">${esc(pw.field)}</small>`:''}`:dash(pw&&pw.name);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(slipOwnerName(x))}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pwCell}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td>${dispatchAction(x)}</td></tr>`}).join(''):'<tr><td colspan="10">No records.</td></tr>';
+ if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);const pw=pendingWithInfo(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Slip Owner</small><strong>${esc(slipOwnerName(x)||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div>${pw&&pw.name?`<div><small>Pending With</small><strong>${esc(pw.name)}${pw.field?' — '+esc(pw.field):''}</strong></div>`:''}</div>${dispatchActionCard(x)}</div>`}).join(''):'<div class="note">No records.</div>';
  renderDashboard();
 }
 // Analytics Dashboard is Admin/Director-only — either the shared Super Admin unlock, or
