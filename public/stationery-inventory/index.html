@@ -293,6 +293,7 @@ tbody tr:hover td{background:#f7faf8}
 <button class="tab" data-tab="vendor" onclick="mtab(this,'vendor')">Vendor</button>
 <button class="tab" data-tab="roles" onclick="mtab(this,'roles')">Team &amp; Access</button>
 <button class="tab" data-tab="notify" onclick="mtab(this,'notify')">Low Stock Alerts</button>
+<button class="tab" data-tab="templates" onclick="mtab(this,'templates')">Message Templates</button>
 </div>
 <div id="manageContent"></div>
 </div></div>
@@ -329,7 +330,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const todayISO=()=>new Date().toISOString().slice(0,10);
 
 let users=[],items=[],inLog=[],outLog=[];
-let masters={categories:[],units:[],vendors:[],lowStockRecipients:[]};
+let masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{}};
 let api={};
 let currentUser=null,currentTab='category';
 let usersStarted=false,itemsStarted=false,inStarted=false,outStarted=false,mastersStarted=false;
@@ -426,7 +427,7 @@ function seedStarterMastersIfEmpty(){
 function startMastersSync(){
   if(mastersStarted||!db)return;mastersStarted=true;
   seedStarterMastersIfEmpty();
-  db.collection('si_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={categories:[],units:[],vendors:[],lowStockRecipients:[],...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  db.collection('si_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{},...doc.data()};renderAll();},err=>console.error('masters sync error',err));
   db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed',e));
 }
 function saveMasters(){ if(db) db.collection('si_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
@@ -442,17 +443,30 @@ async function sendRawWA(phone,message){
     return r.ok;
   }catch(e){console.error('WA send failed:',e);return false}
 }
+// Editable WhatsApp message library (Manage -> Message Templates). Each notify function
+// pulls its text from masters.templates[id] if the admin has customized it, else falls
+// back to this default - so a fresh install always has a sensible message with no setup.
+const DEFAULT_SI_TEMPLATES={
+  low_stock:{name:'Low Stock Alert',text:'⚠️ Low Stock Alert\n\nItem: {ItemName}\nIn Hand: {InHand} {Unit}\nMinimum Level: {MinLevel}\n\nPlease arrange for restocking at the earliest.'},
+  stock_issued:{name:'Stock Issued',text:'📦 Stock Issued\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nIssued To: {IssuedTo}\nIssued By: {IssuedBy}'}
+};
+function fillTemplate(text,vars){
+  return text.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m);
+}
+function templateText(id){
+  return (masters.templates&&masters.templates[id]!==undefined)?masters.templates[id]:DEFAULT_SI_TEMPLATES[id].text;
+}
 function notifyLowStock(item){
   const configured=(masters.lowStockRecipients||[]).length>0;
   const admins=configured
     ? users.filter(u=>u.active!==false && u.phone && masters.lowStockRecipients.includes(u.id))
     : users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
-  const msg=`⚠ Low Stock Alert\n\nItem: ${item.name}\nIn Hand: ${item.stock} ${item.unit||''}\nMinimum Level: ${item.min}\n\nRestock karwana zaroori hai.`;
+  const msg=fillTemplate(templateText('low_stock'),{ItemName:item.name,InHand:item.stock,Unit:item.unit||'',MinLevel:item.min});
   admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('low stock WA failed:',e)));
 }
 function notifyIssue(item,qty,toUserId,byUserId){
   const admins=users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
-  const msg=`📦 Stock Issued\n\nItem: ${item.name}\nQty: ${qty} ${item.unit||''}\nIssued To: ${nameOfUserId(toUserId)}\nBy: ${nameOfUserId(byUserId)}`;
+  const msg=fillTemplate(templateText('stock_issued'),{ItemName:item.name,Qty:qty,Unit:item.unit||'',IssuedTo:nameOfUserId(toUserId),IssuedBy:nameOfUserId(byUserId)});
   admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('issue WA failed:',e)));
 }
 
@@ -573,6 +587,16 @@ async function addStockOut(){
   if(!item||!qty||!to){alert('Item, Quantity aur Issued To zaroori hai.');return}
   const it=items.find(x=>x.id===item);
   if(it&&qty>(it.stock||0)){if(!confirm(`Sirf ${it.stock||0} ${it.unit||''} stock mein hai. Phir bhi issue karein?`))return}
+  // Same item issued again within a few days is often a genuine repeat need, but can also be
+  // an accidental duplicate entry - flag it so the person issuing it gets one chance to catch
+  // a mistake before it's saved, without blocking legitimate repeat issues.
+  const RECENT_ISSUE_DAYS=3;
+  const cutoff=new Date(Date.now()-RECENT_ISSUE_DAYS*86400000).toISOString().slice(0,10);
+  const recentSame=outLog.find(x=>x.item===item && x.date>=cutoff);
+  if(recentSame){
+    const recentToName=nameOfUserId(recentSame.to);
+    if(!confirm(`⚠ ${it?it.name:'Ye item'} pichle ${RECENT_ISSUE_DAYS} din mein (${recentSame.date}) ${recentToName} ko already issue kiya gaya tha.\n\nPhir se issue karna hai?`))return;
+  }
   const actor=loggedUser();
   await db.collection('si_stock_out').add({item,qty,to,purpose,date,by:actor?actor.id:'',at:new Date().toISOString()});
   await db.collection('si_items').doc(item).update({stock:firebase.firestore.FieldValue.increment(-qty)});
@@ -632,12 +656,33 @@ function renderManage(){
     c.innerHTML=`<p class="note">Low Stock Alert WhatsApp message kisko jaye, yahan se select karein. Kuch bhi select na karein to default Admin/Director (jinke paas phone number hai) ko jayega.</p>`+
       (withPhone.map(u=>`<div class="item"><span>${esc(u.name)}</span><input type="checkbox" ${selected.includes(u.id)?'checked':''} onchange="toggleLowStockRecipient('${esc(u.id)}')"></div>`).join('')||'<div class="note" style="padding:8px 0">Koi active user ka phone number save nahi hai.</div>');
   }
+  else if(currentTab==='templates'){
+    c.innerHTML=`<p class="note">In messages ki wording customize kar sakte hain. {CurlyBraces} wale words ko chhoda na chhedein — inki jagah actual data automatically bharta hai.</p>`+
+      Object.keys(DEFAULT_SI_TEMPLATES).map(id=>{
+        const cur=templateText(id);
+        return `<div class="field" style="margin-bottom:14px"><label>${esc(DEFAULT_SI_TEMPLATES[id].name)}</label><textarea id="tpl_${id}" rows="5" style="width:100%;font-family:monospace">${esc(cur)}</textarea>
+        <div style="display:flex;gap:8px;margin-top:6px"><button class="btn primary small" onclick="saveTemplate('${id}')">Save</button><button class="btn small" onclick="resetTemplate('${id}')">Reset to Default</button></div></div>`;
+      }).join('');
+  }
 }
 function toggleLowStockRecipient(userId){
   if(!masters.lowStockRecipients)masters.lowStockRecipients=[];
   const i=masters.lowStockRecipients.indexOf(userId);
   if(i===-1)masters.lowStockRecipients.push(userId);else masters.lowStockRecipients.splice(i,1);
   saveMasters();renderManage();
+}
+function saveTemplate(id){
+  const el=$('tpl_'+id);if(!el)return;
+  if(!masters.templates)masters.templates={};
+  masters.templates[id]=el.value;
+  saveMasters();
+  toast('Template saved');
+}
+function resetTemplate(id){
+  if(masters.templates)delete masters.templates[id];
+  saveMasters();
+  renderManage();
+  toast('Reset to default');
 }
 function setUserRole(userId,role){
   if(!db)return;
