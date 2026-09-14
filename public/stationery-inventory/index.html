@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" id="viewportMeta" content="width=device-width,initial-scale=1.0">
+<script>
+/* Crash safety net — same pattern as the other Bliss apps: registered first so a later
+   script error still surfaces as a visible banner instead of a silently dead page. */
+(function(){
+  function showCrashBanner(msg){
+    if(document.getElementById('siCrashBanner'))return;
+    var b=document.createElement('div');
+    b.id='siCrashBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b42318;color:#fff;padding:10px 14px;font:600 13px Arial,sans-serif;text-align:center;box-shadow:0 2px 10px #0004';
+    b.innerHTML='⚠ App me error aa gaya hai. Page reload karein.'
+      +' <button type="button" style="margin-left:10px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#b42318;font-weight:700;cursor:pointer" onclick="location.reload()">Reload</button>'
+      +'<div style="font-weight:400;font-size:11px;opacity:.85;margin-top:3px">'+String(msg||'').slice(0,200).replace(/[<>]/g,'')+'</div>';
+    function attach(){document.body&&document.body.prepend(b)}
+    if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach);
+  }
+  window.addEventListener('error',function(e){console.error('Uncaught error:',e.error||e.message);showCrashBanner((e.error&&e.error.message)||e.message);});
+  window.addEventListener('unhandledrejection',function(e){console.error('Unhandled promise rejection:',e.reason);showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));});
+})();
+</script>
+<title>Stationery Inventory</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+:root{--p:#268F76;--p2:#3FAF93;--mint:#E8F8F2;--bg:#f4f7f5;--b:#d9e2dc;--t:#17211b;--m:#66756c;--danger:#b42318;--warn:#b8860b;--warn-bg:#fdf3d9}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--t);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;margin:0}
+.wrap{max-width:980px;margin:0 auto;padding:14px 14px 90px}
+header{display:flex;align-items:center;gap:10px;padding:12px 14px;background:#fff;border-bottom:1px solid var(--b);position:sticky;top:0;z-index:20}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;font-weight:700;flex:none}
+.brandtext b{font-size:15px;display:block}
+.brandtext small{color:var(--m);font-size:11px}
+#loginBadge{font-size:12px;font-weight:700;color:var(--p)}
+.btn{border:1px solid var(--b);background:#fff;color:var(--t);padding:8px 13px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+.btn.primary{background:var(--p);border-color:var(--p);color:#fff}
+.btn.secondary{background:#fff}
+.btn.small{padding:5px 9px;font-size:12px}
+.btn.danger{background:#fff;color:var(--danger);border-color:var(--danger)}
+.hidden{display:none!important}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin:14px 0;padding-bottom:2px}
+.tab{border:1px solid var(--b);background:#fff;color:var(--m);padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex:none}
+.tab.on{background:var(--p);border-color:var(--p);color:#fff}
+.page{display:none}
+.page.on{display:block}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.stat{background:#fff;border:1px solid var(--b);border-radius:12px;padding:14px}
+.stat small{color:var(--m);font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+.stat b{display:block;font-size:24px;margin-top:4px;font-variant-numeric:tabular-nums}
+.stat.warn b{color:var(--warn)}
+.card{background:#fff;border:1px solid var(--b);border-radius:12px;margin-bottom:14px;overflow:hidden}
+.card h3{margin:0;padding:12px 16px;font-size:14px;border-bottom:1px solid var(--b)}
+.card .body{padding:16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:520px){.grid{grid-template-columns:1fr}}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--m);margin-bottom:4px}
+.field input,.field select{width:100%;padding:9px 10px;border:1px solid var(--b);border-radius:8px;font-size:13px;background:#fff;color:var(--t)}
+.span2{grid-column:1/-1}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--m);font-size:11px;text-transform:uppercase;letter-spacing:.03em;padding:8px 16px;border-bottom:1px solid var(--b)}
+td{padding:9px 16px;border-bottom:1px solid var(--b)}
+tr:last-child td{border-bottom:0}
+.tablewrap{overflow-x:auto}
+.pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.pill.ok{background:var(--mint);color:var(--p)}
+.pill.low{background:var(--warn-bg);color:var(--warn)}
+.num{font-variant-numeric:tabular-nums;text-align:right}
+.itemrow{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--b);gap:10px}
+.itemrow:last-child{border-bottom:0}
+.itemrow b{font-size:13px}
+.itemrow small{color:var(--m);display:block;font-size:11px;margin-top:2px}
+.item{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--b)}
+.item:last-child{border-bottom:0}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:9999}
+.modal.show{display:flex}
+.box{width:min(420px,100%);background:#fff;border-radius:14px;padding:19px;max-height:90vh;overflow:auto}
+.box h3{margin:0 0 14px;font-size:17px}
+.note{font-size:12px;color:var(--m)}
+#gateWrap{display:flex;align-items:center;justify-content:center;min-height:70vh;padding:20px}
+#gateBox{text-align:center;max-width:360px}
+.superAdminOnly.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<div id="gateWrap" style="display:none"><div id="gateBox"></div></div>
+
+<div id="appWrap" style="display:none">
+<header>
+  <div class="logo">b</div>
+  <div class="brandtext"><b>Stationery Inventory</b><small>Bliss Gems &amp; Minerals</small></div>
+  <span id="loginBadge" style="margin-left:auto">Not Logged In</span>
+  <button class="btn small secondary hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
+  <button class="btn small secondary superAdminOnly hidden" onclick="openManage()">⚙ Manage</button>
+</header>
+
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab on" data-page="dash" onclick="go('dash',this)">📊 Dashboard</button>
+    <button class="tab" data-page="in" onclick="go('in',this)">⬇ Stock In</button>
+    <button class="tab" data-page="out" onclick="go('out',this)">⬆ Stock Out / Issue</button>
+    <button class="tab superAdminOnly hidden" data-page="items" onclick="go('items',this)">🗂 Item Master</button>
+  </div>
+
+  <section class="page on" id="page-dash">
+    <div class="stats" id="statTiles"></div>
+    <div class="card">
+      <h3>Current Stock</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Item</th><th>Category</th><th class="num">In Hand</th><th class="num">Min Level</th><th>Status</th></tr></thead>
+        <tbody id="stockTable"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-in">
+    <div class="card">
+      <h3>New Stock In Entry</h3>
+      <div class="body">
+        <div class="grid">
+          <div class="field"><label>Item <span style="color:var(--danger)">*</span></label><select id="inItem"></select></div>
+          <div class="field"><label>Quantity <span style="color:var(--danger)">*</span></label><input type="number" id="inQty"></div>
+          <div class="field"><label>Date</label><input type="date" id="inDate"></div>
+          <div class="field"><label>Vendor / Source</label><input id="inVendor" list="vendorList" placeholder="Select ya type karein"><datalist id="vendorList"></datalist></div>
+          <div class="field span2"><label>Remark</label><input id="inRemark" placeholder="Optional"></div>
+        </div>
+        <div style="margin-top:14px;text-align:right"><button class="btn primary" onclick="addStockIn()">＋ Add Stock In</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Recent Stock In</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Date</th><th>Item</th><th class="num">Qty</th><th>Vendor</th><th>By</th></tr></thead>
+        <tbody id="inHistory"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-out">
+    <div class="card">
+      <h3>New Stock Out / Issue Entry</h3>
+      <div class="body">
+        <div class="grid">
+          <div class="field"><label>Item <span style="color:var(--danger)">*</span></label><select id="outItem"></select></div>
+          <div class="field"><label>Quantity <span style="color:var(--danger)">*</span></label><input type="number" id="outQty"></div>
+          <div class="field"><label>Issued To <span style="color:var(--danger)">*</span></label><select id="outTo"></select></div>
+          <div class="field"><label>Date</label><input type="date" id="outDate"></div>
+          <div class="field span2"><label>Purpose</label><input id="outPurpose" placeholder="Optional"></div>
+        </div>
+        <div style="margin-top:14px;text-align:right"><button class="btn primary" onclick="addStockOut()">＋ Issue Stock</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Recent Stock Out</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Date</th><th>Item</th><th class="num">Qty</th><th>Issued To</th><th>By</th></tr></thead>
+        <tbody id="outHistory"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-items">
+    <div class="card">
+      <h3>Add New Item</h3>
+      <div class="body">
+        <div class="grid">
+          <div class="field"><label>Item Name <span style="color:var(--danger)">*</span></label><input id="mItemName"></div>
+          <div class="field"><label>Category</label><input id="mItemCat" list="categoryList" placeholder="Select ya type karein"><datalist id="categoryList"></datalist></div>
+          <div class="field"><label>Unit</label><input id="mItemUnit" list="unitList" placeholder="Select ya type karein"><datalist id="unitList"></datalist></div>
+          <div class="field"><label>Minimum Stock Level</label><input type="number" id="mItemMin"></div>
+        </div>
+        <div style="margin-top:14px;text-align:right"><button class="btn primary" onclick="addItem()">＋ Add Item</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>All Items</h3>
+      <div id="itemList"></div>
+    </div>
+  </section>
+</div>
+</div>
+
+<!-- Login modal -->
+<div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
+<h3>Login</h3>
+<div class="field"><label>Username</label><input id="loginUsername" autocomplete="off"></div>
+<div class="field" style="margin-top:8px"><label>Password</label><input id="loginPassword" type="password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<p class="note" id="loginMsg" style="margin:8px 0 0"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeLogin()">Cancel</button><button class="btn primary" onclick="doLogin()">Login</button></div>
+</div></div>
+
+<!-- Super Admin modal -->
+<div class="modal" id="superAdminModal"><div class="box" style="width:min(340px,100%)">
+<h3>🔒 Super Admin</h3>
+<div class="field"><label>Password</label><input id="superAdminPassword" type="password" onkeydown="if(event.key==='Enter')unlockSuperAdmin()"></div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeSuperAdminModal()">Cancel</button><button class="btn primary" onclick="unlockSuperAdmin()">Unlock</button></div>
+</div></div>
+
+<!-- Manage modal -->
+<div class="modal" id="manageModal"><div class="box" style="width:min(560px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Admin / Backend Masters</h3><button class="btn small" onclick="closeManage()">✕</button></div>
+<div class="tabs" style="margin:0 0 10px">
+<button class="tab on" data-tab="category" onclick="mtab(this,'category')">Category</button>
+<button class="tab" data-tab="unit" onclick="mtab(this,'unit')">Unit</button>
+<button class="tab" data-tab="vendor" onclick="mtab(this,'vendor')">Vendor</button>
+<button class="tab" data-tab="roles" onclick="mtab(this,'roles')">Team &amp; Access</button>
+</div>
+<div id="manageContent"></div>
+</div></div>
+
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:14px;right:14px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:13px;line-height:26px;cursor:default;z-index:999999;transition:background .15s">•</button>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
+let db=null;
+try{
+  if(typeof firebase!=='undefined'){
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+  }else{console.error('firebase SDK not loaded — cloud sync unavailable this session');}
+}catch(e){console.error('firebase init failed:',e);}
+
+const APP_SLUG='stationery-inventory';
+const UU_COLLECTION='universal_users';
+const SESSION_KEY='pd_logged_user_v1'; // same key as Bliss One hub / Parcel Dispatch / Trip Expense — one login everywhere
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const todayISO=()=>new Date().toISOString().slice(0,10);
+
+let users=[],items=[],inLog=[],outLog=[];
+let masters={categories:[],units:[],vendors:[]};
+let api={};
+let currentUser=null,currentTab='category';
+let usersStarted=false,itemsStarted=false,inStarted=false,outStarted=false,mastersStarted=false;
+
+function loggedUser(){return users.find(x=>x.id===currentUser)||null}
+function myRole(){const u=loggedUser();return (u&&u.appRoles&&u.appRoles[APP_SLUG])||''}
+function isAdminRole(){const r=myRole();return superAdminUnlocked||r==='admin'||r==='director'}
+
+/* ===== Super Admin (same shared password as other Bliss apps) ===== */
+const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
+let superAdminUnlocked=false;
+let secretAdminTapCount=0,secretAdminTapTimer=null,secretAdminFlashTimer=null;
+function secretAdminTap(){
+  secretAdminTapCount++;
+  const dot=$('secretAdminIcon');
+  if(dot){dot.style.background='rgba(214,48,49,.45)';clearTimeout(secretAdminFlashTimer);secretAdminFlashTimer=setTimeout(()=>{dot.style.background='transparent'},200);}
+  clearTimeout(secretAdminTapTimer);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2500);
+  if(secretAdminTapCount>=10){secretAdminTapCount=0;clearTimeout(secretAdminTapTimer);openSuperAdminModal();}
+}
+function openSuperAdminModal(){
+  if(superAdminUnlocked){renderAll();return}
+  $('superAdminPassword').value='';
+  $('superAdminModal').classList.add('show');
+  setTimeout(()=>$('superAdminPassword')?.focus(),30);
+}
+function closeSuperAdminModal(){$('superAdminModal')?.classList.remove('show')}
+function unlockSuperAdmin(){
+  const pw=$('superAdminPassword')?.value||'';
+  if(pw!==SUPER_ADMIN_PASSWORD){alert('Galat password.');return}
+  superAdminUnlocked=true;
+  closeSuperAdminModal();
+  renderAll();
+}
+function silentUnlockSuperAdmin(){ if(!superAdminUnlocked){superAdminUnlocked=true;renderAll();} }
+
+/* ===== Login ===== */
+function loginFromHub(){
+  try{ if(window.self!==window.top && window.top.openStaffLoginModal){window.top.openStaffLoginModal();return;} }catch(e){}
+  openLogin();
+}
+function openLogin(){$('loginModal').classList.add('show');$('loginMsg').textContent='';}
+function closeLogin(){$('loginModal').classList.remove('show')}
+function doLogin(){
+  const uname=$('loginUsername').value.trim(),pass=$('loginPassword').value;
+  const msg=$('loginMsg');
+  if(!uname||!pass){msg.style.color='#b43a35';msg.textContent='Username aur Password dono bharein.';return}
+  const u=users.find(x=>String(x.username||x.id).toLowerCase()===uname.toLowerCase() && x.active!==false);
+  if(!u||pass!==String(u.password||'1234')){msg.style.color='#b43a35';msg.textContent='Invalid Username / Password';return}
+  if(u.appAccess && u.appAccess[APP_SLUG]===false){msg.style.color='#b43a35';msg.textContent='Aapko is app ka access nahi hai.';return}
+  localStorage.setItem(SESSION_KEY,u.id);
+  currentUser=u.id;
+  closeLogin();
+  renderAll();
+}
+function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
+
+/* ===== Firestore sync ===== */
+function startUsersSync(){
+  if(usersStarted||!db)return;usersStarted=true;
+  db.collection(UU_COLLECTION).onSnapshot(snap=>{users=[];snap.forEach(d=>users.push(d.data()));renderAll();},err=>console.error('users sync error',err));
+}
+function startItemsSync(){
+  if(itemsStarted||!db)return;itemsStarted=true;
+  db.collection('si_items').onSnapshot(snap=>{items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));renderAll();},err=>console.error('items sync error',err));
+}
+function startLogsSync(){
+  if(inStarted||!db)return;inStarted=true;outStarted=true;
+  db.collection('si_stock_in').orderBy('date','desc').limit(200).onSnapshot(snap=>{inLog=[];snap.forEach(d=>inLog.push({id:d.id,...d.data()}));renderAll();},err=>console.error('stock-in sync error',err));
+  db.collection('si_stock_out').orderBy('date','desc').limit(200).onSnapshot(snap=>{outLog=[];snap.forEach(d=>outLog.push({id:d.id,...d.data()}));renderAll();},err=>console.error('stock-out sync error',err));
+}
+function startMastersSync(){
+  if(mastersStarted||!db)return;mastersStarted=true;
+  db.collection('si_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={categories:[],units:[],vendors:[],...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed',e));
+}
+function saveMasters(){ if(db) db.collection('si_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
+
+/* ===== WhatsApp (shared GREEN-API credentials) ===== */
+function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===10)p='91'+p;return p;}
+async function sendRawWA(phone,message){
+  const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token){console.warn('GREEN-API settings missing');return false}
+  const p=normalizePhone(phone);if(p.length<11)return false;
+  try{
+    const r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
+    return r.ok;
+  }catch(e){console.error('WA send failed:',e);return false}
+}
+function notifyLowStock(item){
+  const admins=users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
+  const msg=`⚠ Low Stock Alert\n\nItem: ${item.name}\nIn Hand: ${item.stock} ${item.unit||''}\nMinimum Level: ${item.min}\n\nRestock karwana zaroori hai.`;
+  admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('low stock WA failed:',e)));
+}
+
+/* ===== Nav / gate ===== */
+function go(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab[data-page]').forEach(t=>t.classList.remove('on'));
+  $('page-'+id).classList.add('on');
+  if(btn)btn.classList.add('on');
+}
+function renderGate(){
+  const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
+  const u=loggedUser();
+  if(!currentUser||!u){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    const inFrame=window.self!==window.top;
+    gateBox.innerHTML=inFrame
+      ? `<h3>Login Required</h3><p class="note">Stationery Inventory dekhne ke liye Bliss One dashboard se login karein.</p><button class="btn primary" onclick="loginFromHub()">Login</button>`
+      : `<h3>Login Required</h3><p class="note">Stationery Inventory dekhne ke liye login karein — wahi username/password jo baaki Bliss apps me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
+    return;
+  }
+  const role=myRole();
+  const hasAccess=superAdminUnlocked||role==='admin'||role==='director';
+  if(!hasAccess || (u.appAccess && u.appAccess[APP_SLUG]===false)){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    gateBox.innerHTML=`<h3>No Access</h3><p class="note">Ye app sirf Admin ya Director role wale users ke liye hai. Access ke liye Bliss One admin se contact karein.</p>`;
+    return;
+  }
+  gateWrap.style.display='none';appWrap.style.display='';
+}
+
+function refreshLoginBadge(){
+  const u=loggedUser();
+  $('loginBadge').textContent=u?'👤 '+u.name:'Not Logged In';
+  $('logoutBtn').classList.toggle('hidden',!u);
+}
+function applyFeatureVisibility(){
+  document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.toggle('hidden',!isAdminRole()));
+  document.querySelectorAll('.tab[data-page]').forEach(t=>{
+    if(t.classList.contains('superAdminOnly'))return; // already handled above
+    t.classList.toggle('hidden',!canAccessFeature(t.dataset.page));
+  });
+}
+
+/* ===== Dashboard / stock ===== */
+function itemName(id){return (items.find(x=>x.id===id)||{}).name||id}
+function renderDash(){
+  const low=items.filter(x=>x.stock<=x.min).length;
+  const monthPrefix=todayISO().slice(0,7);
+  const inThisMonth=inLog.filter(x=>String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
+  const outThisMonth=outLog.filter(x=>String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
+  const tiles=[
+    {label:'Total Items',val:items.length},
+    {label:'Low Stock Alerts',val:low,warn:low>0},
+    {label:'Stock In (This Month)',val:inThisMonth},
+    {label:'Stock Out (This Month)',val:outThisMonth}
+  ];
+  $('statTiles').innerHTML=tiles.map(t=>`<div class="stat${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+  $('stockTable').innerHTML=items.map(x=>{
+    const isLow=x.stock<=x.min;
+    return `<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category||'-')}</td><td class="num">${x.stock||0} ${esc(x.unit||'')}</td><td class="num">${x.min||0}</td><td><span class="pill ${isLow?'low':'ok'}">${isLow?'⚠ Low Stock':'✓ OK'}</span></td></tr>`;
+  }).join('')||'<tr><td colspan="5" class="note">Koi item nahi hai. Item Master se add karein.</td></tr>';
+}
+function renderSelects(){
+  const opts=items.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+  if($('inItem'))$('inItem').innerHTML=opts;
+  if($('outItem'))$('outItem').innerHTML=opts;
+  const au=users.filter(u=>u.active!==false);
+  if($('outTo'))$('outTo').innerHTML='<option value="">Select</option>'+au.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+  if($('vendorList'))$('vendorList').innerHTML=(masters.vendors||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+  if($('categoryList'))$('categoryList').innerHTML=(masters.categories||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+  if($('unitList'))$('unitList').innerHTML=(masters.units||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+}
+function nameOfUserId(id){return (users.find(x=>x.id===id)||{}).name||id}
+function renderLogs(){
+  $('inHistory').innerHTML=inLog.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(itemName(x.item))}</td><td class="num">+${x.qty}</td><td>${esc(x.vendor||'-')}</td><td>${esc(nameOfUserId(x.by))}</td></tr>`).join('')||'<tr><td colspan="5" class="note">Koi entry nahi.</td></tr>';
+  $('outHistory').innerHTML=outLog.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(itemName(x.item))}</td><td class="num">-${x.qty}</td><td>${esc(nameOfUserId(x.to))}</td><td>${esc(nameOfUserId(x.by))}</td></tr>`).join('')||'<tr><td colspan="5" class="note">Koi entry nahi.</td></tr>';
+}
+function renderItems(){
+  $('itemList').innerHTML=items.map(x=>{
+    const isLow=x.stock<=x.min;
+    return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span></div>`;
+  }).join('')||'<div class="note" style="padding:14px">Koi item nahi hai.</div>';
+}
+
+async function addStockIn(){
+  const item=$('inItem').value,qty=parseInt($('inQty').value,10),vendor=$('inVendor').value.trim(),remark=$('inRemark').value.trim(),date=$('inDate').value||todayISO();
+  if(!item||!qty){alert('Item aur Quantity zaroori hai.');return}
+  const actor=loggedUser();
+  await db.collection('si_stock_in').add({item,qty,vendor,remark,date,by:actor?actor.id:'',at:new Date().toISOString()});
+  await db.collection('si_items').doc(item).update({stock:firebase.firestore.FieldValue.increment(qty)});
+  $('inQty').value='';$('inVendor').value='';$('inRemark').value='';
+  toast('Stock In entry saved');
+}
+async function addStockOut(){
+  const item=$('outItem').value,qty=parseInt($('outQty').value,10),to=$('outTo').value,purpose=$('outPurpose').value.trim(),date=$('outDate').value||todayISO();
+  if(!item||!qty||!to){alert('Item, Quantity aur Issued To zaroori hai.');return}
+  const it=items.find(x=>x.id===item);
+  if(it&&qty>(it.stock||0)){if(!confirm(`Sirf ${it.stock||0} ${it.unit||''} stock mein hai. Phir bhi issue karein?`))return}
+  const actor=loggedUser();
+  await db.collection('si_stock_out').add({item,qty,to,purpose,date,by:actor?actor.id:'',at:new Date().toISOString()});
+  await db.collection('si_items').doc(item).update({stock:firebase.firestore.FieldValue.increment(-qty)});
+  $('outQty').value='';$('outPurpose').value='';
+  toast('Stock issued');
+  if(it && (it.stock||0)-qty<=(it.min||0))notifyLowStock({...it,stock:(it.stock||0)-qty});
+}
+async function addItem(){
+  const name=$('mItemName').value.trim(),category=$('mItemCat').value.trim(),unit=$('mItemUnit').value.trim(),min=parseInt($('mItemMin').value,10)||0;
+  if(!name){alert('Item Name zaroori hai.');return}
+  await db.collection('si_items').add({name,category,unit,min,stock:0});
+  if(category && !masters.categories.includes(category)){masters.categories.push(category);saveMasters();}
+  if(unit && !masters.units.includes(unit)){masters.units.push(unit);saveMasters();}
+  $('mItemName').value='';$('mItemCat').value='';$('mItemUnit').value='';$('mItemMin').value='';
+  toast('Item added');
+}
+
+/* ===== Manage panel ===== */
+function openManage(){currentTab='category';$('manageModal').classList.add('show');renderManage()}
+function closeManage(){$('manageModal').classList.remove('show')}
+function mtab(btn,t){currentTab=t;document.querySelectorAll('#manageModal .tab').forEach(x=>x.classList.toggle('on',x===btn));renderManage()}
+function masterListUI(key,label){
+  const list=masters[key]||[];
+  return `<div class="field"><label>Add ${label}</label><div style="display:flex;gap:6px"><input id="mNew_${key}" style="flex:1"><button class="btn primary small" onclick="addMasterEntry('${key}')">Add</button></div></div>
+  <div style="margin-top:10px">${list.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delMasterEntry('${key}',${i})">Delete</button></div>`).join('')||'<div class="note" style="padding:8px 0">Koi entry nahi.</div>'}</div>`;
+}
+function addMasterEntry(key){
+  const inp=$('mNew_'+key);const v=inp.value.trim();if(!v)return;
+  if(!masters[key])masters[key]=[];
+  if(!masters[key].includes(v)){masters[key].push(v);saveMasters();}
+  inp.value='';renderManage();
+}
+function delMasterEntry(key,i){masters[key].splice(i,1);saveMasters();renderManage();}
+function renderManage(){
+  const c=$('manageContent');
+  if(currentTab==='category'){c.innerHTML=masterListUI('categories','Category');}
+  else if(currentTab==='unit'){c.innerHTML=masterListUI('units','Unit');}
+  else if(currentTab==='vendor'){c.innerHTML=masterListUI('vendors','Vendor');}
+  else if(currentTab==='roles'){
+    const au=users.filter(u=>u.active!==false);
+    c.innerHTML=`<p class="note">Ye poori app sirf Admin/Director role wale users ke liye hai — baaki sabko "No Access" dikhega.</p>`+au.map(u=>{
+      const role=(u.appRoles&&u.appRoles[APP_SLUG])||'';
+      return `<div class="item">
+        <b style="font-size:13px">${esc(u.name)}</b>
+        <select style="width:auto" onchange="setUserRole('${esc(u.id)}',this.value)">
+          <option value=""${role===''?' selected':''}>No Access</option>
+          <option value="admin"${role==='admin'?' selected':''}>Admin</option>
+          <option value="director"${role==='director'?' selected':''}>Director</option>
+        </select>
+      </div>`;
+    }).join('');
+  }
+}
+function setUserRole(userId,role){
+  if(!db)return;
+  const patch={};patch['appRoles.'+APP_SLUG]=role||firebase.firestore.FieldValue.delete();
+  db.collection(UU_COLLECTION).doc(userId).update(patch).catch(e=>console.error('role save failed',e));
+}
+function toggleFeature(pageId,userId,checked){
+  const list=new Set(featureAccess[pageId]||[]);
+  if(checked)list.add(userId);else list.delete(userId);
+  featureAccess[pageId]=[...list];
+  saveFeatureAccess();
+}
+
+/* ===== Toast ===== */
+let toastTimer=null;
+function toast(msg){
+  let t=$('siToast');
+  if(!t){t=document.createElement('div');t.id='siToast';t.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#17211b;color:#fff;padding:9px 16px;border-radius:20px;font-size:12px;z-index:99999;opacity:0;transition:opacity .2s';document.body.appendChild(t);}
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.opacity='0',2200);
+}
+
+function renderAll(){
+  renderGate();
+  refreshLoginBadge();
+  applyFeatureVisibility();
+  renderDash();
+  renderSelects();
+  renderLogs();
+  renderItems();
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  currentUser=localStorage.getItem(SESSION_KEY)||null;
+  if($('inDate'))$('inDate').value=todayISO();
+  if($('outDate'))$('outDate').value=todayISO();
+  startUsersSync();
+  startItemsSync();
+  startLogsSync();
+  startMastersSync();
+  renderAll();
+});
+window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
+</script>
+</body>
+</html>

@@ -10,5 +10,11 @@
     "name": "Trip Expense app",
     "pushedAt": 0,
     "enabled": true
+  },
+  {
+    "slug": "stationery-inventory",
+    "name": "Stationery Inventory",
+    "pushedAt": 0,
+    "enabled": true
   }
 ]
