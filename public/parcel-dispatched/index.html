@@ -1316,22 +1316,37 @@ function filterMyPendingTasks(){
  renderHistory();
  if(!window._dispatchFiltered||!window._dispatchFiltered.length)toast('Aapke naam par abhi koi slip pending nahi hai.');
 }
-// Which Doer a still-pending record is currently waiting on, derived from the live WhatsApp
-// transfer-reminder queue (pd_whatsapp_queue_v1) - the same queue that drives the recurring
-// reminders, so "pending with" here always matches who's actually being reminded. Falls back
-// to nothing (no badge) for records with no active queue entry (e.g. very old records from
-// before this queue existed, or a stage that isn't a worker-selection field).
-function pendingWithMap(){
-  const q=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
-  const map={};
-  q.forEach(item=>{
-    if(item.status!=='PENDING')return;
-    const existing=map[item.parcelId];
-    if(!existing||new Date(item.createdAt||0)>new Date(existing.createdAt||0)){
-      map[item.parcelId]={toUserId:item.toUserId,createdAt:item.createdAt,fieldId:item.stage||''};
+// Which Doer a record is currently waiting on, derived straight from the record's own field
+// values (dispatchDate...parcelHandoverTime - the same fields STAGE_SEQUENCE already tracks),
+// NOT from the local-only stage-lock store or the local-only WhatsApp reminder queue. Locks
+// and the reminder queue live only in this one browser's localStorage, so a different Doer
+// checking from their own phone would see nothing/stale data from either. Record fields, in
+// contrast, sync live across every device via pd_records_cloud (pdStartRecordsSync already
+// calls renderHistory() on every change) - so this is what makes "who's it pending with"
+// genuinely real-time across users, not just on the device that made the assignment.
+// Walks every STAGE_SEQUENCE field in order and stops at the first one that's still empty;
+// the value of the last "who" field seen before that point is whoever the work currently
+// rests with (they either still need to do their own step, or were just handed this stage
+// and haven't acted on it yet). Returns null once every field is filled - nothing pending.
+const PD_PERSON_FIELDS=new Set(['slipFillBy','parcelGivenBy','handoverToPrepare','dispatchPktBy','weightCheckedBy','linesTagsCheckedBy','handoverToNoting','notedBy','handoverToRecheck','recheckedBy','handoverToPacking','itemPackedBy','parcelHandoverBy']);
+// Fields that only apply (and only need to be filled) when a companion "Required?" toggle
+// is YES - mirrors dispatchPktRule()/linesTagsRule(), which clear and hide these same fields
+// when the toggle is NO. Without this, a record that legitimately skipped PKT Change or
+// Lines & Tags would look permanently "pending" on that empty field forever.
+const PD_CONDITIONAL_FIELDS={dispatchPktBy:'dispatchPktRequired',dispatchPktTime:'dispatchPktRequired',linesTagsCheckedBy:'linesTagsRequired',linesTagsTime:'linesTagsRequired'};
+function currentPendingAssignee(rec){
+  let lastPerson='',lastPersonField='';
+  for(const stage of STAGE_SEQUENCE){
+    for(const fieldId of stage.fields){
+      const gate=PD_CONDITIONAL_FIELDS[fieldId];
+      if(gate && rec[gate]!=='YES')continue;
+      const val=rec[fieldId];
+      const filled=val!==undefined&&val!==null&&String(val).trim()!=='';
+      if(PD_PERSON_FIELDS.has(fieldId)&&filled){lastPerson=val;lastPersonField=fieldId;}
+      if(!filled)return{toUserId:lastPerson,fieldId:lastPersonField,stageName:stage.name};
     }
-  });
-  return map;
+  }
+  return null;
 }
 function renderHistory(){
  refreshDashboardButtonVisibility();
@@ -1345,7 +1360,8 @@ function renderHistory(){
  fillRecordFilter('dispatchPartyFilter',uniqueSorted(all.map(x=>x.shipTo)),partyCur,'All Parties');
  fillRecordFilter('dispatchCourierFilter',uniqueSorted(all.map(x=>x.courierName||x.shipThrough)),courierCur,'All Couriers');
  fillRecordFilter('dispatchStatusFilter',uniqueSorted(all.map(x=>x.shippingFinalStatus||x.status)),statusCur,'All Status');
- const pendingWith=pendingWithMap();
+ const pendingMap={};
+ all.forEach(x=>{pendingMap[x.parcelId]=currentPendingAssignee(x);});
  if($('dispatchDoerFilter')){
    const au=users.filter(u=>u.active!==false);
    $('dispatchDoerFilter').innerHTML='<option value="">All Doers (Pending With)</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===doerCur?' selected':''}>${esc(u.name)}</option>`).join('');
@@ -1358,7 +1374,7 @@ function renderHistory(){
  let a=all.filter(x=>{
    let c=x.courierName||x.shipThrough||'',s=x.shippingFinalStatus||x.status||'',d=x.shippingDate||x.dispatchDate||'';
    let text=`${x.parcelId||''} ${slipLabel(x)} ${x.shipTo||''} ${c} ${x.broker||''} ${x.awbNo||''} ${s}`.toLowerCase();
-   const pw=pendingWith[x.parcelId];
+   const pw=pendingMap[x.parcelId];
    return (!q||text.includes(q))&&(!party||x.shipTo===party)&&(!courier||c===courier)&&(!status||s===status)&&(!doer||(pw&&pw.toUserId===doer))&&inDateRange(d,from,to);
  });
  a.sort((x,y)=>(isRecordPending(x.parcelId)?0:1)-(isRecordPending(y.parcelId)?0:1));
@@ -1385,16 +1401,11 @@ function renderHistory(){
    :`<button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button>${loggedUser()?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑 Delete</button>`:''}`;
  const slipOwnerName=x=>{const u=users.find(u=>u.id===x.slipFillBy);return u?u.name:''};
  const pendingWithInfo=x=>{
-   // Once every stage is locked, the record is no longer pending - even if some field
-   // (e.g. an early "Handover To" that got bypassed by someone else finishing the work
-   // directly) still literally holds the last-queued doer's name. isRecordPending is the
-   // real source of truth here, not whether a stale reminder-queue entry exists.
-   if(!isRecordPending(x.parcelId))return null;
-   const pw=pendingWith[x.parcelId];
-   if(!pw)return null;
+   const pw=pendingMap[x.parcelId];
+   if(!pw||!pw.toUserId)return null;
    const u=users.find(u=>u.id===pw.toUserId);
    const field=pw.fieldId?fieldLabel($(pw.fieldId)):'';
-   return {name:u?u.name:'',field};
+   return {name:u?u.name:pw.toUserId,field};
  };
  $('history').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);const pw=pendingWithInfo(x);const pwCell=pend&&pw&&pw.name?`<b>${esc(pw.name)}</b>${pw.field?`<br><small class="cellSub">${esc(pw.field)}</small>`:''}`:dash(pw&&pw.name);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(slipOwnerName(x))}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pwCell}</td><td>${pend?pendingBadge(x):esc(x.shippingFinalStatus||x.status||'')}</td><td>${dispatchAction(x)}</td></tr>`}).join(''):'<tr><td colspan="10">No records.</td></tr>';
  if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=a.length?a.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);const pw=pendingWithInfo(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(x.shippingFinalStatus||x.status||'')}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Slip Owner</small><strong>${esc(slipOwnerName(x)||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div>${pw&&pw.name?`<div><small>Pending With</small><strong>${esc(pw.name)}${pw.field?' — '+esc(pw.field):''}</strong></div>`:''}</div>${dispatchActionCard(x)}</div>`}).join(''):'<div class="note">No records.</div>';
