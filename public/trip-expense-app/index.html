@@ -98,20 +98,20 @@ if(window.self!==window.top){
 
 <div class="shell" id="appWrap" style="display:none"><nav>
 <div class="grouplabel">Operations</div>
-<button class="on" data-role="admin,director" onclick="go('admin',this)">▦ Admin Control</button>
-<button data-role="admin,director,accounts" onclick="go('ledger',this)">₹ Advance Ledger</button>
-<button data-role="admin,director" onclick="go('pending',this)">⏱ Pending Hisaab</button>
-<button onclick="go('sales',this)">👤 My Trip</button>
+<button class="on" data-page="admin" data-role="admin,director" onclick="go('admin',this)">▦ Admin Control</button>
+<button data-page="ledger" data-role="admin,director,accounts" onclick="go('ledger',this)">₹ Advance Ledger</button>
+<button data-page="pending" data-role="admin,director" onclick="go('pending',this)">⏱ Pending Hisaab</button>
+<button data-page="sales" onclick="go('sales',this)">👤 My Trip</button>
 <div class="grouplabel">Insights</div>
-<button data-role="admin,director" onclick="go('analytics',this)">📊 Analytics</button>
-<button data-role="admin,director,accounts" onclick="go('explorer',this)">🔎 Detailed Trips</button>
-<button data-role="admin,accounts,director,sales" onclick="go('accounts',this)">📚 Bookkeeping</button>
-<button data-role="admin,director,accounts" onclick="go('activity',this)">🕒 Activity Log</button>
+<button data-page="analytics" data-role="admin,director" onclick="go('analytics',this)">📊 Analytics</button>
+<button data-page="explorer" data-role="admin,director,accounts" onclick="go('explorer',this)">🔎 Detailed Trips</button>
+<button data-page="accounts" data-role="admin,accounts,director,sales" onclick="go('accounts',this)">📚 Bookkeeping</button>
+<button data-page="activity" data-role="admin,director,accounts" onclick="go('activity',this)">🕒 Activity Log</button>
 <div class="grouplabel">System</div>
-<button data-role="director" onclick="go('director',this)">★ Directors</button>
-<button data-role="director" onclick="go('notify',this)">💬 Notifications</button>
-<button data-role="director" onclick="go('templates',this)">📝 Message Templates</button>
-<button data-role="admin,director" onclick="go('teamroles',this)">👥 Team &amp; Roles</button>
+<button data-page="director" data-role="director" onclick="go('director',this)">★ Directors</button>
+<button data-page="notify" data-role="director" onclick="go('notify',this)">💬 Notifications</button>
+<button data-page="templates" data-role="director" onclick="go('templates',this)">📝 Message Templates</button>
+<button data-page="teamroles" data-role="admin,director" onclick="go('teamroles',this)">👥 Team &amp; Roles</button>
 </nav><main>
 
 <section id="admin" class="page on">
@@ -192,18 +192,18 @@ if(window.self!==window.top){
 </main></div>
 
 <div class="bottomNav" id="bottomNav">
-<button class="on" data-role="admin,director" onclick="mgo('admin',this)"><span>▦</span>Admin</button>
-<button data-role="admin,director,accounts" onclick="mgo('ledger',this)"><span>₹</span>Ledger</button>
-<button data-role="admin,director" onclick="mgo('pending',this)"><span>⏱</span>Pending</button>
-<button onclick="mgo('sales',this)"><span>👤</span>My Trip</button>
-<button data-role="admin,director" onclick="mgo('analytics',this)"><span>📊</span>Analytics</button>
-<button data-role="admin,director,accounts" onclick="mgo('explorer',this)"><span>🔎</span>Trips</button>
-<button data-role="admin,accounts,director,sales" onclick="mgo('accounts',this)"><span>📚</span>Books</button>
-<button data-role="admin,director,accounts" onclick="mgo('activity',this)"><span>🕒</span>Activity</button>
-<button data-role="director" onclick="mgo('director',this)"><span>★</span>Director</button>
-<button data-role="director" onclick="mgo('notify',this)"><span>💬</span>Notify</button>
-<button data-role="director" onclick="mgo('templates',this)"><span>📝</span>Templates</button>
-<button data-role="admin,director" onclick="mgo('teamroles',this)"><span>👥</span>Roles</button>
+<button class="on" data-page="admin" data-role="admin,director" onclick="mgo('admin',this)"><span>▦</span>Admin</button>
+<button data-page="ledger" data-role="admin,director,accounts" onclick="mgo('ledger',this)"><span>₹</span>Ledger</button>
+<button data-page="pending" data-role="admin,director" onclick="mgo('pending',this)"><span>⏱</span>Pending</button>
+<button data-page="sales" onclick="mgo('sales',this)"><span>👤</span>My Trip</button>
+<button data-page="analytics" data-role="admin,director" onclick="mgo('analytics',this)"><span>📊</span>Analytics</button>
+<button data-page="explorer" data-role="admin,director,accounts" onclick="mgo('explorer',this)"><span>🔎</span>Trips</button>
+<button data-page="accounts" data-role="admin,accounts,director,sales" onclick="mgo('accounts',this)"><span>📚</span>Books</button>
+<button data-page="activity" data-role="admin,director,accounts" onclick="mgo('activity',this)"><span>🕒</span>Activity</button>
+<button data-page="director" data-role="director" onclick="mgo('director',this)"><span>★</span>Director</button>
+<button data-page="notify" data-role="director" onclick="mgo('notify',this)"><span>💬</span>Notify</button>
+<button data-page="templates" data-role="director" onclick="mgo('templates',this)"><span>📝</span>Templates</button>
+<button data-page="teamroles" data-role="admin,director" onclick="mgo('teamroles',this)"><span>👥</span>Roles</button>
 </div>
 
 <div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
@@ -763,6 +763,29 @@ async function setUserAppRole(userId,role){
   const patch={};patch['appRoles.'+APP_SLUG]=role||firebase.firestore.FieldValue.delete();
   await db.collection(UU_COLLECTION).doc(userId).update(patch);
 }
+// Extra, per-user feature access on top of (or instead of) the 4 broad roles above - lets a
+// normal employee with no role (or a limited role) still be granted specific pages, without
+// giving them a full Admin/Accounts/Director role. Pages are matched by the nav buttons'
+// data-page attribute.
+const TRIP_FEATURE_LIST=[
+  {id:'admin',name:'Admin Control'},
+  {id:'ledger',name:'Advance Ledger'},
+  {id:'pending',name:'Pending Hisaab'},
+  {id:'analytics',name:'Analytics'},
+  {id:'explorer',name:'Detailed Trips'},
+  {id:'accounts',name:'Bookkeeping'},
+  {id:'activity',name:'Activity Log'},
+  {id:'director',name:'Directors'},
+  {id:'notify',name:'Notifications'},
+  {id:'templates',name:'Message Templates'},
+  {id:'teamroles',name:'Team & Roles'}
+];
+async function toggleUserFeatureAccess(userId,pageId,checked){
+  const patch={};
+  const path='appFeatureAccess.'+APP_SLUG;
+  patch[path]=checked?firebase.firestore.FieldValue.arrayUnion(pageId):firebase.firestore.FieldValue.arrayRemove(pageId);
+  await db.collection(UU_COLLECTION).doc(userId).update(patch);
+}
 function teamRoleInitials(name){return (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()}
 function renderTeamRolesPage(){
   const wrap=$('teamRolesList');if(!wrap)return;
@@ -771,14 +794,18 @@ function renderTeamRolesPage(){
   if(!list.length){wrap.innerHTML='<div class="row"><small>Koi user nahi mila.</small></div>';return}
   wrap.innerHTML=list.map(u=>{
     const role=(u.appRoles&&u.appRoles[APP_SLUG])||'';
-    return `<div class="rolerow"><div class="avatar">${esc(teamRoleInitials(u.name))}</div><div style="flex:1;font-size:13px;font-weight:700">${esc(u.name)}<br><small style="font-weight:500;color:var(--muted)">${esc(u.username||u.id)}</small></div>
+    const extra=(u.appFeatureAccess&&u.appFeatureAccess[APP_SLUG])||[];
+    return `<div class="rolerow" style="flex-wrap:wrap"><div class="avatar">${esc(teamRoleInitials(u.name))}</div><div style="flex:1;font-size:13px;font-weight:700">${esc(u.name)}<br><small style="font-weight:500;color:var(--muted)">${esc(u.username||u.id)}</small></div>
     <select class="rolesel" style="border:1px solid var(--line);background:#fff;color:var(--txt);padding:7px 9px;border-radius:6px;font-size:13px" onchange="setUserAppRole('${esc(u.id)}',this.value)">
       <option value=""${role===''?' selected':''}>No Access</option>
       <option value="sales"${role==='sales'?' selected':''}>Sales</option>
       <option value="admin"${role==='admin'?' selected':''}>Admin</option>
       <option value="accounts"${role==='accounts'?' selected':''}>Accounts</option>
       <option value="director"${role==='director'?' selected':''}>Director</option>
-    </select></div>`;
+    </select>
+    <div style="flex-basis:100%;font-size:11px;color:var(--muted);margin-top:6px">Extra feature access (role ke alawa, ya role ke bina bhi):
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">${TRIP_FEATURE_LIST.map(f=>`<label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" style="width:auto" onchange="toggleUserFeatureAccess('${esc(u.id)}','${f.id}',this.checked)" ${extra.includes(f.id)?'checked':''}> ${esc(f.name)}</label>`).join('')}</div>
+    </div></div>`;
   }).join('');
 }
 
@@ -1254,7 +1281,12 @@ function renderPage(id){
 function currentPageId(){const on=document.querySelector('.page.on');return on?on.id:'admin'}
 function applyRoleVisibility(){
   const role=effectiveRole();
-  const allowed=btn=>{const r=btn.dataset.role;if(!r)return true;return r.split(',').includes(role);};
+  const allowed=btn=>{
+    const u=myUserObj();
+    const extra=(u&&u.appFeatureAccess&&u.appFeatureAccess[APP_SLUG])||[];
+    if(btn.dataset.page && extra.includes(btn.dataset.page))return true;
+    const r=btn.dataset.role;if(!r)return true;return r.split(',').includes(role);
+  };
   let firstAllowed=null;
   document.querySelectorAll('nav button[data-role]').forEach(b=>{
     const ok=allowed(b);
@@ -1286,7 +1318,8 @@ function renderGate(){
     gateBox.innerHTML=`<h3>Access Nahi Hai</h3><p style="font-size:13px;color:var(--muted)">Aapko is app ka access nahi diya gaya hai. Bliss One admin se contact karein.</p>`;
     return;
   }
-  if(!role){
+  const extraFeatures=(u.appFeatureAccess&&u.appFeatureAccess[APP_SLUG])||[];
+  if(!role && !extraFeatures.length){
     gateWrap.style.display='block';appWrap.style.display='none';
     gateBox.innerHTML=`<h3>No Access</h3><p style="font-size:13px;color:var(--muted)">Aapko is app ka access nahi diya gaya hai. Bliss One admin se contact karein.</p>`;
     return;
