@@ -1288,7 +1288,7 @@ function renderGate(){
   }
   if(!role){
     gateWrap.style.display='block';appWrap.style.display='none';
-    gateBox.innerHTML=`<h3>Role Assign Nahi Hua</h3><p style="font-size:13px;color:var(--muted)">Login ho gaya, lekin abhi is app me aapka koi role (Admin/Director/Sales/Accounts) assign nahi hai. Director se karwayein — ya khud Super Admin unlock karke Director → Team Roles se set karein.</p>`;
+    gateBox.innerHTML=`<h3>No Access</h3><p style="font-size:13px;color:var(--muted)">Aapko is app ka access nahi diya gaya hai. Bliss One admin se contact karein.</p>`;
     return;
   }
   gateWrap.style.display='none';appWrap.style.display='';
