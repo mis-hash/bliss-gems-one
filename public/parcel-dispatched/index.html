@@ -2166,11 +2166,15 @@ function openReturnTransferTask(fieldId){
     alert('Ye section lock ho chuka hai. Sirf jisne is section ko lock kiya tha (ya Super Admin), wahi ab bhi task transfer kar sakta hai.');
     return;
   }
-  // If this field's stage is already locked, the check above already confirmed the actor
-  // owns that lock (or is Super Admin) — that authorizes transferring every field in the
-  // section, so skip the narrower per-field "only the current assignee" check below.
-  const stageLockCoversIt=stage && locks[stage.id];
-  if(!stageLockCoversIt && el.value && el.value!==actor.id && !superAdminUnlocked){
+  // A field that belongs to the sequential stage system is already fully authorized by the
+  // two checks above: either its stage is locked (and we just confirmed the actor owns that
+  // lock, or is Super Admin), or its stage is the currently-active unlocked stage (reachable
+  // because previous stages are locked) - which is exactly the same condition canEditField()
+  // uses to allow directly editing that field's value. Transfer is just a logged, notified
+  // way of changing that same value, so it must not be more restrictive than a plain edit.
+  // The narrower "only the current assignee" check below is therefore only relevant for
+  // fields with no stage at all (not part of STAGE_SEQUENCE / RETURN_STAGE_SEQUENCE).
+  if(!stage && el.value && el.value!==actor.id && !superAdminUnlocked){
     alert('Sirf jis Doer ko ye task currently assigned hai (ya Super Admin), wahi ise transfer kar sakta hai.');
     return;
   }
@@ -3214,11 +3218,15 @@ function openTransferTask(fieldId){
     alert('Ye section lock ho chuka hai. Sirf jisne is section ko lock kiya tha (ya Super Admin), wahi ab bhi task transfer kar sakta hai.');
     return;
   }
-  // If this field's stage is already locked, the check above already confirmed the actor
-  // owns that lock (or is Super Admin) — that authorizes transferring every field in the
-  // section, so skip the narrower per-field "only the current assignee" check below.
-  const stageLockCoversIt=stage && locks[stage.id];
-  if(!stageLockCoversIt && el.value && el.value!==actor.id && !superAdminUnlocked){
+  // A field that belongs to the sequential stage system is already fully authorized by the
+  // two checks above: either its stage is locked (and we just confirmed the actor owns that
+  // lock, or is Super Admin), or its stage is the currently-active unlocked stage (reachable
+  // because previous stages are locked) - which is exactly the same condition canEditField()
+  // uses to allow directly editing that field's value. Transfer is just a logged, notified
+  // way of changing that same value, so it must not be more restrictive than a plain edit.
+  // The narrower "only the current assignee" check below is therefore only relevant for
+  // fields with no stage at all (not part of STAGE_SEQUENCE / RETURN_STAGE_SEQUENCE).
+  if(!stage && el.value && el.value!==actor.id && !superAdminUnlocked){
     alert('Sirf jis Doer ko ye task currently assigned hai (ya Super Admin), wahi ise transfer kar sakta hai.');
     return;
   }
