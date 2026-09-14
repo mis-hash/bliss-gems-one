@@ -263,7 +263,7 @@ if(window.self!==window.top){
 <input type="date" id="dispatchDateFrom" onchange="renderHistory()" title="From Date">
 <input type="date" id="dispatchDateTo" onchange="renderHistory()" title="To Date">
 <button class="btn secondary small" type="button" onclick="clearDispatchFilters()">Clear Filters</button>
-<button class="btn small" type="button" onclick="filterMyPendingTasks()">🔔 Mere Pending Tasks</button>
+<button class="btn small" type="button" onclick="filterMyPendingTasks()">🔔 My Pending Slips</button>
 <button class="btn secondary small" type="button" onclick="exportDispatchCSV()">⬇ Export CSV</button>
 </div>
 <div class="recordSummary" id="dispatchRecordSummary"></div>
@@ -1314,7 +1314,7 @@ function filterMyPendingTasks(){
  if(!actor){toast('Pehle login karein.');return}
  if($('dispatchDoerFilter'))$('dispatchDoerFilter').value=actor.id;
  renderHistory();
- if(!window._dispatchFiltered||!window._dispatchFiltered.length)toast('Aapke naam par abhi koi task pending nahi hai.');
+ if(!window._dispatchFiltered||!window._dispatchFiltered.length)toast('Aapke naam par abhi koi slip pending nahi hai.');
 }
 // Which Doer a still-pending record is currently waiting on, derived from the live WhatsApp
 // transfer-reminder queue (pd_whatsapp_queue_v1) - the same queue that drives the recurring
