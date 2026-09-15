@@ -47,11 +47,22 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
   .row{flex-wrap:wrap;gap:6px}
 }
 
+.printLetterhead{display:none}
 @media print{
-  @page{size:A4;margin:6mm}
+  /* Extra left margin so a standard office hole-punch (left edge, ring binder filing)
+     never punches through printed text - other sides stay tight to fit more per page. */
+  @page{size:A4;margin:6mm 6mm 6mm 20mm}
   html,body{background:#fff;font-size:9px}
   header,.save,#historyCard,#returnHistoryCard,#dashboardCard,.modal,.toast,.no-print,.note{display:none!important}
   .container{max-width:none;margin:0;padding:0}
+  .printLetterhead{display:flex!important;align-items:center;justify-content:space-between;gap:8px;padding-bottom:5px;margin-bottom:6px;border-bottom:2px solid #268F76}
+  .printLetterhead .brand{display:flex;align-items:center;gap:8px}
+  .printLetterhead .logo{width:28px;height:28px;font-size:15px;background:#E8F8F2!important;color:#268F76!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;border-radius:8px;display:grid;place-items:center;font-weight:900;flex:none}
+  .printLetterhead h1{font-size:15px;margin:0;color:#000;line-height:1.2}
+  .printLetterhead small{font-size:8.5px;color:#444;display:block;margin-top:1px}
+  .printDocBadge{font-size:9px;font-weight:800;padding:3px 9px;border-radius:999px;letter-spacing:.4px;white-space:nowrap;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .printDocBadge.dispatch{background:#E8F8F2!important;color:#268F76!important;border:1.5px solid #268F76}
+  .printDocBadge.return{background:#FFF2E3!important;color:#B4611A!important;border:1.5px solid #B4611A}
   .card{break-inside:avoid;page-break-inside:avoid;border:1px solid #777;border-radius:0;margin:0 0 3px;box-shadow:none}
   .card h3{padding:3px 6px;font-size:10px;background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .body{padding:4px}
@@ -207,6 +218,7 @@ body.pd-force-mobile #headerMoreMenu .btn{width:100%;text-align:left}
 
 </head>
 <body>
+<div class="printLetterhead"><div class="brand"><div class="logo">b</div><div><h1>Bliss Gems &amp; Minerals</h1><small>Parcel Dispatch &amp; Return</small></div></div><span id="printDocBadge" class="printDocBadge"></span></div>
 <header><div class="head"><div id="secretAdminLogo" title="" style="display:flex;align-items:center;gap:10px"><div class="logo">b</div><div><h2>Bliss Gems &amp; Minerals</h2><small>Parcel Dispatch &amp; Return</small></div></div><div class="row">
 <span id="loginBadge" class="pill">Not Logged In</span>
 <button class="btn secondary" id="loginBtn" onclick="openLogin()">👤 Login</button>
@@ -1366,6 +1378,8 @@ let autoSaveTimer=null;
 function scheduleAutoSave(){clearTimeout(autoSaveTimer);autoSaveTimer=setTimeout(autoSaveParcel,1200)}
 function printSlip(){
   if(!$('dispatchDate').value||!$('shipTo').value||!$('shipThrough').value){toast('Print se pehle Dispatch Date, Ship To aur Ship Through fill karein.');return}
+  const badge=$('printDocBadge');
+  if(badge){badge.textContent='DISPATCH SLIP';badge.className='printDocBadge dispatch'}
   window.print();
 }
 function uniqueSorted(arr){return [...new Set(arr.filter(Boolean).map(String))].sort((a,b)=>a.localeCompare(b))}
@@ -2308,7 +2322,12 @@ function openReturnTransferTask(fieldId){
 
 
 
-function printReturn(){ saveReturn(true); window.print(); }
+function printReturn(){
+  saveReturn(true);
+  const badge=$('printDocBadge');
+  if(badge){badge.textContent='RETURN SLIP';badge.className='printDocBadge return'}
+  window.print();
+}
 
 const _returnAuditPrev=new WeakMap();
 document.addEventListener('focusin',e=>{
