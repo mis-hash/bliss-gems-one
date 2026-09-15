@@ -954,9 +954,11 @@ function personChanged(s){
     const recipients=[owner,givenBy].filter((x,i,arr)=>x&&x.phone&&x.id!==u.id&&arr.findIndex(y=>y&&y.id===x.id)===i);
     if(recipients.length){
       const parcel=editing||currentParcelId||'(New Parcel)',party=$('shipTo')?.value||'-';
+      const courierAmt=$('courierSlipAmount')?.value||'';
+      const courierAmtLine=courierAmt?`\nCourier Amt: ${courierAmt}`:'';
       const msg=s.id==='itemPackedBy'
         ?`📦 Parcel Packing Complete\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nPacked By: ${u.name}\nTime: ${now()}\n\n👉 View Details: ${parcelOpenLink(parcel)}`
-        :`🚚 Parcel Dispatch Complete\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nCourier: ${$('courierName')?.value||'-'}\nShip Through: ${$('shipThrough')?.value||'-'}\nAWB No: ${$('awbNo')?.value||'-'}\nInsurance Amount: ${$('inshAmount')?.value||'-'}\nHandover By: ${u.name}\nTime: ${now()}\n\n👉 View Details: ${parcelOpenLink(parcel)}`;
+        :`🚚 Parcel Dispatch Complete\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nCourier: ${$('courierName')?.value||'-'}\nShip Through: ${$('shipThrough')?.value||'-'}\nAWB No: ${$('awbNo')?.value||'-'}${courierAmtLine}\nInsurance Amount: ${$('inshAmount')?.value||'-'}\nHandover By: ${u.name}\nTime: ${now()}\n\n👉 View Details: ${parcelOpenLink(parcel)}`;
       for(const r of recipients){
         sendRawWA(r.phone,msg).catch(err=>console.error('Slip owner milestone WA failed:',err));
       }
