@@ -385,7 +385,7 @@ if(window.self!==window.top){
 <input id="returnSearch" placeholder="Search Return ID / Party / Courier / User / Remark" oninput="renderReturnHistory()">
 <select id="returnPartyFilter" onchange="renderReturnHistory()"><option value="">All Parties</option></select>
 <select id="returnCourierFilter" onchange="renderReturnHistory()"><option value="">All Couriers</option></select>
-<select id="returnUserFilter" onchange="renderReturnHistory()"><option value="">All Users</option></select>
+<select id="returnUserFilter" onchange="renderReturnHistory()"><option value="">All Doers (Pending With)</option></select>
 <input type="date" id="returnDateFrom" onchange="renderReturnHistory()" title="From Date">
 <input type="date" id="returnDateTo" onchange="renderReturnHistory()" title="To Date">
 <button class="btn secondary small" type="button" onclick="clearReturnFilters()">Clear Filters</button>
@@ -395,7 +395,7 @@ if(window.self!==window.top){
 <label id="showDeletedReturnWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="showDeletedReturn" onchange="renderReturnHistory()" style="width:auto"> 🗑 Show Deleted (<span id="deletedReturnCount">0</span>)</label>
     <div class="table desktopRecords">
 <table>
-<thead><tr><th>Return ID</th><th>Date</th><th>Party</th><th>Courier</th><th>User / Doer</th><th>Status</th><th>Saved At</th><th>Action</th></tr></thead>
+<thead><tr><th>Return ID</th><th>Date</th><th>Party</th><th>Courier</th><th>Pending With</th><th>Status</th><th>Saved At</th><th>Action</th></tr></thead>
 <tbody id="returnHistory"></tbody>
 </table>
 </div>
@@ -1439,6 +1439,13 @@ function currentPendingAssignee(rec){
   }
   return null;
 }
+// Shared by Dispatch and Return's Recent Records tables.
+function pendingBadge(x){
+  if(!x.createdAt)return '<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>';
+  const hrs=(Date.now()-new Date(x.createdAt).getTime())/36e5;
+  if(hrs>=24){const days=Math.floor(hrs/24);return `<span class="pendingBadge stuck" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">🚨 Stuck ${days}+ day${days>1?'s':''}</span>`}
+  return '<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>';
+}
 function renderHistory(){
  refreshDashboardButtonVisibility();
  let all=JSON.parse(localStorage.getItem(K.records)||'[]');
@@ -1483,12 +1490,6 @@ function renderHistory(){
  if($('dispatchRecordSummary'))$('dispatchRecordSummary').textContent=`Showing ${a.length} of ${all.length} dispatch records`+(pendingCount?` • ${pendingCount} pending (in progress)`:'');
  const dash=v=>v?esc(v):'<span class="cellDash">—</span>';
  const createdLabel=x=>x.createdAt?new Date(x.createdAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}):'';
- const pendingBadge=x=>{
-   if(!x.createdAt)return '<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>';
-   const hrs=(Date.now()-new Date(x.createdAt).getTime())/36e5;
-   if(hrs>=24){const days=Math.floor(hrs/24);return `<span class="pendingBadge stuck" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">🚨 Stuck ${days}+ day${days>1?'s':''}</span>`}
-   return '<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>';
- };
  const dispatchAction=x=>x.deletedAt
    ?`<button class="btn small secondary" onclick="restoreDispatchRecord('${esc(x.parcelId||'')}')">↩ Restore</button>`
    :`<button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button>${loggedUser()?` <button class="btn small danger" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑</button>`:''}`;
@@ -2125,6 +2126,27 @@ const RETURN_STAGE_SEQUENCE=[
   {id:'rstage3',name:'3. Return Entry',fields:['approvalReturnBy','approvalReturnTime','returnItemCount','notFoundReason','returnToBroker','handover506By','handover506Time']},
   {id:'rstage4',name:'4. PKT / Tag Change & Stock Closing',fields:['returnPktRequired','returnPktBy','returnPktTime','stockBoxesBy','stockBoxesTime']}
 ];
+// Pure record-data version of Dispatch's currentPendingAssignee() - walks the sequence
+// against the record's own stored values (not live DOM/locks), so "who/which section is
+// this stuck on" is correct for every record in the Recent Return Records list, not just
+// whichever slip happens to be open right now.
+const RETURN_PERSON_FIELDS=new Set(['returnReceiveBy','returnHandoverChecking','handoverToWeightCheck','returnWeightBy','returnLinesBy','returnEntryBy','approvalReturnBy','handover506By','returnPktBy','stockBoxesBy']);
+function isReturnFieldFilledForRecord(rec,fieldId){
+  if(fieldId==='returnAmount' && rec.returnParcelType!=='To Pay')return true;
+  if((fieldId==='returnPktBy'||fieldId==='returnPktTime') && rec.returnPktRequired!=='YES')return true;
+  return String(rec[fieldId]||'').trim()!=='';
+}
+function currentPendingReturnAssignee(rec){
+  let lastPerson='',lastPersonField='';
+  for(const stage of RETURN_STAGE_SEQUENCE){
+    for(const fieldId of stage.fields){
+      const filled=isReturnFieldFilledForRecord(rec,fieldId);
+      if(RETURN_PERSON_FIELDS.has(fieldId)&&filled){lastPerson=rec[fieldId];lastPersonField=fieldId;}
+      if(!filled)return{toUserId:lastPerson,fieldId:lastPersonField,stageName:stage.name};
+    }
+  }
+  return null;
+}
 const RETURN_APPROVAL_LOCK_KEY='pd_return_stage_locks_v1';
 function getReturnStageLocks(){
   const all=JSON.parse(localStorage.getItem(RETURN_APPROVAL_LOCK_KEY)||'{}');
@@ -2397,6 +2419,10 @@ function saveReturn(silent=false){
  let data=returnRecordData(); currentReturnId=data.returnId;
  localStorage.setItem(RETURN_KEY,JSON.stringify(data));
  let a=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]'),i=a.findIndex(x=>x.returnId===data.returnId);
+ // Stamped once, on first save only - the merge below preserves it on every save after
+ // that (data itself never carries createdAt again) - needed so pendingBadge() can tell
+ // how long a still-open Return slip has actually been sitting, same as Dispatch.
+ if(i<0)data.createdAt=new Date().toISOString();
  // Merge rather than replace — otherwise fields added outside the form (like the
  // assigned Slip No.) get wiped back to unassigned on every subsequent save.
  if(i>=0)a[i]={...a[i],...data};else a.unshift(data);
@@ -2451,28 +2477,41 @@ function renderReturnHistory(){
  let partyCur=$('returnPartyFilter')?.value||'',courierCur=$('returnCourierFilter')?.value||'',userCur=$('returnUserFilter')?.value||'';
  fillRecordFilter('returnPartyFilter',uniqueSorted(all.map(r=>r.returnFrom)),partyCur,'All Parties');
  fillRecordFilter('returnCourierFilter',uniqueSorted(all.map(r=>r.returnThrough)),courierCur,'All Couriers');
- let userList=uniqueSorted(all.flatMap(r=>returnUserNames(r).split(' • ').filter(Boolean)));
- fillRecordFilter('returnUserFilter',userList,userCur,'All Users');
+ const pendingMap={};
+ all.forEach(r=>{pendingMap[r.returnId]=currentPendingReturnAssignee(r);});
+ if($('returnUserFilter')){
+   const au=users.filter(u=>u.active!==false);
+   $('returnUserFilter').innerHTML='<option value="">All Doers (Pending With)</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===userCur?' selected':''}>${esc(u.name)}</option>`).join('');
+ }
 
  let q=($('returnSearch')?.value||'').trim().toLowerCase();
  let party=$('returnPartyFilter')?.value||'',courier=$('returnCourierFilter')?.value||'',user=$('returnUserFilter')?.value||'';
  let from=$('returnDateFrom')?.value||'',to=$('returnDateTo')?.value||'';
  let a=all.filter(r=>{
-   let usersText=returnUserNames(r),date=r.returnDate||'',status=r.status||'Return';
-   let text=`${r.returnId||''} ${slipLabel(r)} ${r.returnFrom||''} ${r.returnThrough||''} ${date} ${usersText} ${r.returnRemarks||''} ${r.notFoundReason||''} ${status}`.toLowerCase();
-   return (!q||text.includes(q))&&(!party||r.returnFrom===party)&&(!courier||r.returnThrough===courier)&&(!user||usersText.toLowerCase().includes(user.toLowerCase()))&&inDateRange(date,from,to);
+   let usersText=returnUserNames(r),date=r.returnDate||'';
+   let text=`${r.returnId||''} ${slipLabel(r)} ${r.returnFrom||''} ${r.returnThrough||''} ${date} ${usersText} ${r.returnRemarks||''} ${r.notFoundReason||''}`.toLowerCase();
+   const pw=pendingMap[r.returnId];
+   return (!q||text.includes(q))&&(!party||r.returnFrom===party)&&(!courier||r.returnThrough===courier)&&(!user||(pw&&pw.toUserId===user))&&inDateRange(date,from,to);
  });
  if($('returnRecordSummary'))$('returnRecordSummary').textContent=`Showing ${a.length} of ${all.length} return records`;
  window._returnFiltered=a;
  const dash=v=>v?esc(v):'<span class="cellDash">—</span>';
+ const returnFinalStatusLabel=r=>pendingMap[r.returnId]?null:'✅ Complete';
+ const returnPendingWithInfo=r=>{
+   const pw=pendingMap[r.returnId];
+   if(!pw||!pw.toUserId)return null;
+   const u=users.find(u=>u.id===pw.toUserId);
+   const field=pw.fieldId?fieldLabel($(pw.fieldId)):'';
+   return {name:u?u.name:pw.toUserId,field};
+ };
  const returnAction=r=>r.deletedAt
    ?`<button class="btn small secondary" onclick="restoreReturnRecord('${esc(r.returnId||'')}')">↩ Restore</button>`
    :`<button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button>${loggedUser()?` <button class="btn small danger" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑</button>`:''}`;
  const returnActionCard=r=>r.deletedAt
    ?`<button class="btn secondary" style="margin-top:6px" onclick="restoreReturnRecord('${esc(r.returnId||'')}')">↩ Restore</button>`
    :`<button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button>${loggedUser()?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑 Delete</button>`:''}`;
- body.innerHTML=a.length?a.map(r=>`<tr><td><b>${esc(slipLabel(r))}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${dash(returnUserNames(r))}</td><td>${esc(r.status||'Return')}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td>${returnAction(r)}</td></tr>`).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
- if($('returnMobileCards'))$('returnMobileCards').innerHTML=a.length?a.map(r=>`<div class="recordCard"><div class="recordCardTop"><b>${esc(slipLabel(r))}</b><span>${esc(r.status||'Return')}</span></div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div><div><small>User / Doer</small><strong>${esc(returnUserNames(r)||'-')}</strong></div></div>${returnActionCard(r)}</div>`).join(''):'<div class="note">No return records.</div>';
+ body.innerHTML=a.length?a.map(r=>{const pend=!!pendingMap[r.returnId];const pw=returnPendingWithInfo(r);const pwCell=pend&&pw&&pw.name?`<b>${esc(pw.name)}</b>${pw.field?`<br><small class="cellSub">${esc(pw.field)}</small>`:''}`:dash(pw&&pw.name);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(r))}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${pwCell}</td><td>${pend?pendingBadge(r):esc(returnFinalStatusLabel(r))}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td>${returnAction(r)}</td></tr>`}).join(''):'<tr><td colspan="8">No return records found.</td></tr>';
+ if($('returnMobileCards'))$('returnMobileCards').innerHTML=a.length?a.map(r=>{const pend=!!pendingMap[r.returnId];const pw=returnPendingWithInfo(r);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(r))}</b>${pend?pendingBadge(r):`<span>${esc(returnFinalStatusLabel(r))}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div>${pw&&pw.name?`<div><small>Pending With</small><strong>${esc(pw.name)}${pw.field?' — '+esc(pw.field):''}</strong></div>`:''}</div>${returnActionCard(r)}</div>`}).join(''):'<div class="note">No return records.</div>';
 }
 
 function openAllRecords(){ openRecordType('dispatch'); }
