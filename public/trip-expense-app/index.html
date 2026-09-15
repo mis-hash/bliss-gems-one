@@ -235,13 +235,13 @@ if(window.self!==window.top){
 <div class="field"><label>Hisaab Due *</label><input type="date" id="issueDue"></div>
 <div class="field span2" id="issueSuggestBox" style="display:none;background:var(--mint);border:1px solid #cdeadf;border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--g)"></div>
 <div class="field span2"><label>Amount *</label><input type="number" id="issueAmount" placeholder="₹ 0"></div>
-</div><div class="actions"><button class="btn" onclick="hide('issue')">Cancel</button><button class="btn primary" onclick="submitIssue()">Issue & Start Trip</button></div><div class="msg" id="issueMsg"></div></div></div>
+</div><div class="actions"><button class="btn" onclick="hide('issue')">Cancel</button><button class="btn primary" id="issueSubmitBtn" onclick="submitIssue()">Issue & Start Trip</button></div><div class="msg" id="issueMsg"></div></div></div>
 
 <div class="modal" id="extra"><div class="box"><h3>Additional Advance</h3>
 <div class="field"><label>Amount *</label><input type="number" id="extraAmount" placeholder="₹ 0"></div>
 <div class="field" style="margin-top:8px"><label>Payment Mode</label><select id="extraMode"><option>Cash</option><option>Bank</option><option>UPI</option></select></div>
 <div class="field" style="margin-top:8px"><label>Reference / Remark</label><input id="extraRemark"></div>
-<div class="actions"><button class="btn" onclick="hide('extra')">Cancel</button><button class="btn primary" onclick="submitExtra()">Issue Additional Advance</button></div><div class="msg" id="extraMsg"></div></div></div>
+<div class="actions"><button class="btn" onclick="hide('extra')">Cancel</button><button class="btn primary" id="extraSubmitBtn" onclick="submitExtra()">Issue Additional Advance</button></div><div class="msg" id="extraMsg"></div></div></div>
 
 <div class="modal" id="expense"><div class="box"><h3>Add Expense</h3><div class="fields">
 <div class="field"><label>Category *</label><select id="expCategory"><option>Hotel</option><option>Food</option><option>Taxi / Cab</option><option>Flight</option><option>Train</option><option>Fuel</option><option>Other</option></select></div>
@@ -249,7 +249,7 @@ if(window.self!==window.top){
 <div class="field span2"><label>Paid To *</label><input id="expPaidTo"></div>
 <div class="field span2"><label>Bill / Proof (photo)</label><input type="file" id="expProof" accept="image/*" capture="environment"></div>
 <div class="field span2"><label>Remark / No Bill Reason</label><textarea id="expRemark"></textarea></div>
-</div><div class="actions"><button class="btn" onclick="hide('expense')">Cancel</button><button class="btn primary" onclick="submitExpense()">Save Expense</button></div><div class="msg" id="expMsg"></div></div></div>
+</div><div class="actions"><button class="btn" onclick="hide('expense')">Cancel</button><button class="btn primary" id="expSubmitBtn" onclick="submitExpense()">Save Expense</button></div><div class="msg" id="expMsg"></div></div></div>
 
 <div class="modal" id="proofView"><div class="box"><h3>Bill / Proof</h3><img id="proofImg" style="max-width:100%;border-radius:8px"><div class="actions"><button class="btn" onclick="hide('proofView')">Close</button></div></div></div>
 
@@ -607,33 +607,51 @@ function openIssueModal(){
   $('issueMsg').textContent='';
   show('issue');
 }
+let _issueSubmitting=false;
 async function submitIssue(){
+  if(_issueSubmitting)return;
   const salesId=$('issueSales').value,location=$('issueLocation').value,purpose=$('issuePurpose').value,start=$('issueStart').value,due=$('issueDue').value,amount=Number($('issueAmount').value);
   const msg=$('issueMsg');
   if(!salesId||!location||!purpose||!start||!due||!amount){msg.style.color='#b43a35';msg.textContent='Sabhi fields bharein.';return}
-  const sales=users.find(u=>u.id===salesId);
-  const tripId=genId();
-  const trip={id:tripId,salesId,salesName:sales?sales.name:salesId,location,purpose,startDate:start,dueDate:due,status:'running',bookedByAccounts:false,createdAt:new Date().toISOString(),createdBy:currentUser};
-  await db.collection('te_trips').doc(tripId).set(trip);
-  const lg={id:genLedgerId(),tripId,type:'advance',amount,category:'',location,paidTo:'',proofDataUri:'',remark:'Initial Advance',byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
-  await db.collection('te_ledger').doc(lg.id).set(lg);
-  hide('issue');
-  logActivity(`${(myUserObj()||{}).name||currentUser} issued ${money(amount)} advance`,`to ${sales?sales.name:salesId} · ${location} · ${purpose} · ${tripId}`);
-  if(notifySettings.issued && sales)sendWA(sales.phone,renderTemplate(messageTemplates.issued,{amount:money(amount),location,due,tripId}));
+  _issueSubmitting=true;
+  const btn=$('issueSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const sales=users.find(u=>u.id===salesId);
+    const tripId=genId();
+    const trip={id:tripId,salesId,salesName:sales?sales.name:salesId,location,purpose,startDate:start,dueDate:due,status:'running',bookedByAccounts:false,createdAt:new Date().toISOString(),createdBy:currentUser};
+    await db.collection('te_trips').doc(tripId).set(trip);
+    const lg={id:genLedgerId(),tripId,type:'advance',amount,category:'',location,paidTo:'',proofDataUri:'',remark:'Initial Advance',byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
+    await db.collection('te_ledger').doc(lg.id).set(lg);
+    hide('issue');
+    logActivity(`${(myUserObj()||{}).name||currentUser} issued ${money(amount)} advance`,`to ${sales?sales.name:salesId} · ${location} · ${purpose} · ${tripId}`);
+    if(notifySettings.issued && sales)sendWA(sales.phone,renderTemplate(messageTemplates.issued,{amount:money(amount),location,due,tripId}));
+  }finally{
+    _issueSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
 }
 let extraForTrip=null;
 function openExtraModal(tripId){extraForTrip=tripId;$('extraAmount').value='';$('extraMode').value='Cash';$('extraRemark').value='';$('extraMsg').textContent='';show('extra')}
+let _extraSubmitting=false;
 async function submitExtra(){
+  if(_extraSubmitting)return;
   const amount=Number($('extraAmount').value),mode=$('extraMode').value,remark=$('extraRemark').value.trim();
   const msg=$('extraMsg');
   if(!extraForTrip||!amount){msg.style.color='#b43a35';msg.textContent='Amount bharein.';return}
-  const trip=trips.find(t=>t.id===extraForTrip);
-  const lg={id:genLedgerId(),tripId:extraForTrip,type:'additional_advance',amount,category:'',location:trip?trip.location:'',paidTo:'',proofDataUri:'',remark:mode+(remark?(' • '+remark):''),byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
-  await db.collection('te_ledger').doc(lg.id).set(lg);
-  hide('extra');
-  if(notifySettings.additional && trip){
-    const sales=users.find(u=>u.id===trip.salesId);
-    if(sales)sendWA(sales.phone,renderTemplate(messageTemplates.additional,{amount:money(amount),tripId:extraForTrip}));
+  _extraSubmitting=true;
+  const btn=$('extraSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const trip=trips.find(t=>t.id===extraForTrip);
+    const lg={id:genLedgerId(),tripId:extraForTrip,type:'additional_advance',amount,category:'',location:trip?trip.location:'',paidTo:'',proofDataUri:'',remark:mode+(remark?(' • '+remark):''),byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
+    await db.collection('te_ledger').doc(lg.id).set(lg);
+    hide('extra');
+    if(notifySettings.additional && trip){
+      const sales=users.find(u=>u.id===trip.salesId);
+      if(sales)sendWA(sales.phone,renderTemplate(messageTemplates.additional,{amount:money(amount),tripId:extraForTrip}));
+    }
+  }finally{
+    _extraSubmitting=false;
+    if(btn)btn.disabled=false;
   }
 }
 function fileToCompressedDataUri(file){
@@ -664,21 +682,30 @@ function openExpenseModal(){
   $('expCategory').value='Hotel';$('expAmount').value='';$('expPaidTo').value='';$('expProof').value='';$('expRemark').value='';$('expMsg').textContent='';
   show('expense');
 }
+let _expenseSubmitting=false;
 async function submitExpense(){
+  if(_expenseSubmitting)return;
   const trip=mySalesTrip();
   const msg=$('expMsg');
   if(!trip){msg.style.color='#b43a35';msg.textContent='Koi active trip nahi hai.';return}
   const category=$('expCategory').value,amount=Number($('expAmount').value),paidTo=$('expPaidTo').value.trim(),remark=$('expRemark').value.trim();
   if(!amount||!paidTo){msg.style.color='#b43a35';msg.textContent='Amount aur Paid To zaroori hain.';return}
   if(!remark && !$('expProof').files[0]){msg.style.color='#b43a35';msg.textContent='Bill photo lagayein ya No-Bill reason likhein.';return}
-  let proofDataUri='';
-  const file=$('expProof').files[0];
-  if(file){
-    try{proofDataUri=await fileToCompressedDataUri(file);}catch(e){}
+  _expenseSubmitting=true;
+  const btn=$('expSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    let proofDataUri='';
+    const file=$('expProof').files[0];
+    if(file){
+      try{proofDataUri=await fileToCompressedDataUri(file);}catch(e){}
+    }
+    const lg={id:genLedgerId(),tripId:trip.id,type:'expense',amount,category,location:trip.location,paidTo,proofDataUri,remark,byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
+    await db.collection('te_ledger').doc(lg.id).set(lg);
+    hide('expense');
+  }finally{
+    _expenseSubmitting=false;
+    if(btn)btn.disabled=false;
   }
-  const lg={id:genLedgerId(),tripId:trip.id,type:'expense',amount,category,location:trip.location,paidTo,proofDataUri,remark,byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
-  await db.collection('te_ledger').doc(lg.id).set(lg);
-  hide('expense');
 }
 async function submitHisaab(){
   const trip=mySalesTrip();
