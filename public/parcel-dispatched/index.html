@@ -2792,12 +2792,14 @@ async function processWaReminderQueue(){
       // The initial "here's your new task" message (with Parcel ID/Task/Assigned By) is
       // sent directly by logWorkerSelection() - by the time an item reaches here it has
       // already had lastSentAt set once, so every message from this loop is a follow-up
-      // reminder. Keep those short: just the My Pending Slips link, escalated once the
-      // task has been sitting for a full day or more.
+      // reminder. Keep those short, but the link goes straight back into this specific
+      // slip's pending section (not a generic list) - escalated once the task has been
+      // sitting for a full day or more.
       const ageMs=nowMs-new Date(item.createdAt||nowMs).getTime();
+      const openLink=parcelOpenLink(item.parcelId,item.stage);
       const reminderMsg=ageMs>=24*60*60*1000
-        ?`🚨 Critically Delayed (1+ Day)\n\nYour Pending Slips - kindly complete it urgently.\n\n👉 ${myPendingSlipsLink(item.toUserId)}`
-        :`📌 Reminder\n\nYour Pending Slips - kindly complete it.\n\n👉 ${myPendingSlipsLink(item.toUserId)}`;
+        ?`🚨 Critically Delayed (1+ Day)\n\nYour Pending Slip - kindly complete it urgently.\n\n👉 ${openLink}`
+        :`📌 Reminder\n\nYour Pending Slip - kindly complete it.\n\n👉 ${openLink}`;
       try{await sendRawWA(item.toPhone,reminderMsg);item.lastSentAt=new Date().toISOString();changed=true}
       catch(e){console.error('Reminder WA failed:',e)}
     }
@@ -3322,7 +3324,7 @@ function logWorkerSelection(field,selectedId,el){
    const intro=reason
      ? `${actor.name} has transferred '${field}' to you.\nReason: ${reason}`
      : `${actor.name} has assigned you a new task: '${field}'.`;
-   const msg=`📦 New Task — Parcel ${row.parcelId||''}\n\n${intro}\n\n👉 My Pending Slips: ${myPendingSlipsLink(worker.id)}`;
+   const msg=`📦 New Task — Parcel ${row.parcelId||''}\n\n${intro}\n\n👉 Open Task: ${parcelOpenLink(row.parcelId,fieldId)}`;
    let q=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
    q.unshift({createdAt:row.at,toUserId:worker.id,toPhone:worker.phone,parcelId:row.parcelId,stage:fieldId,status:'PENDING',reminderEveryMinutes:everyMin,message:msg,lastSentAt:''});
    localStorage.setItem(WA_QUEUE_KEY,JSON.stringify(q));
