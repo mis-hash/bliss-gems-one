@@ -1046,22 +1046,19 @@ async function checkStuckParcelsAndAlertDelays(){
       if(rec[alertKey]&&(hours<24||rec[criticalKey]))continue;
       const givenUser=users.find(u=>u.id===rec.parcelGivenBy);
       const ownerUser=users.find(u=>u.id===rec.slipFillBy);
+      // The Doer already gets their own reminder thread from the WA_QUEUE (New Task ->
+      // 30-min Reminder -> Critically Delayed after 24h, via processWaReminderQueue()) -
+      // this function does not message the Doer separately, so they only ever see one
+      // reminder channel instead of two overlapping ones.
       const doerUser=users.find(u=>u.id===info.responsibleDoerId);
       const targets=[givenUser,ownerUser].filter((u,i,arr)=>u&&u.phone&&arr.findIndex(x=>x&&x.id===u.id)===i);
-      const doerTarget=(doerUser&&doerUser.phone&&!targets.some(t=>t.id===doerUser.id))?doerUser:null;
-      if(!targets.length&&!doerTarget)continue;
+      if(!targets.length)continue;
       const hrs=Math.floor(hours);
       const withLine=doerUser?`\nCurrently With: ${doerUser.name}`:'';
       if(!rec[alertKey]){
-        if(targets.length){
-          const msg=`⏰ Delay Alert\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nStuck at: ${info.stage.name}${withLine}\nPending for: ${hrs}+ hours\n\n👉 ${parcelOpenLink(rec.parcelId)}`;
-          for(const u of targets){
-            try{await sendRawWA(u.phone,msg)}catch(e){console.error('delay WA failed',e)}
-          }
-        }
-        if(doerTarget){
-          const doerMsg=`⏰ Aapka Kaam Pending Hai\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nSection: ${info.stage.name}\nPending for: ${hrs}+ hours\n\n👉 Turant complete karein: ${parcelOpenLink(rec.parcelId)}`;
-          try{await sendRawWA(doerTarget.phone,doerMsg)}catch(e){console.error('doer delay WA failed',e)}
+        const msg=`⏰ Delay Alert\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nStuck at: ${info.stage.name}${withLine}\nPending for: ${hrs}+ hours\n\n👉 ${parcelOpenLink(rec.parcelId)}`;
+        for(const u of targets){
+          try{await sendRawWA(u.phone,msg)}catch(e){console.error('delay WA failed',e)}
         }
         rec[alertKey]=true;changed=true;
         try{await pdDb.collection('pd_records_cloud').doc(String(rec.parcelId)).update({[alertKey]:true})}catch(e){console.error('delay flag save failed',e)}
