@@ -112,7 +112,7 @@ if(window.self!==window.top){
 <button data-page="director" data-role="director" onclick="go('director',this)">★ Directors</button>
 <button data-page="notify" data-role="director" data-superadmin="1" onclick="go('notify',this)">💬 Notifications</button>
 <button data-page="templates" data-role="director" data-superadmin="1" onclick="go('templates',this)">📝 Message Templates</button>
-<button data-page="teamroles" data-role="admin,director" onclick="go('teamroles',this)">👥 Team &amp; Roles</button>
+<button data-page="teamroles" data-role-or-superadmin="admin" onclick="go('teamroles',this)">👥 Team &amp; Roles</button>
 </nav><main>
 
 <section id="admin" class="page on">
@@ -122,7 +122,7 @@ if(window.self!==window.top){
 </section>
 
 <section id="director" class="page">
-<div class="hero"><div><h1>Management Intelligence</h1><p>Company-wide trip expense • live data</p></div><div style="text-align:right"><small>TOTAL EXPENSE (ALL TIME)</small><strong id="dirTotalExpense">₹0</strong><div style="margin-top:8px"><button class="btn" style="background:#ffffff28;color:#fff" onclick="openReport()">📄 Export Report</button></div></div></div>
+<div class="hero"><div><h1>Management Intelligence</h1><p>Company-wide trip expense • live data</p></div><div style="text-align:right"><small>TOTAL EXPENSE (ALL TIME)</small><strong id="dirTotalExpense">₹0</strong></div></div>
 <div class="cards">
 <div class="card"><small>ACTIVE TRIPS</small><b id="dirActive">0</b></div>
 <div class="card"><small>ADVANCE OUTSTANDING</small><b id="dirOutstanding">₹0</b></div>
@@ -152,7 +152,7 @@ if(window.self!==window.top){
 </div></section>
 
 <section id="accounts" class="page">
-<div class="hero"><div><h1>Bookkeeping Register</h1><p>Every closed trip, with NOC and entry status</p></div><div><small>ALL-TIME EXPENSE</small><strong id="accTotal">₹0</strong></div></div>
+<div class="hero"><div><h1>Bookkeeping Register</h1><p>Every closed trip, with NOC and entry status</p></div><div style="text-align:right"><small>ALL-TIME EXPENSE</small><strong id="accTotal">₹0</strong><div style="margin-top:8px"><button class="btn" style="background:#ffffff28;color:#fff" onclick="openReport()">📄 Export Report</button></div></div></div>
 <div class="cards"><div class="card"><small>TRIPS TO BOOK</small><b id="accToBook">0</b></div><div class="card"><small>TOTAL ISSUED</small><b id="accIssued">₹0</b></div><div class="card"><small>TOTAL EXPENSE</small><b id="accExpense">₹0</b></div><div class="card"><small>NO BILL EXPENSES</small><b id="accNoBill">0</b></div></div>
 <div class="panel"><div class="ph"><span>Sales Person Expense Summary</span><span style="display:flex;gap:6px"><button class="btn" onclick="openLedgerHeads()">🧮 Ledger Heads</button><button class="btn" onclick="exportTally()">⬇️ Tally</button><button class="btn" onclick="exportBusy()">⬇️ Busy</button></span></div><div class="pb" id="accList"></div></div>
 </section>
@@ -204,7 +204,7 @@ if(window.self!==window.top){
 <button data-page="director" data-role="director" onclick="mgo('director',this)"><span>★</span>Director</button>
 <button data-page="notify" data-role="director" data-superadmin="1" onclick="mgo('notify',this)"><span>💬</span>Notify</button>
 <button data-page="templates" data-role="director" data-superadmin="1" onclick="mgo('templates',this)"><span>📝</span>Templates</button>
-<button data-page="teamroles" data-role="admin,director" onclick="mgo('teamroles',this)"><span>👥</span>Roles</button>
+<button data-page="teamroles" data-role-or-superadmin="admin" onclick="mgo('teamroles',this)"><span>👥</span>Roles</button>
 </div>
 
 <div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
@@ -909,9 +909,13 @@ function renderSalesPage(){
   if(!trip){wrap.innerHTML='<div class="panel"><div class="pb"><small>Abhi koi active trip nahi hai. Admin se advance issue karwayein.</small></div></div>';return}
   const issued=tripIssued(trip.id),expense=tripExpense(trip.id),balance=issued-expense;
   const rows=tripLedger(trip.id).filter(l=>l.type==='expense').sort((a,b)=>b.at.localeCompare(a.at)).map(l=>`<div class="row"><span>${esc(l.category)}<br><small>${esc(l.at.slice(0,10))} • ${l.proofDataUri?'Proof attached':'No Bill'}</small></span><b>${money(l.amount)}</b></div>`).join('')||'<div class="row"><small>Koi expense abhi tak nahi.</small></div>';
+  const submitted=trip.status==='hisaab_submitted';
+  const submitBtn=submitted
+    ?`<div class="big" style="background:var(--mint);color:var(--g);cursor:default;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.3"><span>✅ Hisaab Submitted<br><small style="font-weight:500">Admin verify karega</small></span></div>`
+    :`<button class="big primary" onclick="submitHisaab()"><span>✓</span>Submit Hisaab</button>`;
   wrap.innerHTML=`<div class="trip"><h1>My ${esc(trip.location)} Trip</h1><p>${esc(trip.id)} • ${esc(trip.salesName)} • Hisaab Due ${esc(trip.dueDate)}</p>
   <div class="tripMoney"><div class="tm"><small>TOTAL ADVANCE</small><b>${money(issued)}</b></div><div class="tm"><small>MY EXPENSE</small><b>${money(expense)}</b></div><div class="tm"><small>BALANCE</small><b>${money(balance)}</b></div></div></div>
-  <div class="salesActions"><button class="big" onclick="openExpenseModal()"><span>＋</span>Add Expense</button><button class="big" onclick="go('ledger')"><span>📋</span>My Expenses</button><button class="big" onclick="submitHisaab()"><span>✓</span>Submit Hisaab</button></div>
+  <div class="salesActions"><button class="big" onclick="openExpenseModal()"><span>＋</span>Add Expense</button><button class="big" onclick="go('ledger')"><span>📋</span>My Expenses</button>${submitBtn}</div>
   <div class="panel"><div class="ph">Recent Expenses</div><div class="pb">${rows}</div></div>`;
 }
 function renderLedgerPage(){
@@ -1330,15 +1334,19 @@ function applyRoleVisibility(){
     // a Director's normal role no longer surfaces them; only the shared Super Admin
     // unlock does.
     if(btn.dataset.superadmin)return !!superAdminUnlocked;
+    // Team & Roles: Admin only (a plain Director role no longer sees it), but Super
+    // Admin unlock must still work - effectiveRole() folds superAdminUnlocked into
+    // 'director', so it's checked separately here against the raw, unfolded myRole().
+    if(btn.dataset.roleOrSuperadmin)return !!superAdminUnlocked||btn.dataset.roleOrSuperadmin.split(',').includes(myRole());
     const r=btn.dataset.role;if(!r)return true;return r.split(',').includes(role);
   };
   let firstAllowed=null;
-  document.querySelectorAll('nav button[data-role]').forEach(b=>{
+  document.querySelectorAll('nav button[data-role], nav button[data-role-or-superadmin]').forEach(b=>{
     const ok=allowed(b);
     b.classList.toggle('hidden',!ok);
     if(ok&&!firstAllowed)firstAllowed=b;
   });
-  document.querySelectorAll('.bottomNav button[data-role]').forEach(b=>b.classList.toggle('hidden',!allowed(b)));
+  document.querySelectorAll('.bottomNav button[data-role], .bottomNav button[data-role-or-superadmin]').forEach(b=>b.classList.toggle('hidden',!allowed(b)));
   if(!document.querySelector(`nav button:not(.hidden)[onclick*="'${currentPageId()}'"]`) && firstAllowed){
     firstAllowed.click();
   }
