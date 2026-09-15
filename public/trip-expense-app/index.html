@@ -110,8 +110,8 @@ if(window.self!==window.top){
 <button data-page="activity" data-role="admin,director,accounts" onclick="go('activity',this)">🕒 Activity Log</button>
 <div class="grouplabel">System</div>
 <button data-page="director" data-role="director" onclick="go('director',this)">★ Directors</button>
-<button data-page="notify" data-role="director" onclick="go('notify',this)">💬 Notifications</button>
-<button data-page="templates" data-role="director" onclick="go('templates',this)">📝 Message Templates</button>
+<button data-page="notify" data-role="director" data-superadmin="1" onclick="go('notify',this)">💬 Notifications</button>
+<button data-page="templates" data-role="director" data-superadmin="1" onclick="go('templates',this)">📝 Message Templates</button>
 <button data-page="teamroles" data-role="admin,director" onclick="go('teamroles',this)">👥 Team &amp; Roles</button>
 </nav><main>
 
@@ -202,8 +202,8 @@ if(window.self!==window.top){
 <button data-page="accounts" data-role="admin,accounts,director,sales" onclick="mgo('accounts',this)"><span>📚</span>Books</button>
 <button data-page="activity" data-role="admin,director,accounts" onclick="mgo('activity',this)"><span>🕒</span>Activity</button>
 <button data-page="director" data-role="director" onclick="mgo('director',this)"><span>★</span>Director</button>
-<button data-page="notify" data-role="director" onclick="mgo('notify',this)"><span>💬</span>Notify</button>
-<button data-page="templates" data-role="director" onclick="mgo('templates',this)"><span>📝</span>Templates</button>
+<button data-page="notify" data-role="director" data-superadmin="1" onclick="mgo('notify',this)"><span>💬</span>Notify</button>
+<button data-page="templates" data-role="director" data-superadmin="1" onclick="mgo('templates',this)"><span>📝</span>Templates</button>
 <button data-page="teamroles" data-role="admin,director" onclick="mgo('teamroles',this)"><span>👥</span>Roles</button>
 </div>
 
@@ -1326,6 +1326,10 @@ function applyRoleVisibility(){
     const u=myUserObj();
     const extra=(u&&u.appFeatureAccess&&u.appFeatureAccess[APP_SLUG])||[];
     if(btn.dataset.page && extra.includes(btn.dataset.page))return true;
+    // Notifications / Message Templates are Super Admin-only, not just any Director -
+    // a Director's normal role no longer surfaces them; only the shared Super Admin
+    // unlock does.
+    if(btn.dataset.superadmin)return !!superAdminUnlocked;
     const r=btn.dataset.role;if(!r)return true;return r.split(',').includes(role);
   };
   let firstAllowed=null;
