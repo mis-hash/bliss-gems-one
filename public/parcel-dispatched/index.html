@@ -862,6 +862,7 @@ document.addEventListener('DOMContentLoaded',()=>{ensureDoerMaster();ensureUserP
   shipTo=clientMaster.map(x=>x.party);
   populate();
   const openId=new URLSearchParams(location.search).get('open');
+  const myPendingUserId=new URLSearchParams(location.search).get('mypending');
   if(openId && String(openId).startsWith('PR-')){
     const openFieldId=new URLSearchParams(location.search).get('f')||null;
     if(typeof openReturnRecord==='function')openReturnRecord(openId,openFieldId);
@@ -871,6 +872,12 @@ document.addEventListener('DOMContentLoaded',()=>{ensureDoerMaster();ensureUserP
     window._pendingOpenFieldId=new URLSearchParams(location.search).get('f')||null;
     const existing=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===openId);
     if(existing){openFromLink(openId)}else{newParcel();toast('Slip load ho rahi hai…')}
+  }else if(myPendingUserId){
+    // A WhatsApp task-assignment link - go straight to this Doer's own Pending Slips list
+    // instead of opening a specific field, since the whole point is "here's everything
+    // waiting on you right now", not just the one slip that triggered this message.
+    window._pendingMyPendingUserId=myPendingUserId;
+    if(history.replaceState)history.replaceState(null,'',location.pathname);
   }else{
     const activeDraftId=localStorage.getItem(ACTIVE_DRAFT_KEY);
     const activeDraftExists=activeDraftId&&JSON.parse(localStorage.getItem(K.records)||'[]').some(x=>x.parcelId===activeDraftId);
@@ -935,18 +942,19 @@ function personChanged(s){
   if(t)t.value=now();
   let u=users.find(x=>x.id===s.value);
   if(!u||!u.phone){console.warn('Selected user mobile number not saved.');return}
-  if(s.id==='parcelGivenBy')return; // Parcel Given By is the initiator, not someone a task is being handed to — no notification needed here.
-  if(notifySettings[s.dataset.event]===false)return; // Super Admin turned this event's notification off.
-  sendBackgroundWA(u,s.dataset.event,s.id).catch(err=>console.error('WhatsApp background send failed:',err));
+  // The per-field "you've been assigned this task" WhatsApp message is sent by
+  // logWorkerSelection() (wired to the same change event via the document-level listener
+  // below) - not here, to avoid sending two separate messages for one selection. This
+  // function still owns setting Time and the two Slip Owner milestone pings below.
   // Slip Owner gets pinged at the two milestones they actually care about, separately from
-  // the generic per-field notification above (which goes to whoever was just selected).
+  // the generic per-field notification (which goes to whoever was just selected).
   if(s.id==='itemPackedBy'||s.id==='parcelHandoverBy'){
     const owner=users.find(x=>x.id===$('slipFillBy')?.value);
     if(owner&&owner.phone&&owner.id!==u.id){
       const parcel=editing||currentParcelId||'(New Parcel)',party=$('shipTo')?.value||'-';
       const msg=s.id==='itemPackedBy'
-        ?`📦 Parcel Pack Ho Gaya\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nPacked By: ${u.name}\nTime: ${now()}\n\n👉 ${parcelOpenLink(parcel)}`
-        :`🚚 Parcel Dispatch Ho Gaya\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nCourier: ${$('courierName')?.value||'-'}\nShip Through: ${$('shipThrough')?.value||'-'}\nAWB No: ${$('awbNo')?.value||'-'}\nInsurance Amount: ${$('inshAmount')?.value||'-'}\nHandover By: ${u.name}\nTime: ${now()}\n\n👉 ${parcelOpenLink(parcel)}`;
+        ?`📦 Parcel Packing Complete\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nPacked By: ${u.name}\nTime: ${now()}\n\n👉 View Details: ${parcelOpenLink(parcel)}`
+        :`🚚 Parcel Dispatch Complete\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nCourier: ${$('courierName')?.value||'-'}\nShip Through: ${$('shipThrough')?.value||'-'}\nAWB No: ${$('awbNo')?.value||'-'}\nInsurance Amount: ${$('inshAmount')?.value||'-'}\nHandover By: ${u.name}\nTime: ${now()}\n\n👉 View Details: ${parcelOpenLink(parcel)}`;
       sendRawWA(owner.phone,msg).catch(err=>console.error('Slip owner milestone WA failed:',err));
     }
   }
@@ -958,12 +966,6 @@ async function sendRawWA(phone,message){
   let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
   if(!r.ok){let d=await r.json().catch(()=>({}));throw new Error(d.message||d.error||('HTTP '+r.status))}
   return true;
-}
-async function sendBackgroundWA(u,eventName,fieldId){
-  let parcel=editing||currentParcelId||'(New Parcel)';
-  let client=$('shipTo').value||'-',st=$('shipThrough').value||'-',tm=now();
-  let message=`📦 Parcel Dispatch\n\nClient: ${client}\nParcel ID: ${parcel}\nShip Through: ${st}\n${eventName}: ${u.name}\nTime: ${tm}\n\nParcel update: ${eventName} completed/handed over to ${u.name}.\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(parcel,fieldId)}`;
-  return sendRawWA(u.phone,message);
 }
 /* ===== Stuck-parcel delay alerts =====
    Best-effort, client-side only (Spark plan has no server/cron): checked whenever this
@@ -1070,6 +1072,9 @@ function mask(p){p=String(p);return p.length>4?'••••••'+p.slice(-4):
 function normalizePhone(p){let n=String(p||'').replace(/\D/g,'');if(n.length===10)n='91'+n;return n}
 function parcelOpenLink(parcelId,fieldId){
   return 'https://bliss-gems-one.web.app/parcel-dispatched/?open='+encodeURIComponent(parcelId)+(fieldId?'&f='+encodeURIComponent(fieldId):'');
+}
+function myPendingSlipsLink(userId){
+  return 'https://bliss-gems-one.web.app/parcel-dispatched/?mypending='+encodeURIComponent(userId);
 }
 async function sendWA(){if(!waTarget)return;let id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');if(!id||!token){toast('Manage → GREEN-API me ID Instance aur API Token save karein.');return}let phone=normalizePhone(waTarget.user.phone);if(phone.length<11){toast('User mobile number valid nahi hai.');return}let btn=$('waSendBtn');btn.disabled=true;btn.textContent='Sending...';try{let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:phone+'@c.us',message:$('waMessage').value})});let data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.message||data.error||('HTTP '+r.status));closeWA();toast('WhatsApp message sent successfully.')}catch(e){toast('Message send failed: '+e.message)}finally{btn.disabled=false;btn.textContent='Send WhatsApp'}}
 function closeWA(){$('waModal').classList.add('hidden')}
@@ -1394,6 +1399,11 @@ function renderHistory(){
  if($('dispatchDoerFilter')){
    const au=users.filter(u=>u.active!==false);
    $('dispatchDoerFilter').innerHTML='<option value="">All Doers (Pending With)</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===doerCur?' selected':''}>${esc(u.name)}</option>`).join('');
+   if(window._pendingMyPendingUserId){
+     $('dispatchDoerFilter').value=window._pendingMyPendingUserId;
+     doerCur=window._pendingMyPendingUserId;
+     window._pendingMyPendingUserId=null;
+   }
  }
 
  let q=($('search')?.value||'').trim().toLowerCase();
@@ -2207,15 +2217,9 @@ function returnPersonSelected(s){
   }
   if(t)t.value=returnNow();
   saveReturn(true);
-  const u=users.find(x=>x.id===s.value);
-  if(!u||!u.phone)return;
-  const label=s.closest('.field')?.querySelector('label')?.textContent.replace('*','').trim()||'Return Task';
-  sendReturnWA(u,label,s.id).catch(err=>console.error('Return WhatsApp send failed:',err));
-}
-async function sendReturnWA(u,eventName,fieldId){
-  const party=$('returnFrom')?.value||'-',tm=returnNow(),rid=currentReturnId||'(New Return)';
-  const message=`↩ Naya Task — Parcel Return\n\nParty: ${party}\nReturn ID: ${rid}\nTask: ${eventName}\nAssign kiya gaya: ${u.name}\nTime: ${tm}\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(rid,fieldId)}`;
-  return sendRawWA(u.phone,message);
+  // The "you've been assigned this task" WhatsApp message is sent by logWorkerSelection()
+  // (wired to the same change event via the document-level select.returnPerson listener),
+  // not here - sendReturnWA() used to send a second, separate message for one selection.
 }
 function openReturnTransferTask(fieldId){
   const el=$(fieldId);
@@ -2748,7 +2752,16 @@ async function processWaReminderQueue(){
       const everyMs=(item.reminderEveryMinutes||30)*60*1000;
       if(nowMs-lastSent<everyMs)continue;
       if(!item.toPhone)continue;
-      try{await sendRawWA(item.toPhone,item.message);item.lastSentAt=new Date().toISOString();changed=true}
+      // The initial "here's your new task" message (with Parcel ID/Task/Assigned By) is
+      // sent directly by logWorkerSelection() - by the time an item reaches here it has
+      // already had lastSentAt set once, so every message from this loop is a follow-up
+      // reminder. Keep those short: just the My Pending Slips link, escalated once the
+      // task has been sitting for a full day or more.
+      const ageMs=nowMs-new Date(item.createdAt||nowMs).getTime();
+      const reminderMsg=ageMs>=24*60*60*1000
+        ?`🚨 Critically Delayed (1+ Day)\n\nYour Pending Slips - kindly complete it urgently.\n\n👉 ${myPendingSlipsLink(item.toUserId)}`
+        :`📌 Reminder\n\nYour Pending Slips - kindly complete it.\n\n👉 ${myPendingSlipsLink(item.toUserId)}`;
+      try{await sendRawWA(item.toPhone,reminderMsg);item.lastSentAt=new Date().toISOString();changed=true}
       catch(e){console.error('Reminder WA failed:',e)}
     }
     if(changed)localStorage.setItem(WA_QUEUE_KEY,JSON.stringify(q.filter(x=>x.status==='PENDING'||Date.now()-new Date(x.at||x.createdAt).getTime()<7*86400000)));
@@ -3261,16 +3274,18 @@ function logWorkerSelection(field,selectedId,el){
  let fieldId=el?el.id:'';
  let row={at:new Date().toISOString(),parcelId:pid,field,enteredBy:actor?actor.name:'Unknown',workBy:worker.name};
  let a=JSON.parse(localStorage.getItem(WORK_AUDIT_KEY)||'[]');a.unshift(row);localStorage.setItem(WORK_AUDIT_KEY,JSON.stringify(a));
- // Parcel Given By is the initiator, not someone a task is being handed to - same exclusion
- // personChanged()/sendBackgroundWA() already applies, missing here until now, which is why
- // this field was still queuing/sending its own "select kiya hai" reminder message.
+ // Parcel Given By is the initiator, not someone a task is being handed to - no notification.
  if(fieldId==='parcelGivenBy')return;
+ // Respect the same Notification Control toggle personChanged() used to check before its
+ // own send was removed (see comment above) - this is now the only place that sends the
+ // per-field assignment message, so it must honor the same on/off setting.
+ if(el && el.dataset && el.dataset.event && notifySettings[el.dataset.event]===false)return;
  if(actor && actor.id!==worker.id){
    const everyMin=notifySettings.transferReminderMinutes||30;
    const intro=reason
-     ? `${actor.name} ne aapko '${field}' ka task transfer kiya hai.\nReason: ${reason}`
-     : `${actor.name} ne aapko '${field}' ka naya task assign kiya hai.`;
-   const msg=`📦 Naya Task — Parcel ${row.parcelId||''}\n\n${intro}\n\n⏰ Jab tak task pending rahega, har ${everyMin} minute reminder aayega.\n\n👉 Seedhe apna kaam kholne ke liye: ${parcelOpenLink(row.parcelId,fieldId)}`;
+     ? `${actor.name} has transferred '${field}' to you.\nReason: ${reason}`
+     : `${actor.name} has assigned you a new task: '${field}'.`;
+   const msg=`📦 New Task — Parcel ${row.parcelId||''}\n\n${intro}\n\n👉 My Pending Slips: ${myPendingSlipsLink(worker.id)}`;
    let q=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
    q.unshift({createdAt:row.at,toUserId:worker.id,toPhone:worker.phone,parcelId:row.parcelId,stage:fieldId,status:'PENDING',reminderEveryMinutes:everyMin,message:msg,lastSentAt:''});
    localStorage.setItem(WA_QUEUE_KEY,JSON.stringify(q));
