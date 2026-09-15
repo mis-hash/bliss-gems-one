@@ -3685,7 +3685,14 @@ document.addEventListener('DOMContentLoaded',()=>{ensureUserPasswords();refreshL
    Triple-click the Parcel Dispatch Slip logo/title to open the hidden login.
    This is convenience privacy for the standalone HTML preview, not server-grade security.
 */
-const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
+// SHA-256 of the shared Super Admin password, not the plaintext itself - see sha256Hex()
+// at the point of use. Doesn't make the password uncrackable (it's still a client-side
+// check with no backend), but at least "View Source" no longer hands it over directly.
+const SUPER_ADMIN_PASSWORD_HASH='0cb73e5ce7c7e7b2bc347bc16e73c2a16331fdedaec4c1c787815eab4daa6fad';
+async function sha256Hex(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
 const SUPER_ADMIN_IDLE_MS=4*60*1000;
 let superAdminUnlocked=false;
 let superAdminIdleTimer=null;
@@ -3739,9 +3746,9 @@ function canAccessManagePanel(){
 function refreshSuperAdminOnlyVisibility(){
   setSuperAdminVisibility(canAccessManagePanel());
 }
-function unlockSuperAdmin(){
+async function unlockSuperAdmin(){
   const pw=$('superAdminPassword')?.value||'';
-  if(pw!==SUPER_ADMIN_PASSWORD){
+  if((await sha256Hex(pw))!==SUPER_ADMIN_PASSWORD_HASH){
     alert('Incorrect Super Admin password.');
     if($('superAdminPassword'))$('superAdminPassword').value='';
     return;
