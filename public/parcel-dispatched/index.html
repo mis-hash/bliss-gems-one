@@ -270,12 +270,14 @@ if(window.self!==window.top){
 <input id="search" placeholder="Search Parcel / Party / Courier / AWB / Broker" oninput="renderHistory()">
 <select id="dispatchPartyFilter" onchange="renderHistory()"><option value="">All Parties</option></select>
 <select id="dispatchCourierFilter" onchange="renderHistory()"><option value="">All Couriers</option></select>
-<select id="dispatchStatusFilter" onchange="renderHistory()"><option value="">All Status</option></select>
+<select id="dispatchStatusFilter" onchange="renderHistory()"><option value="">All Status</option><option value="PENDING">Pending</option><option value="COMPLETE">Complete</option></select>
 <select id="dispatchDoerFilter" onchange="renderHistory()"><option value="">All Doers (Pending With)</option></select>
+<select id="dispatchGivenByFilter" onchange="renderHistory()"><option value="">All (Parcel Given By)</option></select>
 <input type="date" id="dispatchDateFrom" onchange="renderHistory()" title="From Date">
 <input type="date" id="dispatchDateTo" onchange="renderHistory()" title="To Date">
 <button class="btn secondary small" type="button" onclick="clearDispatchFilters()">Clear Filters</button>
 <button class="btn small" type="button" onclick="filterMyPendingTasks()">🔔 My Pending Slips</button>
+<button class="btn small" type="button" onclick="filterMyOwnedDueSlips()">📋 My Slips Due</button>
 <button class="btn secondary small" type="button" onclick="exportDispatchCSV()">⬇ Export CSV</button>
 </div>
 <div class="recordSummary" id="dispatchRecordSummary"></div>
@@ -1396,7 +1398,8 @@ function inDateRange(v,from,to){
   return true;
 }
 function clearDispatchFilters(){
- ['search','dispatchPartyFilter','dispatchCourierFilter','dispatchStatusFilter','dispatchDoerFilter','dispatchDateFrom','dispatchDateTo'].forEach(id=>{if($(id))$(id).value=''});
+ ['search','dispatchPartyFilter','dispatchCourierFilter','dispatchStatusFilter','dispatchDoerFilter','dispatchGivenByFilter','dispatchDateFrom','dispatchDateTo'].forEach(id=>{if($(id))$(id).value=''});
+ window._filterOwnerId=null;
  renderHistory();
 }
 // One-tap shortcut for "is anything pending in my name" - sets the Pending With filter to
@@ -1404,9 +1407,25 @@ function clearDispatchFilters(){
 function filterMyPendingTasks(){
  const actor=loggedUser();
  if(!actor){toast('Pehle login karein.');return}
+ window._filterOwnerId=null;
  if($('dispatchDoerFilter'))$('dispatchDoerFilter').value=actor.id;
+ if($('dispatchGivenByFilter'))$('dispatchGivenByFilter').value='';
+ if($('dispatchStatusFilter'))$('dispatchStatusFilter').value='';
  renderHistory();
  if(!window._dispatchFiltered||!window._dispatchFiltered.length)toast('Aapke naam par abhi koi slip pending nahi hai.');
+}
+// Slip Owner's own view: slips THEY created (slipFillBy), not yet complete - regardless of
+// which Doer it's currently sitting with. Distinct from "My Pending Slips" above, which is
+// about tasks currently assigned to the logged-in person to fill themselves.
+function filterMyOwnedDueSlips(){
+ const actor=loggedUser();
+ if(!actor){toast('Pehle login karein.');return}
+ window._filterOwnerId=actor.id;
+ if($('dispatchDoerFilter'))$('dispatchDoerFilter').value='';
+ if($('dispatchGivenByFilter'))$('dispatchGivenByFilter').value='';
+ if($('dispatchStatusFilter'))$('dispatchStatusFilter').value='PENDING';
+ renderHistory();
+ if(!window._dispatchFiltered||!window._dispatchFiltered.length)toast('Aapki banayi hui koi slip abhi pending nahi hai.');
 }
 // Which Doer a record is currently waiting on, derived straight from the record's own field
 // values (dispatchDate...parcelHandoverTime - the same fields STAGE_SEQUENCE already tracks),
@@ -1463,10 +1482,10 @@ function renderHistory(){
  if($('deletedDispatchCount'))$('deletedDispatchCount').textContent=deletedCount;
  const showDeleted=$('showDeletedDispatch')&&$('showDeletedDispatch').checked;
  all=showDeleted?all.filter(x=>x.deletedAt):all.filter(x=>!x.deletedAt);
- let partyCur=$('dispatchPartyFilter')?.value||'',courierCur=$('dispatchCourierFilter')?.value||'',statusCur=$('dispatchStatusFilter')?.value||'',doerCur=$('dispatchDoerFilter')?.value||'';
+ let partyCur=$('dispatchPartyFilter')?.value||'',courierCur=$('dispatchCourierFilter')?.value||'',statusCur=$('dispatchStatusFilter')?.value||'',doerCur=$('dispatchDoerFilter')?.value||'',givenByCur=$('dispatchGivenByFilter')?.value||'';
  fillRecordFilter('dispatchPartyFilter',uniqueSorted(all.map(x=>x.shipTo)),partyCur,'All Parties');
  fillRecordFilter('dispatchCourierFilter',uniqueSorted(all.map(x=>x.courierName||x.shipThrough)),courierCur,'All Couriers');
- fillRecordFilter('dispatchStatusFilter',uniqueSorted(all.map(x=>x.shippingFinalStatus||x.status)),statusCur,'All Status');
+ if($('dispatchStatusFilter'))$('dispatchStatusFilter').value=statusCur;
  const pendingMap={};
  all.forEach(x=>{pendingMap[x.parcelId]=currentPendingAssignee(x);});
  if($('dispatchDoerFilter')){
@@ -1478,16 +1497,21 @@ function renderHistory(){
      window._pendingMyPendingUserId=null;
    }
  }
+ if($('dispatchGivenByFilter')){
+   const au=users.filter(u=>u.active!==false);
+   $('dispatchGivenByFilter').innerHTML='<option value="">All (Parcel Given By)</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===givenByCur?' selected':''}>${esc(u.name)}</option>`).join('');
+ }
 
  let q=($('search')?.value||'').trim().toLowerCase();
- let party=$('dispatchPartyFilter')?.value||'',courier=$('dispatchCourierFilter')?.value||'',status=$('dispatchStatusFilter')?.value||'',doer=$('dispatchDoerFilter')?.value||'';
+ let party=$('dispatchPartyFilter')?.value||'',courier=$('dispatchCourierFilter')?.value||'',status=$('dispatchStatusFilter')?.value||'',doer=$('dispatchDoerFilter')?.value||'',givenBy=$('dispatchGivenByFilter')?.value||'';
  let from=$('dispatchDateFrom')?.value||'',to=$('dispatchDateTo')?.value||'';
 
  let a=all.filter(x=>{
    let c=x.courierName||x.shipThrough||'',s=x.shippingFinalStatus||x.status||'',d=x.shippingDate||x.dispatchDate||'';
    let text=`${x.parcelId||''} ${slipLabel(x)} ${x.shipTo||''} ${c} ${x.broker||''} ${x.awbNo||''} ${s}`.toLowerCase();
    const pw=pendingMap[x.parcelId];
-   return (!q||text.includes(q))&&(!party||x.shipTo===party)&&(!courier||c===courier)&&(!status||s===status)&&(!doer||(pw&&pw.toUserId===doer))&&inDateRange(d,from,to);
+   const statusOk=!status||(status==='PENDING'?!!pw:!pw);
+   return (!q||text.includes(q))&&(!party||x.shipTo===party)&&(!courier||c===courier)&&statusOk&&(!doer||(pw&&pw.toUserId===doer))&&(!givenBy||x.parcelGivenBy===givenBy)&&(!window._filterOwnerId||x.slipFillBy===window._filterOwnerId)&&inDateRange(d,from,to);
  });
  a.sort((x,y)=>(isRecordPending(x.parcelId)?0:1)-(isRecordPending(y.parcelId)?0:1));
  let pendingCount=a.filter(x=>isRecordPending(x.parcelId)).length;
@@ -1739,10 +1763,15 @@ function exportReturnCSV(){
   const rows=[header,...a.map(r=>[r.returnSeq?String(r.returnSeq).padStart(3,'0'):'',r.returnId||'',r.returnDate||'',r.returnFrom||'',r.returnThrough||'',returnUserNames(r)||'',r.status||'Return',r.savedAt?new Date(r.savedAt).toLocaleString('en-IN'):''])];
   downloadCSV('Return_Records_'+new Date().toISOString().slice(0,10)+'.csv',rows);
 }
+// Was lock-based (APPROVAL_LOCK_KEY, localStorage-only) - correct only on the device that did
+// the locking, stale on every other device/browser. Now derived the same way "Pending With"
+// already is: purely from the record's own synced field values, so Complete/Pending agrees
+// across every device the moment the cloud record updates.
 function isRecordPending(parcelId){
  if(!parcelId)return true;
- const locks=(JSON.parse(localStorage.getItem(APPROVAL_LOCK_KEY)||'{}'))[parcelId]||{};
- return !STAGE_SEQUENCE.every(s=>locks[s.id]);
+ const rec=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===parcelId);
+ if(!rec)return true;
+ return currentPendingAssignee(rec)!==null;
 }
 function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)||'[]'),r=a.find(x=>x.parcelId===id);if(!r)return;editing=id;currentParcelId=id;localStorage.setItem(ACTIVE_DRAFT_KEY,id);updateSlipNoTag();if($('autoSaveTag'))$('autoSaveTag').textContent='';populate();Object.keys(r).forEach(k=>{let e=$(k);if(e&&e.type!=='file')e.value=r[k]??''});shipChanged();priceChanged();dispatchPktRule();linesTagsRule();{const cm=findClientByParty($('shipTo').value);if(cm){$('broker').value=cm.broker||'';}}syncShippingSection();syncPackPhotoPreview();syncCourierSlipPhotoPreview();applySequenceAndLocks();if(!silent){showDispatchFormView();const _fid=window._pendingOpenFieldId;window._pendingOpenFieldId=null;const _target=_fid?$(_fid):null;if(_target)_target.scrollIntoView({behavior:'smooth',block:'center'});else scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
 function openManage(){currentTab='users';$('manageModal').classList.remove('hidden');renderManage()}function closeManage(){$('manageModal').classList.add('hidden');populate();shipChanged()}function tab(b,t){currentTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));renderManage()}
@@ -2868,7 +2897,13 @@ function waQueueTargetStillPending(item){
   const list=JSON.parse(localStorage.getItem(isReturn?RETURN_RECORDS_KEY:K.records)||'[]');
   const rec=list.find(x=>(isReturn?x.returnId:x.parcelId)===item.parcelId);
   if(!rec)return false;
-  return rec[item.stage]===item.toUserId;
+  // A person-field like handoverToPrepare is never cleared once filled - it stays as a
+  // permanent record of "who did this step," so comparing it to item.toUserId alone stays
+  // true forever, even after the whole slip is long complete. Ask who the record is ACTUALLY
+  // still pending with right now (or null if it's fully done) instead of just re-reading one
+  // frozen field - this is why completed slips kept generating reminders indefinitely.
+  const pw=isReturn?currentPendingReturnAssignee(rec):currentPendingAssignee(rec);
+  return !!pw && pw.toUserId===item.toUserId;
 }
 async function processWaReminderQueue(){
   if(_waReminderRunning)return;
