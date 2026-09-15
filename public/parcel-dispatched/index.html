@@ -272,8 +272,8 @@ if(window.self!==window.top){
 <select id="dispatchPartyFilter" onchange="renderHistory()"><option value="">All Parties</option></select>
 <select id="dispatchCourierFilter" onchange="renderHistory()"><option value="">All Couriers</option></select>
 <select id="dispatchStatusFilter" onchange="renderHistory()"><option value="">All Status</option><option value="PENDING">Pending</option><option value="COMPLETE">Complete</option></select>
-<select id="dispatchDoerFilter" onchange="renderHistory()"><option value="">All Doers (Pending With)</option></select>
-<select id="dispatchGivenByFilter" onchange="renderHistory()"><option value="">All (Parcel Given By)</option></select>
+<select id="dispatchDoerFilter" onchange="renderHistory()"><option value="">All Doers</option></select>
+<select id="dispatchGivenByFilter" onchange="renderHistory()"><option value="">All Given By</option></select>
 <input type="date" id="dispatchDateFrom" onchange="renderHistory()" title="From Date">
 <input type="date" id="dispatchDateTo" onchange="renderHistory()" title="To Date">
 <button class="btn secondary small" type="button" onclick="clearDispatchFilters()">Clear Filters</button>
@@ -388,7 +388,7 @@ if(window.self!==window.top){
 <input id="returnSearch" placeholder="Search Return ID / Party / Courier / User / Remark" oninput="renderReturnHistory()">
 <select id="returnPartyFilter" onchange="renderReturnHistory()"><option value="">All Parties</option></select>
 <select id="returnCourierFilter" onchange="renderReturnHistory()"><option value="">All Couriers</option></select>
-<select id="returnUserFilter" onchange="renderReturnHistory()"><option value="">All Doers (Pending With)</option></select>
+<select id="returnUserFilter" onchange="renderReturnHistory()"><option value="">All Doers</option></select>
 <input type="date" id="returnDateFrom" onchange="renderReturnHistory()" title="From Date">
 <input type="date" id="returnDateTo" onchange="renderReturnHistory()" title="To Date">
 <button class="btn secondary small" type="button" onclick="clearReturnFilters()">Clear Filters</button>
@@ -1495,7 +1495,7 @@ function renderHistory(){
  all.forEach(x=>{pendingMap[x.parcelId]=currentPendingAssignee(x);});
  if($('dispatchDoerFilter')){
    const au=users.filter(u=>u.active!==false&&!TEST_USER_IDS.has(u.id));
-   $('dispatchDoerFilter').innerHTML='<option value="">All Doers (Pending With)</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===doerCur?' selected':''}>${esc(u.name)}</option>`).join('');
+   $('dispatchDoerFilter').innerHTML='<option value="">All Doers</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===doerCur?' selected':''}>${esc(u.name)}</option>`).join('');
    if(window._pendingMyPendingUserId){
      $('dispatchDoerFilter').value=window._pendingMyPendingUserId;
      doerCur=window._pendingMyPendingUserId;
@@ -1505,7 +1505,7 @@ function renderHistory(){
  }
  if($('dispatchGivenByFilter')){
    const au=users.filter(u=>u.active!==false&&!TEST_USER_IDS.has(u.id));
-   $('dispatchGivenByFilter').innerHTML='<option value="">All (Parcel Given By)</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===givenByCur?' selected':''}>${esc(u.name)}</option>`).join('');
+   $('dispatchGivenByFilter').innerHTML='<option value="">All Given By</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===givenByCur?' selected':''}>${esc(u.name)}</option>`).join('');
    makeFilterSearchCombo($('dispatchGivenByFilter'));
  }
 
@@ -2544,7 +2544,7 @@ function renderReturnHistory(){
  all.forEach(r=>{pendingMap[r.returnId]=currentPendingReturnAssignee(r);});
  if($('returnUserFilter')){
    const au=users.filter(u=>u.active!==false&&!TEST_USER_IDS.has(u.id));
-   $('returnUserFilter').innerHTML='<option value="">All Doers (Pending With)</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===userCur?' selected':''}>${esc(u.name)}</option>`).join('');
+   $('returnUserFilter').innerHTML='<option value="">All Doers</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===userCur?' selected':''}>${esc(u.name)}</option>`).join('');
    makeFilterSearchCombo($('returnUserFilter'));
  }
 
