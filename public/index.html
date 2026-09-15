@@ -623,6 +623,13 @@ try{
   fbAuth=hubOfflineAuthStub();
   fbDb=hubOfflineDbStub();
 }
+// Ensures every visitor (even before Staff Login, which itself needs to read
+// universal_users to check credentials) has some Firebase Auth session. This is a
+// no-op with today's open Firestore rules; it exists so a future rules tightening
+// (requiring request.auth != null) doesn't need a client-code change to go with it. A real
+// email/password sign-in (staff/admin login) simply replaces this anonymous one. Isolated
+// in its own try/catch, outside the init block above, so it can never affect fbAuth/fbDb.
+try{if(fbAuth.onAuthStateChanged)fbAuth.onAuthStateChanged(u=>{if(!u)fbAuth.signInAnonymously().catch(e=>console.error('anon auth failed:',e));});}catch(e){console.error('anon auth failed:',e);}
 const UU_COLLECTION='universal_users';
 // Only apps with their own internal role system need a role dropdown here (in addition
 // to the plain app-access checkbox every app gets) — Trip Expense is role-gated

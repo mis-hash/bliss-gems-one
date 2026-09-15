@@ -36,6 +36,7 @@ if(localStorage.getItem('bliss_force_desktop')==='1')document.getElementById('vi
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <style>
 :root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--pink:#F2A8C0;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
 *{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}button,input,select,textarea{font:inherit}
@@ -298,6 +299,11 @@ try{
 }catch(e){
   console.error('firebase init failed:',e);
 }
+// Anonymous auth is a no-op with today's open Firestore rules; it exists so a future
+// rules tightening (requiring request.auth != null) doesn't need a client-code change to
+// go with it. Isolated in its own try/catch and kept out of the Firestore-init block above
+// so a missing/failing auth() call can never affect `db`.
+try{if(typeof firebase!=='undefined'&&firebase.auth)firebase.auth().signInAnonymously().catch(e=>console.error('anon auth failed:',e));}catch(e){console.error('anon auth failed:',e);}
 const APP_SLUG='trip-expense-app';
 const UU_COLLECTION='universal_users';
 const SESSION_KEY='pd_logged_user_v1';

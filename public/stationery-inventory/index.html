@@ -24,6 +24,7 @@
 <title>Stationery Inventory</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -321,6 +322,11 @@ try{
     db=firebase.firestore();
   }else{console.error('firebase SDK not loaded — cloud sync unavailable this session');}
 }catch(e){console.error('firebase init failed:',e);}
+// Anonymous auth is a no-op with today's open Firestore rules; it exists so a future
+// rules tightening (requiring request.auth != null) doesn't need a client-code change to
+// go with it. Isolated in its own try/catch and kept out of the Firestore-init block above
+// so a missing/failing auth() call can never affect `db`.
+try{if(typeof firebase!=='undefined'&&firebase.auth)firebase.auth().signInAnonymously().catch(e=>console.error('anon auth failed:',e));}catch(e){console.error('anon auth failed:',e);}
 
 const APP_SLUG='stationery-inventory';
 const UU_COLLECTION='universal_users';
