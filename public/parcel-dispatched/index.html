@@ -149,8 +149,9 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 
 
 <style id="advanced-record-mobile-style">
-.recordFilters{display:grid;grid-template-columns:minmax(250px,2fr) repeat(3,minmax(145px,1fr)) repeat(2,minmax(140px,1fr)) auto;gap:8px;align-items:center;margin-bottom:8px}
+.recordFilters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:center;margin-bottom:8px}
 .recordFilters>*{min-width:0}
+.recordFilters input:first-child{grid-column:span 2}
 .recordSummary{font-size:12px;color:var(--m);margin:4px 0 10px}
 .mobileRecordCards{display:none}
 .recordCard{border:1px solid var(--b);border-radius:12px;background:#fff;padding:12px;margin-bottom:10px}
@@ -839,6 +840,10 @@ let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(
 })();
 const $=id=>document.getElementById(id);
 
+// Test/placeholder accounts that ship in DEFAULT_DOERS for setup/QA - real staff never
+// pick these, so they're excluded from the Doer/Given By filter dropdowns to keep the list
+// down to people actually worth filtering by. Not removed from the user list itself.
+const TEST_USER_IDS=new Set(['Dummy','MIDAP']);
 const DOER_MASTER_VERSION='20260819_doers_v3';
 const DEFAULT_DOERS=[{"id":"Dummy","username":"Dummy","name":"Dummy","email":"","phone":"1234567890","role":"Doer","department":"","active":true},{"id":"ND","username":"ND","name":"NiteshDusad","email":"","phone":"9351140507","role":"Doer","department":"","active":true},{"id":"HD","username":"HD","name":"HiteshDUSAD","email":"","phone":"9414752137","role":"Doer","department":"","active":true},{"id":"AnkurKhandelwal","username":"AnkurKhandelwal","name":"Ankur Khandelwal","email":"aankur.khandelwal@gmail.com","phone":"9314445552","role":"Doer","department":"","active":true},{"id":"NiteshDusad","username":"NiteshDusad","name":"Nitesh Dusad","email":"niteshgems@gmail.com","phone":"9351140507","role":"Doer","department":"","active":true},{"id":"RahulVyas","username":"RahulVyas","name":"Rahul Kumar Vays","email":"rahulkumarvyas82@gmail.com","phone":"9166594487","role":"Doer","department":"Maintainance","active":true},{"id":"Vikash","username":"Vikash","name":"Vikash Prajapat","email":"vikashprajapatv6@gmail.com","phone":"9079328073","role":"Doer","department":"Maintainance","active":true},{"id":"Anil","username":"Anil","name":"Anil Saini","email":"anilsainiamer@gmail.com","phone":"8955366574","role":"Doer","department":"Maintainance","active":true},{"id":"Chunnu","username":"Chunnu","name":"Chunnu Khandelwal","email":"saranshkhandelwal914@gmail.com","phone":"7878266001","role":"Doer","department":"Inventory","active":true},{"id":"Kamal","username":"Kamal","name":"Kamal Badaya","email":"Kamalbadaya1970@gmail.com","phone":"9829247330","role":"Doer","department":"","active":true},{"id":"Sunil","username":"Sunil","name":"Sunil Shirmal","email":"bgmmanufacturing7@gmail.com","phone":"9251983720","role":"Doer","department":"Manufacturing","active":true},{"id":"AmitYogi","username":"AmitYogi","name":"Amit Yogi","email":"amit777yogi@gmail.com","phone":"6350122991","role":"Doer","department":"Accounts & Finance","active":true},{"id":"Jitendra","username":"Jitendra","name":"Jitendra Sharma","email":"js6503578@gmail.com","phone":"6350122991","role":"Doer","department":"Accounts & Finance","active":true},{"id":"Ritika","username":"Ritika","name":"Ritika Gupta","email":"accountshead@teambgmjaipur.com","phone":"9251488653","role":"Doer","department":"Accounts & Finance","active":true},{"id":"Akhilesh","username":"Akhilesh","name":"Akhilesh Sharma","email":"financehead@teambgmjaipur.com","phone":"9251488653","role":"Doer","department":"Accounts & Finance","active":true},{"id":"MIDAP","username":"MIDAP","name":"Test MIDAP","email":"rahul@minervainfocom.com","phone":"7003169991","role":"Doer","department":"","active":true},{"id":"Tarun","username":"Tarun","name":"Tarun Kushwah","email":"aartifcjt@gmail.com","phone":"7851944746","role":"Doer","department":"","active":true},{"id":"Kadu","username":"Kadu","name":"Kadu Saini","email":"kadusaini4@gmail.com","phone":"8114479480","role":"Doer","department":"Operations","active":true},{"id":"Vijay","username":"Vijay","name":"Vijay Saini","email":"vijaysaini5004@gmail.com","phone":"9251666853","role":"Doer","department":"Operations","active":true},{"id":"Dharmendra","username":"Dharmendra","name":"Dharmendra Kumar","email":"dharmendrakumar464666@gmail.com","phone":"7518657751","role":"Doer","department":"Operations","active":true},{"id":"Amit","username":"Amit","name":"Amit Sharma","email":"admin@teambgmjaipur.com","phone":"9829760504","role":"Doer","department":"Admin","active":true},{"id":"Saaransh","username":"Saaransh","name":"Saaransh Jain","email":"salesbgm.sj@gmail.com","phone":"9251997977","role":"Doer","department":"Sales","active":true},{"id":"Vansh","username":"Vansh","name":"Vansh Khandelwal","email":"khandelwalvansh321@gmail.com","phone":"9251554760","role":"Doer","department":"Operations","active":true},{"id":"Himanshu","username":"Himanshu","name":"Himanshu Saini","email":"sales.hs@teambgmjaipur.com","phone":"9251554761","role":"Doer","department":"Sales","active":true},{"id":"Satish","username":"Satish","name":"Satish Gupta","email":"bgmsales.sg@gmail.com","phone":"9251597492","role":"Doer","department":"Sales","active":true},{"id":"Mukund","username":"Mukund","name":"Mukund Bhukhmaria","email":"sales.mb@teambgmjaipur.com","phone":"9251983728","role":"Doer","department":"Sales","active":true},{"id":"TK","username":"TK","name":"Tarun Khandelwal","email":"sales.tk@teambgmjaipur.com","phone":"9251597493","role":"Doer","department":"Sales","active":true},{"id":"Sneha","username":"Sneha","name":"Sneha Sahu","email":"inventoryhead@teambgmjaipur.com","phone":"9251488655","role":"Doer","department":"","active":true},{"id":"Riddhi","username":"Riddhi","name":"Riddhi Gupta","email":"crm@teambgmjaipur.com","phone":"9251983730","role":"Doer","department":"Admin","active":true},{"id":"Praveen","username":"Praveen","name":"Praveen Saini","email":"mis@teambgmjaipur.com","phone":"9251487220","role":"Doer","department":"MIS","active":true}];
 function ensureDoerMaster(){
@@ -1489,17 +1494,19 @@ function renderHistory(){
  const pendingMap={};
  all.forEach(x=>{pendingMap[x.parcelId]=currentPendingAssignee(x);});
  if($('dispatchDoerFilter')){
-   const au=users.filter(u=>u.active!==false);
+   const au=users.filter(u=>u.active!==false&&!TEST_USER_IDS.has(u.id));
    $('dispatchDoerFilter').innerHTML='<option value="">All Doers (Pending With)</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===doerCur?' selected':''}>${esc(u.name)}</option>`).join('');
    if(window._pendingMyPendingUserId){
      $('dispatchDoerFilter').value=window._pendingMyPendingUserId;
      doerCur=window._pendingMyPendingUserId;
      window._pendingMyPendingUserId=null;
    }
+   makeFilterSearchCombo($('dispatchDoerFilter'));
  }
  if($('dispatchGivenByFilter')){
-   const au=users.filter(u=>u.active!==false);
+   const au=users.filter(u=>u.active!==false&&!TEST_USER_IDS.has(u.id));
    $('dispatchGivenByFilter').innerHTML='<option value="">All (Parcel Given By)</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===givenByCur?' selected':''}>${esc(u.name)}</option>`).join('');
+   makeFilterSearchCombo($('dispatchGivenByFilter'));
  }
 
  let q=($('search')?.value||'').trim().toLowerCase();
@@ -2536,8 +2543,9 @@ function renderReturnHistory(){
  const pendingMap={};
  all.forEach(r=>{pendingMap[r.returnId]=currentPendingReturnAssignee(r);});
  if($('returnUserFilter')){
-   const au=users.filter(u=>u.active!==false);
+   const au=users.filter(u=>u.active!==false&&!TEST_USER_IDS.has(u.id));
    $('returnUserFilter').innerHTML='<option value="">All Doers (Pending With)</option>'+au.map(u=>`<option value="${esc(u.id)}"${u.id===userCur?' selected':''}>${esc(u.name)}</option>`).join('');
+   makeFilterSearchCombo($('returnUserFilter'));
  }
 
  let q=($('returnSearch')?.value||'').trim().toLowerCase();
@@ -2660,6 +2668,54 @@ document.addEventListener('change',e=>{
 
 
 
+// Turns a plain filter <select> (already populated with real <option>s) into a searchable
+// combo box, reusing the same .comboBox/.comboMenu look as the form's person fields - but
+// standalone (no personChanged/self-only rules, just search-and-pick then fire 'change').
+// Safe to call every render: if the combo already exists it's left alone except for syncing
+// the visible text to the select's current value, so repeated calls from renderHistory()/
+// renderReturnHistory() don't rebuild the DOM or lose focus while typing.
+function makeFilterSearchCombo(select){
+  if(!select)return;
+  let wrap=select.previousElementSibling;
+  if(!(wrap&&wrap.classList&&wrap.classList.contains('comboBox'))){
+    wrap=document.createElement('div');wrap.className='comboBox';
+    let inp=document.createElement('input');inp.type='text';inp.autocomplete='off';
+    let menu=document.createElement('div');menu.className='comboMenu';
+    select.parentNode.insertBefore(wrap,select);wrap.appendChild(inp);wrap.appendChild(menu);select.style.display='none';
+  }
+  const inp=wrap.querySelector('input'),menu=wrap.querySelector('.comboMenu');
+  const blankOpt=select.options[0];
+  const blankLabel=blankOpt?blankOpt.textContent:'All';
+  inp.placeholder=blankLabel;
+  if(document.activeElement!==inp){
+    const sel=select.options[select.selectedIndex];
+    inp.value=(sel&&sel.value)?sel.textContent:'';
+  }
+  function positionMenu(){
+    const r=inp.getBoundingClientRect();
+    menu.style.left=r.left+'px';menu.style.width=r.width+'px';menu.style.right='auto';
+    menu.style.top=(r.bottom+4)+'px';menu.style.bottom='auto';menu.style.borderRadius='0 0 8px 8px';
+    menu.style.maxHeight='240px';
+  }
+  function draw(showAll){
+    const q=showAll?'':inp.value.trim().toLowerCase();
+    const opts=[...select.options].filter(o=>o.value);
+    const list=opts.filter(o=>!q||o.textContent.toLowerCase().includes(q));
+    menu.innerHTML=`<div class="comboOption" data-v="">${esc(blankLabel)}</div>`+(list.length?list.map(o=>`<div class="comboOption" data-v="${esc(o.value)}">${esc(o.textContent)}</div>`).join(''):'');
+    positionMenu();
+    menu.classList.add('show');
+  }
+  inp.onfocus=()=>{inp.select();draw(true)};
+  inp.oninput=()=>draw(false);
+  menu.onmousedown=e=>{
+    const o=e.target.closest('[data-v]');if(!o)return;
+    select.value=o.dataset.v;
+    inp.value=o.dataset.v?o.textContent:'';
+    menu.classList.remove('show');
+    select.dispatchEvent(new Event('change',{bubbles:true}));
+  };
+  inp.onblur=()=>setTimeout(()=>menu.classList.remove('show'),120);
+}
 function makeSingleSearchCombos(){
  ensureDoerMaster();
  document.querySelectorAll('select.person,select.returnPerson').forEach((s)=>{
