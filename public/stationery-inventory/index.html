@@ -177,9 +177,9 @@ tbody tr:hover td{background:#f7faf8}
       </div>
     </div>
     <div class="panel">
-      <div class="ph"><span>Recent Stock In</span></div>
+      <div class="ph"><span>Recent Stock In</span><label id="showDeletedInWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeletedIn" onchange="renderLogs()" style="width:auto"> 🗑 Show Deleted (<span id="deletedInCount">0</span>)</label></div>
       <div class="pb"><div class="tablewrap"><table>
-        <thead><tr><th>Date</th><th>Item</th><th class="num">Qty</th><th>Vendor</th><th>By</th></tr></thead>
+        <thead><tr><th>Date</th><th>Item</th><th class="num">Qty</th><th>Vendor</th><th>By</th><th class="superAdminOnly hidden">Action</th></tr></thead>
         <tbody id="inHistory"></tbody>
       </table></div></div>
     </div>
@@ -200,9 +200,9 @@ tbody tr:hover td{background:#f7faf8}
       </div>
     </div>
     <div class="panel">
-      <div class="ph"><span>Recent Stock Out</span></div>
+      <div class="ph"><span>Recent Stock Out</span><label id="showDeletedOutWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeletedOut" onchange="renderLogs()" style="width:auto"> 🗑 Show Deleted (<span id="deletedOutCount">0</span>)</label></div>
       <div class="pb"><div class="tablewrap"><table>
-        <thead><tr><th>Date</th><th>Item</th><th class="num">Qty</th><th>Issued To</th><th>By</th></tr></thead>
+        <thead><tr><th>Date</th><th>Item</th><th class="num">Qty</th><th>Issued To</th><th>By</th><th class="superAdminOnly hidden">Action</th></tr></thead>
         <tbody id="outHistory"></tbody>
       </table></div></div>
     </div>
@@ -525,8 +525,8 @@ function itemName(id){return (items.find(x=>x.id===id)||{}).name||id}
 function renderDash(){
   const low=items.filter(x=>x.stock<=x.min).length;
   const monthPrefix=todayISO().slice(0,7);
-  const inThisMonth=inLog.filter(x=>String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
-  const outThisMonth=outLog.filter(x=>String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
+  const inThisMonth=inLog.filter(x=>!x.deletedAt&&String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
+  const outThisMonth=outLog.filter(x=>!x.deletedAt&&String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
   const tiles=[
     {label:'TOTAL ITEMS',val:items.length},
     {label:'LOW STOCK ALERTS',val:low,warn:low>0},
@@ -553,9 +553,26 @@ function renderSelects(){
   if($('editUnitList'))$('editUnitList').innerHTML=(masters.units||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
 }
 function nameOfUserId(id){return (users.find(x=>x.id===id)||{}).name||id}
+function deletedInfo(x){return x.deletedAt?`<br><small style="color:var(--muted)">Deleted by ${esc(nameOfUserId(x.deletedBy)||x.deletedBy||'-')}</small>`:''}
+function logAction(x,onDelete,onRestore){
+  if(!isAdminRole())return'';
+  return x.deletedAt
+    ?`<button class="btn small" onclick="${onRestore}('${x.id}')">↩ Restore</button>`
+    :`<button class="btn small danger" onclick="${onDelete}('${x.id}')">🗑</button>`;
+}
 function renderLogs(){
-  $('inHistory').innerHTML=inLog.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(itemName(x.item))}</td><td class="num">+${x.qty}</td><td>${esc(x.vendor||'-')}</td><td>${esc(nameOfUserId(x.by))}</td></tr>`).join('')||`<tr><td colspan="5"><div class="emptystate">⬇<p>Koi Stock In entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
-  $('outHistory').innerHTML=outLog.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(itemName(x.item))}</td><td class="num">-${x.qty}</td><td>${esc(nameOfUserId(x.to))}</td><td>${esc(nameOfUserId(x.by))}</td></tr>`).join('')||`<tr><td colspan="5"><div class="emptystate">⬆<p>Koi Stock Out entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
+  const deletedInN=inLog.filter(x=>x.deletedAt).length,deletedOutN=outLog.filter(x=>x.deletedAt).length;
+  if($('showDeletedInWrap'))$('showDeletedInWrap').classList.toggle('hidden',!deletedInN);
+  if($('deletedInCount'))$('deletedInCount').textContent=deletedInN;
+  if($('showDeletedOutWrap'))$('showDeletedOutWrap').classList.toggle('hidden',!deletedOutN);
+  if($('deletedOutCount'))$('deletedOutCount').textContent=deletedOutN;
+  const showDeletedIn=$('showDeletedIn')&&$('showDeletedIn').checked;
+  const showDeletedOut=$('showDeletedOut')&&$('showDeletedOut').checked;
+  const inRows=showDeletedIn?inLog.filter(x=>x.deletedAt):inLog.filter(x=>!x.deletedAt);
+  const outRows=showDeletedOut?outLog.filter(x=>x.deletedAt):outLog.filter(x=>!x.deletedAt);
+  const actionTh=isAdminRole()?'':' hidden';
+  $('inHistory').innerHTML=inRows.map(x=>`<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td>${esc(itemName(x.item))}</td><td class="num">+${x.qty}</td><td>${esc(x.vendor||'-')}</td><td>${esc(nameOfUserId(x.by))}</td><td class="superAdminOnly${actionTh}">${logAction(x,'deleteStockIn','restoreStockIn')}</td></tr>`).join('')||`<tr><td colspan="6"><div class="emptystate">⬇<p>Koi Stock In entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
+  $('outHistory').innerHTML=outRows.map(x=>`<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td>${esc(itemName(x.item))}</td><td class="num">-${x.qty}</td><td>${esc(nameOfUserId(x.to))}</td><td>${esc(nameOfUserId(x.by))}</td><td class="superAdminOnly${actionTh}">${logAction(x,'deleteStockOut','restoreStockOut')}</td></tr>`).join('')||`<tr><td colspan="6"><div class="emptystate">⬆<p>Koi Stock Out entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
 }
 function renderItems(){
   $('itemList').innerHTML=items.map(x=>{
@@ -616,7 +633,7 @@ async function addStockOut(){
   // a mistake before it's saved, without blocking legitimate repeat issues.
   const RECENT_ISSUE_DAYS=3;
   const cutoff=new Date(Date.now()-RECENT_ISSUE_DAYS*86400000).toISOString().slice(0,10);
-  const recentSame=outLog.find(x=>x.item===item && x.date>=cutoff);
+  const recentSame=outLog.find(x=>!x.deletedAt && x.item===item && x.date>=cutoff);
   if(recentSame){
     const recentToName=nameOfUserId(recentSame.to);
     if(!confirm(`⚠ ${it?it.name:'Ye item'} pichle ${RECENT_ISSUE_DAYS} din mein (${recentSame.date}) ${recentToName} ko already issue kiya gaya tha.\n\nPhir se issue karna hai?`))return;
@@ -635,6 +652,43 @@ async function addStockOut(){
     _stockOutSubmitting=false;
     if(btn)btn.disabled=false;
   }
+}
+// Soft-delete only, same pattern as Parcel Dispatch/Trip Expense - a wrong entry moves to
+// "Deleted" (restorable) instead of being permanently destroyed. Reverses the entry's own
+// effect on the item's current stock count so a mistaken entry doesn't leave stock wrong
+// even after it's hidden from the log; restoring re-applies that same effect.
+function canDeleteStockEntries(){return isAdminRole()}
+async function deleteStockIn(id){
+  if(!canDeleteStockEntries()){alert('Sirf Admin/Director stock entries delete kar sakte hain.');return}
+  const x=inLog.find(e=>e.id===id);if(!x)return;
+  if(!confirm('Ye Stock In entry Deleted list me chali jayegi (permanent delete nahi hoga) aur item ka current stock '+x.qty+' se kam kar diya jayega.\n\nConfirm karein?'))return;
+  const actor=loggedUser();
+  await db.collection('si_stock_in').doc(id).update({deletedAt:new Date().toISOString(),deletedBy:actor?actor.id:'Unknown'});
+  await db.collection('si_items').doc(x.item).update({stock:firebase.firestore.FieldValue.increment(-x.qty)});
+  toast('Stock In entry deleted');
+}
+async function restoreStockIn(id){
+  if(!canDeleteStockEntries()){alert('Sirf Admin/Director restore kar sakte hain.');return}
+  const x=inLog.find(e=>e.id===id);if(!x)return;
+  await db.collection('si_stock_in').doc(id).update({deletedAt:firebase.firestore.FieldValue.delete(),deletedBy:firebase.firestore.FieldValue.delete()});
+  await db.collection('si_items').doc(x.item).update({stock:firebase.firestore.FieldValue.increment(x.qty)});
+  toast('Stock In entry restored');
+}
+async function deleteStockOut(id){
+  if(!canDeleteStockEntries()){alert('Sirf Admin/Director stock entries delete kar sakte hain.');return}
+  const x=outLog.find(e=>e.id===id);if(!x)return;
+  if(!confirm('Ye Stock Out entry Deleted list me chali jayegi (permanent delete nahi hoga) aur item ka current stock '+x.qty+' se wapas badha diya jayega.\n\nConfirm karein?'))return;
+  const actor=loggedUser();
+  await db.collection('si_stock_out').doc(id).update({deletedAt:new Date().toISOString(),deletedBy:actor?actor.id:'Unknown'});
+  await db.collection('si_items').doc(x.item).update({stock:firebase.firestore.FieldValue.increment(x.qty)});
+  toast('Stock Out entry deleted');
+}
+async function restoreStockOut(id){
+  if(!canDeleteStockEntries()){alert('Sirf Admin/Director restore kar sakte hain.');return}
+  const x=outLog.find(e=>e.id===id);if(!x)return;
+  await db.collection('si_stock_out').doc(id).update({deletedAt:firebase.firestore.FieldValue.delete(),deletedBy:firebase.firestore.FieldValue.delete()});
+  await db.collection('si_items').doc(x.item).update({stock:firebase.firestore.FieldValue.increment(-x.qty)});
+  toast('Stock Out entry restored');
 }
 let _addItemSubmitting=false;
 async function addItem(){
@@ -740,8 +794,8 @@ function inRange(dateStr,from,to){
 function renderReports(){
   if(!$('repItemTable'))return;
   const {from,to}=reportRange();
-  const outF=outLog.filter(x=>inRange(String(x.date||''),from,to));
-  const inF=inLog.filter(x=>inRange(String(x.date||''),from,to));
+  const outF=outLog.filter(x=>!x.deletedAt&&inRange(String(x.date||''),from,to));
+  const inF=inLog.filter(x=>!x.deletedAt&&inRange(String(x.date||''),from,to));
   $('repSummary').innerHTML=`<div class="cards"><div class="card"><small>STOCK IN</small><b>${inF.reduce((s,x)=>s+(x.qty||0),0)}</b></div><div class="card"><small>STOCK OUT</small><b>${outF.reduce((s,x)=>s+(x.qty||0),0)}</b></div></div>`;
   const byItem={};
   outF.forEach(x=>{const n=itemName(x.item);byItem[n]=(byItem[n]||0)+(x.qty||0);});
@@ -761,13 +815,13 @@ function downloadCSV(filename,rows){
 function exportStockInCSV(){
   const {from,to}=reportRange();
   const rows=[['Date','Item','Qty','Vendor','By']];
-  inLog.filter(x=>inRange(String(x.date||''),from,to)).forEach(x=>rows.push([x.date,itemName(x.item),x.qty,x.vendor||'',nameOfUserId(x.by)]));
+  inLog.filter(x=>!x.deletedAt&&inRange(String(x.date||''),from,to)).forEach(x=>rows.push([x.date,itemName(x.item),x.qty,x.vendor||'',nameOfUserId(x.by)]));
   downloadCSV('stock-in-report.csv',rows);
 }
 function exportStockOutCSV(){
   const {from,to}=reportRange();
   const rows=[['Date','Item','Qty','Issued To','By','Purpose']];
-  outLog.filter(x=>inRange(String(x.date||''),from,to)).forEach(x=>rows.push([x.date,itemName(x.item),x.qty,nameOfUserId(x.to),nameOfUserId(x.by),x.purpose||'']));
+  outLog.filter(x=>!x.deletedAt&&inRange(String(x.date||''),from,to)).forEach(x=>rows.push([x.date,itemName(x.item),x.qty,nameOfUserId(x.to),nameOfUserId(x.by),x.purpose||'']));
   downloadCSV('stock-out-report.csv',rows);
 }
 
