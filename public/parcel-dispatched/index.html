@@ -316,7 +316,7 @@ if(window.self!==window.top){
 <div class="field full"><label>Handed Over By (Section 4)</label><input id="handoverPackingRef" readonly></div>
 <div class="field"><label>Item Packed By <span class="req">*</span></label><select class="person" id="itemPackedBy" data-time="packedTime" data-event="Item Packed By" onchange="personChanged(this)"></select></div>
 <div class="field"><label>Time <span class="req">*</span></label><input id="packedTime" readonly></div>
-<div class="field"><label>No. Items Packed <span class="req">*</span></label><input type="number" id="itemsPacked"></div><div class="field"><label>Parcel Weight (GR) <span class="req">*</span></label><input type="number" id="parcelWeight" oninput="syncShippingSection()"></div>
+<div class="field"><label>No. Items Packed <span class="req">*</span></label><input type="number" id="itemsPacked" onchange="validateItemsPacked()"></div><div class="field"><label>Parcel Weight (GR) <span class="req">*</span></label><input type="number" id="parcelWeight" oninput="syncShippingSection()"></div>
 <div class="field span2 no-print"><label>Packed Parcel Photo <span class="req">*</span></label><input type="hidden" id="packPhotoData"><input type="file" id="packPhotoInput" accept="image/*" capture="environment" onchange="handlePackPhoto(this)"><div class="note" id="packPhotoStatus"></div><a id="packPhotoLink" class="hidden" target="_blank" download style="display:block;margin-top:6px"><img id="packPhotoPreview" style="max-width:160px;border-radius:8px;display:block"></a></div>
 </div></div></section>
 
@@ -1094,6 +1094,17 @@ function myPendingSlipsLink(userId){
 async function sendWA(){if(!waTarget)return;let id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');if(!id||!token){toast('Manage → GREEN-API me ID Instance aur API Token save karein.');return}let phone=normalizePhone(waTarget.user.phone);if(phone.length<11){toast('User mobile number valid nahi hai.');return}let btn=$('waSendBtn');btn.disabled=true;btn.textContent='Sending...';try{let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:phone+'@c.us',message:$('waMessage').value})});let data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.message||data.error||('HTTP '+r.status));closeWA();toast('WhatsApp message sent successfully.')}catch(e){toast('Message send failed: '+e.message)}finally{btn.disabled=false;btn.textContent='Send WhatsApp'}}
 function closeWA(){$('waModal').classList.add('hidden')}
 function shipChanged(){let v=($('shipThrough').value||'').toUpperCase().trim();let yes=['SECURE','SEQUEL','SQL','BVC'].includes(v);$('section1A').classList.toggle('hidden',!yes);$('deliveryChallanRequired').value=yes?'YES':'NO';if(!yes){['dlcItem','dlcPrice','remark1','remark2','remark3'].forEach(id=>$(id).value='')}}
+function validateItemsPacked(){
+  const packed=$('itemsPacked'),noted=$('itemsNoted');
+  if(!packed||!noted)return;
+  const packedVal=String(packed.value||'').trim(),notedVal=String(noted.value||'').trim();
+  if(!packedVal||!notedVal)return;
+  if(Number(packedVal)!==Number(notedVal)){
+    alert('Items Packed ('+packedVal+') Noting mein diye gaye Items ('+notedVal+') se match nahi karta.\n\nPacked items Noted items ke barabar hone chahiye - na kam, na zyada.');
+    packed.value='';
+    packed.focus();
+  }
+}
 const DLC_NOTIFIED_KEY='pd_dlc_notified_v1';
 function notifyDlcIfNeeded(){
   const v=($('shipThrough').value||'').toUpperCase().trim();
@@ -2200,11 +2211,11 @@ function renderReturnWorkflowStatus(){
     let st=locked?'🔒 LOCKED':(done?'✅ COMPLETE':(prev?'🟡 IN PROGRESS':'⛔ WAITING'));
     return `<span style="display:inline-block;margin:4px 10px 4px 0"><b>${esc(s.name)}</b>: ${st}</span>`;
   }).join('');
-  // Tint each section's own card once it's locked, so a long scroll of sections is easy to
-  // scan at a glance for what's already done vs. what's still open.
+  // Tint as soon as a section is fully filled, not only once it's actually locked - same
+  // reasoning as Dispatch's renderWorkflowStatus().
   RETURN_STAGE_SEQUENCE.forEach(s=>{
     const sec=$('returnSec'+s.id.replace('rstage',''));
-    if(sec)sec.classList.toggle('stageLocked',!!locks[s.id]);
+    if(sec)sec.classList.toggle('stageLocked',!!locks[s.id]||returnStageComplete(s));
   });
 }
 function refreshReturnFieldStates(){
@@ -2912,6 +2923,32 @@ function canEditField(el){
   if(locks[stage.id])return false;
   return previousStagesLocked(stage);
 }
+// A field disabled/readonly because an earlier section isn't complete yet gives no feedback
+// on click - it just silently does nothing, which reads as broken. This tells the person
+// exactly which section to finish first, for every section pair, both modules.
+function firstIncompletePriorStage(sequence,stage,locks){
+  const idx=sequence.findIndex(s=>s.id===stage.id);
+  for(let i=0;i<idx;i++){
+    if(!locks[sequence[i].id])return sequence[i];
+  }
+  return null;
+}
+function handleLockedFieldMousedown(e,stageForElFn,sequence,getLocksFn){
+  const wrap=e.target.closest('.field');
+  if(!wrap)return;
+  const ctrl=wrap.querySelector('input[id],select[id],textarea[id]');
+  if(!ctrl||!ctrl.id)return;
+  const stage=stageForElFn(ctrl);
+  if(!stage)return;
+  const locks=getLocksFn();
+  if(locks[stage.id])return;
+  const blocker=firstIncompletePriorStage(sequence,stage,locks);
+  if(blocker)alert('Kindly complete '+blocker.name+' first.');
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('dispatchModule')?.addEventListener('mousedown',e=>handleLockedFieldMousedown(e,stageForElement,STAGE_SEQUENCE,getStageLocks));
+  document.getElementById('returnFormView')?.addEventListener('mousedown',e=>handleLockedFieldMousedown(e,returnStageForElement,RETURN_STAGE_SEQUENCE,getReturnStageLocks));
+});
 function applySequenceAndLocks(){
   // isFieldFilled() treats any field under a .hidden ancestor as "filled" (a pre-existing
   // escape hatch for conditionally-hidden fields like priceWrap). While #dispatchFormView
@@ -2976,10 +3013,12 @@ function renderWorkflowStatus(){
     let st=locked?'🔒 LOCKED':(done?'✅ COMPLETE':(prev?'🟡 IN PROGRESS':'⛔ WAITING'));
     return `<span style="display:inline-block;margin:4px 10px 4px 0"><b>${esc(s.name)}</b>: ${st}</span>`;
   }).join('');
-  // Same visual tint as Return: a locked section's card stands out from the still-open one.
+  // Tint as soon as a section is fully filled, not only once it's actually locked - auto-lock
+  // only advances one stage per edit, so several already-complete sections can otherwise sit
+  // unlocked (and so untinted/looking unfinished) until something else triggers the next tick.
   STAGE_SEQUENCE.forEach(s=>{
     const sec=$('dispatchSec'+s.id.replace('stage',''));
-    if(sec)sec.classList.toggle('stageLocked',!!locks[s.id]);
+    if(sec)sec.classList.toggle('stageLocked',!!locks[s.id]||stageComplete(s));
   });
 }
 function currentEditableStage(){
