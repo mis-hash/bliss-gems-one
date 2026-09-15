@@ -2171,7 +2171,13 @@ function returnNow(){
   return new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
 }
 function returnControls(){
-  return [...document.querySelectorAll('#returnModule input,#returnModule select,#returnModule textarea')]
+  // Scoped to #returnFormView (the actual slip form), NOT the whole #returnModule - that
+  // wrapper also contains #returnListView's filter/search bar (returnPartyFilter,
+  // returnCourierFilter, returnDateFrom/To, returnSearch, returnUserFilter,
+  // showDeletedReturn), which was being swept up as if it were part of the slip's own
+  // data. That's why saved Return records had garbage fields like returnFrom:"All Parties"
+  // (the party filter's own default option text) and other filter-bar leftovers.
+  return [...document.querySelectorAll('#returnFormView input,#returnFormView select,#returnFormView textarea')]
     .filter(e=>!e.closest('.comboBox'));
 }
 function returnKey(e,i){ return e.id || e.dataset.rkey || ('r_'+i); }
