@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" id="viewportMeta" content="width=device-width,initial-scale=1.0">
+<script>
+/* Crash safety net — same pattern as the other Bliss apps: registered first so a later
+   script error still surfaces as a visible banner instead of a silently dead page. */
+(function(){
+  function showCrashBanner(msg){
+    if(document.getElementById('siCrashBanner'))return;
+    var b=document.createElement('div');
+    b.id='siCrashBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b42318;color:#fff;padding:10px 14px;font:600 13px Arial,sans-serif;text-align:center;box-shadow:0 2px 10px #0004';
+    b.innerHTML='⚠ App me error aa gaya hai. Page reload karein.'
+      +' <button type="button" style="margin-left:10px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#b42318;font-weight:700;cursor:pointer" onclick="location.reload()">Reload</button>'
+      +'<div style="font-weight:400;font-size:11px;opacity:.85;margin-top:3px">'+String(msg||'').slice(0,200).replace(/[<>]/g,'')+'</div>';
+    function attach(){document.body&&document.body.prepend(b)}
+    if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach);
+  }
+  window.addEventListener('error',function(e){console.error('Uncaught error:',e.error||e.message);showCrashBanner((e.error&&e.error.message)||e.message);});
+  window.addEventListener('unhandledrejection',function(e){console.error('Unhandled promise rejection:',e.reason);showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));});
+})();
+</script>
+<title>Stationery Inventory</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Same design system as the Trip Expense app, so all Bliss apps read as one family. */
+:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
+*{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit}
+h1,h2,h3,.card b,.tabular{font-family:'Manrope',sans-serif}
+.hidden{display:none!important}
+header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.head{height:100%;max-width:1100px;margin:auto;padding:0 18px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:28px;font-weight:900;color:var(--g2)}
+.brand b{color:var(--g);font-size:20px;font-family:'Manrope',sans-serif}
+.brand small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.headRight{display:flex;align-items:center;gap:10px}
+.pillbadge{font-size:13px;font-weight:700;background:var(--mint);color:var(--g);padding:7px 12px;border-radius:999px}
+.btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--g);color:#fff}
+.btn.danger{background:var(--redbg);color:var(--red)}
+.btn.small{padding:7px 11px;font-size:12px}
+.shell{max-width:1100px;margin:auto;display:grid;grid-template-columns:220px 1fr;gap:16px;padding:17px 18px 60px}
+nav{background:#fff;border:1px solid var(--line);border-radius:14px;padding:9px;height:max-content;position:sticky;top:85px}
+nav button{width:100%;border:0;background:transparent;text-align:left;padding:12px 11px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin:2px 0;display:flex;align-items:center;gap:9px;border-left:3px solid transparent}
+nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
+nav button.hidden{display:none}
+.grouplabel{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:14px 11px 6px}
+.grouplabel:first-child{padding-top:4px}
+.page{display:none}
+.page.on{display:block;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px;display:flex;justify-content:space-between;gap:12px}
+.hero h1{font-size:26px;margin:0 0 5px}
+.hero p{font-size:13px;margin:0;opacity:.9}
+.hero .heroStat{text-align:right}
+.hero .heroStat small{display:block;font-size:11px;opacity:.85}
+.hero .heroStat strong{font-size:30px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+.card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px}
+.card small{font-size:11px;color:var(--muted)}
+.card b{display:block;font-size:22px;margin-top:6px}
+.card.warn{background:var(--amberbg)!important;color:var(--amber)!important}
+.panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:12px}
+.ph{padding:14px 16px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.pb{padding:15px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field label{display:block;font-size:11px;font-weight:bold;margin-bottom:5px}
+.field input,.field select{width:100%;padding:10px;border:1px solid var(--line);border-radius:7px;font-size:14px;background:#fff;color:var(--txt)}
+.span2{grid-column:1/-1}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 0 9px;border-bottom:1px solid var(--line)}
+td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:#f7faf8}
+.tablewrap{overflow-x:auto}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font-size:11px;font-weight:700}
+.pill.ok{background:var(--mint);color:var(--g)}
+.pill.low{background:var(--amberbg);color:var(--amber)}
+.itemrow{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #edf1ee;gap:12px}
+.itemrow:last-child{border-bottom:0}
+.itemrow b{font-size:13.5px;font-weight:600}
+.itemrow small{color:var(--muted);display:block;font-size:11.5px;margin-top:3px}
+.item{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #edf1ee}
+.item:last-child{border-bottom:0}
+.emptystate{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;text-align:center;font-size:24px}
+.emptystate p{font-size:13.5px;font-weight:600;color:var(--txt);margin:10px 0 2px;font-family:'Work Sans',sans-serif}
+.emptystate small{color:var(--muted);font-size:12px}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:50}
+.modal.show{display:flex}
+.box{width:min(500px,100%);background:#fff;border-radius:14px;padding:19px;max-height:90vh;overflow:auto}
+.box h3{margin:0 0 14px;font-size:19px}
+.note{font-size:12px;color:var(--muted)}
+.gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px}
+.gate h3{font-size:19px}
+.gate p{font-size:13px;color:var(--muted)}
+.gate .btn{margin-top:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:#fff;color:var(--muted);padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--g);border-color:var(--g);color:#fff}
+.bottomNav{display:none}
+.superAdminOnly.hidden{display:none!important}
+@media(max-width:720px){
+  header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:22px}.brand b{font-size:16px}.brand small{display:none}
+  .shell{display:block;padding:11px 10px 76px}nav{display:none}
+  .hero{padding:17px}.hero h1{font-size:20px}.hero .heroStat strong{font-size:23px}
+  .cards{grid-template-columns:1fr 1fr}
+  .grid{grid-template-columns:1fr}
+  .bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}
+  .bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:0 0 auto;padding:2px 12px;white-space:nowrap}
+  .bottomNav button.hidden{display:none}
+  .bottomNav span{display:block;font-size:19px}
+  .bottomNav button.on{color:var(--g)}
+}
+</style>
+</head>
+<body>
+
+<div id="gateWrap" style="display:none"><div class="gate" id="gateBox"></div></div>
+
+<div id="appWrap" style="display:none">
+<header><div class="head">
+  <div class="brand"><div class="logo">b</div><div><b>Stationery Inventory</b><small>Bliss Gems &amp; Minerals</small></div></div>
+  <div class="headRight">
+    <span class="pillbadge" id="loginBadge">Not Logged In</span>
+    <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
+    <button class="btn superAdminOnly hidden" onclick="openManage()">⚙ Manage</button>
+  </div>
+</div></header>
+
+<div class="shell">
+<nav>
+<div class="grouplabel">Inventory</div>
+<button class="on" data-page="dash" onclick="go('dash',this)">📊 Dashboard</button>
+<button data-page="in" onclick="go('in',this)">⬇ Stock In</button>
+<button data-page="out" onclick="go('out',this)">⬆ Stock Out / Issue</button>
+<button class="superAdminOnly hidden" data-page="items" onclick="go('items',this)">🗂 Item Master</button>
+<button data-page="reports" onclick="go('reports',this)">📈 Reports</button>
+</nav>
+
+<main>
+  <section class="page on" id="page-dash">
+    <div class="hero">
+      <div><h1>Stationery Inventory</h1><p>Live stock levels aur is mahine ki activity, ek nazar mein.</p></div>
+      <div class="heroStat"><small>TOTAL ITEMS</small><strong id="heroTotalItems">0</strong></div>
+    </div>
+    <div class="cards" id="statTiles"></div>
+    <div class="panel">
+      <div class="ph"><span>Current Stock</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Item</th><th>Category</th><th class="num">In Hand</th><th class="num">Min Level</th><th>Status</th></tr></thead>
+        <tbody id="stockTable"></tbody>
+      </table></div></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-in">
+    <div class="panel">
+      <div class="ph"><span>New Stock In Entry</span></div>
+      <div class="pb">
+        <div class="grid">
+          <div class="field"><label>Item <span style="color:var(--red)">*</span></label><select id="inItem"></select></div>
+          <div class="field"><label>Quantity <span style="color:var(--red)">*</span></label><input type="number" id="inQty"></div>
+          <div class="field"><label>Date</label><input type="date" id="inDate"></div>
+          <div class="field"><label>Vendor / Source</label><input id="inVendor" list="vendorList" placeholder="Select ya type karein"><datalist id="vendorList"></datalist></div>
+          <div class="field span2"><label>Remark</label><input id="inRemark" placeholder="Optional"></div>
+        </div>
+        <div style="margin-top:14px;text-align:right"><button class="btn primary" id="stockInSubmitBtn" onclick="addStockIn()">＋ Add Stock In</button></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span>Recent Stock In</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Date</th><th>Item</th><th class="num">Qty</th><th>Vendor</th><th>By</th></tr></thead>
+        <tbody id="inHistory"></tbody>
+      </table></div></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-out">
+    <div class="panel">
+      <div class="ph"><span>New Stock Out / Issue Entry</span></div>
+      <div class="pb">
+        <div class="grid">
+          <div class="field"><label>Item <span style="color:var(--red)">*</span></label><select id="outItem"></select></div>
+          <div class="field"><label>Quantity <span style="color:var(--red)">*</span></label><input type="number" id="outQty"></div>
+          <div class="field"><label>Issued To <span style="color:var(--red)">*</span></label><select id="outTo"></select></div>
+          <div class="field"><label>Date</label><input type="date" id="outDate"></div>
+          <div class="field span2"><label>Purpose</label><input id="outPurpose" placeholder="Optional"></div>
+        </div>
+        <div style="margin-top:14px;text-align:right"><button class="btn primary" id="stockOutSubmitBtn" onclick="addStockOut()">＋ Issue Stock</button></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span>Recent Stock Out</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Date</th><th>Item</th><th class="num">Qty</th><th>Issued To</th><th>By</th></tr></thead>
+        <tbody id="outHistory"></tbody>
+      </table></div></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-items">
+    <div class="panel">
+      <div class="ph"><span>Add New Item</span></div>
+      <div class="pb">
+        <div class="grid">
+          <div class="field"><label>Item Name <span style="color:var(--red)">*</span></label><input id="mItemName"></div>
+          <div class="field"><label>Category</label><input id="mItemCat" list="categoryList" placeholder="Select ya type karein"><datalist id="categoryList"></datalist></div>
+          <div class="field"><label>Unit</label><input id="mItemUnit" list="unitList" placeholder="Select ya type karein"><datalist id="unitList"></datalist></div>
+          <div class="field"><label>Minimum Stock Level</label><input type="number" id="mItemMin"></div>
+        </div>
+        <div style="margin-top:14px;text-align:right"><button class="btn primary" id="addItemSubmitBtn" onclick="addItem()">＋ Add Item</button></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span>All Items</span></div>
+      <div class="pb" id="itemList"></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-reports">
+    <div class="panel">
+      <div class="ph"><span>Reports &amp; Insights</span></div>
+      <div class="pb">
+        <div class="grid">
+          <div class="field"><label>From</label><input type="date" id="repFrom" onchange="renderReports()"></div>
+          <div class="field"><label>To</label><input type="date" id="repTo" onchange="renderReports()"></div>
+        </div>
+        <div id="repSummary" style="margin-top:10px"></div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" onclick="exportStockInCSV()">⬇ Export Stock In CSV</button>
+          <button class="btn" onclick="exportStockOutCSV()">⬆ Export Stock Out CSV</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span>Item-wise Issue Breakdown</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Item</th><th class="num">Qty Issued</th></tr></thead>
+        <tbody id="repItemTable"></tbody>
+      </table></div></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span>Category-wise Issue Breakdown</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Category</th><th class="num">Qty Issued</th></tr></thead>
+        <tbody id="repCatTable"></tbody>
+      </table></div></div>
+    </div>
+  </section>
+</main>
+</div>
+</div>
+
+<div class="bottomNav" id="bottomNav">
+<button class="on" data-page="dash" onclick="go('dash',this)"><span>📊</span>Dashboard</button>
+<button data-page="in" onclick="go('in',this)"><span>⬇</span>Stock In</button>
+<button data-page="out" onclick="go('out',this)"><span>⬆</span>Stock Out</button>
+<button class="superAdminOnly hidden" data-page="items" onclick="go('items',this)"><span>🗂</span>Items</button>
+<button data-page="reports" onclick="go('reports',this)"><span>📈</span>Reports</button>
+</div>
+
+<!-- Login modal -->
+<div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
+<h3>Login</h3>
+<div class="field"><label>Username</label><input id="loginUsername" autocomplete="off"></div>
+<div class="field" style="margin-top:8px"><label>Password</label><input id="loginPassword" type="password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<p class="note" id="loginMsg" style="margin:8px 0 0"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeLogin()">Cancel</button><button class="btn primary" onclick="doLogin()">Login</button></div>
+</div></div>
+
+<!-- Super Admin modal -->
+<div class="modal" id="superAdminModal"><div class="box" style="width:min(340px,100%)">
+<h3>🔒 Super Admin</h3>
+<div class="field"><label>Password</label><input id="superAdminPassword" type="password" onkeydown="if(event.key==='Enter')unlockSuperAdmin()"></div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeSuperAdminModal()">Cancel</button><button class="btn primary" onclick="unlockSuperAdmin()">Unlock</button></div>
+</div></div>
+
+<!-- Manage modal -->
+<div class="modal" id="manageModal"><div class="box" style="width:min(560px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Admin / Backend Masters</h3><button class="btn small" onclick="closeManage()">✕</button></div>
+<div class="tabs" style="margin:0 0 10px">
+<button class="tab on" data-tab="category" onclick="mtab(this,'category')">Category</button>
+<button class="tab" data-tab="unit" onclick="mtab(this,'unit')">Unit</button>
+<button class="tab" data-tab="vendor" onclick="mtab(this,'vendor')">Vendor</button>
+<button class="tab" data-tab="roles" onclick="mtab(this,'roles')">Team &amp; Access</button>
+<button class="tab" data-tab="notify" onclick="mtab(this,'notify')">Low Stock Alerts</button>
+<button class="tab" data-tab="templates" onclick="mtab(this,'templates')">Message Templates</button>
+</div>
+<div id="manageContent"></div>
+</div></div>
+
+<!-- Edit Item modal -->
+<div class="modal" id="editItemModal"><div class="box" style="width:min(420px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Edit Item</h3><button class="btn small" onclick="closeEditItem()">✕</button></div>
+<div class="grid">
+  <div class="field span2"><label>Item Name <span style="color:var(--red)">*</span></label><input id="eiName"></div>
+  <div class="field"><label>Category</label><input id="eiCat" list="editCategoryList"><datalist id="editCategoryList"></datalist></div>
+  <div class="field"><label>Unit</label><input id="eiUnit" list="editUnitList"><datalist id="editUnitList"></datalist></div>
+  <div class="field span2"><label>Minimum Stock Level (Low Stock Limit)</label><input type="number" id="eiMin"></div>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditItem()">Cancel</button><button class="btn primary" onclick="saveEditItem()">Save</button></div>
+</div></div>
+
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:14px;right:14px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:13px;line-height:26px;cursor:default;z-index:999999;transition:background .15s">•</button>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
+let db=null;
+try{
+  if(typeof firebase!=='undefined'){
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+  }else{console.error('firebase SDK not loaded — cloud sync unavailable this session');}
+}catch(e){console.error('firebase init failed:',e);}
+
+const APP_SLUG='stationery-inventory';
+const UU_COLLECTION='universal_users';
+const SESSION_KEY='pd_logged_user_v1'; // same key as Bliss One hub / Parcel Dispatch / Trip Expense — one login everywhere
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const todayISO=()=>new Date().toISOString().slice(0,10);
+
+let users=[],items=[],inLog=[],outLog=[];
+let masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{}};
+let api={};
+let currentUser=null,currentTab='category';
+let usersStarted=false,itemsStarted=false,inStarted=false,outStarted=false,mastersStarted=false;
+
+function loggedUser(){return users.find(x=>x.id===currentUser)||null}
+function myRole(){const u=loggedUser();return (u&&u.appRoles&&u.appRoles[APP_SLUG])||''}
+function isAdminRole(){const r=myRole();return superAdminUnlocked||r==='admin'||r==='director'}
+
+/* ===== Super Admin (same shared password as other Bliss apps) ===== */
+const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
+let superAdminUnlocked=false;
+let secretAdminTapCount=0,secretAdminTapTimer=null,secretAdminFlashTimer=null;
+function secretAdminTap(){
+  secretAdminTapCount++;
+  const dot=$('secretAdminIcon');
+  if(dot){dot.style.background='rgba(214,48,49,.45)';clearTimeout(secretAdminFlashTimer);secretAdminFlashTimer=setTimeout(()=>{dot.style.background='transparent'},200);}
+  clearTimeout(secretAdminTapTimer);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2500);
+  if(secretAdminTapCount>=10){secretAdminTapCount=0;clearTimeout(secretAdminTapTimer);openSuperAdminModal();}
+}
+function openSuperAdminModal(){
+  if(superAdminUnlocked){renderAll();return}
+  $('superAdminPassword').value='';
+  $('superAdminModal').classList.add('show');
+  setTimeout(()=>$('superAdminPassword')?.focus(),30);
+}
+function closeSuperAdminModal(){$('superAdminModal')?.classList.remove('show')}
+function unlockSuperAdmin(){
+  const pw=$('superAdminPassword')?.value||'';
+  if(pw!==SUPER_ADMIN_PASSWORD){alert('Galat password.');return}
+  superAdminUnlocked=true;
+  closeSuperAdminModal();
+  renderAll();
+}
+function silentUnlockSuperAdmin(){ if(!superAdminUnlocked){superAdminUnlocked=true;renderAll();} }
+
+/* ===== Login ===== */
+function loginFromHub(){
+  try{ if(window.self!==window.top && window.top.openStaffLoginModal){window.top.openStaffLoginModal();return;} }catch(e){}
+  openLogin();
+}
+function openLogin(){$('loginModal').classList.add('show');$('loginMsg').textContent='';}
+function closeLogin(){$('loginModal').classList.remove('show')}
+function doLogin(){
+  const uname=$('loginUsername').value.trim(),pass=$('loginPassword').value;
+  const msg=$('loginMsg');
+  if(!uname||!pass){msg.style.color='#b43a35';msg.textContent='Username aur Password dono bharein.';return}
+  const u=users.find(x=>String(x.username||x.id).toLowerCase()===uname.toLowerCase() && x.active!==false);
+  if(!u||pass!==String(u.password||'1234')){msg.style.color='#b43a35';msg.textContent='Invalid Username / Password';return}
+  if(u.appAccess && u.appAccess[APP_SLUG]===false){msg.style.color='#b43a35';msg.textContent='Aapko is app ka access nahi hai.';return}
+  localStorage.setItem(SESSION_KEY,u.id);
+  currentUser=u.id;
+  closeLogin();
+  renderAll();
+}
+function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
+
+/* ===== Firestore sync ===== */
+function startUsersSync(){
+  if(usersStarted||!db)return;usersStarted=true;
+  db.collection(UU_COLLECTION).onSnapshot(snap=>{users=[];snap.forEach(d=>users.push(d.data()));renderAll();},err=>console.error('users sync error',err));
+}
+let itemsSeedChecked=false;
+function seedStarterItemsIfEmpty(){
+  if(itemsSeedChecked||!db)return;itemsSeedChecked=true;
+  db.collection('si_items').limit(1).get().then(snap=>{
+    if(!snap.empty)return; // already has real data - never overwrite
+    const starters=[
+      {name:'Pen',category:'Writing',unit:'Pcs',min:20,stock:0},
+      {name:'Pencil',category:'Writing',unit:'Pcs',min:20,stock:0},
+      {name:'Notepad',category:'Paper',unit:'Pcs',min:10,stock:0}
+    ];
+    starters.forEach(it=>db.collection('si_items').add(it).catch(e=>console.error('starter item seed failed',e)));
+  }).catch(e=>console.error('items seed check failed',e));
+}
+function startItemsSync(){
+  if(itemsStarted||!db)return;itemsStarted=true;
+  seedStarterItemsIfEmpty();
+  db.collection('si_items').onSnapshot(snap=>{items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));renderAll();},err=>console.error('items sync error',err));
+}
+function startLogsSync(){
+  if(inStarted||!db)return;inStarted=true;outStarted=true;
+  db.collection('si_stock_in').orderBy('date','desc').limit(200).onSnapshot(snap=>{inLog=[];snap.forEach(d=>inLog.push({id:d.id,...d.data()}));renderAll();},err=>console.error('stock-in sync error',err));
+  db.collection('si_stock_out').orderBy('date','desc').limit(200).onSnapshot(snap=>{outLog=[];snap.forEach(d=>outLog.push({id:d.id,...d.data()}));renderAll();},err=>console.error('stock-out sync error',err));
+}
+let mastersSeedChecked=false;
+function seedStarterMastersIfEmpty(){
+  if(mastersSeedChecked||!db)return;mastersSeedChecked=true;
+  db.collection('si_settings').doc('masters').get().then(doc=>{
+    if(doc.exists)return; // already configured - never overwrite
+    db.collection('si_settings').doc('masters').set({categories:['Writing','Paper'],units:['Pcs','Box','Ream','Packet'],vendors:[]}).catch(e=>console.error('masters seed failed',e));
+  }).catch(e=>console.error('masters seed check failed',e));
+}
+function startMastersSync(){
+  if(mastersStarted||!db)return;mastersStarted=true;
+  seedStarterMastersIfEmpty();
+  db.collection('si_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{},...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed',e));
+}
+function saveMasters(){ if(db) db.collection('si_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
+
+/* ===== WhatsApp (shared GREEN-API credentials) ===== */
+function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===10)p='91'+p;return p;}
+async function sendRawWA(phone,message){
+  const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token){console.warn('GREEN-API settings missing');return false}
+  const p=normalizePhone(phone);if(p.length<11)return false;
+  try{
+    const r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
+    return r.ok;
+  }catch(e){console.error('WA send failed:',e);return false}
+}
+// Editable WhatsApp message library (Manage -> Message Templates). Each notify function
+// pulls its text from masters.templates[id] if the admin has customized it, else falls
+// back to this default - so a fresh install always has a sensible message with no setup.
+const DEFAULT_SI_TEMPLATES={
+  low_stock:{name:'Low Stock Alert',text:'⚠️ Low Stock Alert\n\nItem: {ItemName}\nIn Hand: {InHand} {Unit}\nMinimum Level: {MinLevel}\n\nPlease arrange for restocking at the earliest.'},
+  stock_issued:{name:'Stock Issued',text:'📦 Stock Issued\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nIssued To: {IssuedTo}\nIssued By: {IssuedBy}'}
+};
+function fillTemplate(text,vars){
+  return text.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m);
+}
+function templateText(id){
+  return (masters.templates&&masters.templates[id]!==undefined)?masters.templates[id]:DEFAULT_SI_TEMPLATES[id].text;
+}
+function notifyLowStock(item){
+  const configured=(masters.lowStockRecipients||[]).length>0;
+  const admins=configured
+    ? users.filter(u=>u.active!==false && u.phone && masters.lowStockRecipients.includes(u.id))
+    : users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
+  const msg=fillTemplate(templateText('low_stock'),{ItemName:item.name,InHand:item.stock,Unit:item.unit||'',MinLevel:item.min});
+  admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('low stock WA failed:',e)));
+}
+function notifyIssue(item,qty,toUserId,byUserId){
+  const admins=users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
+  const msg=fillTemplate(templateText('stock_issued'),{ItemName:item.name,Qty:qty,Unit:item.unit||'',IssuedTo:nameOfUserId(toUserId),IssuedBy:nameOfUserId(byUserId)});
+  admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('issue WA failed:',e)));
+}
+
+/* ===== Nav / gate ===== */
+function go(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('nav button[data-page],.bottomNav button[data-page]').forEach(b=>b.classList.remove('on'));
+  $('page-'+id).classList.add('on');
+  document.querySelectorAll('[data-page="'+id+'"]').forEach(b=>b.classList.add('on'));
+}
+function renderGate(){
+  const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
+  const u=loggedUser();
+  if(!currentUser||!u){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    const inFrame=window.self!==window.top;
+    gateBox.innerHTML=inFrame
+      ? `<h3>Login Required</h3><p class="note">Stationery Inventory dekhne ke liye Bliss One dashboard se login karein.</p><button class="btn primary" onclick="loginFromHub()">Login</button>`
+      : `<h3>Login Required</h3><p class="note">Stationery Inventory dekhne ke liye login karein — wahi username/password jo baaki Bliss apps me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
+    return;
+  }
+  const role=myRole();
+  const hasAccess=superAdminUnlocked||role==='admin'||role==='director';
+  if(!hasAccess || (u.appAccess && u.appAccess[APP_SLUG]===false)){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    gateBox.innerHTML=`<h3>No Access</h3>`;
+    return;
+  }
+  gateWrap.style.display='none';appWrap.style.display='';
+}
+
+function refreshLoginBadge(){
+  const u=loggedUser();
+  $('loginBadge').textContent=u?'👤 '+u.name:'Not Logged In';
+  $('logoutBtn').classList.toggle('hidden',!u);
+}
+function applyFeatureVisibility(){
+  document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.toggle('hidden',!isAdminRole()));
+}
+
+/* ===== Dashboard / stock ===== */
+function itemName(id){return (items.find(x=>x.id===id)||{}).name||id}
+function renderDash(){
+  const low=items.filter(x=>x.stock<=x.min).length;
+  const monthPrefix=todayISO().slice(0,7);
+  const inThisMonth=inLog.filter(x=>String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
+  const outThisMonth=outLog.filter(x=>String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
+  const tiles=[
+    {label:'TOTAL ITEMS',val:items.length},
+    {label:'LOW STOCK ALERTS',val:low,warn:low>0},
+    {label:'STOCK IN (THIS MONTH)',val:inThisMonth},
+    {label:'STOCK OUT (THIS MONTH)',val:outThisMonth}
+  ];
+  $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+  if($('heroTotalItems'))$('heroTotalItems').textContent=items.length;
+  $('stockTable').innerHTML=items.map(x=>{
+    const isLow=x.stock<=x.min;
+    return `<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category||'-')}</td><td class="num">${x.stock||0} ${esc(x.unit||'')}</td><td class="num">${x.min||0}</td><td><span class="pill ${isLow?'low':'ok'}">${isLow?'⚠ Low Stock':'✓ OK'}</span></td></tr>`;
+  }).join('')||`<tr><td colspan="5"><div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Item Master se naya item add karein.</small></div></td></tr>`;
+}
+function renderSelects(){
+  const opts=items.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+  if($('inItem'))$('inItem').innerHTML=opts;
+  if($('outItem'))$('outItem').innerHTML=opts;
+  const au=users.filter(u=>u.active!==false);
+  if($('outTo'))$('outTo').innerHTML='<option value="">Select</option>'+au.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+  if($('vendorList'))$('vendorList').innerHTML=(masters.vendors||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+  if($('categoryList'))$('categoryList').innerHTML=(masters.categories||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+  if($('unitList'))$('unitList').innerHTML=(masters.units||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+  if($('editCategoryList'))$('editCategoryList').innerHTML=(masters.categories||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+  if($('editUnitList'))$('editUnitList').innerHTML=(masters.units||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+}
+function nameOfUserId(id){return (users.find(x=>x.id===id)||{}).name||id}
+function renderLogs(){
+  $('inHistory').innerHTML=inLog.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(itemName(x.item))}</td><td class="num">+${x.qty}</td><td>${esc(x.vendor||'-')}</td><td>${esc(nameOfUserId(x.by))}</td></tr>`).join('')||`<tr><td colspan="5"><div class="emptystate">⬇<p>Koi Stock In entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
+  $('outHistory').innerHTML=outLog.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(itemName(x.item))}</td><td class="num">-${x.qty}</td><td>${esc(nameOfUserId(x.to))}</td><td>${esc(nameOfUserId(x.by))}</td></tr>`).join('')||`<tr><td colspan="5"><div class="emptystate">⬆<p>Koi Stock Out entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
+}
+function renderItems(){
+  $('itemList').innerHTML=items.map(x=>{
+    const isLow=x.stock<=x.min;
+    return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span><button class="btn small" onclick="openEditItem('${x.id}')">✎ Edit</button></div>`;
+  }).join('')||`<div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Upar se pehla item add karein.</small></div>`;
+}
+let editItemTarget=null;
+function openEditItem(id){
+  const it=items.find(x=>x.id===id);
+  if(!it)return;
+  editItemTarget=id;
+  $('eiName').value=it.name||'';
+  $('eiCat').value=it.category||'';
+  $('eiUnit').value=it.unit||'';
+  $('eiMin').value=it.min||0;
+  $('editItemModal').classList.add('show');
+}
+function closeEditItem(){$('editItemModal').classList.remove('show');editItemTarget=null;}
+async function saveEditItem(){
+  if(!editItemTarget)return;
+  const name=$('eiName').value.trim(),category=$('eiCat').value.trim(),unit=$('eiUnit').value.trim(),min=parseInt($('eiMin').value,10)||0;
+  if(!name){alert('Item Name zaroori hai.');return}
+  await db.collection('si_items').doc(editItemTarget).update({name,category,unit,min});
+  if(category && !masters.categories.includes(category)){masters.categories.push(category);saveMasters();}
+  if(unit && !masters.units.includes(unit)){masters.units.push(unit);saveMasters();}
+  closeEditItem();
+  toast('Item updated');
+}
+
+let _stockInSubmitting=false;
+async function addStockIn(){
+  if(_stockInSubmitting)return;
+  const item=$('inItem').value,qty=parseInt($('inQty').value,10),vendor=$('inVendor').value.trim(),remark=$('inRemark').value.trim(),date=$('inDate').value||todayISO();
+  if(!item||!qty){alert('Item aur Quantity zaroori hai.');return}
+  _stockInSubmitting=true;
+  const btn=$('stockInSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const actor=loggedUser();
+    await db.collection('si_stock_in').add({item,qty,vendor,remark,date,by:actor?actor.id:'',at:new Date().toISOString()});
+    await db.collection('si_items').doc(item).update({stock:firebase.firestore.FieldValue.increment(qty)});
+    $('inQty').value='';$('inVendor').value='';$('inRemark').value='';
+    toast('Stock In entry saved');
+  }finally{
+    _stockInSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
+}
+let _stockOutSubmitting=false;
+async function addStockOut(){
+  if(_stockOutSubmitting)return;
+  const item=$('outItem').value,qty=parseInt($('outQty').value,10),to=$('outTo').value,purpose=$('outPurpose').value.trim(),date=$('outDate').value||todayISO();
+  if(!item||!qty||!to){alert('Item, Quantity aur Issued To zaroori hai.');return}
+  const it=items.find(x=>x.id===item);
+  if(it&&qty>(it.stock||0)){if(!confirm(`Sirf ${it.stock||0} ${it.unit||''} stock mein hai. Phir bhi issue karein?`))return}
+  // Same item issued again within a few days is often a genuine repeat need, but can also be
+  // an accidental duplicate entry - flag it so the person issuing it gets one chance to catch
+  // a mistake before it's saved, without blocking legitimate repeat issues.
+  const RECENT_ISSUE_DAYS=3;
+  const cutoff=new Date(Date.now()-RECENT_ISSUE_DAYS*86400000).toISOString().slice(0,10);
+  const recentSame=outLog.find(x=>x.item===item && x.date>=cutoff);
+  if(recentSame){
+    const recentToName=nameOfUserId(recentSame.to);
+    if(!confirm(`⚠ ${it?it.name:'Ye item'} pichle ${RECENT_ISSUE_DAYS} din mein (${recentSame.date}) ${recentToName} ko already issue kiya gaya tha.\n\nPhir se issue karna hai?`))return;
+  }
+  _stockOutSubmitting=true;
+  const btn=$('stockOutSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const actor=loggedUser();
+    await db.collection('si_stock_out').add({item,qty,to,purpose,date,by:actor?actor.id:'',at:new Date().toISOString()});
+    await db.collection('si_items').doc(item).update({stock:firebase.firestore.FieldValue.increment(-qty)});
+    $('outQty').value='';$('outPurpose').value='';
+    toast('Stock issued');
+    if(it)notifyIssue(it,qty,to,actor?actor.id:'');
+    if(it && (it.stock||0)-qty<=(it.min||0))notifyLowStock({...it,stock:(it.stock||0)-qty});
+  }finally{
+    _stockOutSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
+}
+let _addItemSubmitting=false;
+async function addItem(){
+  if(_addItemSubmitting)return;
+  const name=$('mItemName').value.trim(),category=$('mItemCat').value.trim(),unit=$('mItemUnit').value.trim(),min=parseInt($('mItemMin').value,10)||0;
+  if(!name){alert('Item Name zaroori hai.');return}
+  _addItemSubmitting=true;
+  const btn=$('addItemSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    await db.collection('si_items').add({name,category,unit,min,stock:0});
+    if(category && !masters.categories.includes(category)){masters.categories.push(category);saveMasters();}
+    if(unit && !masters.units.includes(unit)){masters.units.push(unit);saveMasters();}
+    $('mItemName').value='';$('mItemCat').value='';$('mItemUnit').value='';$('mItemMin').value='';
+    toast('Item added');
+  }finally{
+    _addItemSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
+}
+
+/* ===== Manage panel ===== */
+function openManage(){currentTab='category';$('manageModal').classList.add('show');renderManage()}
+function closeManage(){$('manageModal').classList.remove('show')}
+function mtab(btn,t){currentTab=t;document.querySelectorAll('#manageModal .tab').forEach(x=>x.classList.toggle('on',x===btn));renderManage()}
+function masterListUI(key,label){
+  const list=masters[key]||[];
+  return `<div class="field"><label>Add ${label}</label><div style="display:flex;gap:6px"><input id="mNew_${key}" style="flex:1"><button class="btn primary small" onclick="addMasterEntry('${key}')">Add</button></div></div>
+  <div style="margin-top:10px">${list.map((x,i)=>`<div class="item"><span>${esc(x)}</span><button class="btn small danger" onclick="delMasterEntry('${key}',${i})">Delete</button></div>`).join('')||'<div class="note" style="padding:8px 0">Koi entry nahi.</div>'}</div>`;
+}
+function addMasterEntry(key){
+  const inp=$('mNew_'+key);const v=inp.value.trim();if(!v)return;
+  if(!masters[key])masters[key]=[];
+  if(!masters[key].includes(v)){masters[key].push(v);saveMasters();}
+  inp.value='';renderManage();
+}
+function delMasterEntry(key,i){masters[key].splice(i,1);saveMasters();renderManage();}
+function renderManage(){
+  const c=$('manageContent');
+  if(currentTab==='category'){c.innerHTML=masterListUI('categories','Category');}
+  else if(currentTab==='unit'){c.innerHTML=masterListUI('units','Unit');}
+  else if(currentTab==='vendor'){c.innerHTML=masterListUI('vendors','Vendor');}
+  else if(currentTab==='roles'){
+    const au=users.filter(u=>u.active!==false);
+    c.innerHTML=`<p class="note">Ye poori app sirf Admin/Director role wale users ke liye hai — baaki sabko "No Access" dikhega.</p>`+au.map(u=>{
+      const role=(u.appRoles&&u.appRoles[APP_SLUG])||'';
+      return `<div class="item">
+        <b style="font-size:13px">${esc(u.name)}</b>
+        <select style="width:auto" onchange="setUserRole('${esc(u.id)}',this.value)">
+          <option value=""${role===''?' selected':''}>No Access</option>
+          <option value="admin"${role==='admin'?' selected':''}>Admin</option>
+          <option value="director"${role==='director'?' selected':''}>Director</option>
+        </select>
+      </div>`;
+    }).join('');
+  }
+  else if(currentTab==='notify'){
+    const withPhone=users.filter(u=>u.active!==false && u.phone);
+    const selected=masters.lowStockRecipients||[];
+    c.innerHTML=`<p class="note">Low Stock Alert WhatsApp message kisko jaye, yahan se select karein. Kuch bhi select na karein to default Admin/Director (jinke paas phone number hai) ko jayega.</p>`+
+      (withPhone.map(u=>`<div class="item"><span>${esc(u.name)}</span><input type="checkbox" ${selected.includes(u.id)?'checked':''} onchange="toggleLowStockRecipient('${esc(u.id)}')"></div>`).join('')||'<div class="note" style="padding:8px 0">Koi active user ka phone number save nahi hai.</div>');
+  }
+  else if(currentTab==='templates'){
+    c.innerHTML=`<p class="note">In messages ki wording customize kar sakte hain. {CurlyBraces} wale words ko chhoda na chhedein — inki jagah actual data automatically bharta hai.</p>`+
+      Object.keys(DEFAULT_SI_TEMPLATES).map(id=>{
+        const cur=templateText(id);
+        return `<div class="field" style="margin-bottom:14px"><label>${esc(DEFAULT_SI_TEMPLATES[id].name)}</label><textarea id="tpl_${id}" rows="5" style="width:100%;font-family:monospace">${esc(cur)}</textarea>
+        <div style="display:flex;gap:8px;margin-top:6px"><button class="btn primary small" onclick="saveTemplate('${id}')">Save</button><button class="btn small" onclick="resetTemplate('${id}')">Reset to Default</button></div></div>`;
+      }).join('');
+  }
+}
+function toggleLowStockRecipient(userId){
+  if(!masters.lowStockRecipients)masters.lowStockRecipients=[];
+  const i=masters.lowStockRecipients.indexOf(userId);
+  if(i===-1)masters.lowStockRecipients.push(userId);else masters.lowStockRecipients.splice(i,1);
+  saveMasters();renderManage();
+}
+function saveTemplate(id){
+  const el=$('tpl_'+id);if(!el)return;
+  if(!masters.templates)masters.templates={};
+  masters.templates[id]=el.value;
+  saveMasters();
+  toast('Template saved');
+}
+function resetTemplate(id){
+  if(masters.templates)delete masters.templates[id];
+  saveMasters();
+  renderManage();
+  toast('Reset to default');
+}
+function setUserRole(userId,role){
+  if(!db)return;
+  const patch={};patch['appRoles.'+APP_SLUG]=role||firebase.firestore.FieldValue.delete();
+  db.collection(UU_COLLECTION).doc(userId).update(patch).catch(e=>console.error('role save failed',e));
+}
+
+/* ===== Reports ===== */
+function reportRange(){ return {from:$('repFrom')?.value||'',to:$('repTo')?.value||''}; }
+function inRange(dateStr,from,to){
+  if(from && dateStr<from)return false;
+  if(to && dateStr>to)return false;
+  return true;
+}
+function renderReports(){
+  if(!$('repItemTable'))return;
+  const {from,to}=reportRange();
+  const outF=outLog.filter(x=>inRange(String(x.date||''),from,to));
+  const inF=inLog.filter(x=>inRange(String(x.date||''),from,to));
+  $('repSummary').innerHTML=`<div class="cards"><div class="card"><small>STOCK IN</small><b>${inF.reduce((s,x)=>s+(x.qty||0),0)}</b></div><div class="card"><small>STOCK OUT</small><b>${outF.reduce((s,x)=>s+(x.qty||0),0)}</b></div></div>`;
+  const byItem={};
+  outF.forEach(x=>{const n=itemName(x.item);byItem[n]=(byItem[n]||0)+(x.qty||0);});
+  const itemRows=Object.entries(byItem).sort((a,b)=>b[1]-a[1]);
+  $('repItemTable').innerHTML=itemRows.map(([n,q])=>`<tr><td>${esc(n)}</td><td class="num">${q}</td></tr>`).join('')||`<tr><td colspan="2"><div class="emptystate">📈<p>Is range mein koi issue nahi hua.</p></div></td></tr>`;
+  const byCat={};
+  outF.forEach(x=>{const it=items.find(i=>i.id===x.item);const cat=(it&&it.category)||'Other';byCat[cat]=(byCat[cat]||0)+(x.qty||0);});
+  const catRows=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  $('repCatTable').innerHTML=catRows.map(([c,q])=>`<tr><td>${esc(c)}</td><td class="num">${q}</td></tr>`).join('')||`<tr><td colspan="2"><div class="emptystate">📈<p>Is range mein koi issue nahi hua.</p></div></td></tr>`;
+}
+function downloadCSV(filename,rows){
+  const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+function exportStockInCSV(){
+  const {from,to}=reportRange();
+  const rows=[['Date','Item','Qty','Vendor','By']];
+  inLog.filter(x=>inRange(String(x.date||''),from,to)).forEach(x=>rows.push([x.date,itemName(x.item),x.qty,x.vendor||'',nameOfUserId(x.by)]));
+  downloadCSV('stock-in-report.csv',rows);
+}
+function exportStockOutCSV(){
+  const {from,to}=reportRange();
+  const rows=[['Date','Item','Qty','Issued To','By','Purpose']];
+  outLog.filter(x=>inRange(String(x.date||''),from,to)).forEach(x=>rows.push([x.date,itemName(x.item),x.qty,nameOfUserId(x.to),nameOfUserId(x.by),x.purpose||'']));
+  downloadCSV('stock-out-report.csv',rows);
+}
+
+/* ===== Toast ===== */
+let toastTimer=null;
+function toast(msg){
+  let t=$('siToast');
+  if(!t){t=document.createElement('div');t.id='siToast';t.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#17211b;color:#fff;padding:9px 16px;border-radius:20px;font-size:12px;z-index:99999;opacity:0;transition:opacity .2s';document.body.appendChild(t);}
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.opacity='0',2200);
+}
+
+function renderAll(){
+  renderGate();
+  refreshLoginBadge();
+  applyFeatureVisibility();
+  renderDash();
+  renderSelects();
+  renderLogs();
+  renderItems();
+  renderReports();
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  currentUser=localStorage.getItem(SESSION_KEY)||null;
+  if($('inDate'))$('inDate').value=todayISO();
+  if($('outDate'))$('outDate').value=todayISO();
+  if($('repFrom'))$('repFrom').value=todayISO().slice(0,8)+'01';
+  if($('repTo'))$('repTo').value=todayISO();
+  startUsersSync();
+  startItemsSync();
+  startLogsSync();
+  startMastersSync();
+  renderAll();
+});
+window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
+</script>
+</body>
+</html>

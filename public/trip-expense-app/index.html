@@ -2,7 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" id="viewportMeta" content="width=device-width,initial-scale=1">
-<script>if(localStorage.getItem('te_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')</script>
+<script>
+/* Crash safety net — registered first, before any other script, so it can never itself
+   be skipped by a later error. A broken script tag still halts the rest of THAT tag, but
+   this at least turns a silent dead page into a visible, actionable message instead of the
+   user just clicking buttons that quietly do nothing. */
+(function(){
+  function showCrashBanner(msg){
+    if(document.getElementById('teCrashBanner'))return;
+    var b=document.createElement('div');
+    b.id='teCrashBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b42318;color:#fff;padding:10px 14px;font:600 13px Arial,sans-serif;text-align:center;box-shadow:0 2px 10px #0004';
+    b.innerHTML='⚠ App me error aa gaya hai. Page reload karein.'
+      +' <button type="button" style="margin-left:10px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#b42318;font-weight:700;cursor:pointer" onclick="location.reload()">Reload</button>'
+      +'<div style="font-weight:400;font-size:11px;opacity:.85;margin-top:3px">'+String(msg||'').slice(0,200).replace(/[<>]/g,'')+'</div>';
+    function attach(){document.body&&document.body.prepend(b)}
+    if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach);
+  }
+  window.addEventListener('error',function(e){
+    console.error('Uncaught error:',e.error||e.message);
+    showCrashBanner((e.error&&e.error.message)||e.message);
+  });
+  window.addEventListener('unhandledrejection',function(e){
+    console.error('Unhandled promise rejection:',e.reason);
+    showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));
+  });
+})();
+if(localStorage.getItem('bliss_force_desktop')==='1')document.getElementById('viewportMeta').setAttribute('content','width=1100')
+</script>
 <title>Bliss Gems & Minerals - Trip Expense</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,10 +69,14 @@ table.dtb td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px}tab
 .statusrow{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #edf1ee}.statusrow:last-child{border:0}
 .statusdot{width:9px;height:9px;border-radius:50%;flex:none}.statusdot.on{background:var(--g2)}.statusdot.off{background:var(--red)}
 .statusbadge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px}.statusbadge.on{background:var(--mint);color:var(--g)}.statusbadge.off{background:var(--redbg);color:var(--red)}
-@media(max-width:720px){header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:22px}.brand b{font-size:16px}.brand small,.live{display:none}.shell{display:block;padding:11px 10px 76px}nav{display:none}.hero{padding:17px}.hero h1{font-size:20px}.hero strong{font-size:23px}.cards{grid-template-columns:1fr 1fr}.money{grid-template-columns:1fr 1fr}.money .m:last-child{grid-column:1/-1}.analytics{grid-template-columns:1fr}.tripMoney{grid-template-columns:1fr 1fr}.tripMoney .tm:last-child{grid-column:1/-1}.salesActions{grid-template-columns:1fr}.big{min-height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;text-align:left}.big span{margin:0}.fields{grid-template-columns:1fr}.span2{grid-column:auto}.bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;justify-content:space-around;padding:6px}.bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold}.bottomNav button.hidden{display:none}.bottomNav span{display:block;font-size:19px}.bottomNav button.on{color:var(--g)}}
+@media(max-width:720px){header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:22px}.brand b{font-size:16px}.brand small,.live{display:none}.shell{display:block;padding:11px 10px 76px}nav{display:none}.hero{padding:17px}.hero h1{font-size:20px}.hero strong{font-size:23px}.cards{grid-template-columns:1fr 1fr}.money{grid-template-columns:1fr 1fr}.money .m:last-child{grid-column:1/-1}.analytics{grid-template-columns:1fr}.tripMoney{grid-template-columns:1fr 1fr}.tripMoney .tm:last-child{grid-column:1/-1}.salesActions{grid-template-columns:1fr}.big{min-height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;text-align:left}.big span{margin:0}.fields{grid-template-columns:1fr}.span2{grid-column:auto}.bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}.bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:0 0 auto;padding:2px 12px;white-space:nowrap}.bottomNav button.hidden{display:none}.bottomNav span{display:block;font-size:19px}.bottomNav button.on{color:var(--g)}}
+/* Same mobile-layout rules as above, but toggled by a class instead of actual viewport width —
+   lets "📱 Mobile View" preview mobile layout on a real desktop browser, where the viewport
+   meta tag hack has no visible effect at all. */
+body.te-force-mobile header{height:60px}body.te-force-mobile .head{padding:0 11px}body.te-force-mobile .logo{width:38px;height:38px;font-size:22px}body.te-force-mobile .brand b{font-size:16px}body.te-force-mobile .brand small,body.te-force-mobile .live{display:none}body.te-force-mobile .shell{display:block;padding:11px 10px 76px}body.te-force-mobile nav{display:none}body.te-force-mobile .hero{padding:17px}body.te-force-mobile .hero h1{font-size:20px}body.te-force-mobile .hero strong{font-size:23px}body.te-force-mobile .cards{grid-template-columns:1fr 1fr}body.te-force-mobile .money{grid-template-columns:1fr 1fr}body.te-force-mobile .money .m:last-child{grid-column:1/-1}body.te-force-mobile .analytics{grid-template-columns:1fr}body.te-force-mobile .tripMoney{grid-template-columns:1fr 1fr}body.te-force-mobile .tripMoney .tm:last-child{grid-column:1/-1}body.te-force-mobile .salesActions{grid-template-columns:1fr}body.te-force-mobile .big{min-height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;text-align:left}body.te-force-mobile .big span{margin:0}body.te-force-mobile .fields{grid-template-columns:1fr}body.te-force-mobile .span2{grid-column:auto}body.te-force-mobile .bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}body.te-force-mobile .bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:0 0 auto;padding:2px 12px;white-space:nowrap}body.te-force-mobile .bottomNav button.hidden{display:none}body.te-force-mobile .bottomNav span{display:block;font-size:19px}body.te-force-mobile .bottomNav button.on{color:var(--g)}
 </style></head>
 <body>
-<header><div class="head"><div class="brand"><div class="logo" id="secretLogo" onclick="tapLogo()">b</div><div><b>Bliss Gems & Minerals</b><small>Employee Advance & Trip Settlement</small></div></div>
+<header><div class="head"><div class="brand"><div class="logo" id="secretLogo">b</div><div><b>Bliss Gems & Minerals</b><small>Employee Advance & Trip Settlement</small></div></div>
 <div class="searchbox hidden" id="searchBoxWrap"><input id="globalSearch" type="text" placeholder="🔎 Search trip, sales person, location…" oninput="doGlobalSearch()"><div id="searchResults" class="searchresults hidden"></div></div>
 <div class="headRight">
 <button class="btn" id="desktopViewBtn" onclick="toggleDesktopView()" title="Switch between mobile and desktop layout">🖥 Desktop View</button>
@@ -67,20 +98,20 @@ if(window.self!==window.top){
 
 <div class="shell" id="appWrap" style="display:none"><nav>
 <div class="grouplabel">Operations</div>
-<button class="on" data-role="admin,director" onclick="go('admin',this)">▦ Admin Control</button>
-<button data-role="admin,director,accounts" onclick="go('ledger',this)">₹ Advance Ledger</button>
-<button data-role="admin,director" onclick="go('pending',this)">⏱ Pending Hisaab</button>
-<button data-role="sales" onclick="go('sales',this)">👤 My Trip</button>
+<button class="on" data-page="admin" data-role="admin,director" onclick="go('admin',this)">▦ Admin Control</button>
+<button data-page="ledger" data-role="admin,director,accounts" onclick="go('ledger',this)">₹ Advance Ledger</button>
+<button data-page="pending" data-role="admin,director" onclick="go('pending',this)">⏱ Pending Hisaab</button>
+<button data-page="sales" onclick="go('sales',this)">👤 My Trip</button>
 <div class="grouplabel">Insights</div>
-<button data-role="admin,director" onclick="go('analytics',this)">📊 Analytics</button>
-<button data-role="admin,director,accounts" onclick="go('explorer',this)">🔎 Detailed Trips</button>
-<button data-role="admin,accounts,director" onclick="go('accounts',this)">📚 Bookkeeping</button>
-<button data-role="admin,director,accounts" onclick="go('activity',this)">🕒 Activity Log</button>
+<button data-page="analytics" data-role="admin,director" onclick="go('analytics',this)">📊 Analytics</button>
+<button data-page="explorer" data-role="admin,director,accounts" onclick="go('explorer',this)">🔎 Detailed Trips</button>
+<button data-page="accounts" data-role="admin,accounts,director,sales" onclick="go('accounts',this)">📚 Bookkeeping</button>
+<button data-page="activity" data-role="admin,director,accounts" onclick="go('activity',this)">🕒 Activity Log</button>
 <div class="grouplabel">System</div>
-<button data-role="director" onclick="go('director',this)">★ Directors</button>
-<button data-role="director" onclick="go('notify',this)">💬 Notifications</button>
-<button data-role="director" onclick="go('templates',this)">📝 Message Templates</button>
-<button data-role="director" onclick="go('teamroles',this)">👥 Team &amp; Roles</button>
+<button data-page="director" data-role="director" onclick="go('director',this)">★ Directors</button>
+<button data-page="notify" data-role="director" onclick="go('notify',this)">💬 Notifications</button>
+<button data-page="templates" data-role="director" onclick="go('templates',this)">📝 Message Templates</button>
+<button data-page="teamroles" data-role="admin,director" onclick="go('teamroles',this)">👥 Team &amp; Roles</button>
 </nav><main>
 
 <section id="admin" class="page on">
@@ -101,7 +132,7 @@ if(window.self!==window.top){
 <div class="panel"><div class="ph"><span>💰 Idle Advance<small>capital tied up unnecessarily</small></span></div><div class="pb" id="dirIdleAdvance"></div></div>
 <div class="panel"><div class="ph"><span>🏆 Cost Efficiency Ranking<small>vs. company benchmark</small></span></div><div class="pb" id="dirEfficiency"></div></div>
 <div class="panel"><div class="ph"><span>Location × Purpose Benchmark<small>avg. per trip</small></span></div><div class="pb" id="dirBenchmark"></div></div>
-<div class="panel"><div class="ph"><span>Team Roles</span><span class="tag">DIRECTORS ONLY</span></div><div class="pb"><div class="note" style="font-size:12px;color:var(--muted)">Role assign karne ke liye <b style="color:var(--txt)">Team &amp; Roles</b> page par jaayein.</div><div style="margin-top:10px"><button class="btn primary" onclick="go('teamroles')">👥 Open Team &amp; Roles</button></div></div></div>
+<div class="panel"><div class="ph"><span>Team Roles</span><span class="tag">ADMIN &amp; DIRECTORS</span></div><div class="pb"><div class="note" style="font-size:12px;color:var(--muted)">Role assign karne ke liye <b style="color:var(--txt)">Team &amp; Roles</b> page par jaayein.</div><div style="margin-top:10px"><button class="btn primary" onclick="go('teamroles')">👥 Open Team &amp; Roles</button></div></div></div>
 </section>
 
 <section id="sales" class="page"><div class="salesWrap" id="salesWrap"><div class="row"><small>Loading…</small></div></div></section>
@@ -161,10 +192,18 @@ if(window.self!==window.top){
 </main></div>
 
 <div class="bottomNav" id="bottomNav">
-<button class="on" data-role="admin,director" onclick="mgo('admin',this)"><span>▦</span>Admin</button>
-<button data-role="director" onclick="mgo('director',this)"><span>★</span>Director</button>
-<button data-role="sales" onclick="mgo('sales',this)"><span>👤</span>My Trip</button>
-<button data-role="admin,director" onclick="mgo('pending',this)"><span>⏱</span>Pending</button>
+<button class="on" data-page="admin" data-role="admin,director" onclick="mgo('admin',this)"><span>▦</span>Admin</button>
+<button data-page="ledger" data-role="admin,director,accounts" onclick="mgo('ledger',this)"><span>₹</span>Ledger</button>
+<button data-page="pending" data-role="admin,director" onclick="mgo('pending',this)"><span>⏱</span>Pending</button>
+<button data-page="sales" onclick="mgo('sales',this)"><span>👤</span>My Trip</button>
+<button data-page="analytics" data-role="admin,director" onclick="mgo('analytics',this)"><span>📊</span>Analytics</button>
+<button data-page="explorer" data-role="admin,director,accounts" onclick="mgo('explorer',this)"><span>🔎</span>Trips</button>
+<button data-page="accounts" data-role="admin,accounts,director,sales" onclick="mgo('accounts',this)"><span>📚</span>Books</button>
+<button data-page="activity" data-role="admin,director,accounts" onclick="mgo('activity',this)"><span>🕒</span>Activity</button>
+<button data-page="director" data-role="director" onclick="mgo('director',this)"><span>★</span>Director</button>
+<button data-page="notify" data-role="director" onclick="mgo('notify',this)"><span>💬</span>Notify</button>
+<button data-page="templates" data-role="director" onclick="mgo('templates',this)"><span>📝</span>Templates</button>
+<button data-page="teamroles" data-role="admin,director" onclick="mgo('teamroles',this)"><span>👥</span>Roles</button>
 </div>
 
 <div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
@@ -175,8 +214,16 @@ if(window.self!==window.top){
 <div class="msg" id="loginMsg"></div>
 </div></div>
 
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:74px;right:14px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:13px;line-height:26px;cursor:default;z-index:999999;transition:background .15s">•</button>
+
+<div class="modal" id="superAdminModal"><div class="box" style="width:min(360px,100%)">
+<h3>Private Access</h3>
+<div class="field"><label>Super Admin Password</label><input id="superAdminPassword" type="password" onkeydown="if(event.key==='Enter')unlockSuperAdmin()"></div>
+<div class="actions"><button class="btn" onclick="closeSuperAdminModal()">Cancel</button><button class="btn primary" onclick="unlockSuperAdmin()">Unlock</button></div>
+</div></div>
+
 <div class="modal" id="issue"><div class="box"><h3>Issue Trip Amount</h3><div class="fields">
-<div class="field span2"><label>Sales Person *</label><select id="issueSales" onchange="updateIssueSuggestion()"></select></div>
+<div class="field span2"><label>Person *</label><select id="issueSales" onchange="updateIssueSuggestion()"></select></div>
 <div class="field"><label>Location *</label><select id="issueLocation" onchange="handleIssueLocPurposeChange(this,'issueLocation')"></select></div>
 <div class="field"><label>Trip Purpose *</label><select id="issuePurpose" onchange="handleIssueLocPurposeChange(this,'issuePurpose')"></select></div>
 <div class="field span2 hidden" id="issueAddNewRow" style="display:flex;gap:8px;align-items:flex-end">
@@ -188,13 +235,13 @@ if(window.self!==window.top){
 <div class="field"><label>Hisaab Due *</label><input type="date" id="issueDue"></div>
 <div class="field span2" id="issueSuggestBox" style="display:none;background:var(--mint);border:1px solid #cdeadf;border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--g)"></div>
 <div class="field span2"><label>Amount *</label><input type="number" id="issueAmount" placeholder="₹ 0"></div>
-</div><div class="actions"><button class="btn" onclick="hide('issue')">Cancel</button><button class="btn primary" onclick="submitIssue()">Issue & Start Trip</button></div><div class="msg" id="issueMsg"></div></div></div>
+</div><div class="actions"><button class="btn" onclick="hide('issue')">Cancel</button><button class="btn primary" id="issueSubmitBtn" onclick="submitIssue()">Issue & Start Trip</button></div><div class="msg" id="issueMsg"></div></div></div>
 
 <div class="modal" id="extra"><div class="box"><h3>Additional Advance</h3>
 <div class="field"><label>Amount *</label><input type="number" id="extraAmount" placeholder="₹ 0"></div>
 <div class="field" style="margin-top:8px"><label>Payment Mode</label><select id="extraMode"><option>Cash</option><option>Bank</option><option>UPI</option></select></div>
 <div class="field" style="margin-top:8px"><label>Reference / Remark</label><input id="extraRemark"></div>
-<div class="actions"><button class="btn" onclick="hide('extra')">Cancel</button><button class="btn primary" onclick="submitExtra()">Issue Additional Advance</button></div><div class="msg" id="extraMsg"></div></div></div>
+<div class="actions"><button class="btn" onclick="hide('extra')">Cancel</button><button class="btn primary" id="extraSubmitBtn" onclick="submitExtra()">Issue Additional Advance</button></div><div class="msg" id="extraMsg"></div></div></div>
 
 <div class="modal" id="expense"><div class="box"><h3>Add Expense</h3><div class="fields">
 <div class="field"><label>Category *</label><select id="expCategory"><option>Hotel</option><option>Food</option><option>Taxi / Cab</option><option>Flight</option><option>Train</option><option>Fuel</option><option>Other</option></select></div>
@@ -202,7 +249,7 @@ if(window.self!==window.top){
 <div class="field span2"><label>Paid To *</label><input id="expPaidTo"></div>
 <div class="field span2"><label>Bill / Proof (photo)</label><input type="file" id="expProof" accept="image/*" capture="environment"></div>
 <div class="field span2"><label>Remark / No Bill Reason</label><textarea id="expRemark"></textarea></div>
-</div><div class="actions"><button class="btn" onclick="hide('expense')">Cancel</button><button class="btn primary" onclick="submitExpense()">Save Expense</button></div><div class="msg" id="expMsg"></div></div></div>
+</div><div class="actions"><button class="btn" onclick="hide('expense')">Cancel</button><button class="btn primary" id="expSubmitBtn" onclick="submitExpense()">Save Expense</button></div><div class="msg" id="expMsg"></div></div></div>
 
 <div class="modal" id="proofView"><div class="box"><h3>Bill / Proof</h3><img id="proofImg" style="max-width:100%;border-radius:8px"><div class="actions"><button class="btn" onclick="hide('proofView')">Close</button></div></div></div>
 
@@ -236,8 +283,21 @@ if(window.self!==window.top){
 
 <script>
 const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
-if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
-const db=firebase.firestore();
+// If the firebase SDK failed to load (slow network, an ad/tracker blocker on gstatic.com,
+// a transient CDN hiccup), this must not throw here — a bare top-level throw would halt
+// every function defined below it in this script tag (toggleDesktopView, page renderers,
+// everything), leaving every button on the page silently doing nothing with no visible error.
+let db=null;
+try{
+  if(typeof firebase!=='undefined'){
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+  }else{
+    console.error('firebase SDK not loaded — cloud sync unavailable this session');
+  }
+}catch(e){
+  console.error('firebase init failed:',e);
+}
 const APP_SLUG='trip-expense-app';
 const UU_COLLECTION='universal_users';
 const SESSION_KEY='pd_logged_user_v1';
@@ -284,7 +344,7 @@ function myUserObj(){return users.find(x=>x.id===currentUser)||null}
 /* ===== Super Admin escape hatch (same shared password used across all Bliss apps) — lets a logged-in user reach the Director/Team Roles panel even before any role is assigned, so the first role can be bootstrapped. ===== */
 const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
 let superAdminUnlocked=false;
-let secretTapCount=0,secretTapTimer=null;
+let secretAdminTapCount=0,secretAdminTapTimer=null,secretAdminFlashTimer=null;
 function hardRefreshApp(){
   var btn=document.getElementById('hardRefreshBtn');
   if(btn)btn.textContent='⏳';
@@ -298,27 +358,72 @@ function hardRefreshApp(){
   }
 }
 function toggleDesktopView(){
-  var forced=localStorage.getItem('te_force_desktop')==='1';
-  if(forced)localStorage.removeItem('te_force_desktop');else localStorage.setItem('te_force_desktop','1');
+  // On an actual wide desktop screen, forcing the viewport meta tag does nothing (only
+  // mobile browsers respect it) — so give desktop a real CSS-only mobile-layout preview
+  // instead of reloading with a viewport hack that has no visible effect there.
+  if(window.innerWidth>900){
+    var previewOn=localStorage.getItem('te_force_mobile_preview')==='1';
+    if(previewOn)localStorage.removeItem('te_force_mobile_preview');else localStorage.setItem('te_force_mobile_preview','1');
+    document.body.classList.toggle('te-force-mobile',!previewOn);
+    syncDesktopViewBtn();
+    return;
+  }
+  var forced=localStorage.getItem('bliss_force_desktop')==='1';
+  if(forced)localStorage.removeItem('bliss_force_desktop');else localStorage.setItem('bliss_force_desktop','1');
   location.replace(location.pathname+'?_r='+Date.now()+location.hash);
 }
 function syncDesktopViewBtn(){
   var btn=document.getElementById('desktopViewBtn');if(!btn)return;
-  var forced=localStorage.getItem('te_force_desktop')==='1';
+  if(window.innerWidth>900){
+    var previewOn=localStorage.getItem('te_force_mobile_preview')==='1';
+    document.body.classList.toggle('te-force-mobile',previewOn);
+    btn.textContent=previewOn?'🖥 Desktop View':'📱 Mobile View';
+    return;
+  }
+  var forced=localStorage.getItem('bliss_force_desktop')==='1';
   btn.textContent=forced?'📱 Mobile View':'🖥 Desktop View';
 }
 syncDesktopViewBtn();
-function tapLogo(){
-  secretTapCount++;
-  clearTimeout(secretTapTimer);
-  secretTapTimer=setTimeout(()=>secretTapCount=0,1100);
-  if(secretTapCount>=3){
-    secretTapCount=0;
-    if(superAdminUnlocked){renderAll();return}
-    const pw=prompt('Super Admin Password:');
-    if(pw===SUPER_ADMIN_PASSWORD){superAdminUnlocked=true;renderAll();}
-    else if(pw!==null)alert('Galat password.');
+function secretAdminTap(){
+  secretAdminTapCount++;
+  // Brief red flash on every registered tap — feedback that a tap landed on the target.
+  const dot=document.getElementById('secretAdminIcon');
+  if(dot){
+    dot.style.background='rgba(214,48,49,.45)';
+    clearTimeout(secretAdminFlashTimer);
+    secretAdminFlashTimer=setTimeout(()=>{dot.style.background='transparent'},200);
   }
+  clearTimeout(secretAdminTapTimer);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2500);
+  if(secretAdminTapCount>=10){
+    secretAdminTapCount=0;
+    clearTimeout(secretAdminTapTimer);
+    openSuperAdminModal();
+  }
+}
+function openSuperAdminModal(){
+  if(superAdminUnlocked){renderAll();return}
+  const m=$('superAdminModal');if(!m)return;
+  $('superAdminPassword').value='';
+  m.classList.add('show');
+  setTimeout(()=>$('superAdminPassword')?.focus(),30);
+}
+function closeSuperAdminModal(){$('superAdminModal')?.classList.remove('show')}
+// Called by the Bliss One hub (same-origin iframe contentWindow) when its own Super
+// Admin is already unlocked, so opening this app from the hub doesn't ask for the
+// password a second time — same password, same person, one unlock. Still needs a
+// normal login first (Super Admin only bootstraps a role, not the login itself).
+function silentUnlockSuperAdmin(){
+  if(superAdminUnlocked)return;
+  superAdminUnlocked=true;
+  renderAll();
+}
+function unlockSuperAdmin(){
+  const pw=$('superAdminPassword')?.value||'';
+  if(pw!==SUPER_ADMIN_PASSWORD){alert('Galat password.');if($('superAdminPassword'))$('superAdminPassword').value='';return}
+  superAdminUnlocked=true;
+  closeSuperAdminModal();
+  renderAll();
 }
 function effectiveRole(){return superAdminUnlocked?'director':myRole()}
 
@@ -490,7 +595,9 @@ function updateIssueSuggestion(){
   }
 }
 function openIssueModal(){
-  $('issueSales').innerHTML=users.filter(u=>u.appRoles&&u.appRoles[APP_SLUG]==='sales'&&u.active!==false).map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('')||'<option value="">No sales users. Director se role assign karwayein.</option>';
+  // Amount kisi ko bhi issue ho sakta hai — sirf 'sales' role tak seemit nahi, isliye
+  // yahan har active user dikhta hai (role kuch bhi ho).
+  $('issueSales').innerHTML=users.filter(u=>u.active!==false).map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('')||'<option value="">Koi active user nahi hai.</option>';
   $('issueStart').value=todayISO();
   $('issueDue').value='';$('issueAmount').value='';
   populateIssueSelects();
@@ -500,33 +607,51 @@ function openIssueModal(){
   $('issueMsg').textContent='';
   show('issue');
 }
+let _issueSubmitting=false;
 async function submitIssue(){
+  if(_issueSubmitting)return;
   const salesId=$('issueSales').value,location=$('issueLocation').value,purpose=$('issuePurpose').value,start=$('issueStart').value,due=$('issueDue').value,amount=Number($('issueAmount').value);
   const msg=$('issueMsg');
   if(!salesId||!location||!purpose||!start||!due||!amount){msg.style.color='#b43a35';msg.textContent='Sabhi fields bharein.';return}
-  const sales=users.find(u=>u.id===salesId);
-  const tripId=genId();
-  const trip={id:tripId,salesId,salesName:sales?sales.name:salesId,location,purpose,startDate:start,dueDate:due,status:'running',bookedByAccounts:false,createdAt:new Date().toISOString(),createdBy:currentUser};
-  await db.collection('te_trips').doc(tripId).set(trip);
-  const lg={id:genLedgerId(),tripId,type:'advance',amount,category:'',location,paidTo:'',proofDataUri:'',remark:'Initial Advance',byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
-  await db.collection('te_ledger').doc(lg.id).set(lg);
-  hide('issue');
-  logActivity(`${(myUserObj()||{}).name||currentUser} issued ${money(amount)} advance`,`to ${sales?sales.name:salesId} · ${location} · ${purpose} · ${tripId}`);
-  if(notifySettings.issued && sales)sendWA(sales.phone,renderTemplate(messageTemplates.issued,{amount:money(amount),location,due,tripId}));
+  _issueSubmitting=true;
+  const btn=$('issueSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const sales=users.find(u=>u.id===salesId);
+    const tripId=genId();
+    const trip={id:tripId,salesId,salesName:sales?sales.name:salesId,location,purpose,startDate:start,dueDate:due,status:'running',bookedByAccounts:false,createdAt:new Date().toISOString(),createdBy:currentUser};
+    await db.collection('te_trips').doc(tripId).set(trip);
+    const lg={id:genLedgerId(),tripId,type:'advance',amount,category:'',location,paidTo:'',proofDataUri:'',remark:'Initial Advance',byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
+    await db.collection('te_ledger').doc(lg.id).set(lg);
+    hide('issue');
+    logActivity(`${(myUserObj()||{}).name||currentUser} issued ${money(amount)} advance`,`to ${sales?sales.name:salesId} · ${location} · ${purpose} · ${tripId}`);
+    if(notifySettings.issued && sales)sendWA(sales.phone,renderTemplate(messageTemplates.issued,{amount:money(amount),location,due,tripId}));
+  }finally{
+    _issueSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
 }
 let extraForTrip=null;
 function openExtraModal(tripId){extraForTrip=tripId;$('extraAmount').value='';$('extraMode').value='Cash';$('extraRemark').value='';$('extraMsg').textContent='';show('extra')}
+let _extraSubmitting=false;
 async function submitExtra(){
+  if(_extraSubmitting)return;
   const amount=Number($('extraAmount').value),mode=$('extraMode').value,remark=$('extraRemark').value.trim();
   const msg=$('extraMsg');
   if(!extraForTrip||!amount){msg.style.color='#b43a35';msg.textContent='Amount bharein.';return}
-  const trip=trips.find(t=>t.id===extraForTrip);
-  const lg={id:genLedgerId(),tripId:extraForTrip,type:'additional_advance',amount,category:'',location:trip?trip.location:'',paidTo:'',proofDataUri:'',remark:mode+(remark?(' • '+remark):''),byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
-  await db.collection('te_ledger').doc(lg.id).set(lg);
-  hide('extra');
-  if(notifySettings.additional && trip){
-    const sales=users.find(u=>u.id===trip.salesId);
-    if(sales)sendWA(sales.phone,renderTemplate(messageTemplates.additional,{amount:money(amount),tripId:extraForTrip}));
+  _extraSubmitting=true;
+  const btn=$('extraSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const trip=trips.find(t=>t.id===extraForTrip);
+    const lg={id:genLedgerId(),tripId:extraForTrip,type:'additional_advance',amount,category:'',location:trip?trip.location:'',paidTo:'',proofDataUri:'',remark:mode+(remark?(' • '+remark):''),byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
+    await db.collection('te_ledger').doc(lg.id).set(lg);
+    hide('extra');
+    if(notifySettings.additional && trip){
+      const sales=users.find(u=>u.id===trip.salesId);
+      if(sales)sendWA(sales.phone,renderTemplate(messageTemplates.additional,{amount:money(amount),tripId:extraForTrip}));
+    }
+  }finally{
+    _extraSubmitting=false;
+    if(btn)btn.disabled=false;
   }
 }
 function fileToCompressedDataUri(file){
@@ -557,21 +682,30 @@ function openExpenseModal(){
   $('expCategory').value='Hotel';$('expAmount').value='';$('expPaidTo').value='';$('expProof').value='';$('expRemark').value='';$('expMsg').textContent='';
   show('expense');
 }
+let _expenseSubmitting=false;
 async function submitExpense(){
+  if(_expenseSubmitting)return;
   const trip=mySalesTrip();
   const msg=$('expMsg');
   if(!trip){msg.style.color='#b43a35';msg.textContent='Koi active trip nahi hai.';return}
   const category=$('expCategory').value,amount=Number($('expAmount').value),paidTo=$('expPaidTo').value.trim(),remark=$('expRemark').value.trim();
   if(!amount||!paidTo){msg.style.color='#b43a35';msg.textContent='Amount aur Paid To zaroori hain.';return}
   if(!remark && !$('expProof').files[0]){msg.style.color='#b43a35';msg.textContent='Bill photo lagayein ya No-Bill reason likhein.';return}
-  let proofDataUri='';
-  const file=$('expProof').files[0];
-  if(file){
-    try{proofDataUri=await fileToCompressedDataUri(file);}catch(e){}
+  _expenseSubmitting=true;
+  const btn=$('expSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    let proofDataUri='';
+    const file=$('expProof').files[0];
+    if(file){
+      try{proofDataUri=await fileToCompressedDataUri(file);}catch(e){}
+    }
+    const lg={id:genLedgerId(),tripId:trip.id,type:'expense',amount,category,location:trip.location,paidTo,proofDataUri,remark,byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
+    await db.collection('te_ledger').doc(lg.id).set(lg);
+    hide('expense');
+  }finally{
+    _expenseSubmitting=false;
+    if(btn)btn.disabled=false;
   }
-  const lg={id:genLedgerId(),tripId:trip.id,type:'expense',amount,category,location:trip.location,paidTo,proofDataUri,remark,byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
-  await db.collection('te_ledger').doc(lg.id).set(lg);
-  hide('expense');
 }
 async function submitHisaab(){
   const trip=mySalesTrip();
@@ -656,6 +790,29 @@ async function setUserAppRole(userId,role){
   const patch={};patch['appRoles.'+APP_SLUG]=role||firebase.firestore.FieldValue.delete();
   await db.collection(UU_COLLECTION).doc(userId).update(patch);
 }
+// Extra, per-user feature access on top of (or instead of) the 4 broad roles above - lets a
+// normal employee with no role (or a limited role) still be granted specific pages, without
+// giving them a full Admin/Accounts/Director role. Pages are matched by the nav buttons'
+// data-page attribute.
+const TRIP_FEATURE_LIST=[
+  {id:'admin',name:'Admin Control'},
+  {id:'ledger',name:'Advance Ledger'},
+  {id:'pending',name:'Pending Hisaab'},
+  {id:'analytics',name:'Analytics'},
+  {id:'explorer',name:'Detailed Trips'},
+  {id:'accounts',name:'Bookkeeping'},
+  {id:'activity',name:'Activity Log'},
+  {id:'director',name:'Directors'},
+  {id:'notify',name:'Notifications'},
+  {id:'templates',name:'Message Templates'},
+  {id:'teamroles',name:'Team & Roles'}
+];
+async function toggleUserFeatureAccess(userId,pageId,checked){
+  const patch={};
+  const path='appFeatureAccess.'+APP_SLUG;
+  patch[path]=checked?firebase.firestore.FieldValue.arrayUnion(pageId):firebase.firestore.FieldValue.arrayRemove(pageId);
+  await db.collection(UU_COLLECTION).doc(userId).update(patch);
+}
 function teamRoleInitials(name){return (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()}
 function renderTeamRolesPage(){
   const wrap=$('teamRolesList');if(!wrap)return;
@@ -664,14 +821,19 @@ function renderTeamRolesPage(){
   if(!list.length){wrap.innerHTML='<div class="row"><small>Koi user nahi mila.</small></div>';return}
   wrap.innerHTML=list.map(u=>{
     const role=(u.appRoles&&u.appRoles[APP_SLUG])||'';
-    return `<div class="rolerow"><div class="avatar">${esc(teamRoleInitials(u.name))}</div><div style="flex:1;font-size:13px;font-weight:700">${esc(u.name)}<br><small style="font-weight:500;color:var(--muted)">${esc(u.username||u.id)}</small></div>
+    const extra=(u.appFeatureAccess&&u.appFeatureAccess[APP_SLUG])||[];
+    return `<div class="rolerow" style="flex-wrap:wrap"><div class="avatar">${esc(teamRoleInitials(u.name))}</div><div style="flex:1;font-size:13px;font-weight:700">${esc(u.name)}<br><small style="font-weight:500;color:var(--muted)">${esc(u.username||u.id)}</small></div>
     <select class="rolesel" style="border:1px solid var(--line);background:#fff;color:var(--txt);padding:7px 9px;border-radius:6px;font-size:13px" onchange="setUserAppRole('${esc(u.id)}',this.value)">
       <option value=""${role===''?' selected':''}>No Access</option>
+      <option value="employee"${role==='employee'?' selected':''}>Employee</option>
       <option value="sales"${role==='sales'?' selected':''}>Sales</option>
       <option value="admin"${role==='admin'?' selected':''}>Admin</option>
       <option value="accounts"${role==='accounts'?' selected':''}>Accounts</option>
       <option value="director"${role==='director'?' selected':''}>Director</option>
-    </select></div>`;
+    </select>
+    <div style="flex-basis:100%;font-size:11px;color:var(--muted);margin-top:6px">Extra feature access (role ke alawa, ya role ke bina bhi):
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">${TRIP_FEATURE_LIST.map(f=>`<label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" style="width:auto" onchange="toggleUserFeatureAccess('${esc(u.id)}','${f.id}',this.checked)" ${extra.includes(f.id)?'checked':''}> ${esc(f.name)}</label>`).join('')}</div>
+    </div></div>`;
   }).join('');
 }
 
@@ -743,7 +905,10 @@ function renderLedgerPage(){
   const picker=$('ledgerTripPicker');
   const role=myRole();
   let visibleTrips=trips;
-  if(role==='sales'){const t=mySalesTrip();visibleTrips=t?[t]:[];}
+  // Finance-level roles see every trip; anyone else (sales, or now any other role that
+  // received an advance) sees only their own — was gated on role==='sales' specifically,
+  // which would have let a non-finance, non-sales recipient see everyone else's trips.
+  if(role!=='admin'&&role!=='director'&&role!=='accounts'){const t=mySalesTrip();visibleTrips=t?[t]:[];}
   if(picker.dataset.filled!=='1'||picker.options.length!==visibleTrips.length){
     picker.innerHTML=visibleTrips.map(t=>`<option value="${esc(t.id)}">${esc(t.salesName)} • ${esc(t.id)}</option>`).join('')||'<option value="">Koi trip nahi</option>';
     picker.dataset.filled='1';
@@ -1144,7 +1309,12 @@ function renderPage(id){
 function currentPageId(){const on=document.querySelector('.page.on');return on?on.id:'admin'}
 function applyRoleVisibility(){
   const role=effectiveRole();
-  const allowed=btn=>{const r=btn.dataset.role;if(!r)return true;return r.split(',').includes(role);};
+  const allowed=btn=>{
+    const u=myUserObj();
+    const extra=(u&&u.appFeatureAccess&&u.appFeatureAccess[APP_SLUG])||[];
+    if(btn.dataset.page && extra.includes(btn.dataset.page))return true;
+    const r=btn.dataset.role;if(!r)return true;return r.split(',').includes(role);
+  };
   let firstAllowed=null;
   document.querySelectorAll('nav button[data-role]').forEach(b=>{
     const ok=allowed(b);
@@ -1173,12 +1343,13 @@ function renderGate(){
   const role=effectiveRole();
   if(u.appAccess && u.appAccess[APP_SLUG]===false){
     gateWrap.style.display='block';appWrap.style.display='none';
-    gateBox.innerHTML=`<h3>Access Nahi Hai</h3><p style="font-size:13px;color:var(--muted)">Aapko is app ka access nahi diya gaya hai. Bliss One admin se contact karein.</p>`;
+    gateBox.innerHTML=`<h3>No Access</h3>`;
     return;
   }
-  if(!role){
+  const extraFeatures=(u.appFeatureAccess&&u.appFeatureAccess[APP_SLUG])||[];
+  if(!role && !extraFeatures.length){
     gateWrap.style.display='block';appWrap.style.display='none';
-    gateBox.innerHTML=`<h3>Role Assign Nahi Hua</h3><p style="font-size:13px;color:var(--muted)">Login ho gaya, lekin abhi is app me aapka koi role (Admin/Director/Sales/Accounts) assign nahi hai. Director se karwayein — ya khud Super Admin unlock karke Director → Team Roles se set karein.</p>`;
+    gateBox.innerHTML=`<h3>No Access</h3>`;
     return;
   }
   gateWrap.style.display='none';appWrap.style.display='';
@@ -1195,7 +1366,11 @@ function renderAll(){
 }
 function boot(){
   currentUser=localStorage.getItem(SESSION_KEY)||null;
-  startUsersSync();startTripsSync();startLedgerSync();startSettingsSync();startOptionsSync();startLedgerHeadsSync();startActivitySync();startTemplatesSync();
+  // Each sync isolated so one failing (e.g. Firebase unavailable) can't stop the rest from
+  // starting or block renderAll() below — the page should still show local/cached data.
+  [startUsersSync,startTripsSync,startLedgerSync,startSettingsSync,startOptionsSync,startLedgerHeadsSync,startActivitySync,startTemplatesSync].forEach(fn=>{
+    try{fn();}catch(e){console.error(fn.name+' failed:',e);}
+  });
   renderAll();
 }
 document.addEventListener('DOMContentLoaded',boot);

@@ -216,6 +216,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
     </div>
     <div class="actions">
       <button class="btn soft" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄</button>
+      <button class="btn soft" id="hubDesktopViewBtn" onclick="toggleHubDesktopView()" title="Switch between mobile and desktop layout — applies to whichever app is open">🖥 Desktop View</button>
       <div style="position:relative" id="staffLoginWrap">
         <button class="btn soft" id="staffLoginBtn" onclick="openStaffLoginModal()">👤 Staff Login</button>
         <div class="hidden" id="staffUserMenu" style="position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.15);min-width:180px;overflow:hidden;z-index:50">
@@ -224,8 +225,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
           <button class="btn" style="width:100%;border:none;border-radius:0;text-align:left" onclick="staffLogout()">Logout</button>
         </div>
       </div>
-      <button class="btn soft superAdminOnly hidden" onclick="document.getElementById('userManagePanel').scrollIntoView({behavior:'smooth'})">⚙ Manage</button>
-      <button class="btn primary superAdminOnly hidden" onclick="document.getElementById('uploadPanel').scrollIntoView({behavior:'smooth'})">＋ Add App</button>
+      <button class="btn soft superAdminOnly hidden" onclick="openManagePanel()">⚙ Manage</button>
+      <button class="btn primary superAdminOnly hidden" onclick="openAddAppPanel()">＋ Add App</button>
     </div>
   </div>
 </header>
@@ -239,8 +240,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
 <main class="page" id="dashboardContent">
   <section class="hero">
     <div>
-      <h2>All Bliss apps. One place.</h2>
-      <p>Upload, publish, update and open your internal business apps from a single dashboard. GitHub + Firebase deployment can be connected behind this portal.</p>
+      <h2>Bliss One</h2>
     </div>
     <div class="heroStats">
       <div class="stat"><b id="heroLiveApps">0</b><small>Saved Apps</small></div>
@@ -338,59 +338,76 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
     </div>
   </section>
 
-  <section class="panel superAdminOnly hidden" id="userManagePanel">
-    <div class="panelHead"><h3>⚙ Manage — Users</h3><span class="badge">Super Admin</span></div>
+  <section class="panel" id="userManagePanel">
+    <div class="panelHead"><h3>⚙ Manage — Users</h3><span class="badge">Admin / Director</span></div>
     <div class="panelBody">
       <div id="adminAuthStatus" class="deployBox">Checking admin login…</div>
 
-      <div id="createUserBox" style="margin-top:14px">
-        <div class="uploadGrid">
-          <div><label>Name</label><input id="newUserName" placeholder="e.g. Ramesh Kumar"></div>
-          <div><label>Email</label><input id="newUserEmail" type="email" placeholder="staff@example.com"></div>
-          <div><label>Password</label><input id="newUserPassword" type="password" placeholder="min 6 characters"></div>
-        </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-          <button class="btn primary" type="button" onclick="createStaffUser()">Create Doer Account</button>
-        </div>
-        <div id="createUserMsg" style="font-size:12px;margin-top:8px"></div>
+      <div id="umTabsRow" class="hidden" style="display:flex;gap:8px;margin:14px 0">
+        <button class="btn primary" type="button" id="umTabStaffBtn" onclick="umShowTab('staff')">Staff Accounts</button>
+        <button class="btn" type="button" id="umTabUniversalBtn" onclick="umShowTab('universal')">Universal Users (Doers)</button>
       </div>
 
-      <div style="margin-top:18px">
-        <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">Staff Accounts</h3><button class="btn" onclick="loadUsersList()">Refresh</button></div>
-        <div class="tableWrap">
-          <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
-            <tbody id="usersTableBody"><tr><td colspan="4" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
-          </table>
+      <div id="umTabStaff">
+        <div id="createUserBox">
+          <div class="uploadGrid">
+            <div><label>Name</label><input id="newUserName" placeholder="e.g. Ramesh Kumar"></div>
+            <div><label>Email</label><input id="newUserEmail" type="email" placeholder="staff@example.com"></div>
+            <div><label>Password</label><input id="newUserPassword" type="password" placeholder="min 6 characters"></div>
+            <div><label>Role</label><select id="newUserRole"><option value="doer">Doer (normal staff)</option><option value="admin">Admin</option><option value="director">Director</option></select></div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+            <button class="btn primary" type="button" onclick="createStaffUser()">Create Account</button>
+          </div>
+          <div id="createUserMsg" style="font-size:12px;margin-top:8px"></div>
         </div>
-      </div>
-    </div>
-  </section>
 
-  <section class="panel superAdminOnly hidden" id="universalUsersPanel">
-    <div class="panelHead"><h3>🌐 Universal Users (Doers — All Apps)</h3><span class="badge">Super Admin</span></div>
-    <div class="panelBody">
-      <div class="deployBox">Yeh ek hi shared user list hai jo Parcel Dispatch aur future ki har app use karegi (username/password se login — yeh upar wale Firebase Staff Accounts se alag hai). Yahan se decide karein ki kaun-sa doer kaun-si app khol sakta hai.</div>
-      <div id="uuCreateBox" style="margin-top:14px">
-        <div class="uploadGrid">
-          <div><label>Name</label><input id="uuName" placeholder="e.g. Ramesh Kumar"></div>
-          <div><label>Username</label><input id="uuUsername" placeholder="e.g. Ramesh"></div>
-          <div><label>Mobile Number</label><input id="uuPhone" placeholder="10 digit or 91..."></div>
-          <div><label>Department</label><input id="uuDepartment" placeholder="optional"></div>
-          <div><label>Password</label><input id="uuPassword" type="password" placeholder="default 1234"></div>
+        <div style="margin-top:18px">
+          <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">Staff Accounts</h3><button class="btn" onclick="loadUsersList()">Refresh</button></div>
+          <div class="tableWrap">
+            <table>
+              <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
+              <tbody id="usersTableBody"><tr><td colspan="4" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
+            </table>
+          </div>
         </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-          <button class="btn primary" type="button" onclick="uuAddUser()">Add Universal User</button>
-        </div>
-        <div id="uuCreateMsg" style="font-size:12px;margin-top:8px"></div>
       </div>
-      <div style="margin-top:18px">
-        <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">All Doers</h3><button class="btn" onclick="uuLoadList()">Refresh</button></div>
-        <div class="tableWrap">
-          <table>
-            <thead><tr><th>Name</th><th>Username</th><th>Mobile</th><th>Password</th><th>Status</th><th>App Access</th><th>Action</th></tr></thead>
-            <tbody id="uuTableBody"><tr><td colspan="7" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
-          </table>
+
+      <div id="umTabUniversal" class="hidden">
+        <div class="deployBox">Yeh ek hi shared user list hai jo Parcel Dispatch aur future ki har app use karegi (username/password se login — yeh Staff Accounts se alag hai). Yahan se decide karein ki kaun-sa doer kaun-si app khol sakta hai.</div>
+        <div id="uuCreateBox" style="margin-top:14px">
+          <div class="uploadGrid">
+            <div><label>Name</label><input id="uuName" placeholder="e.g. Ramesh Kumar"></div>
+            <div><label>Username</label><input id="uuUsername" placeholder="e.g. Ramesh"></div>
+            <div><label>Mobile Number</label><input id="uuPhone" placeholder="10 digit or 91..."></div>
+            <div><label>Department</label><input id="uuDepartment" placeholder="optional"></div>
+            <div><label>Email</label><input id="uuEmail" type="email" placeholder="optional"></div>
+            <div><label>Password</label><input id="uuPassword" type="password" placeholder="default 1234"></div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+            <button class="btn primary" type="button" onclick="uuAddUser()">Add Universal User</button>
+          </div>
+          <div id="uuCreateMsg" style="font-size:12px;margin-top:8px"></div>
+
+          <div style="margin-top:22px;border-top:1px solid var(--line,#e5e5e5);padding-top:14px">
+            <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">Bulk Import (Name / Department / Email)</h3></div>
+            <div class="deployBox">Har line mein <b>Name</b>, <b>Department</b>, <b>Email</b> — TAB se separate karke paste karein. Sirf woh log match honge jinka Name yahan exactly wahi hai jo neeche list mein pehle se hai (case-insensitive) — unka Department aur Email update ho jayega. Jo match nahi honge unke naam neeche result mein dikha diye jayenge.</div>
+            <textarea id="uuBulkImportBox" rows="8" style="width:100%;margin-top:8px;font-family:monospace;font-size:12px;padding:8px;border:1px solid var(--line,#ccc);border-radius:8px"></textarea>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+              <button class="btn" type="button" onclick="uuFillBulkImportSample()">Sample Bhariye</button>
+              <button class="btn primary" type="button" onclick="uuBulkImportEmails()">Bulk Import Chalayein</button>
+            </div>
+            <div id="uuBulkImportMsg" style="font-size:12px;margin-top:8px;white-space:pre-line"></div>
+          </div>
+        </div>
+        <div style="margin-top:18px">
+          <div class="sectionTitle" style="margin:0 0 8px"><h3 style="font-size:15px">All Doers</h3><button class="btn" onclick="uuLoadList()">Refresh</button></div>
+          <div class="tableWrap">
+            <table>
+              <thead><tr><th>Name</th><th>Username</th><th>Mobile</th><th>Email</th><th>Password</th><th>Status</th><th>App Access / Role</th><th>Bliss One Role</th><th>Action</th></tr></thead>
+              <tbody id="uuTableBody"><tr><td colspan="9" style="text-align:center;color:var(--muted)">Loading…</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -420,6 +437,8 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
   </section>
 </div>
 
+
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:10px;right:12px;width:22px;height:22px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:10px;line-height:22px;cursor:default;z-index:999999;transition:background .15s">•</button>
 
 <div class="adminModal hidden" id="superAdminModal">
   <div class="adminBox">
@@ -532,7 +551,7 @@ footer{padding:24px 0 0;color:var(--muted);font-size:12px;text-align:center}
       <button class="btn" type="button" onclick="adminFirebaseForgotPassword()" style="width:100%;margin-top:8px">Forgot Password?</button>
       <div id="adminFbMsg" style="font-size:12px;margin-top:8px"></div>
       <div class="deployBox" style="margin-top:12px">
-        पहली बार account बनाने के बाद, Firebase Console → Firestore Database → <code>users</code> collection → अपने account वाले document में जाकर <code>role</code> field को <code>"doer"</code> से <code>"admin"</code> कर दें (सिर्फ़ एक बार करना है)।
+        सबसे पहला account जो बनाया जाता है वो अपने-आप Admin बन जाता है — किसी manual Firestore edit की ज़रूरत नहीं। उसके बाद के accounts "Doer" से शुरू होते हैं; किसी existing Admin को उन्हें "Manage — Users" panel से Admin बनाना होगा।
       </div>
     </div>
   </div>
@@ -578,10 +597,42 @@ const firebaseConfig = {
   messagingSenderId: "702608135517",
   appId: "1:702608135517:web:d848197040efb3be5f04b4"
 };
-firebase.initializeApp(firebaseConfig);
-const fbAuth = firebase.auth();
-const fbDb = firebase.firestore();
+// If the Firebase SDK failed to load (slow network, blocked CDN, etc.), an unguarded
+// initializeApp()/auth()/firestore() here would throw and — since this is top-level
+// script code — silently stop every later const/function in this same <script> tag
+// from ever running, breaking the whole hub (not just cloud sync/login). Fall back to
+// harmless stubs instead, so the page still boots and local features still work.
+function hubOfflineDbStub(){
+  const noopQuery={limit:()=>noopQuery,where:()=>noopQuery,orderBy:()=>noopQuery,get:async()=>({empty:true,docs:[],forEach:()=>{}}),onSnapshot:(cb)=>{try{cb({forEach:()=>{},docs:[],empty:true});}catch(e){}return ()=>{};}};
+  const noopDoc={set:async()=>{},update:async()=>{},get:async()=>({exists:false,data:()=>({})}),collection:()=>noopCollection,delete:async()=>{}};
+  const noopCollection={...noopQuery,doc:()=>noopDoc};
+  return {collection:()=>noopCollection,batch:()=>({set:()=>{},update:()=>{},delete:()=>{},commit:async()=>{}})};
+}
+function hubOfflineAuthStub(){
+  const err=()=>Promise.reject(new Error('Firebase auth unavailable (SDK failed to load)'));
+  return {currentUser:null,onAuthStateChanged:()=>{},createUserWithEmailAndPassword:err,sendPasswordResetEmail:err,signInWithEmailAndPassword:err,signOut:err};
+}
+let fbAuth,fbDb;
+try{
+  if(typeof firebase==='undefined')throw new Error('firebase SDK not loaded');
+  firebase.initializeApp(firebaseConfig);
+  fbAuth=firebase.auth();
+  fbDb=firebase.firestore();
+}catch(e){
+  console.error('Firebase init failed, running offline (no cloud sync/login this session):',e);
+  fbAuth=hubOfflineAuthStub();
+  fbDb=hubOfflineDbStub();
+}
 const UU_COLLECTION='universal_users';
+// Only apps with their own internal role system need a role dropdown here (in addition
+// to the plain app-access checkbox every app gets) — Trip Expense is role-gated
+// (sales/admin/accounts/director); Parcel Dispatch's own Analytics Dashboard is gated on
+// an admin/director role too (assignable here or from Parcel Dispatch's own Manage panel).
+const APP_ROLE_OPTIONS={
+  'trip-expense-app':[['','No Access'],['sales','Sales'],['admin','Admin'],['accounts','Accounts'],['director','Director']],
+  'parcel-dispatched':[['','No Access'],['admin','Admin'],['director','Director']],
+  'stationery-inventory':[['','No Access'],['admin','Admin'],['director','Director']]
+};
 
 /* ===== Staff (public) login — shared Universal Users, same session key as Parcel Dispatch (same origin, so one login works everywhere) ===== */
 const PD_SESSION_KEY='pd_logged_user_v1';
@@ -831,11 +882,32 @@ function adminFirebaseSignUp(){
   if(!email||pass.length<6){msg.style.color='#a12222';msg.textContent='Valid email aur kam se kam 6 character ka password daalein.';return;}
   msg.style.color='';msg.textContent='Creating account…';
   fbAuth.createUserWithEmailAndPassword(email,pass).then(async cred=>{
+    // The very first account ever created bootstraps straight to admin — no manual
+    // Firestore console edit needed. Every account after that defaults to 'doer'; an
+    // existing admin promotes further accounts from the "Manage — Users" panel.
+    // Deliberately checking a single sentinel doc in app_config (not querying the whole
+    // `users` collection) — security rules here commonly require an existing admin just
+    // to list/query `users` at all, which would make the very bootstrap check itself
+    // fail for the first-ever signup. A single doc get()/set() in app_config has no such
+    // chicken-and-egg problem.
+    let role='doer';
+    try{
+      const sentinelRef=fbDb.collection('app_config').doc('first_admin_bootstrap');
+      const sentinel=await sentinelRef.get();
+      if(!sentinel.exists){
+        await sentinelRef.set({uid:cred.user.uid,email,claimedAt:Date.now()});
+        role='admin';
+      }
+    }catch(e){
+      console.error('bootstrap sentinel check failed:',e);
+    }
     await fbDb.collection('users').doc(cred.user.uid).set({
-      name:email.split('@')[0],email,role:'doer',createdAt:Date.now()
+      name:email.split('@')[0],email,role,createdAt:Date.now()
     });
     msg.style.color='#268F76';
-    msg.textContent='Account ban gaya. Ab Firestore console me is account ka role "doer" se "admin" karein, phir dobara login karein.';
+    msg.textContent=role==='admin'
+      ?'Admin account ban gaya — ab seedha login karein.'
+      :'Account ban gaya (role: doer). Kisi existing Admin se apna role "Manage — Users" panel se "admin" karwayein.';
     refreshAdminAuthStatus();
   }).catch(err=>{msg.style.color='#a12222';msg.textContent=err.message;});
 }
@@ -859,25 +931,77 @@ function adminFirebaseForgotPassword(){
     msg.style.color='#268F76';msg.textContent='"'+email+'" पर password reset link भेज दिया गया है — inbox check करें।';
   }).catch(err=>{msg.style.color='#a12222';msg.textContent=err.message;});
 }
+function setHubAdminPanelsVisible(show){
+  document.getElementById('umTabsRow')?.classList.toggle('hidden',!show);
+  document.getElementById('createUserBox')?.classList.toggle('hidden',!show);
+  document.getElementById('uuCreateBox')?.classList.toggle('hidden',!show);
+  if(show){
+    loadUsersList();
+    uuLoadList();
+  }else{
+    const staffBody=document.getElementById('usersTableBody');
+    const uuBody=document.getElementById('uuTableBody');
+    if(staffBody)staffBody.innerHTML='';
+    if(uuBody)uuBody.innerHTML='';
+  }
+}
+function umShowTab(tab){
+  document.getElementById('umTabStaff')?.classList.toggle('hidden',tab!=='staff');
+  document.getElementById('umTabUniversal')?.classList.toggle('hidden',tab!=='universal');
+  document.getElementById('umTabStaffBtn')?.classList.toggle('primary',tab==='staff');
+  document.getElementById('umTabUniversalBtn')?.classList.toggle('primary',tab==='universal');
+}
 async function refreshAdminAuthStatus(){
   const box=document.getElementById('adminAuthStatus');
   if(!box)return;
+  box.classList.remove('hidden');
   const user=fbAuth.currentUser;
+  // Super Admin (the shared secret-password unlock) already grants access to everything
+  // else on this page — GreenAPI, app management — so it grants access to Staff Accounts
+  // and Universal Users here too. A real Firebase Admin/Director login is a separate,
+  // independent path to the same two panels (useful for someone who wants a named,
+  // persistent login instead of re-typing the shared Super Admin password) — neither one
+  // is required on top of the other.
+  if(superAdminUnlocked){
+    box.innerHTML='Super Admin se unlocked — Staff Accounts aur Universal Users dono manage kar sakte hain.'+(user?' &nbsp; Firebase login bhi hai: <b>'+user.email+'</b> <button class="btn" type="button" onclick="fbAuth.signOut().then(refreshAdminAuthStatus)">Sign out</button>':' &nbsp; <button class="btn" type="button" onclick="openAdminFirebaseModal()">Firebase Admin Login (optional)</button>');
+    setHubAdminPanelsVisible(true);
+    return;
+  }
+  // Third, independent path: the same everyday Staff Login (Universal Users username/
+  // password, shared with Parcel Dispatch/Trip Expense) can also carry hub access — via
+  // a dedicated "Bliss One Role" set per Universal User — so someone doesn't need a
+  // separate Firebase email/password account (with its own password-reset hassles) just
+  // to manage Staff Accounts / Universal Users.
+  const staffId=pdLoggedUserId();
+  if(staffId){
+    try{
+      const staffDoc=await fbDb.collection(UU_COLLECTION).doc(staffId).get();
+      if(staffDoc.exists){
+        const su=staffDoc.data();
+        const hubRole=su.appRoles&&su.appRoles['bliss-one'];
+        if(hubRole==='admin'||hubRole==='director'){
+          box.innerHTML='';
+          box.classList.add('hidden');
+          setHubAdminPanelsVisible(true);
+          return;
+        }
+      }
+    }catch(e){console.error('staff-login hub access check failed:',e);}
+  }
   if(!user){
     box.innerHTML='आप अभी Firebase से admin login नहीं हैं। <button class="btn primary" type="button" onclick="openAdminFirebaseModal()">Admin Firebase Login</button>';
-    document.getElementById('createUserBox').classList.add('hidden');
+    setHubAdminPanelsVisible(false);
     document.getElementById('usersTableBody').innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted)">Admin login karein pehle</td></tr>';
     return;
   }
   const doc=await fbDb.collection('users').doc(user.uid).get();
   const role=doc.exists?doc.data().role:'(no profile)';
-  if(role==='admin'){
-    box.innerHTML='Firebase Admin: <b>'+user.email+'</b> (role: admin) &nbsp; <button class="btn" type="button" onclick="fbAuth.signOut().then(refreshAdminAuthStatus)">Sign out</button>';
-    document.getElementById('createUserBox').classList.remove('hidden');
-    loadUsersList();
+  if(role==='admin'||role==='director'){
+    box.innerHTML='Firebase Login: <b>'+user.email+'</b> (role: '+role+') &nbsp; <button class="btn" type="button" onclick="fbAuth.signOut().then(refreshAdminAuthStatus)">Sign out</button>';
+    setHubAdminPanelsVisible(true);
   } else {
-    box.innerHTML='Signed in as <b>'+user.email+'</b> लेकिन role "admin" नहीं है (अभी: '+role+')। Firestore console में role बदलें, फिर page reload करें।';
-    document.getElementById('createUserBox').classList.add('hidden');
+    box.innerHTML='Signed in as <b>'+user.email+'</b> लेकिन role "admin" ya "director" नहीं है (अभी: '+role+')। Manage — Users se kisi Admin/Director se apna role badalwayein.';
+    setHubAdminPanelsVisible(false);
     document.getElementById('usersTableBody').innerHTML='';
   }
 }
@@ -886,6 +1010,7 @@ async function createStaffUser(){
   const name=document.getElementById('newUserName').value.trim();
   const email=document.getElementById('newUserEmail').value.trim();
   const pass=document.getElementById('newUserPassword').value;
+  const role=document.getElementById('newUserRole')?.value||'doer';
   const msg=document.getElementById('createUserMsg');
   if(!name||!email||pass.length<6){msg.style.color='#a12222';msg.textContent='Naam, email aur kam se kam 6-character password bharein.';return;}
   msg.style.color='';msg.textContent='Creating…';
@@ -893,10 +1018,10 @@ async function createStaffUser(){
   try{
     const cred=await secondaryApp.auth().createUserWithEmailAndPassword(email,pass);
     await secondaryApp.firestore().collection('users').doc(cred.user.uid).set({
-      name,email,role:'doer',createdAt:Date.now()
+      name,email,role,createdAt:Date.now()
     });
     await secondaryApp.auth().signOut();
-    msg.style.color='#268F76';msg.textContent='"'+name+'" ka Doer account ban gaya.';
+    msg.style.color='#268F76';msg.textContent='"'+name+'" ka '+(role==='admin'?'Admin':role==='director'?'Director':'Doer')+' account ban gaya.';
     document.getElementById('newUserName').value='';
     document.getElementById('newUserEmail').value='';
     document.getElementById('newUserPassword').value='';
@@ -965,6 +1090,7 @@ async function uuAddUser(){
   const username=document.getElementById('uuUsername').value.trim();
   const phone=document.getElementById('uuPhone').value.trim();
   const department=document.getElementById('uuDepartment').value.trim();
+  const email=document.getElementById('uuEmail').value.trim();
   const password=document.getElementById('uuPassword').value.trim()||'1234';
   const msg=document.getElementById('uuCreateMsg');
   msg.style.color='#b3261e';
@@ -976,11 +1102,75 @@ async function uuAddUser(){
     if(existing.exists){msg.textContent='Yeh username pehle se maujood hai.';return;}
     await uuLoadAppList();
     const appAccess={};uuAppList.forEach(slug=>appAccess[slug]=true);
-    await ref.set({id:username,username,name,phone,department,password,role:'Doer',active:true,appAccess});
+    await ref.set({id:username,username,name,phone,department,email,password,role:'Doer',active:true,appAccess});
     msg.style.color='#268F76';msg.textContent='User added.';
-    ['uuName','uuUsername','uuPhone','uuDepartment','uuPassword'].forEach(id=>document.getElementById(id).value='');
+    ['uuName','uuUsername','uuPhone','uuDepartment','uuEmail','uuPassword'].forEach(id=>document.getElementById(id).value='');
     uuLoadList();
   }catch(e){msg.textContent='Error: '+e.message;}
+}
+// Master checklist se Name/Department/Email ek saath paste karke, existing Universal Users
+// (jo already Parcel Dispatch me kaam kar rahe hain, phone number ke saath) ko unke email se
+// match karke update karne ke liye — taaki dobara se 25 log manually type na karne padein.
+const UU_BULK_IMPORT_SAMPLE=[
+  ['Amit Sharma','Admin','admin@teambgmjaipur.com'],
+  ['Dharmendra Kumar','Maintenance','dharmendrakumar464666@gmail.com'],
+  ['Vijay Saini','Operations','vijaysaini5004@gmail.com'],
+  ['Anil Saini','Maintenance','anilsainiamer@gmail.com'],
+  ['Praveen Saini','MIS','mis@teambgmjaipur.com'],
+  ['Vansh Khandelwal','Operations','khandelwalvansh321@gmail.com'],
+  ['Riddhi Gupta','CRM','crm@teambgmjaipur.com'],
+  ['Saaransh Jain','Operations','salesbgm.sj@gmail.com'],
+  ['Babita Doriya','MDO','ea@teambgmjaipur.com'],
+  ['Ritika Gupta','Accounts','accountshead@teambgmjaipur.com'],
+  ['Akhilesh Sharma','Accounts','financehead@teambgmjaipur.com'],
+  ['Amit Yogi','Accounts','amit777yogi@gmail.com'],
+  ['Mukund Bhukhmaria','Sales','sales.mb@teambgmjaipur.com'],
+  ['Sneha Sahu','Inventory','inventoryhead@teambgmjaipur.com'],
+  ['Tarun Khandelwal','Sales','sales.tk@teambgmjaipur.com'],
+  ['Himanshu Saini','Sales','sales.hs@teambgmjaipur.com'],
+  ['Kamal Badaya','Production','Kamalbadaya1970@gmail.com'],
+  ['Tarun Kushwah','Maintenance','aartifcjt@gmail.com'],
+  ['Sunil Shirmal','Manufacturing','bgmmanufacturing7@gmail.com'],
+  ['Rahul Kumar Vyas','Maintenance','rahulkumarvyas82@gmail.com'],
+  ['Payal Saini','Office Assistant','bgmpc5321@gmail.com'],
+  ['Satish Gupta','Sales','bgmsales.sg@gmail.com'],
+  ['Jitendra Sharma','Accounts','js6503578@gmail.com'],
+  ['Kadu Saini','Office Assistant','kadusaini4@gmail.com'],
+  ['Vikash Prajapat','Maintenance','vikashprajapatv6@gmail.com'],
+];
+function uuFillBulkImportSample(){
+  document.getElementById('uuBulkImportBox').value=UU_BULK_IMPORT_SAMPLE.map(r=>r.join('\t')).join('\n');
+}
+async function uuBulkImportEmails(){
+  const raw=document.getElementById('uuBulkImportBox').value;
+  const msg=document.getElementById('uuBulkImportMsg');
+  const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!lines.length){msg.style.color='#a12222';msg.textContent='Pehle list paste karein ya "Sample Bhariye" dabayein.';return;}
+  msg.style.color='';msg.textContent='Import ho raha hai…';
+  try{
+    const snap=await fbDb.collection(UU_COLLECTION).get();
+    const existingByName={};
+    snap.forEach(doc=>{
+      const u=doc.data();
+      if(u.name)existingByName[u.name.trim().toLowerCase()]={id:doc.id,data:u};
+    });
+    const updated=[],notFound=[];
+    for(const line of lines){
+      const cols=line.split('\t').map(c=>c.trim());
+      if(cols.length<3){notFound.push(line+' (format galat — 3 columns tab se separate chahiye)');continue;}
+      const [name,department,email]=cols;
+      const match=existingByName[name.trim().toLowerCase()];
+      if(!match){notFound.push(name);continue;}
+      await fbDb.collection(UU_COLLECTION).doc(match.id).update({email,department});
+      updated.push(name);
+    }
+    msg.style.color='#268F76';
+    msg.textContent=`${updated.length} user update ho gaye: ${updated.join(', ')||'-'}`+
+      (notFound.length?`\n\n${notFound.length} match nahi hue (naam check karein): ${notFound.join(', ')}`:'');
+    uuLoadList();
+  }catch(e){
+    msg.style.color='#a12222';msg.textContent='Error: '+e.message;
+  }
 }
 async function uuLoadList(){
   await uuLoadAppList();
@@ -990,7 +1180,7 @@ async function uuLoadList(){
   try{
     const snap=await fbDb.collection(UU_COLLECTION).get();
     if(snap.empty){
-      body.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted)">Koi user nahi hai</td></tr>';
+      body.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted)">Koi user nahi hai</td></tr>';
       return;
     }
     snap.forEach(doc=>{
@@ -999,6 +1189,7 @@ async function uuLoadList(){
       const tdName=document.createElement('td');tdName.textContent=u.name||'';
       const tdUser=document.createElement('td');tdUser.textContent=u.username||id;
       const tdPhone=document.createElement('td');tdPhone.textContent=u.phone||'-';
+      const tdEmail=document.createElement('td');tdEmail.textContent=u.email||'-';
       const tdPw=document.createElement('td');tdPw.textContent=u.password||'1234';tdPw.style.fontFamily='monospace';
       const tdStatus=document.createElement('td');tdStatus.textContent=u.active===false?'INACTIVE':'ACTIVE';
       const tdApps=document.createElement('td');
@@ -1006,14 +1197,43 @@ async function uuLoadList(){
         tdApps.innerHTML='<small style="color:var(--muted)">No apps live yet</small>';
       }else{
         uuAppList.forEach(slug=>{
+          const row=document.createElement('div');
+          row.style.cssText='display:flex;align-items:center;gap:4px;margin-bottom:4px;font-size:12px';
           const lbl=document.createElement('label');
-          lbl.style.cssText='display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:12px';
+          lbl.style.cssText='display:inline-flex;align-items:center;gap:4px';
           const cb=document.createElement('input');cb.type='checkbox';cb.checked=(u.appAccess&&u.appAccess[slug])!==false;
           cb.onchange=()=>uuToggleAppAccess(id,slug,cb.checked);
           lbl.appendChild(cb);lbl.appendChild(document.createTextNode(' '+slug));
-          tdApps.appendChild(lbl);
+          row.appendChild(lbl);
+          const roleOpts=APP_ROLE_OPTIONS[slug];
+          if(roleOpts){
+            const curRole=(u.appRoles&&u.appRoles[slug])||'';
+            const sel=document.createElement('select');
+            sel.style.cssText='font-size:11px;padding:2px 4px;border:1px solid var(--line,#ccc);border-radius:5px';
+            roleOpts.forEach(([v,l])=>{
+              const opt=document.createElement('option');opt.value=v;opt.textContent=l;opt.selected=v===curRole;
+              sel.appendChild(opt);
+            });
+            sel.onchange=()=>uuSetUserAppRole(id,slug,sel.value);
+            row.appendChild(sel);
+          }
+          tdApps.appendChild(row);
         });
       }
+      // A Universal User's own Staff Login can carry Bliss One hub access too (see
+      // refreshAdminAuthStatus) — this is separate from their per-app roles above, so it
+      // gets its own dedicated control rather than living inside the App Access loop
+      // (which only lists live operational apps, not the hub itself).
+      const tdHubRole=document.createElement('td');
+      const hubSel=document.createElement('select');
+      hubSel.style.cssText='font-size:12px;padding:3px 6px;border:1px solid var(--line,#ccc);border-radius:5px';
+      const curHubRole=(u.appRoles&&u.appRoles['bliss-one'])||'';
+      [['','No Access'],['admin','Admin'],['director','Director']].forEach(([v,l])=>{
+        const opt=document.createElement('option');opt.value=v;opt.textContent=l;opt.selected=v===curHubRole;
+        hubSel.appendChild(opt);
+      });
+      hubSel.onchange=()=>uuSetUserAppRole(id,'bliss-one',hubSel.value);
+      tdHubRole.appendChild(hubSel);
       const tdAction=document.createElement('td');
       const btnEdit=document.createElement('button');btnEdit.className='btn small secondary';btnEdit.textContent='✏️ Edit';
       btnEdit.onclick=()=>uuEditUser(id,u);
@@ -1024,12 +1244,12 @@ async function uuLoadList(){
       const btnDel=document.createElement('button');btnDel.className='btn small danger';btnDel.style.marginLeft='6px';btnDel.textContent='Delete';
       btnDel.onclick=()=>uuDeleteUser(id);
       tdAction.appendChild(btnEdit);tdAction.appendChild(btnPw);tdAction.appendChild(btnToggle);tdAction.appendChild(btnDel);
-      tr.appendChild(tdName);tr.appendChild(tdUser);tr.appendChild(tdPhone);tr.appendChild(tdPw);tr.appendChild(tdStatus);tr.appendChild(tdApps);tr.appendChild(tdAction);
+      tr.appendChild(tdName);tr.appendChild(tdUser);tr.appendChild(tdPhone);tr.appendChild(tdEmail);tr.appendChild(tdPw);tr.appendChild(tdStatus);tr.appendChild(tdApps);tr.appendChild(tdHubRole);tr.appendChild(tdAction);
       body.appendChild(tr);
     });
   }catch(e){
     body.innerHTML='';
-    const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=7;td.style.color='#b3261e';td.style.textAlign='center';td.textContent='Error: '+e.message;
+    const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=9;td.style.color='#b3261e';td.style.textAlign='center';td.textContent='Error: '+e.message;
     tr.appendChild(td);body.appendChild(tr);
   }
 }
@@ -1037,10 +1257,12 @@ async function uuEditUser(id,u){
   const name=prompt('Name',u.name||''); if(name===null)return;
   const phone=prompt('Mobile Number',u.phone||''); if(phone===null)return;
   const department=prompt('Department',u.department||''); if(department===null)return;
+  const email=prompt('Email',u.email||''); if(email===null)return;
   await fbDb.collection(UU_COLLECTION).doc(id).update({
     name:name.trim()||u.name||id,
     phone:phone.trim(),
-    department:department.trim()
+    department:department.trim(),
+    email:email.trim()
   });
   uuLoadList();
 }
@@ -1057,6 +1279,11 @@ async function uuToggleActive(id,makeActive){
 }
 async function uuToggleAppAccess(id,slug,allowed){
   await fbDb.collection(UU_COLLECTION).doc(id).update({['appAccess.'+slug]:allowed});
+}
+async function uuSetUserAppRole(id,slug,role){
+  const patch={};
+  patch['appRoles.'+slug]=role||firebase.firestore.FieldValue.delete();
+  await fbDb.collection(UU_COLLECTION).doc(id).update(patch);
 }
 async function uuDeleteUser(id){
   if(!confirm('Delete this user? This cannot be undone.'))return;
@@ -1400,6 +1627,11 @@ function renderSidebarApps(list){
 
 function openAppInline(slug,name){
   document.getElementById('dashboardContent')?.classList.add('hidden');
+  // Hub's own Super Admin dot sits at the same fixed screen corner as each app's own
+  // dot. Since it lives in the parent page (outside the iframe), it always paints above
+  // the iframe and swallows taps meant for the app's dot — hide it while an app is open
+  // so 10 taps in that corner reach the embedded app's Super Admin, not the hub's.
+  document.getElementById('secretAdminIcon')?.classList.add('hidden');
   document.getElementById('appViewerTitle').textContent=name;
   const frame=document.getElementById('appViewerFrame');
   const loading=document.getElementById('appViewerLoading');
@@ -1408,6 +1640,17 @@ function openAppInline(slug,name){
   frame.onload=()=>{
     frame.classList.add('loaded');
     loading?.classList.add('hidden');
+    if(typeof syncHubDesktopViewBtn==='function')syncHubDesktopViewBtn();
+    // If Super Admin is already unlocked here in the hub, unlock it in the app too
+    // (same-origin iframe) instead of making the same person enter the same password
+    // a second time inside the app.
+    if(superAdminUnlocked){
+      try{
+        if(frame.contentWindow && typeof frame.contentWindow.silentUnlockSuperAdmin==='function'){
+          frame.contentWindow.silentUnlockSuperAdmin();
+        }
+      }catch(e){console.error('silent super admin propagation failed',e);}
+    }
   };
   frame.src='/'+slug+'/';
   document.getElementById('appViewerOpenNew').href='/'+slug+'/';
@@ -1420,9 +1663,51 @@ function openAppInline(slug,name){
   history.replaceState(null,'',location.pathname+'#app='+encodeURIComponent(slug));
 }
 
+function toggleHubDesktopView(){
+  // When an app is open, proxy straight into its own toggleDesktopView() (same-origin
+  // iframe) instead of only flipping a shared localStorage key — on an actual desktop
+  // screen, each app's "mobile view" is a CSS-class preview toggled in-page, not
+  // something a reload of a stored key alone would ever trigger.
+  const frame=document.getElementById('appViewerFrame');
+  if(frame && frame.src && frame.src!=='about:blank'){
+    try{
+      if(frame.contentWindow && typeof frame.contentWindow.toggleDesktopView==='function'){
+        frame.contentWindow.toggleDesktopView();
+        syncHubDesktopViewBtn();
+        return;
+      }
+    }catch(e){console.error('proxy toggleDesktopView failed',e);}
+  }
+  const forced=localStorage.getItem('bliss_force_desktop')==='1';
+  if(forced)localStorage.removeItem('bliss_force_desktop');else localStorage.setItem('bliss_force_desktop','1');
+  syncHubDesktopViewBtn();
+}
+function syncHubDesktopViewBtn(){
+  const btn=document.getElementById('hubDesktopViewBtn');if(!btn)return;
+  const frame=document.getElementById('appViewerFrame');
+  if(frame && frame.src && frame.src!=='about:blank'){
+    try{
+      const innerBtn=frame.contentWindow && frame.contentWindow.document && frame.contentWindow.document.getElementById('desktopViewBtn');
+      if(innerBtn){btn.textContent=innerBtn.textContent;return}
+    }catch(e){}
+  }
+  const forced=localStorage.getItem('bliss_force_desktop')==='1';
+  btn.textContent=forced?'📱 Mobile View':'🖥 Desktop View';
+}
+syncHubDesktopViewBtn();
+window.addEventListener('focus',syncHubDesktopViewBtn);
+function openManagePanel(){
+  closeAppViewer();
+  document.getElementById('userManagePanel')?.scrollIntoView({behavior:'smooth'});
+}
+function openAddAppPanel(){
+  closeAppViewer();
+  document.getElementById('uploadPanel')?.scrollIntoView({behavior:'smooth'});
+}
 function closeAppViewer(){
   document.getElementById('appViewer')?.classList.add('hidden');
   document.getElementById('dashboardContent')?.classList.remove('hidden');
+  document.getElementById('secretAdminIcon')?.classList.remove('hidden');
   document.getElementById('staffLoginWrap')?.classList.remove('hidden');
   const frame=document.getElementById('appViewerFrame');
   if(frame){frame.src='about:blank';frame.classList.remove('loaded');}
@@ -1507,11 +1792,29 @@ function cancelZipFileEdit(){
 
 /* ===== Hidden Super Admin Backend ===== */
 let superAdminUnlocked=false;
-let secretTapCount=0;
-let secretTapTimer=null;
 let adminIdleTimer=null;
 const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
 
+let secretAdminTapCount=0;
+let secretAdminTapTimer=null;
+let secretAdminFlashTimer=null;
+function secretAdminTap(){
+  secretAdminTapCount++;
+  // Brief red flash on every registered tap — feedback that a tap landed on the target.
+  const dot=document.getElementById('secretAdminIcon');
+  if(dot){
+    dot.style.background='rgba(214,48,49,.45)';
+    clearTimeout(secretAdminFlashTimer);
+    secretAdminFlashTimer=setTimeout(()=>{dot.style.background='transparent'},200);
+  }
+  clearTimeout(secretAdminTapTimer);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2500);
+  if(secretAdminTapCount>=10){
+    secretAdminTapCount=0;
+    clearTimeout(secretAdminTapTimer);
+    openSuperAdminModal();
+  }
+}
 function openSuperAdminModal(){
   document.getElementById('superAdminModal')?.classList.remove('hidden');
   const p=document.getElementById('superAdminPassword');
@@ -1527,7 +1830,6 @@ function showSuperAdminControls(){
   loadGreenApiCreds();
   loadGithubToken();
   refreshAdminAuthStatus();
-  uuLoadList();
 }
 function saveGreenApiCreds(){
   const instance=document.getElementById('greenApiInstance')?.value||'';
@@ -1556,6 +1858,10 @@ function hideSuperAdminControls(){
   superAdminUnlocked=false;
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.add('hidden'));
   closeSuperAdminModal();
+  // Staff Accounts / Universal Users aren't tied to superAdminOnly directly anymore —
+  // recompute their visibility so a real Firebase Admin/Director login (independent of
+  // Super Admin) keeps its access after Super Admin idle-locks.
+  refreshAdminAuthStatus();
 }
 function resetAdminIdleTimer(){
   if(!superAdminUnlocked)return;
@@ -1565,6 +1871,12 @@ function resetAdminIdleTimer(){
     alert('Super Admin backend locked due to inactivity.');
   },4*60*1000);
 }
+function doUnlockSuperAdmin(){
+  superAdminUnlocked=true;
+  showSuperAdminControls();
+  closeSuperAdminModal();
+  resetAdminIdleTimer();
+}
 function unlockSuperAdmin(){
   const value=document.getElementById('superAdminPassword')?.value||'';
   if(value!==SUPER_ADMIN_PASSWORD){
@@ -1572,30 +1884,18 @@ function unlockSuperAdmin(){
     if(e)e.style.display='block';
     return;
   }
-  superAdminUnlocked=true;
-  showSuperAdminControls();
-  closeSuperAdminModal();
-  resetAdminIdleTimer();
+  doUnlockSuperAdmin();
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
   renderSavedApps();
   loadLiveAppsRegistry();
-  const logo=document.getElementById('secretBlissOneLogo');
-  if(logo){
-    const secretTap=()=>{
-      secretTapCount++;
-      clearTimeout(secretTapTimer);
-      secretTapTimer=setTimeout(()=>secretTapCount=0,1100);
-      if(secretTapCount>=3){
-        secretTapCount=0;
-        clearTimeout(secretTapTimer);
-        openSuperAdminModal();
-      }
-    };
-    logo.addEventListener('click',secretTap);
-    logo.addEventListener('touchend',secretTap,{passive:true});
-  }
+  // Staff Accounts (Manage — Users) has its own real Firebase Admin login gate
+  // (refreshAdminAuthStatus checks role==='admin'), so it no longer needs the separate
+  // Super Admin tap-gesture on top — just reflect the real login state on load and
+  // whenever it changes (covers a session already logged in from a previous visit).
+  try{fbAuth.onAuthStateChanged(()=>refreshAdminAuthStatus());}catch(e){}
+  refreshAdminAuthStatus();
   ['click','keydown','touchstart','mousemove'].forEach(evt=>{
     document.addEventListener(evt,()=>{if(superAdminUnlocked)resetAdminIdleTimer();},{passive:true});
   });
