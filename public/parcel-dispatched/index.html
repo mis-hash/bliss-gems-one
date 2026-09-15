@@ -389,6 +389,7 @@ if(window.self!==window.top){
 <input type="date" id="returnDateFrom" onchange="renderReturnHistory()" title="From Date">
 <input type="date" id="returnDateTo" onchange="renderReturnHistory()" title="To Date">
 <button class="btn secondary small" type="button" onclick="clearReturnFilters()">Clear Filters</button>
+<button class="btn small" type="button" onclick="filterMyPendingReturnTasks()">🔔 My Pending Slips</button>
 <button class="btn secondary small" type="button" onclick="exportReturnCSV()">⬇ Export CSV</button>
 </div>
 <div class="recordSummary" id="returnRecordSummary"></div>
@@ -2483,6 +2484,13 @@ function returnUserNames(r){
 function clearReturnFilters(){
  ['returnSearch','returnPartyFilter','returnCourierFilter','returnUserFilter','returnDateFrom','returnDateTo'].forEach(id=>{if($(id))$(id).value=''});
  renderReturnHistory();
+}
+function filterMyPendingReturnTasks(){
+ const actor=loggedUser();
+ if(!actor){toast('Pehle login karein.');return}
+ if($('returnUserFilter'))$('returnUserFilter').value=actor.id;
+ renderReturnHistory();
+ if(!window._returnFiltered||!window._returnFiltered.length)toast('Aapke naam par abhi koi Return slip pending nahi hai.');
 }
 function renderReturnHistory(){
  refreshDashboardButtonVisibility();
