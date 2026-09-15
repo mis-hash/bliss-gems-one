@@ -294,7 +294,7 @@ if(window.self!==window.top){
 <div class="field"><label>PKT Change Required <span class="req">*</span></label><select id="dispatchPktRequired" onchange="dispatchPktRule()"><option value="">Select</option><option>YES</option><option>NO</option></select></div><div class="field"><label>Handover To Weight Check &amp; PKT Change <span class="req">*</span></label><select class="person" id="handoverToPrepare" data-time="prepareTime" data-event="Handover To Weight Check &amp; PKT Change" onchange="personChanged(this)"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openTransferTask('handoverToPrepare')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input id="prepareTime" readonly></div>
 </div></div></section>
 <section class="card hidden" id="section1A"><h3>1-A. DLC / Delivery Challan</h3><div class="body"><div class="grid">
-<div class="field"><label>Delivery Challan Required <span class="req">*</span></label><select id="deliveryChallanRequired"><option>YES</option><option>NO</option></select></div><div class="field"><label>Item Name <span class="req">*</span></label><input id="dlcItem"></div><div class="field"><label>Price in DLC <span class="req">*</span></label><input type="number" id="dlcPrice"></div><div class="field"><label>Remark 1</label><input id="remark1"></div><div class="field"><label>Remark 2</label><input id="remark2"></div><div class="field"><label>Remark 3</label><input id="remark3"></div>
+<div class="field"><label>Delivery Challan Required <span class="req">*</span></label><select id="deliveryChallanRequired"><option>YES</option><option>NO</option></select></div><div class="field"><label>Item Name <span class="req">*</span></label><input id="dlcItem" oninput="refreshDlcTint()"></div><div class="field"><label>Price in DLC <span class="req">*</span></label><input type="number" id="dlcPrice" oninput="refreshDlcTint()"></div><div class="field"><label>Remark 1</label><input id="remark1"></div><div class="field"><label>Remark 2</label><input id="remark2"></div><div class="field"><label>Remark 3</label><input id="remark3"></div>
 </div></div></section>
 <section class="card" id="dispatchSec2"><h3>2. Weight & Checking</h3><div class="body"><div class="grid">
 <div class="field full"><label>Handed Over By (Section 1)</label><input id="handoverPrepareRef" readonly></div>
@@ -1093,7 +1093,18 @@ function myPendingSlipsLink(userId){
 }
 async function sendWA(){if(!waTarget)return;let id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');if(!id||!token){toast('Manage → GREEN-API me ID Instance aur API Token save karein.');return}let phone=normalizePhone(waTarget.user.phone);if(phone.length<11){toast('User mobile number valid nahi hai.');return}let btn=$('waSendBtn');btn.disabled=true;btn.textContent='Sending...';try{let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:phone+'@c.us',message:$('waMessage').value})});let data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.message||data.error||('HTTP '+r.status));closeWA();toast('WhatsApp message sent successfully.')}catch(e){toast('Message send failed: '+e.message)}finally{btn.disabled=false;btn.textContent='Send WhatsApp'}}
 function closeWA(){$('waModal').classList.add('hidden')}
-function shipChanged(){let v=($('shipThrough').value||'').toUpperCase().trim();let yes=['SECURE','SEQUEL','SQL','BVC'].includes(v);$('section1A').classList.toggle('hidden',!yes);$('deliveryChallanRequired').value=yes?'YES':'NO';if(!yes){['dlcItem','dlcPrice','remark1','remark2','remark3'].forEach(id=>$(id).value='')}}
+function shipChanged(){let v=($('shipThrough').value||'').toUpperCase().trim();let yes=['SECURE','SEQUEL','SQL','BVC'].includes(v);$('section1A').classList.toggle('hidden',!yes);$('deliveryChallanRequired').value=yes?'YES':'NO';if(!yes){['dlcItem','dlcPrice','remark1','remark2','remark3'].forEach(id=>$(id).value='')}refreshDlcTint()}
+// Remarks 1-3 are optional notes, not part of the DLC section's own completion - only
+// Item Name and Price in DLC are required, so the section tints green once just those two
+// are filled, whether or not any remark is ever written.
+function dlcSectionComplete(){
+  return !!($('dlcItem')?.value||'').trim() && !!($('dlcPrice')?.value||'').trim();
+}
+function refreshDlcTint(){
+  const sec=$('section1A');
+  if(!sec)return;
+  sec.classList.toggle('stageLocked',dlcSectionComplete());
+}
 function validateItemsPacked(){
   const packed=$('itemsPacked'),noted=$('itemsNoted');
   if(!packed||!noted)return;
@@ -3020,6 +3031,7 @@ function renderWorkflowStatus(){
     const sec=$('dispatchSec'+s.id.replace('stage',''));
     if(sec)sec.classList.toggle('stageLocked',!!locks[s.id]||stageComplete(s));
   });
+  refreshDlcTint();
 }
 function currentEditableStage(){
   const locks=getStageLocks();
