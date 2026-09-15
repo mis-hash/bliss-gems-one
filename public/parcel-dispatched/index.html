@@ -1426,18 +1426,26 @@ const PD_PERSON_FIELDS=new Set(['slipFillBy','parcelGivenBy','handoverToPrepare'
 // Lines & Tags would look permanently "pending" on that empty field forever.
 const PD_CONDITIONAL_FIELDS={dispatchPktBy:'dispatchPktRequired',dispatchPktTime:'dispatchPktRequired',linesTagsCheckedBy:'linesTagsRequired',linesTagsTime:'linesTagsRequired'};
 function currentPendingAssignee(rec){
+  // Scans the WHOLE record rather than stopping at the first gap - a person field further
+  // along can legitimately be filled before some earlier non-person field on the same stage
+  // (e.g. Handover For Checking done before Parcel Type gets picked), and "Pending With"
+  // should name whoever was actually handed the task LAST, not whoever happened to be the
+  // last person field before the very first empty cell. The stage name still comes from the
+  // first genuinely incomplete field, since that's what's actually blocking completion.
   let lastPerson='',lastPersonField='';
+  let firstIncompleteStage=null;
   for(const stage of STAGE_SEQUENCE){
     for(const fieldId of stage.fields){
       const gate=PD_CONDITIONAL_FIELDS[fieldId];
-      if(gate && rec[gate]!=='YES')continue;
+      const skipped=gate && rec[gate]!=='YES';
       const val=rec[fieldId];
-      const filled=val!==undefined&&val!==null&&String(val).trim()!=='';
-      if(PD_PERSON_FIELDS.has(fieldId)&&filled){lastPerson=val;lastPersonField=fieldId;}
-      if(!filled)return{toUserId:lastPerson,fieldId:lastPersonField,stageName:stage.name};
+      const filled=skipped||(val!==undefined&&val!==null&&String(val).trim()!=='');
+      if(PD_PERSON_FIELDS.has(fieldId)&&filled&&!skipped){lastPerson=val;lastPersonField=fieldId;}
+      if(!filled&&!firstIncompleteStage)firstIncompleteStage=stage;
     }
   }
-  return null;
+  if(!firstIncompleteStage)return null;
+  return{toUserId:lastPerson,fieldId:lastPersonField,stageName:firstIncompleteStage.name};
 }
 // Shared by Dispatch and Return's Recent Records tables.
 function pendingBadge(x){
@@ -2137,15 +2145,26 @@ function isReturnFieldFilledForRecord(rec,fieldId){
   return String(rec[fieldId]||'').trim()!=='';
 }
 function currentPendingReturnAssignee(rec){
+  // Scans the WHOLE record instead of stopping at the first gap - see the matching comment
+  // on Dispatch's currentPendingAssignee(). A later person field (e.g. Handover for Checking)
+  // can be filled before an earlier non-person field (e.g. Parcel Type) on the same stage,
+  // and "Pending With" should name whoever actually received the task last, not whoever was
+  // last-filled before the very first empty cell.
   let lastPerson='',lastPersonField='';
+  let firstIncompleteStage=null;
   for(const stage of RETURN_STAGE_SEQUENCE){
     for(const fieldId of stage.fields){
       const filled=isReturnFieldFilledForRecord(rec,fieldId);
-      if(RETURN_PERSON_FIELDS.has(fieldId)&&filled){lastPerson=rec[fieldId];lastPersonField=fieldId;}
-      if(!filled)return{toUserId:lastPerson,fieldId:lastPersonField,stageName:stage.name};
+      // returnPktBy is gate-skipped (counted as "filled") whenever PKT change isn't
+      // required - that must NOT be read as "this person was assigned", since the field
+      // itself may genuinely be empty; only a real, non-blank value counts as an assignment.
+      const hasRealValue=String(rec[fieldId]||'').trim()!=='';
+      if(RETURN_PERSON_FIELDS.has(fieldId)&&filled&&hasRealValue){lastPerson=rec[fieldId];lastPersonField=fieldId;}
+      if(!filled&&!firstIncompleteStage)firstIncompleteStage=stage;
     }
   }
-  return null;
+  if(!firstIncompleteStage)return null;
+  return{toUserId:lastPerson,fieldId:lastPersonField,stageName:firstIncompleteStage.name};
 }
 const RETURN_APPROVAL_LOCK_KEY='pd_return_stage_locks_v1';
 function getReturnStageLocks(){
