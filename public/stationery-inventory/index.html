@@ -172,7 +172,7 @@ tbody tr:hover td{background:#f7faf8}
           <div class="field"><label>Vendor / Source</label><input id="inVendor" list="vendorList" placeholder="Select ya type karein"><datalist id="vendorList"></datalist></div>
           <div class="field span2"><label>Remark</label><input id="inRemark" placeholder="Optional"></div>
         </div>
-        <div style="margin-top:14px;text-align:right"><button class="btn primary" onclick="addStockIn()">＋ Add Stock In</button></div>
+        <div style="margin-top:14px;text-align:right"><button class="btn primary" id="stockInSubmitBtn" onclick="addStockIn()">＋ Add Stock In</button></div>
       </div>
     </div>
     <div class="panel">
@@ -195,7 +195,7 @@ tbody tr:hover td{background:#f7faf8}
           <div class="field"><label>Date</label><input type="date" id="outDate"></div>
           <div class="field span2"><label>Purpose</label><input id="outPurpose" placeholder="Optional"></div>
         </div>
-        <div style="margin-top:14px;text-align:right"><button class="btn primary" onclick="addStockOut()">＋ Issue Stock</button></div>
+        <div style="margin-top:14px;text-align:right"><button class="btn primary" id="stockOutSubmitBtn" onclick="addStockOut()">＋ Issue Stock</button></div>
       </div>
     </div>
     <div class="panel">
@@ -217,7 +217,7 @@ tbody tr:hover td{background:#f7faf8}
           <div class="field"><label>Unit</label><input id="mItemUnit" list="unitList" placeholder="Select ya type karein"><datalist id="unitList"></datalist></div>
           <div class="field"><label>Minimum Stock Level</label><input type="number" id="mItemMin"></div>
         </div>
-        <div style="margin-top:14px;text-align:right"><button class="btn primary" onclick="addItem()">＋ Add Item</button></div>
+        <div style="margin-top:14px;text-align:right"><button class="btn primary" id="addItemSubmitBtn" onclick="addItem()">＋ Add Item</button></div>
       </div>
     </div>
     <div class="panel">
@@ -573,16 +573,27 @@ async function saveEditItem(){
   toast('Item updated');
 }
 
+let _stockInSubmitting=false;
 async function addStockIn(){
+  if(_stockInSubmitting)return;
   const item=$('inItem').value,qty=parseInt($('inQty').value,10),vendor=$('inVendor').value.trim(),remark=$('inRemark').value.trim(),date=$('inDate').value||todayISO();
   if(!item||!qty){alert('Item aur Quantity zaroori hai.');return}
-  const actor=loggedUser();
-  await db.collection('si_stock_in').add({item,qty,vendor,remark,date,by:actor?actor.id:'',at:new Date().toISOString()});
-  await db.collection('si_items').doc(item).update({stock:firebase.firestore.FieldValue.increment(qty)});
-  $('inQty').value='';$('inVendor').value='';$('inRemark').value='';
-  toast('Stock In entry saved');
+  _stockInSubmitting=true;
+  const btn=$('stockInSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const actor=loggedUser();
+    await db.collection('si_stock_in').add({item,qty,vendor,remark,date,by:actor?actor.id:'',at:new Date().toISOString()});
+    await db.collection('si_items').doc(item).update({stock:firebase.firestore.FieldValue.increment(qty)});
+    $('inQty').value='';$('inVendor').value='';$('inRemark').value='';
+    toast('Stock In entry saved');
+  }finally{
+    _stockInSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
 }
+let _stockOutSubmitting=false;
 async function addStockOut(){
+  if(_stockOutSubmitting)return;
   const item=$('outItem').value,qty=parseInt($('outQty').value,10),to=$('outTo').value,purpose=$('outPurpose').value.trim(),date=$('outDate').value||todayISO();
   if(!item||!qty||!to){alert('Item, Quantity aur Issued To zaroori hai.');return}
   const it=items.find(x=>x.id===item);
@@ -597,22 +608,38 @@ async function addStockOut(){
     const recentToName=nameOfUserId(recentSame.to);
     if(!confirm(`⚠ ${it?it.name:'Ye item'} pichle ${RECENT_ISSUE_DAYS} din mein (${recentSame.date}) ${recentToName} ko already issue kiya gaya tha.\n\nPhir se issue karna hai?`))return;
   }
-  const actor=loggedUser();
-  await db.collection('si_stock_out').add({item,qty,to,purpose,date,by:actor?actor.id:'',at:new Date().toISOString()});
-  await db.collection('si_items').doc(item).update({stock:firebase.firestore.FieldValue.increment(-qty)});
-  $('outQty').value='';$('outPurpose').value='';
-  toast('Stock issued');
-  if(it)notifyIssue(it,qty,to,actor?actor.id:'');
-  if(it && (it.stock||0)-qty<=(it.min||0))notifyLowStock({...it,stock:(it.stock||0)-qty});
+  _stockOutSubmitting=true;
+  const btn=$('stockOutSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const actor=loggedUser();
+    await db.collection('si_stock_out').add({item,qty,to,purpose,date,by:actor?actor.id:'',at:new Date().toISOString()});
+    await db.collection('si_items').doc(item).update({stock:firebase.firestore.FieldValue.increment(-qty)});
+    $('outQty').value='';$('outPurpose').value='';
+    toast('Stock issued');
+    if(it)notifyIssue(it,qty,to,actor?actor.id:'');
+    if(it && (it.stock||0)-qty<=(it.min||0))notifyLowStock({...it,stock:(it.stock||0)-qty});
+  }finally{
+    _stockOutSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
 }
+let _addItemSubmitting=false;
 async function addItem(){
+  if(_addItemSubmitting)return;
   const name=$('mItemName').value.trim(),category=$('mItemCat').value.trim(),unit=$('mItemUnit').value.trim(),min=parseInt($('mItemMin').value,10)||0;
   if(!name){alert('Item Name zaroori hai.');return}
-  await db.collection('si_items').add({name,category,unit,min,stock:0});
-  if(category && !masters.categories.includes(category)){masters.categories.push(category);saveMasters();}
-  if(unit && !masters.units.includes(unit)){masters.units.push(unit);saveMasters();}
-  $('mItemName').value='';$('mItemCat').value='';$('mItemUnit').value='';$('mItemMin').value='';
-  toast('Item added');
+  _addItemSubmitting=true;
+  const btn=$('addItemSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    await db.collection('si_items').add({name,category,unit,min,stock:0});
+    if(category && !masters.categories.includes(category)){masters.categories.push(category);saveMasters();}
+    if(unit && !masters.units.includes(unit)){masters.units.push(unit);saveMasters();}
+    $('mItemName').value='';$('mItemCat').value='';$('mItemUnit').value='';$('mItemMin').value='';
+    toast('Item added');
+  }finally{
+    _addItemSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
 }
 
 /* ===== Manage panel ===== */
