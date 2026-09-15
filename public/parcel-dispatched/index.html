@@ -596,6 +596,7 @@ if(window.self!==window.top){
 <div class="toast" id="toast"></div>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script>
 const K={users:'pd_users_v2',shipto:'pd_shipto_v2',shipthrough:'pd_shipthrough_v2',api:'pd_greenapi_v2',records:'pd_records_v2',inshpresets:'pd_inshpresets_v1',couriernames:'pd_couriernames_v1',notifysettings:'pd_notify_settings_v1',featureaccess:'pd_feature_access_v1'};
 const FEATURE_LIST=[
@@ -636,6 +637,11 @@ try{
   console.error('Firebase init failed, running offline (no cloud sync this session):',e);
   pdDb=pdOfflineDbStub();
 }
+// Anonymous auth is a no-op with today's open Firestore rules; it exists so a future
+// rules tightening (requiring request.auth != null) doesn't need a client-code change to
+// go with it. Isolated in its own try/catch and kept out of the Firestore-init block
+// above so a missing/failing auth() call can never fall back to the offline Firestore stub.
+try{if(typeof firebase!=='undefined'&&firebase.auth)firebase.auth().signInAnonymously().catch(e=>console.error('anon auth failed:',e));}catch(e){console.error('anon auth failed:',e);}
 let pdUsersSyncStarted=false,pdRecordsSyncStarted=false,pdReturnsSyncStarted=false,pdUsersSeedChecked=false;
 
 const PD_APP_SLUG='parcel-dispatched';
