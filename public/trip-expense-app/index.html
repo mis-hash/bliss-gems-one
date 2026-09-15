@@ -348,7 +348,14 @@ function myRole(){
 function myUserObj(){return users.find(x=>x.id===currentUser)||null}
 
 /* ===== Super Admin escape hatch (same shared password used across all Bliss apps) — lets a logged-in user reach the Director/Team Roles panel even before any role is assigned, so the first role can be bootstrapped. ===== */
-const SUPER_ADMIN_PASSWORD='Blissmis123jaipur';
+// SHA-256 of the shared Super Admin password, not the plaintext itself - see sha256Hex()
+// at the point of use. Doesn't make the password uncrackable (it's still a client-side
+// check with no backend), but at least "View Source" no longer hands it over directly.
+const SUPER_ADMIN_PASSWORD_HASH='0cb73e5ce7c7e7b2bc347bc16e73c2a16331fdedaec4c1c787815eab4daa6fad';
+async function sha256Hex(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
 let superAdminUnlocked=false;
 let secretAdminTapCount=0,secretAdminTapTimer=null,secretAdminFlashTimer=null;
 function hardRefreshApp(){
@@ -424,9 +431,9 @@ function silentUnlockSuperAdmin(){
   superAdminUnlocked=true;
   renderAll();
 }
-function unlockSuperAdmin(){
+async function unlockSuperAdmin(){
   const pw=$('superAdminPassword')?.value||'';
-  if(pw!==SUPER_ADMIN_PASSWORD){alert('Galat password.');if($('superAdminPassword'))$('superAdminPassword').value='';return}
+  if((await sha256Hex(pw))!==SUPER_ADMIN_PASSWORD_HASH){alert('Galat password.');if($('superAdminPassword'))$('superAdminPassword').value='';return}
   superAdminUnlocked=true;
   closeSuperAdminModal();
   renderAll();
