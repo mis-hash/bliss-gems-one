@@ -1979,7 +1979,12 @@ function setParcelDashboardRole(i,value){
 function saveMessageSettings(){msgSettings={dlcEnabled:$('mDlcEnabled').value,dlcRecipient:$('mDlcRecipient').value,dlcSecondEnabled:$('mDlc2Enabled').value,dlcSecondRecipient:$('mDlc2Recipient').value};localStorage.setItem('pd_message_settings_v1',JSON.stringify(msgSettings));toast('DLC message rules saved')}
 function resetUserPassword(i){
   if(!users[i])return;
-  if(confirm('Reset '+users[i].name+' password to 1234?')){
+  // Every app (Parcel Dispatch, Stationery, Trip Expense) and the Bliss One hub share the
+  // same universal_users record. The hub's Staff Login treats a literal '1234' password as
+  // "never personalized yet" and forces the WhatsApp OTP + set-new-password screen on next
+  // login - so this reset isn't local to this app, it also logs the person out of the hub
+  // and makes them redo that OTP step, even if they'd already set their own password before.
+  if(confirm(users[i].name+' ka password reset karke 1234 par le jayein?\n\nDHYAN DEIN: Isse '+users[i].name+' ko Bliss One hub mein agli baar login karte waqt WhatsApp OTP se naya password set karna padega - chahe unhone pehle apna password set kar rakha ho.')){
     users[i].password='1234';saveMasters();toast('Password reset to 1234 for '+users[i].name);
   }
 }
