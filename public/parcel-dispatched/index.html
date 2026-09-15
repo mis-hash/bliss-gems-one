@@ -283,7 +283,7 @@ if(window.self!==window.top){
 <div class="comboMenu" id="shipToMenu"></div>
 </div></div>
 <div class="field"><label>Broker <span class="req">*</span></label><input id="broker" class="titleCaseField" autocomplete="off" readonly placeholder="Auto from Party Master"></div>
-<div class="field"><label>Ship Through <span class="req">*</span></label><input id="shipThrough" list="shipThroughList" class="titleCaseField" autocomplete="off" onchange="shipChanged();syncShippingSection()"><datalist id="shipThroughList"></datalist></div>
+<div class="field"><label>Ship Through <span class="req">*</span></label><input id="shipThrough" list="shipThroughList" class="titleCaseField" autocomplete="off" onchange="shipChanged();syncShippingSection();notifyDlcIfNeeded()"><datalist id="shipThroughList"></datalist></div>
 <div class="field"><label>INSH Amount <span class="req">*</span></label><input type="number" id="inshAmount" list="inshAmountList" step="0.01"><datalist id="inshAmountList"></datalist></div>
 <div class="field"><label>Price Fill <span class="req">*</span></label><select id="priceFill" onchange="priceChanged()"><option value="">Select</option><option>YES</option><option>NO</option></select></div>
 <div class="field hidden" id="priceWrap"><label>Price <span class="req">*</span></label><input type="text" id="price" placeholder="Numeric ya word, jo bhi likhna ho"></div>
@@ -763,7 +763,7 @@ if(!Array.isArray(clientMaster) || !clientMaster.length){
 let brokers=JSON.parse(localStorage.getItem('pd_brokers_v1')||'[]');
 let selfRemarkPrivacy=JSON.parse(localStorage.getItem('pd_selfremark_privacy_v1')||'null')||{allowedUsers:[]};
 let msgSettings=JSON.parse(localStorage.getItem('pd_message_settings_v1')||'null')||{
- dlcEnabled:'YES', dlcRecipient:'', dlcSecondEnabled:'NO', dlcSecondRecipient:''
+ dlcEnabled:'YES', dlcRecipient:'AmitYogi', dlcSecondEnabled:'NO', dlcSecondRecipient:''
 };
 
 const WA_TEMPLATE_KEY='pd_whatsapp_templates_v2';
@@ -950,12 +950,16 @@ function personChanged(s){
   // the generic per-field notification (which goes to whoever was just selected).
   if(s.id==='itemPackedBy'||s.id==='parcelHandoverBy'){
     const owner=users.find(x=>x.id===$('slipFillBy')?.value);
-    if(owner&&owner.phone&&owner.id!==u.id){
+    const givenBy=users.find(x=>x.id===$('parcelGivenBy')?.value);
+    const recipients=[owner,givenBy].filter((x,i,arr)=>x&&x.phone&&x.id!==u.id&&arr.findIndex(y=>y&&y.id===x.id)===i);
+    if(recipients.length){
       const parcel=editing||currentParcelId||'(New Parcel)',party=$('shipTo')?.value||'-';
       const msg=s.id==='itemPackedBy'
         ?`📦 Parcel Packing Complete\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nPacked By: ${u.name}\nTime: ${now()}\n\n👉 View Details: ${parcelOpenLink(parcel)}`
         :`🚚 Parcel Dispatch Complete\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nCourier: ${$('courierName')?.value||'-'}\nShip Through: ${$('shipThrough')?.value||'-'}\nAWB No: ${$('awbNo')?.value||'-'}\nInsurance Amount: ${$('inshAmount')?.value||'-'}\nHandover By: ${u.name}\nTime: ${now()}\n\n👉 View Details: ${parcelOpenLink(parcel)}`;
-      sendRawWA(owner.phone,msg).catch(err=>console.error('Slip owner milestone WA failed:',err));
+      for(const r of recipients){
+        sendRawWA(r.phone,msg).catch(err=>console.error('Slip owner milestone WA failed:',err));
+      }
     }
   }
 }
@@ -1036,7 +1040,8 @@ async function checkStuckParcelsAndAlertDelays(){
       const hours=(nowMs-entered.getTime())/3600000;
       if(hours<2)continue;
       const alertKey='delayAlerted_'+info.stage.id;
-      if(rec[alertKey])continue;
+      const criticalKey='criticalAlerted_'+info.stage.id;
+      if(rec[alertKey]&&(hours<24||rec[criticalKey]))continue;
       const givenUser=users.find(u=>u.id===rec.parcelGivenBy);
       const ownerUser=users.find(u=>u.id===rec.slipFillBy);
       const doerUser=users.find(u=>u.id===info.responsibleDoerId);
@@ -1044,18 +1049,29 @@ async function checkStuckParcelsAndAlertDelays(){
       const doerTarget=(doerUser&&doerUser.phone&&!targets.some(t=>t.id===doerUser.id))?doerUser:null;
       if(!targets.length&&!doerTarget)continue;
       const hrs=Math.floor(hours);
-      if(targets.length){
-        const msg=`⏰ Delay Alert\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nStuck at: ${info.stage.name}\nPending for: ${hrs}+ hours\n\n👉 ${parcelOpenLink(rec.parcelId)}`;
-        for(const u of targets){
-          try{await sendRawWA(u.phone,msg)}catch(e){console.error('delay WA failed',e)}
+      const withLine=doerUser?`\nCurrently With: ${doerUser.name}`:'';
+      if(!rec[alertKey]){
+        if(targets.length){
+          const msg=`⏰ Delay Alert\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nStuck at: ${info.stage.name}${withLine}\nPending for: ${hrs}+ hours\n\n👉 ${parcelOpenLink(rec.parcelId)}`;
+          for(const u of targets){
+            try{await sendRawWA(u.phone,msg)}catch(e){console.error('delay WA failed',e)}
+          }
         }
+        if(doerTarget){
+          const doerMsg=`⏰ Aapka Kaam Pending Hai\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nSection: ${info.stage.name}\nPending for: ${hrs}+ hours\n\n👉 Turant complete karein: ${parcelOpenLink(rec.parcelId)}`;
+          try{await sendRawWA(doerTarget.phone,doerMsg)}catch(e){console.error('doer delay WA failed',e)}
+        }
+        rec[alertKey]=true;changed=true;
+        try{await pdDb.collection('pd_records_cloud').doc(String(rec.parcelId)).update({[alertKey]:true})}catch(e){console.error('delay flag save failed',e)}
       }
-      if(doerTarget){
-        const doerMsg=`⏰ Aapka Kaam Pending Hai\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nSection: ${info.stage.name}\nPending for: ${hrs}+ hours\n\n👉 Turant complete karein: ${parcelOpenLink(rec.parcelId)}`;
-        try{await sendRawWA(doerTarget.phone,doerMsg)}catch(e){console.error('doer delay WA failed',e)}
+      if(hours>=24&&!rec[criticalKey]&&targets.length){
+        const critMsg=`🚨 Critically Delayed (1+ Day)\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nStuck at: ${info.stage.name}${withLine}\nPending for: ${hrs}+ hours\n\nKindly take action.\n\n👉 ${parcelOpenLink(rec.parcelId)}`;
+        for(const u of targets){
+          try{await sendRawWA(u.phone,critMsg)}catch(e){console.error('critical delay WA failed',e)}
+        }
+        rec[criticalKey]=true;changed=true;
+        try{await pdDb.collection('pd_records_cloud').doc(String(rec.parcelId)).update({[criticalKey]:true})}catch(e){console.error('critical flag save failed',e)}
       }
-      rec[alertKey]=true;changed=true;
-      try{await pdDb.collection('pd_records_cloud').doc(String(rec.parcelId)).update({[alertKey]:true})}catch(e){console.error('delay flag save failed',e)}
     }
     if(changed)localStorage.setItem(K.records,JSON.stringify(all));
   }finally{_delayCheckRunning=false}
@@ -1079,6 +1095,23 @@ function myPendingSlipsLink(userId){
 async function sendWA(){if(!waTarget)return;let id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');if(!id||!token){toast('Manage → GREEN-API me ID Instance aur API Token save karein.');return}let phone=normalizePhone(waTarget.user.phone);if(phone.length<11){toast('User mobile number valid nahi hai.');return}let btn=$('waSendBtn');btn.disabled=true;btn.textContent='Sending...';try{let r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:phone+'@c.us',message:$('waMessage').value})});let data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.message||data.error||('HTTP '+r.status));closeWA();toast('WhatsApp message sent successfully.')}catch(e){toast('Message send failed: '+e.message)}finally{btn.disabled=false;btn.textContent='Send WhatsApp'}}
 function closeWA(){$('waModal').classList.add('hidden')}
 function shipChanged(){let v=($('shipThrough').value||'').toUpperCase().trim();let yes=['SECURE','SEQUEL','SQL','BVC'].includes(v);$('section1A').classList.toggle('hidden',!yes);$('deliveryChallanRequired').value=yes?'YES':'NO';if(!yes){['dlcItem','dlcPrice','remark1','remark2','remark3'].forEach(id=>$(id).value='')}}
+const DLC_NOTIFIED_KEY='pd_dlc_notified_v1';
+function notifyDlcIfNeeded(){
+  const v=($('shipThrough').value||'').toUpperCase().trim();
+  if(!['SECURE','SEQUEL','SQL','BVC'].includes(v))return;
+  if(msgSettings.dlcEnabled!=='YES')return;
+  const pid=editing||currentParcelId||'';
+  if(!pid)return;
+  let sent=JSON.parse(localStorage.getItem(DLC_NOTIFIED_KEY)||'[]');
+  if(sent.includes(pid))return;
+  const recipient=users.find(u=>u.id===(msgSettings.dlcRecipient||'AmitYogi'));
+  if(!recipient||!recipient.phone)return;
+  sent.push(pid);
+  localStorage.setItem(DLC_NOTIFIED_KEY,JSON.stringify(sent));
+  const party=$('shipTo')?.value||'-';
+  const msg=`📦 DLC / Delivery Challan Required\n\nParcel ID: ${pid}\nParty: ${party}\nShip Through: ${$('shipThrough').value}\n\nPlease complete the DLC section for this parcel.\n\n👉 Open DLC Section: ${parcelOpenLink(pid,'dlcItem')}`;
+  sendRawWA(recipient.phone,msg).catch(err=>console.error('DLC notify WA failed:',err));
+}
 function priceChanged(){let yes=$('priceFill').value==='YES';$('priceWrap').classList.toggle('hidden',!yes);if(!yes)$('price').value=''}
 
 
