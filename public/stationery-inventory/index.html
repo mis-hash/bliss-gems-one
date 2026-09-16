@@ -293,8 +293,8 @@ tbody tr:hover td{background:#f7faf8}
 <button class="tab" data-tab="unit" onclick="mtab(this,'unit')">Unit</button>
 <button class="tab" data-tab="vendor" onclick="mtab(this,'vendor')">Vendor</button>
 <button class="tab" data-tab="roles" onclick="mtab(this,'roles')">Team &amp; Access</button>
-<button class="tab" data-tab="notify" onclick="mtab(this,'notify')">Low Stock Alerts</button>
-<button class="tab" data-tab="templates" onclick="mtab(this,'templates')">Message Templates</button>
+<button class="tab superAdminStrict hidden" data-tab="notify" onclick="mtab(this,'notify')">Low Stock Alerts</button>
+<button class="tab superAdminStrict hidden" data-tab="templates" onclick="mtab(this,'templates')">Message Templates</button>
 </div>
 <div id="manageContent"></div>
 </div></div>
@@ -518,6 +518,11 @@ function refreshLoginBadge(){
 }
 function applyFeatureVisibility(){
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.toggle('hidden',!isAdminRole()));
+  // Message Templates / Low Stock Alerts need the actual Super Admin unlock, not just any
+  // Admin/Director role - stricter than the rest of this modal, which isAdminRole() already
+  // gates (via the "⚙ Manage" button itself being superAdminOnly).
+  document.querySelectorAll('.superAdminStrict').forEach(el=>el.classList.toggle('hidden',!superAdminUnlocked));
+  if(!superAdminUnlocked&&(currentTab==='notify'||currentTab==='templates')){currentTab='category';}
 }
 
 /* ===== Dashboard / stock ===== */
