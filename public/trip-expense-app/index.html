@@ -1235,8 +1235,13 @@ function renderDirectorInsights(){
   if(!idleEntries.length){idleWrap.innerHTML='<small>Abhi koi closed trip nahi hai.</small>';}
   else{
     const total=idleEntries.reduce((s,e)=>s+Math.max(0,e.idlePerTrip),0);
+    const maxIdle=Math.max(1,...idleEntries.map(e=>Math.max(0,e.idlePerTrip)));
     idleWrap.innerHTML=`<div style="text-align:center;padding:6px 0 12px;border-bottom:1px solid #edf1ee;margin-bottom:10px"><small style="color:var(--muted);font-weight:600">AVG IDLE CAPITAL PER TRIP (ALL SALES)</small><div style="font-size:26px;font-weight:800;color:var(--amber);margin-top:4px">${money(total)}</div></div>`+
-    idleEntries.map(e=>`<div class="togrow"><span>${e.idlePerTrip>2000?'🔴':(e.idlePerTrip>500?'🟡':'🟢')} <b>${esc(e.name)}</b></span><b>${money(e.idlePerTrip)} / trip</b></div>`).join('');
+    idleEntries.map(e=>{
+      const pct=Math.round(Math.max(0,e.idlePerTrip)/maxIdle*100);
+      const color=e.idlePerTrip>2000?'var(--red)':(e.idlePerTrip>500?'var(--amber)':'var(--g2)');
+      return `<div class="bar"><label><span>${esc(e.name)}</span><b>${money(e.idlePerTrip)} / trip</b></label><div><i style="width:${pct}%;background:${color}"></i></div></div>`;
+    }).join('');
   }
   const effWrap=$('dirEfficiency');
   const purposeLocAvg={};
