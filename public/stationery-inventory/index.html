@@ -149,7 +149,7 @@ tbody tr:hover td{background:#f7faf8}
 <main>
   <section class="page on" id="page-dash">
     <div class="hero">
-      <div><h1>Stationery Inventory</h1><p>Live stock levels aur is mahine ki activity, ek nazar mein.</p></div>
+      <div><h1>Stationery Inventory</h1></div>
       <div class="heroStat"><small>TOTAL ITEMS</small><strong id="heroTotalItems">0</strong></div>
     </div>
     <div class="cards" id="statTiles"></div>
@@ -167,7 +167,7 @@ tbody tr:hover td{background:#f7faf8}
       <div class="ph"><span>New Stock In Entry</span></div>
       <div class="pb">
         <div class="grid">
-          <div class="field"><label>Item <span style="color:var(--red)">*</span></label><select id="inItem"></select></div>
+          <div class="field"><label>Item <span style="color:var(--red)">*</span></label><input id="inItemSearch" list="inItemList" autocomplete="off" placeholder="Item select karein" oninput="syncItemIdFromSearch('inItemSearch','inItem')"><input type="hidden" id="inItem"><datalist id="inItemList"></datalist></div>
           <div class="field"><label>Quantity <span style="color:var(--red)">*</span></label><input type="number" id="inQty"></div>
           <div class="field"><label>Date</label><input type="date" id="inDate"></div>
           <div class="field"><label>Vendor / Source</label><input id="inVendor" list="vendorList" placeholder="Select ya type karein"><datalist id="vendorList"></datalist></div>
@@ -190,7 +190,7 @@ tbody tr:hover td{background:#f7faf8}
       <div class="ph"><span>New Stock Out / Issue Entry</span></div>
       <div class="pb">
         <div class="grid">
-          <div class="field"><label>Item <span style="color:var(--red)">*</span></label><select id="outItem"></select></div>
+          <div class="field"><label>Item <span style="color:var(--red)">*</span></label><input id="outItemSearch" list="outItemList" autocomplete="off" placeholder="Item select karein" oninput="syncItemIdFromSearch('outItemSearch','outItem')"><input type="hidden" id="outItem"><datalist id="outItemList"></datalist></div>
           <div class="field"><label>Quantity <span style="color:var(--red)">*</span></label><input type="number" id="outQty"></div>
           <div class="field"><label>Issued To <span style="color:var(--red)">*</span></label><select id="outTo"></select></div>
           <div class="field"><label>Date</label><input type="date" id="outDate"></div>
@@ -545,10 +545,15 @@ function renderDash(){
     return `<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category||'-')}</td><td class="num">${x.stock||0} ${esc(x.unit||'')}</td><td class="num">${x.min||0}</td><td><span class="pill ${isLow?'low':'ok'}">${isLow?'⚠ Low Stock':'✓ OK'}</span></td></tr>`;
   }).join('')||`<tr><td colspan="5"><div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Item Master se naya item add karein.</small></div></td></tr>`;
 }
+function syncItemIdFromSearch(searchId,hiddenId){
+  const name=$(searchId).value.trim();
+  const match=items.find(x=>x.name.toLowerCase()===name.toLowerCase());
+  $(hiddenId).value=match?match.id:'';
+}
 function renderSelects(){
-  const opts=items.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
-  if($('inItem'))$('inItem').innerHTML=opts;
-  if($('outItem'))$('outItem').innerHTML=opts;
+  const itemOpts=items.map(x=>`<option value="${esc(x.name)}"></option>`).join('');
+  if($('inItemList'))$('inItemList').innerHTML=itemOpts;
+  if($('outItemList'))$('outItemList').innerHTML=itemOpts;
   const au=users.filter(u=>u.active!==false);
   if($('outTo'))$('outTo').innerHTML='<option value="">Select</option>'+au.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
   if($('vendorList'))$('vendorList').innerHTML=(masters.vendors||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
@@ -619,7 +624,7 @@ async function addStockIn(){
     const actor=loggedUser();
     await db.collection('si_stock_in').add({item,qty,vendor,remark,date,by:actor?actor.id:'',at:new Date().toISOString()});
     await db.collection('si_items').doc(item).update({stock:firebase.firestore.FieldValue.increment(qty)});
-    $('inQty').value='';$('inVendor').value='';$('inRemark').value='';
+    $('inItemSearch').value='';$('inItem').value='';$('inQty').value='';$('inVendor').value='';$('inRemark').value='';
     toast('Stock In entry saved');
   }finally{
     _stockInSubmitting=false;
@@ -649,7 +654,7 @@ async function addStockOut(){
     const actor=loggedUser();
     await db.collection('si_stock_out').add({item,qty,to,purpose,date,by:actor?actor.id:'',at:new Date().toISOString()});
     await db.collection('si_items').doc(item).update({stock:firebase.firestore.FieldValue.increment(-qty)});
-    $('outQty').value='';$('outPurpose').value='';
+    $('outItemSearch').value='';$('outItem').value='';$('outQty').value='';$('outPurpose').value='';
     toast('Stock issued');
     if(it)notifyIssue(it,qty,to,actor?actor.id:'');
     if(it && (it.stock||0)-qty<=(it.min||0))notifyLowStock({...it,stock:(it.stock||0)-qty});
