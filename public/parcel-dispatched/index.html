@@ -332,7 +332,7 @@ if(window.self!==window.top){
 <div class="field"><label>Item Packed By <span class="req">*</span></label><select class="person" id="itemPackedBy" data-time="packedTime" data-event="Item Packed By" onchange="personChanged(this)"></select></div>
 <div class="field"><label>Time <span class="req">*</span></label><input id="packedTime" readonly></div>
 <div class="field"><label>No. Items Packed <span class="req">*</span></label><input type="number" id="itemsPacked" onchange="validateItemsPacked()"></div><div class="field"><label>Parcel Weight (GR) <span class="req">*</span></label><input type="number" id="parcelWeight" oninput="syncShippingSection()"></div>
-<div class="field span2 no-print"><label>Packed Parcel Photo <span class="req">*</span></label><input type="hidden" id="packPhotoData"><input type="file" id="packPhotoInput" accept="image/*" capture="environment" onchange="handlePackPhoto(this)"><div class="note" id="packPhotoStatus"></div><a id="packPhotoLink" class="hidden" target="_blank" download style="display:block;margin-top:6px"><img id="packPhotoPreview" style="max-width:160px;border-radius:8px;display:block"></a></div>
+<div class="field span2 no-print"><label>Packed Parcel Photo</label><input type="hidden" id="packPhotoData"><input type="file" id="packPhotoInput" accept="image/*" capture="environment" onchange="handlePackPhoto(this)"><div class="note" id="packPhotoStatus"></div><a id="packPhotoLink" class="hidden" target="_blank" download style="display:block;margin-top:6px"><img id="packPhotoPreview" style="max-width:160px;border-radius:8px;display:block"></a></div>
 </div></div></section>
 
 <section class="card" id="dispatchSec6"><h3>6. Courier / Shipping Dispatch</h3><div class="body"><div class="grid">
@@ -2438,6 +2438,17 @@ function returnPersonSelected(s){
   // The "you've been assigned this task" WhatsApp message is sent by logWorkerSelection()
   // (wired to the same change event via the document-level select.returnPerson listener),
   // not here - sendReturnWA() used to send a second, separate message for one selection.
+  // Stock Goods Put in Boxes is the last field in RETURN_STAGE_SEQUENCE - filling it means
+  // the whole return is complete, so Parcel Received By (who owns this return) gets pinged,
+  // mirroring Dispatch's Slip Owner/Parcel Given By completion pings above.
+  if(s.id==='stockBoxesBy'){
+    const receivedBy=users.find(x=>x.id===$('returnReceiveBy')?.value);
+    const doneBy=users.find(x=>x.id===s.value);
+    if(receivedBy&&receivedBy.phone&&doneBy&&receivedBy.id!==doneBy.id){
+      const msg=`↩️ Return Process Complete\n\nReturn From: ${$('returnFrom')?.value||'-'}\nReturn Through: ${$('returnThrough')?.value||'-'}\nStock Boxed By: ${doneBy.name}\nTime: ${returnNow()}`;
+      sendRawWA(receivedBy.phone,msg).catch(err=>console.error('Return complete milestone WA failed:',err));
+    }
+  }
 }
 function openReturnTransferTask(fieldId){
   const el=$(fieldId);
@@ -3032,7 +3043,7 @@ const STAGE_SEQUENCE=[
   {id:'stage2',name:'2. Weight & Checking',fields:['dispatchPktBy','dispatchPktTime','weightCheckedBy','weightCheckedTime','linesTagsRequired','linesTagsCheckedBy','linesTagsTime','handoverToNoting','notingTime']},
   {id:'stage3',name:'3. Noting',fields:['notedBy','notedTime','itemsNoted','handoverToRecheck','recheckTime']},
   {id:'stage4',name:'4. Recheck & Packing',fields:['recheckedBy','actualRecheckTime','handoverToPacking','packingHandoverTime']},
-  {id:'stage5',name:'5. Final Packing',fields:['itemPackedBy','packedTime','itemsPacked','parcelWeight','packPhotoData']},
+  {id:'stage5',name:'5. Final Packing',fields:['itemPackedBy','packedTime','itemsPacked','parcelWeight']},
   {id:'stage6',name:'6. Courier / Shipping Dispatch',fields:['shippingDate','courierName','parcelHandoverBy','parcelHandoverTime']}
 ];
 
