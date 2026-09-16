@@ -978,11 +978,11 @@ function renderTeamRolesPage(){
 }
 
 /* ===== Page renderers ===== */
-let adminNameFilter=null;
-function setAdminNameFilter(salesId){adminNameFilter=salesId;renderAdminPage();}
-function clearAdminNameFilter(){adminNameFilter=null;renderAdminPage();}
+let adminTripFilter=null;
+function setAdminTripFilter(tripId){adminTripFilter=tripId;renderAdminPage();}
+function clearAdminNameFilter(){adminTripFilter=null;renderAdminPage();}
 function renderAdminPage(){
-  const scoped=adminNameFilter?trips.filter(t=>t.salesId===adminNameFilter):trips;
+  const scoped=adminTripFilter?trips.filter(t=>t.id===adminTripFilter):trips;
   const active=scoped.filter(t=>t.status!=='closed');
   const totalIssued=scoped.reduce((s,t)=>s+tripIssued(t.id),0);
   const totalExpense=scoped.reduce((s,t)=>s+tripExpense(t.id),0);
@@ -991,8 +991,9 @@ function renderAdminPage(){
   $('admIssued').textContent=money(totalIssued);
   $('admToVerify').textContent=scoped.filter(t=>t.status==='hisaab_submitted').length;
   $('admOverdue').textContent=scoped.filter(isOverdue).length;
-  const filterName=adminNameFilter&&(scoped[0]||trips.find(t=>t.salesId===adminNameFilter))?(scoped[0]||trips.find(t=>t.salesId===adminNameFilter)).salesName:null;
-  $('admFilterChip').innerHTML=adminNameFilter?`<div class="row" style="background:var(--mint);border-radius:8px;margin-bottom:10px"><span>🔎 Filtered: <b>${esc(filterName||'')}</b></span><button class="btn" onclick="clearAdminNameFilter()">✕ Clear</button></div>`:'';
+  const filterTrip=adminTripFilter&&trips.find(t=>t.id===adminTripFilter);
+  const filterLabel=filterTrip?`${filterTrip.salesName} — ${filterTrip.location}`:null;
+  $('admFilterChip').innerHTML=adminTripFilter?`<div class="row" style="background:var(--mint);border-radius:8px;margin-bottom:10px"><span>🔎 Filtered: <b>${esc(filterLabel||'')}</b></span><button class="btn" onclick="clearAdminNameFilter()">✕ Clear</button></div>`:'';
   const list=$('admTripsList');
   if(!active.length){list.innerHTML='<div class="row"><small>Koi live trip nahi hai.</small></div>';return}
   list.innerHTML=active.map(t=>{
@@ -1010,7 +1011,7 @@ function renderAdminPage(){
     return `<div class="trip-row" style="cursor:pointer" onclick="openTripDetail('${esc(t.id)}')">
     <div class="stripe" style="background:${colors.stripe}"></div>
     <div class="avatar" style="background:${colors.avatarBg};color:${colors.avatarColor}">${esc(initials)}</div>
-    <div style="flex:1"><b style="cursor:pointer" onclick="event.stopPropagation();setAdminNameFilter('${esc(t.salesId)}')">${esc(t.salesName)}</b><br><small style="color:var(--muted)">${esc(t.location)} • Due ${esc(t.dueDate)}</small></div>
+    <div style="flex:1"><b style="cursor:pointer" onclick="event.stopPropagation();setAdminTripFilter('${esc(t.id)}')">${esc(t.salesName)}</b><br><small style="color:var(--muted)">${esc(t.location)} • Due ${esc(t.dueDate)}</small></div>
     <div style="text-align:right"><div style="font-weight:800">${money(balance)}</div><small style="color:var(--muted)">balance</small></div>
     <span class="badge" style="background:${colors.badgeBg};color:${colors.badgeColor}">${esc(colors.label)}</span>
     ${action}
