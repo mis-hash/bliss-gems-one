@@ -816,14 +816,31 @@ async function submitExpense(){
     if(btn)btn.disabled=false;
   }
 }
+function hisaabSummaryLines(tripId){
+  const advance=tripLedger(tripId).filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0);
+  const expense=tripLedger(tripId).filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0);
+  const partyCash=tripLedger(tripId).filter(l=>l.type==='party_cash').reduce((s,l)=>s+Number(l.amount||0),0);
+  const transferIn=tripLedger(tripId).filter(l=>l.type==='transfer_in').reduce((s,l)=>s+Number(l.amount||0),0);
+  const transferOut=tripLedger(tripId).filter(l=>l.type==='transfer_out').reduce((s,l)=>s+Number(l.amount||0),0);
+  const balance=tripIssued(tripId)-tripExpense(tripId);
+  const lines=[`Advance Diya: ${money(advance)}`,`Kharcha Hua: ${money(expense)}`];
+  if(partyCash>0)lines.push(`Party Cash Use: ${money(partyCash)}`);
+  if(transferIn>0)lines.push(`Transfer Mila: ${money(transferIn)}`);
+  if(transferOut>0)lines.push(`Transfer Kiya: ${money(transferOut)}`);
+  lines.push(balance>0?`💵 Company ko lena hai: ${money(balance)}`:balance<0?`💸 Company ko dena hai: ${money(-balance)}`:`✅ Hisaab barabar hai`);
+  return lines.join('\n');
+}
 async function submitHisaab(){
   const trip=mySalesTrip();
   if(!trip){alert('Koi active trip nahi hai.');return}
   if(!confirm('Hisaab submit karein? Iske baad Admin verify karega.'))return;
   await db.collection('te_trips').doc(trip.id).update({status:'hisaab_submitted'});
+  const summary=hisaabSummaryLines(trip.id);
   if(notifySettings.submitted){
-    const submittedMsg=renderTemplate(messageTemplates.submitted,{name:trip.salesName,location:trip.location,tripId:trip.id});
+    const submittedMsg=renderTemplate(messageTemplates.submitted,{name:trip.salesName,location:trip.location,tripId:trip.id})+'\n\n'+summary;
     usersWithRole('admin').concat(usersWithRole('director')).forEach(u=>sendWA(u.phone,submittedMsg));
+    const me=myUserObj();
+    if(me)sendWA(me.phone,`🧾 Aapka Hisaab Submit Ho Gaya\n${trip.location} • ${trip.id}\n\n${summary}\n\nAdmin verify karega.`);
   }
 }
 function closeTrip(tripId){
@@ -1394,10 +1411,15 @@ function renderDirectorInsights(){
 }
 function openReport(){
   const closed=trips.filter(t=>t.status==='closed');
-  const totalAdvance=closed.reduce((s,t)=>s+tripIssued(t.id),0);
-  const totalSpent=closed.reduce((s,t)=>s+tripExpense(t.id),0);
+  // Use literal advance/expense types here, not tripIssued()/tripExpense() - those also
+  // fold in transfer_in/transfer_out/party_cash for per-trip balance math, which would
+  // double-count internal peer transfers and party cash in this company-wide report.
+  const closedAdvance=t=>tripLedger(t.id).filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0);
+  const closedSpent=t=>tripLedger(t.id).filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0);
+  const totalAdvance=closed.reduce((s,t)=>s+closedAdvance(t),0);
+  const totalSpent=closed.reduce((s,t)=>s+closedSpent(t),0);
   const bySales={};
-  closed.forEach(t=>{bySales[t.salesId]=bySales[t.salesId]||{name:t.salesName,count:0,spent:0};bySales[t.salesId].count++;bySales[t.salesId].spent+=tripExpense(t.id);});
+  closed.forEach(t=>{bySales[t.salesId]=bySales[t.salesId]||{name:t.salesName,count:0,spent:0};bySales[t.salesId].count++;bySales[t.salesId].spent+=closedSpent(t);});
   const byCategory={};
   activeLedger().filter(l=>l.type==='expense').forEach(l=>{byCategory[l.category||'Other']=(byCategory[l.category||'Other']||0)+Number(l.amount);});
   const catTotal=Object.values(byCategory).reduce((a,b)=>a+b,0)||1;
