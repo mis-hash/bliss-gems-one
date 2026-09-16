@@ -938,7 +938,16 @@ function applyFeatureAccessRestrictions(){
   });
 }
 function options(arr,val=x=>x,label=x=>x){return '<option value="">Select</option>'+arr.map(x=>`<option value="${esc(val(x))}">${esc(label(x))}</option>`).join('')}
-function populate(){ensureDoerMaster();document.querySelectorAll('.person').forEach(s=>{let old=s.value;let au=users.filter(u=>u.active!==false);s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});$('shipThroughList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('courierNameList'))$('courierNameList').innerHTML=courierNames.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('inshAmountList'))$('inshAmountList').innerHTML=inshAmountPresets.map(x=>`<option value="${esc(x)}"></option>`).join('');renderShipToMenu('')}
+function populate(){
+  ensureDoerMaster();
+  // On a slow connection, a record can be opened for editing before the Universal Users
+  // list has finished loading - the .person <select> then rebuilds with no matching
+  // <option> for the saved person, so setting s.value silently fails and it looks blank,
+  // even though the actual saved record still has the right value. Whenever the users
+  // list changes (this function re-runs), re-derive each select's value from the record
+  // actually being edited instead of trusting whatever the field currently shows.
+  const editRec=editing?JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===editing):null;
+  document.querySelectorAll('.person').forEach(s=>{let old=(editRec&&editRec[s.id]!==undefined)?editRec[s.id]:s.value;let au=users.filter(u=>u.active!==false);s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});$('shipThroughList').innerHTML=shipThrough.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('courierNameList'))$('courierNameList').innerHTML=courierNames.map(x=>`<option value="${esc(x)}"></option>`).join('');if($('inshAmountList'))$('inshAmountList').innerHTML=inshAmountPresets.map(x=>`<option value="${esc(x)}"></option>`).join('');renderShipToMenu('')}
 function now(){return new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}
 function personChanged(s){
   let t=$(s.dataset.time);
@@ -2644,7 +2653,18 @@ function openReturnRecord(id,fieldId){
  toast('Return opened: '+id);
 }
 
-function populateReturnUsers2(){let au=users.filter(u=>u.active!==false);document.querySelectorAll('#returnModule .returnPerson').forEach(s=>{let old=s.value;s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});let rf=$('returnFrom');if(rf){let old=rf.value;rf.innerHTML=options(shipTo);if(shipTo.includes(old))rf.value=old}}
+function populateReturnUsers2(){
+  // Same fix as populate() for Dispatch: if the Universal Users or parties (shipTo) list
+  // was still loading when this return record was opened, these selects would have
+  // rebuilt with no matching option and silently ended up blank. Re-derive each select's
+  // value from the return record actually being edited, not from whatever it currently
+  // shows, so a later list-load correctly restores it instead of leaving it blank.
+  const editRec=currentReturnId?JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').find(x=>x.returnId===currentReturnId):null;
+  let au=users.filter(u=>u.active!==false);
+  document.querySelectorAll('#returnModule .returnPerson').forEach(s=>{let old=(editRec&&editRec[s.id]!==undefined)?editRec[s.id]:s.value;s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});
+  let rf=$('returnFrom');
+  if(rf){let old=(editRec&&editRec.returnFrom!==undefined)?editRec.returnFrom:rf.value;rf.innerHTML=options(shipTo);if(shipTo.includes(old))rf.value=old}
+}
 function returnPktRule(){let yes=$('returnPktRequired').value==='YES';$('returnPktByWrap').classList.toggle('hidden',!yes);$('returnPktTimeWrap').classList.toggle('hidden',!yes);if(!yes){$('returnPktBy').value='';$('returnPktTime').value=''}}
 
 document.addEventListener('DOMContentLoaded',()=>{populateReturnUsers2();returnPktRule();returnParcelTypeRule();renderReturnHistory();let rd=$('returnDate');if(rd&&!rd.value)rd.value=new Date().toISOString().slice(0,10);pdStartReturnsSync();});
