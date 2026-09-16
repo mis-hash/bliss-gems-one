@@ -1132,8 +1132,13 @@ function validateItemsPacked(){
   const packedVal=String(packed.value||'').trim(),notedVal=String(noted.value||'').trim();
   if(!packedVal||!notedVal)return;
   if(Number(packedVal)!==Number(notedVal)){
-    alert('Items Packed ('+packedVal+') Noting mein diye gaye Items ('+notedVal+') se match nahi karta.\n\nPacked items Noted items ke barabar hone chahiye - na kam, na zyada.');
-    packed.value='';
+    // Warn only - do NOT clear the value. This used to blank the field on a mismatch,
+    // which silently destroyed whatever the Doer had just typed (a real incident: the
+    // stage still auto-locked/looked complete afterward, saving an empty Items Packed
+    // that only surfaced as missing data when the slip was reopened later). A packed-vs-
+    // noted mismatch can be a legitimate correction (e.g. a damaged/missing item found
+    // during packing), so let the Doer keep or fix the number themselves.
+    alert('⚠️ Items Packed ('+packedVal+') Noting mein diye gaye Items ('+notedVal+') se match nahi karta.\n\nAgar ye sahi hai (jaise koi item tuta/missing mila), to aage badh sakte hain. Galti se type hua ho to abhi correct kar lein.');
     packed.focus();
   }
 }
