@@ -259,7 +259,7 @@ if(window.self!==window.top){
 <div class="actions"><button class="btn" onclick="hide('partyCashModal')">Cancel</button><button class="btn primary" id="partyCashSubmitBtn" onclick="submitPartyCash()">Save</button></div><div class="msg" id="partyCashMsg"></div></div></div>
 
 <div class="modal" id="expense"><div class="box"><h3>Add Expense</h3><div class="fields">
-<div class="field"><label>Category *</label><select id="expCategory"><option>Hotel</option><option>Food</option><option>Taxi / Cab</option><option>Flight</option><option>Train</option><option>Fuel</option><option>Other</option></select></div>
+<div class="field"><label>Category *</label><select id="expCategory"><option>Hotel</option><option>Food</option><option>Tea / Snacks</option><option>Taxi / Cab</option><option>Local Conveyance</option><option>Bus</option><option>Train</option><option>Flight</option><option>Fuel</option><option>Toll / Parking</option><option>Party Entertainment</option><option>Sample / Gift to Party</option><option>Courier / Parcel</option><option>Mobile / Internet</option><option>Stationery / Printing</option><option>Porter / Coolie</option><option>Labour Charges</option><option>Godown / Warehouse</option><option>Vehicle Repair</option><option>Medical</option><option>Laundry</option><option>Bank / ATM Charges</option><option>Misc</option><option>Other</option></select></div>
 <div class="field"><label>Amount *</label><input type="number" id="expAmount"></div>
 <div class="field span2"><label>Paid To *</label><input id="expPaidTo"></div>
 <div class="field span2"><label>Bill / Proof (photo)</label><input type="file" id="expProof" accept="image/*" capture="environment"></div>
@@ -340,8 +340,8 @@ let messageTemplates={
 let currentUser=null;
 let usersStarted=false,tripsStarted=false,ledgerStarted=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false;
 let tripOptions={locations:['Surat','Mumbai','Chennai','Udaipur','Ahmedabad','Hyderabad'],purposes:['Exhibition','Client Visit','Sales Tour']};
-const EXPENSE_CATEGORIES=['Hotel','Food','Taxi / Cab','Flight','Train','Fuel','Other'];
-let ledgerHeads={cash:'Cash-in-Hand',advance:'Staff Advance A/c',categories:{Hotel:'Travelling Expenses',Food:'Business Promotion Exp.','Taxi / Cab':'Travelling Expenses',Flight:'Travelling Expenses',Train:'Travelling Expenses',Fuel:'Travelling Expenses',Other:'Miscellaneous Expenses'}};
+const EXPENSE_CATEGORIES=['Hotel','Food','Tea / Snacks','Taxi / Cab','Local Conveyance','Bus','Train','Flight','Fuel','Toll / Parking','Party Entertainment','Sample / Gift to Party','Courier / Parcel','Mobile / Internet','Stationery / Printing','Porter / Coolie','Labour Charges','Godown / Warehouse','Vehicle Repair','Medical','Laundry','Bank / ATM Charges','Misc','Other'];
+let ledgerHeads={cash:'Cash-in-Hand',advance:'Staff Advance A/c',categories:{Hotel:'Travelling Expenses',Food:'Business Promotion Exp.','Tea / Snacks':'Business Promotion Exp.','Taxi / Cab':'Travelling Expenses','Local Conveyance':'Travelling Expenses',Bus:'Travelling Expenses',Train:'Travelling Expenses',Flight:'Travelling Expenses',Fuel:'Travelling Expenses','Toll / Parking':'Travelling Expenses','Party Entertainment':'Business Promotion Exp.','Sample / Gift to Party':'Business Promotion Exp.','Courier / Parcel':'Miscellaneous Expenses','Mobile / Internet':'Miscellaneous Expenses','Stationery / Printing':'Miscellaneous Expenses','Porter / Coolie':'Travelling Expenses','Labour Charges':'Travelling Expenses','Godown / Warehouse':'Miscellaneous Expenses','Vehicle Repair':'Travelling Expenses',Medical:'Miscellaneous Expenses',Laundry:'Travelling Expenses','Bank / ATM Charges':'Miscellaneous Expenses',Misc:'Miscellaneous Expenses',Other:'Miscellaneous Expenses'}};
 let activity=[];
 let closeTripId=null,closeTripExpected=0;
 
