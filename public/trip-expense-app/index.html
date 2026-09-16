@@ -146,7 +146,7 @@ if(window.self!==window.top){
 <div class="metric"><h3>📍 Location Expense</h3><div id="anaLocation"></div></div>
 <div class="metric"><h3>👤 Sales Person Spend</h3><div id="anaPerson"></div></div>
 <div class="metric"><h3>💰 Expense Heads</h3><div id="anaCategory"></div></div>
-<div class="metric"><h3>🏢 Party Cash Used</h3><div id="anaPartyCash"></div></div>
+<div class="metric"><h3>🏢 Add Fund From Party Cash</h3><div id="anaPartyCash"></div></div>
 <div class="metric"><h3>🧠 Smart Flag</h3><p style="font-size:12px;color:var(--muted);line-height:1.5" id="anaFlag">-</p></div>
 <div class="metric"><h3>🧾 Proof Rate</h3><b style="font-size:28px" id="anaProof">-</b></div>
 <div class="metric"><h3>📈 Closed Trips</h3><b style="font-size:28px" id="anaClosed">0</b></div>
@@ -251,7 +251,7 @@ if(window.self!==window.top){
 <div class="field" style="margin-top:8px"><label>Remark</label><input id="transferRemark" placeholder="Optional"></div>
 <div class="actions"><button class="btn" onclick="hide('transferModal')">Cancel</button><button class="btn primary" id="transferSubmitBtn" onclick="submitTransfer()">Transfer</button></div><div class="msg" id="transferMsg"></div></div></div>
 
-<div class="modal" id="partyCashModal"><div class="box"><h3>💰 Party Cash Used</h3>
+<div class="modal" id="partyCashModal"><div class="box"><h3>💰 Add Fund From Party Cash</h3>
 <div class="field"><label>Party Name *</label><input id="partyCashName" placeholder="Party / Client naam"></div>
 <div class="field" style="margin-top:8px"><label>Amount *</label><input type="number" id="partyCashAmount" placeholder="₹ 0"></div>
 <div class="field" style="margin-top:8px"><label>Remark</label><input id="partyCashRemark" placeholder="Optional"></div>
@@ -569,7 +569,7 @@ function tripBalance(tripId){return tripIssued(tripId)-tripExpense(tripId)}
 // expense list is shown (My Trip's Recent Expenses, Admin's per-trip detail, the Ledger
 // timeline) so these self-service money movements are visible everywhere, not just on
 // the Sales person's own Ledger page.
-function ledgerEntryLabel(l){return l.type==='advance'?'Initial Advance':l.type==='additional_advance'?'Additional Advance':l.type==='transfer_in'?'Received from '+(l.fromSalesName||'Sales'):l.type==='transfer_out'?'Transferred to '+(l.toSalesName||'Sales'):l.type==='party_cash'?'Party Cash — '+(l.partyName||''):(l.category||'Expense')}
+function ledgerEntryLabel(l){return l.type==='advance'?'Initial Advance':l.type==='additional_advance'?'Additional Advance':l.type==='transfer_in'?'Received from '+(l.fromSalesName||'Sales'):l.type==='transfer_out'?'Transferred to '+(l.toSalesName||'Sales'):l.type==='party_cash'?'Add Fund From Party Cash — '+(l.partyName||''):(l.category||'Expense')}
 function ledgerEntryIsCredit(l){return l.type==='advance'||l.type==='additional_advance'||l.type==='transfer_in'||l.type==='party_cash'}
 function ledgerEntryRow(l){
   if(l.type==='expense')return `<div class="row"><span>${esc(l.category)}<br><small>${esc(l.at.slice(0,10))} • ${l.proofDataUri?'Proof attached':'No Bill'}</small></span>${l.proofDataUri?`<button class="btn" style="margin-right:8px" onclick="viewProof('${esc(l.id)}')">View Proof</button>`:''}<b>${money(l.amount)}</b></div>`;
@@ -766,7 +766,7 @@ async function submitPartyCash(){
     await db.collection('te_ledger').doc(lg.id).set(lg);
     hide('partyCashModal');
     toast('Party cash record ho gaya');
-    const notifyMsg=`💰 Party Cash Use\n\nSales: ${myName}\nTrip: ${myTrip.location}\nParty: ${partyName}\nAmount: ${money(amount)}${remark?'\nRemark: '+remark:''}\n\nIs party se mila cash trip expense ke liye use ho raha hai.`;
+    const notifyMsg=`💰 Add Fund From Party Cash\n\nSales: ${myName}\nTrip: ${myTrip.location}\nParty: ${partyName}\nAmount: ${money(amount)}${remark?'\nRemark: '+remark:''}\n\nIs party se mila cash trip expense ke liye use ho raha hai.`;
     usersWithRole('admin').concat(usersWithRole('director')).forEach(u=>u.phone&&sendWA(u.phone,notifyMsg));
   }finally{_partyCashSubmitting=false;if(btn)btn.disabled=false;}
 }
@@ -837,7 +837,7 @@ function hisaabSummaryLines(tripId){
   const transferOut=tripLedger(tripId).filter(l=>l.type==='transfer_out').reduce((s,l)=>s+Number(l.amount||0),0);
   const balance=tripIssued(tripId)-tripExpense(tripId);
   const lines=[`Advance Diya: ${money(advance)}`,`Kharcha Hua: ${money(expense)}`];
-  if(partyCash>0)lines.push(`Party Cash Use: ${money(partyCash)}`);
+  if(partyCash>0)lines.push(`Add Fund From Party Cash: ${money(partyCash)}`);
   if(transferIn>0)lines.push(`Transfer Mila: ${money(transferIn)}`);
   if(transferOut>0)lines.push(`Transfer Kiya: ${money(transferOut)}`);
   lines.push(balance>0?`💵 Company ko lena hai: ${money(balance)}`:balance<0?`💸 Company ko dena hai: ${money(-balance)}`:`✅ Hisaab barabar hai`);
@@ -1053,7 +1053,7 @@ function renderSalesPage(){
     :`<button class="big primary" onclick="submitHisaab()"><span>✓</span>Submit Hisaab</button>`;
   wrap.innerHTML=`<div class="trip"><h1>My ${esc(trip.location)} Trip</h1><p>${esc(trip.id)} • ${esc(trip.salesName)} • Hisaab Due ${esc(trip.dueDate)}</p>
   <div class="tripMoney"><div class="tm"><small>TOTAL ADVANCE</small><b>${money(issued)}</b></div><div class="tm"><small>MY EXPENSE</small><b>${money(expense)}</b></div><div class="tm"><small>BALANCE</small><b>${money(balance)}</b></div></div></div>
-  <div class="salesActions"><button class="big" onclick="openExpenseModal()"><span>＋</span>Add Expense</button><button class="big" onclick="go('ledger')"><span>📋</span>My Expenses</button><button class="big" onclick="openTransferModal()"><span>🔄</span>Transfer to Sales</button><button class="big" onclick="openPartyCashModal()"><span>💰</span>Party Cash Used</button>${submitBtn}</div>
+  <div class="salesActions"><button class="big" onclick="openExpenseModal()"><span>＋</span>Add Expense</button><button class="big" onclick="go('ledger')"><span>📋</span>My Expenses</button><button class="big" onclick="openTransferModal()"><span>🔄</span>Transfer to Sales</button><button class="big" onclick="openPartyCashModal()"><span>＋</span>Add Fund From Party Cash</button>${submitBtn}</div>
   <div class="panel"><div class="ph">Recent Activity</div><div class="pb">${rows}</div></div>`+myPastTripsPanel();
 }
 function renderLedgerPage(){
@@ -1104,9 +1104,9 @@ function renderAnalyticsPage(){
     byPerson[l.byName||'-']=(byPerson[l.byName||'-']||0)+Number(l.amount);
     byCategory[l.category||'-']=(byCategory[l.category||'-']||0)+Number(l.amount);
   });
-  // Party Cash Used entries are self-reported at the moment the Sales person spends
-  // party-collected cash, so "received" and "used" are the same single amount here -
-  // there's no separate "collected but not yet spent" state to track.
+  // party_cash entries are a self-issued Additional Advance sourced from a party instead
+  // of the company (a credit, like tripIssued() treats it) - the Sales person separately
+  // logs the actual spend via normal Add Expense entries, which net it back out.
   activeLedger().filter(l=>l.type==='party_cash').forEach(l=>{
     byParty[l.partyName||'-']=(byParty[l.partyName||'-']||0)+Number(l.amount);
   });
