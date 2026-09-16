@@ -689,6 +689,12 @@ function fileToCompressedDataUri(file){
 function mySalesTrip(){
   return trips.filter(t=>t.salesId===currentUser && t.status!=='closed').sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))[0]||null;
 }
+// All of the logged-in Sales person's own trips, any status - unlike mySalesTrip() (which
+// only ever returns the current active one, since that's what "add an expense to" means),
+// this is for read-only history views so a closed trip's ledger doesn't just disappear.
+function mySalesTrips(){
+  return trips.filter(t=>t.salesId===currentUser).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+}
 function openExpenseModal(){
   const trip=mySalesTrip();
   if(!trip){alert('Koi active trip nahi hai.');return}
@@ -903,10 +909,22 @@ function renderDirectorPage(){
     <div class="row"><span><b>📚 ${money(awaitingBook)} Awaiting Bookkeeping</b></span><button class="btn" onclick="go('accounts')">View</button></div>`;
   renderDirectorInsights();
 }
+function myPastTripsPanel(){
+  const past=mySalesTrips().filter(t=>t.status==='closed');
+  if(!past.length)return '';
+  const rows=past.map(t=>`<div class="row"><span><b>${esc(t.location)}</b><br><small>${esc(t.id)} • Closed</small></span><span style="display:flex;align-items:center;gap:8px"><b>${money(tripExpense(t.id))}</b><button class="btn small" onclick="viewMyTripLedger('${esc(t.id)}')">View</button></span></div>`).join('');
+  return `<div class="panel" style="margin-top:12px"><div class="ph">My Past Trips</div><div class="pb">${rows}</div></div>`;
+}
+function viewMyTripLedger(tripId){
+  go('ledger');
+  const p=$('ledgerTripPicker');
+  p.dataset.filled='';renderLedgerPage();
+  p.value=tripId;renderLedgerPage();
+}
 function renderSalesPage(){
   const wrap=$('salesWrap');
   const trip=mySalesTrip();
-  if(!trip){wrap.innerHTML='<div class="panel"><div class="pb"><small>Abhi koi active trip nahi hai. Admin se advance issue karwayein.</small></div></div>';return}
+  if(!trip){wrap.innerHTML='<div class="panel"><div class="pb"><small>Abhi koi active trip nahi hai. Admin se advance issue karwayein.</small></div></div>'+myPastTripsPanel();return}
   const issued=tripIssued(trip.id),expense=tripExpense(trip.id),balance=issued-expense;
   const rows=tripLedger(trip.id).filter(l=>l.type==='expense').sort((a,b)=>b.at.localeCompare(a.at)).map(l=>`<div class="row"><span>${esc(l.category)}<br><small>${esc(l.at.slice(0,10))} • ${l.proofDataUri?'Proof attached':'No Bill'}</small></span><b>${money(l.amount)}</b></div>`).join('')||'<div class="row"><small>Koi expense abhi tak nahi.</small></div>';
   const submitted=trip.status==='hisaab_submitted';
@@ -916,7 +934,7 @@ function renderSalesPage(){
   wrap.innerHTML=`<div class="trip"><h1>My ${esc(trip.location)} Trip</h1><p>${esc(trip.id)} • ${esc(trip.salesName)} • Hisaab Due ${esc(trip.dueDate)}</p>
   <div class="tripMoney"><div class="tm"><small>TOTAL ADVANCE</small><b>${money(issued)}</b></div><div class="tm"><small>MY EXPENSE</small><b>${money(expense)}</b></div><div class="tm"><small>BALANCE</small><b>${money(balance)}</b></div></div></div>
   <div class="salesActions"><button class="big" onclick="openExpenseModal()"><span>＋</span>Add Expense</button><button class="big" onclick="go('ledger')"><span>📋</span>My Expenses</button>${submitBtn}</div>
-  <div class="panel"><div class="ph">Recent Expenses</div><div class="pb">${rows}</div></div>`;
+  <div class="panel"><div class="ph">Recent Expenses</div><div class="pb">${rows}</div></div>`+myPastTripsPanel();
 }
 function renderLedgerPage(){
   const picker=$('ledgerTripPicker');
@@ -925,7 +943,7 @@ function renderLedgerPage(){
   // Finance-level roles see every trip; anyone else (sales, or now any other role that
   // received an advance) sees only their own — was gated on role==='sales' specifically,
   // which would have let a non-finance, non-sales recipient see everyone else's trips.
-  if(role!=='admin'&&role!=='director'&&role!=='accounts'){const t=mySalesTrip();visibleTrips=t?[t]:[];}
+  if(role!=='admin'&&role!=='director'&&role!=='accounts'){visibleTrips=mySalesTrips();}
   if(picker.dataset.filled!=='1'||picker.options.length!==visibleTrips.length){
     picker.innerHTML=visibleTrips.map(t=>`<option value="${esc(t.id)}">${esc(t.salesName)} • ${esc(t.id)}</option>`).join('')||'<option value="">Koi trip nahi</option>';
     picker.dataset.filled='1';
