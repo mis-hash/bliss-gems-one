@@ -644,7 +644,7 @@ try{
 // go with it. Isolated in its own try/catch and kept out of the Firestore-init block
 // above so a missing/failing auth() call can never fall back to the offline Firestore stub.
 try{if(typeof firebase!=='undefined'&&firebase.auth)firebase.auth().signInAnonymously().catch(e=>console.error('anon auth failed:',e));}catch(e){console.error('anon auth failed:',e);}
-let pdUsersSyncStarted=false,pdRecordsSyncStarted=false,pdReturnsSyncStarted=false,pdUsersSeedChecked=false;
+let pdUsersSyncStarted=false,pdRecordsSyncStarted=false,pdReturnsSyncStarted=false,pdUsersSeedChecked=false,pdClientMasterSyncStarted=false,pdClientMasterSeedChecked=false;
 
 const PD_APP_SLUG='parcel-dispatched';
 async function pdSeedCloudUsersIfEmpty(){
@@ -687,9 +687,41 @@ function pdStartUsersSync(){
     users=arr;
     localStorage.setItem(K.users,JSON.stringify(users));
     try{if(typeof populate==='function')populate();}catch(e){}
+    try{if(typeof populateReturnUsers2==='function')populateReturnUsers2();}catch(e){}
     try{if(typeof renderManage==='function')renderManage();}catch(e){}
     try{if(typeof applyWorkerPermissions==='function')applyWorkerPermissions();}catch(e){}
   },err=>{console.error('pd users sync error',err);pdSetFirebaseStatus('error',err.message);});
+}
+// The Client/Broker master (clientMaster, which shipTo/"Ship To"/"Return From" are derived
+// from) used to live in localStorage only, with zero cross-device sync - a party added or
+// already present on one phone/browser was simply invisible on anyone else's, so a
+// dropdown showing that party (Ship To, Return From) would silently end up blank for
+// every other viewer. Synced the same way as universal_users: one shared document rather
+// than per-party docs, since edits are whole-list saves already (saveClientMaster()).
+async function pdSeedCloudClientMasterIfEmpty(){
+  if(pdClientMasterSeedChecked)return;pdClientMasterSeedChecked=true;
+  try{
+    const doc=await pdDb.collection('pd_settings').doc('clientMaster').get();
+    if(!doc.exists)await pdDb.collection('pd_settings').doc('clientMaster').set({list:clientMaster});
+  }catch(e){console.error('pd seed cloud client master failed',e);}
+}
+function pdStartClientMasterSync(){
+  if(pdClientMasterSyncStarted)return;pdClientMasterSyncStarted=true;
+  pdSeedCloudClientMasterIfEmpty();
+  pdDb.collection('pd_settings').doc('clientMaster').onSnapshot(doc=>{
+    if(!doc.exists)return;
+    const list=doc.data().list;
+    if(!Array.isArray(list)||!list.length)return;
+    clientMaster=list;
+    localStorage.setItem(CLIENT_MASTER_KEY,JSON.stringify(clientMaster));
+    shipTo=clientMaster.map(x=>x.party);
+    try{if(typeof populate==='function')populate();}catch(e){}
+    try{if(typeof populateReturnUsers2==='function')populateReturnUsers2();}catch(e){}
+    try{if(typeof renderClientMasterList==='function')renderClientMasterList();}catch(e){}
+  },err=>console.error('pd client master sync error',err));
+}
+function pdPushClientMasterToCloud(){
+  try{pdDb.collection('pd_settings').doc('clientMaster').set({list:clientMaster}).catch(e=>console.error('pd client master cloud push failed',e));}catch(e){}
 }
 
 /* ===== Admin-visible connection status (Firebase + GREEN-API) ===== */
@@ -909,6 +941,7 @@ document.addEventListener('DOMContentLoaded',()=>{ensureDoerMaster();ensureUserP
   }
   renderHistory();
   pdStartRecordsSync();
+  pdStartClientMasterSync();
 });
 function openFromLink(parcelId){
   editRecord(parcelId);
@@ -1176,6 +1209,7 @@ function priceChanged(){let yes=$('priceFill').value==='YES';$('priceWrap').clas
 function saveClientMaster(){
   localStorage.setItem(CLIENT_MASTER_KEY,JSON.stringify(clientMaster));
   shipTo=clientMaster.map(x=>x.party);
+  pdPushClientMasterToCloud();
 }
 function findClientByParty(name){
   const q=String(name||'').trim().toLowerCase();
