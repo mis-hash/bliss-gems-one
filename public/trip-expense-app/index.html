@@ -244,6 +244,18 @@ if(window.self!==window.top){
 <div class="field" style="margin-top:8px"><label>Reference / Remark</label><input id="extraRemark"></div>
 <div class="actions"><button class="btn" onclick="hide('extra')">Cancel</button><button class="btn primary" id="extraSubmitBtn" onclick="submitExtra()">Issue Additional Advance</button></div><div class="msg" id="extraMsg"></div></div></div>
 
+<div class="modal" id="transferModal"><div class="box"><h3>🔄 Transfer to Another Sales Person</h3>
+<div class="field"><label>Sales Person *</label><select id="transferToTrip"></select></div>
+<div class="field" style="margin-top:8px"><label>Amount *</label><input type="number" id="transferAmount" placeholder="₹ 0"></div>
+<div class="field" style="margin-top:8px"><label>Remark</label><input id="transferRemark" placeholder="Optional"></div>
+<div class="actions"><button class="btn" onclick="hide('transferModal')">Cancel</button><button class="btn primary" id="transferSubmitBtn" onclick="submitTransfer()">Transfer</button></div><div class="msg" id="transferMsg"></div></div></div>
+
+<div class="modal" id="partyCashModal"><div class="box"><h3>💰 Party Cash Used</h3>
+<div class="field"><label>Party Name *</label><input id="partyCashName" placeholder="Party / Client naam"></div>
+<div class="field" style="margin-top:8px"><label>Amount *</label><input type="number" id="partyCashAmount" placeholder="₹ 0"></div>
+<div class="field" style="margin-top:8px"><label>Remark</label><input id="partyCashRemark" placeholder="Optional"></div>
+<div class="actions"><button class="btn" onclick="hide('partyCashModal')">Cancel</button><button class="btn primary" id="partyCashSubmitBtn" onclick="submitPartyCash()">Save</button></div><div class="msg" id="partyCashMsg"></div></div></div>
+
 <div class="modal" id="expense"><div class="box"><h3>Add Expense</h3><div class="fields">
 <div class="field"><label>Category *</label><select id="expCategory"><option>Hotel</option><option>Food</option><option>Taxi / Cab</option><option>Flight</option><option>Train</option><option>Fuel</option><option>Other</option></select></div>
 <div class="field"><label>Amount *</label><input type="number" id="expAmount"></div>
@@ -544,8 +556,13 @@ async function notifyRole(role,message){
 /* ===== Derived helpers ===== */
 function activeLedger(){const delIds=new Set(deletedTrips.map(t=>t.id));return ledger.filter(l=>!delIds.has(l.tripId))}
 function tripLedger(tripId){return ledger.filter(l=>l.tripId===tripId)}
-function tripIssued(tripId){return tripLedger(tripId).filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0)}
-function tripExpense(tripId){return tripLedger(tripId).filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0)}
+// transfer_in/party_cash are trip-level credits (money the Sales person now has in hand for
+// this trip) but deliberately excluded from company-wide totals elsewhere (Director/Accounts
+// "Total Advance Issued", Analytics category breakdown) - a peer transfer or party cash isn't
+// money the company issued, it's money moving between people or already collected in the
+// field, so counting it there would inflate the company's real advance/expense totals.
+function tripIssued(tripId){return tripLedger(tripId).filter(l=>l.type==='advance'||l.type==='additional_advance'||l.type==='transfer_in'||l.type==='party_cash').reduce((s,l)=>s+Number(l.amount||0),0)}
+function tripExpense(tripId){return tripLedger(tripId).filter(l=>l.type==='expense'||l.type==='transfer_out').reduce((s,l)=>s+Number(l.amount||0),0)}
 function tripBalance(tripId){return tripIssued(tripId)-tripExpense(tripId)}
 function isOverdue(t){return t.status!=='closed' && t.dueDate && t.dueDate<todayISO()}
 
@@ -666,6 +683,79 @@ async function submitExtra(){
     _extraSubmitting=false;
     if(btn)btn.disabled=false;
   }
+}
+// Two Sales people in the field sometimes hand cash to each other when one runs short -
+// self-service so neither has to route it through Admin, but recorded on both trips so it's
+// never just untracked cash changing hands.
+function openTransferModal(){
+  const myTrip=mySalesTrip();
+  if(!myTrip){alert('Koi active trip nahi hai.');return}
+  const others=trips.filter(t=>t.status!=='closed' && t.salesId!==currentUser);
+  $('transferToTrip').innerHTML='<option value="">Select Sales Person</option>'+others.map(t=>`<option value="${esc(t.id)}">${esc(t.salesName)} (${esc(t.location)})</option>`).join('');
+  $('transferAmount').value='';$('transferRemark').value='';$('transferMsg').textContent='';
+  show('transferModal');
+}
+let _transferSubmitting=false;
+async function submitTransfer(){
+  if(_transferSubmitting)return;
+  const myTrip=mySalesTrip();
+  const toTripId=$('transferToTrip').value;
+  const amount=Number($('transferAmount').value);
+  const remark=$('transferRemark').value.trim();
+  const msg=$('transferMsg');
+  if(!myTrip){msg.textContent='Koi active trip nahi hai.';return}
+  if(!toTripId){msg.textContent='Kisko transfer karna hai, select karein.';return}
+  if(!amount||amount<=0){msg.textContent='Sahi amount bharein.';return}
+  const myBalance=tripIssued(myTrip.id)-tripExpense(myTrip.id);
+  if(amount>myBalance && !confirm(`Aapke paas sirf ${money(myBalance)} balance hai. Phir bhi ${money(amount)} transfer karna hai?`))return;
+  const toTrip=trips.find(t=>t.id===toTripId);
+  _transferSubmitting=true;
+  const btn=$('transferSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const actor=myUserObj();const myName=actor?actor.name:currentUser,at=new Date().toISOString();
+    const outLg={id:genLedgerId(),tripId:myTrip.id,type:'transfer_out',amount,remark:remark,toTripId,toSalesName:toTrip?toTrip.salesName:'',byId:currentUser,byName:myName,at};
+    const inLg={id:genLedgerId(),tripId:toTripId,type:'transfer_in',amount,remark:remark,fromTripId:myTrip.id,fromSalesName:myName,byId:currentUser,byName:myName,at};
+    await db.collection('te_ledger').doc(outLg.id).set(outLg);
+    await db.collection('te_ledger').doc(inLg.id).set(inLg);
+    hide('transferModal');
+    toast('Transfer ho gaya: '+money(amount));
+    if(toTrip){
+      const toSales=users.find(u=>u.id===toTrip.salesId);
+      if(toSales&&toSales.phone)sendWA(toSales.phone,`💸 Aapko ${money(amount)} mile hain ${myName} se (trip transfer).${remark?'\nRemark: '+remark:''}`);
+    }
+  }finally{_transferSubmitting=false;if(btn)btn.disabled=false;}
+}
+// Sales sometimes uses cash collected directly from a party to cover trip expenses -
+// self-service entry, but Admin/Director get notified immediately since it's the company's
+// money from that party's account being spent, not a company-issued advance.
+function openPartyCashModal(){
+  const myTrip=mySalesTrip();
+  if(!myTrip){alert('Koi active trip nahi hai.');return}
+  $('partyCashName').value='';$('partyCashAmount').value='';$('partyCashRemark').value='';$('partyCashMsg').textContent='';
+  show('partyCashModal');
+}
+let _partyCashSubmitting=false;
+async function submitPartyCash(){
+  if(_partyCashSubmitting)return;
+  const myTrip=mySalesTrip();
+  const partyName=$('partyCashName').value.trim();
+  const amount=Number($('partyCashAmount').value);
+  const remark=$('partyCashRemark').value.trim();
+  const msg=$('partyCashMsg');
+  if(!myTrip){msg.textContent='Koi active trip nahi hai.';return}
+  if(!partyName){msg.textContent='Party ka naam bharein.';return}
+  if(!amount||amount<=0){msg.textContent='Sahi amount bharein.';return}
+  _partyCashSubmitting=true;
+  const btn=$('partyCashSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const actor=myUserObj();const myName=actor?actor.name:currentUser;
+    const lg={id:genLedgerId(),tripId:myTrip.id,type:'party_cash',amount,partyName,remark,byId:currentUser,byName:myName,at:new Date().toISOString()};
+    await db.collection('te_ledger').doc(lg.id).set(lg);
+    hide('partyCashModal');
+    toast('Party cash record ho gaya');
+    const notifyMsg=`💰 Party Cash Use\n\nSales: ${myName}\nTrip: ${myTrip.location}\nParty: ${partyName}\nAmount: ${money(amount)}${remark?'\nRemark: '+remark:''}\n\nIs party se mila cash trip expense ke liye use ho raha hai.`;
+    usersWithRole('admin').concat(usersWithRole('director')).forEach(u=>u.phone&&sendWA(u.phone,notifyMsg));
+  }finally{_partyCashSubmitting=false;if(btn)btn.disabled=false;}
 }
 function fileToCompressedDataUri(file){
   return new Promise((resolve,reject)=>{
@@ -933,7 +1023,7 @@ function renderSalesPage(){
     :`<button class="big primary" onclick="submitHisaab()"><span>✓</span>Submit Hisaab</button>`;
   wrap.innerHTML=`<div class="trip"><h1>My ${esc(trip.location)} Trip</h1><p>${esc(trip.id)} • ${esc(trip.salesName)} • Hisaab Due ${esc(trip.dueDate)}</p>
   <div class="tripMoney"><div class="tm"><small>TOTAL ADVANCE</small><b>${money(issued)}</b></div><div class="tm"><small>MY EXPENSE</small><b>${money(expense)}</b></div><div class="tm"><small>BALANCE</small><b>${money(balance)}</b></div></div></div>
-  <div class="salesActions"><button class="big" onclick="openExpenseModal()"><span>＋</span>Add Expense</button><button class="big" onclick="go('ledger')"><span>📋</span>My Expenses</button>${submitBtn}</div>
+  <div class="salesActions"><button class="big" onclick="openExpenseModal()"><span>＋</span>Add Expense</button><button class="big" onclick="go('ledger')"><span>📋</span>My Expenses</button><button class="big" onclick="openTransferModal()"><span>🔄</span>Transfer to Sales</button><button class="big" onclick="openPartyCashModal()"><span>💰</span>Party Cash Used</button>${submitBtn}</div>
   <div class="panel"><div class="ph">Recent Expenses</div><div class="pb">${rows}</div></div>`+myPastTripsPanel();
 }
 function renderLedgerPage(){
@@ -954,9 +1044,9 @@ function renderLedgerPage(){
   const entries=tripLedger(tripId).sort((a,b)=>a.at.localeCompare(b.at));
   let running=0;
   timeline.innerHTML=entries.map(l=>{
-    const isCredit=l.type==='advance'||l.type==='additional_advance';
+    const isCredit=l.type==='advance'||l.type==='additional_advance'||l.type==='transfer_in'||l.type==='party_cash';
     running+=isCredit?Number(l.amount):-Number(l.amount);
-    const label=l.type==='advance'?'Initial Advance':l.type==='additional_advance'?'Additional Advance':(l.category||'Expense');
+    const label=l.type==='advance'?'Initial Advance':l.type==='additional_advance'?'Additional Advance':l.type==='transfer_in'?'Received from '+(l.fromSalesName||'Sales'):l.type==='transfer_out'?'Transferred to '+(l.toSalesName||'Sales'):l.type==='party_cash'?'Party Cash — '+(l.partyName||''):(l.category||'Expense');
     const proofBtn=l.proofDataUri?`<button class="btn" style="margin-left:6px" onclick="viewProof('${l.id}')">View Bill</button>`:'';
     return `<div class="event"><b>${esc(label)}</b><strong>${isCredit?'+ ':'- '}${money(l.amount)}</strong><small>${esc(l.byName)} • ${esc(l.at.slice(0,16).replace('T',' '))}${l.remark?' • '+esc(l.remark):''}${proofBtn}</small></div>`;
   }).join('')+`<div class="event"><b>Running Balance</b><strong>${money(running)}</strong><small>Live calculated</small></div>`;
