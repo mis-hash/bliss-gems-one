@@ -259,7 +259,7 @@ if(window.self!==window.top){
 <div class="actions"><button class="btn" onclick="hide('partyCashModal')">Cancel</button><button class="btn primary" id="partyCashSubmitBtn" onclick="submitPartyCash()">Save</button></div><div class="msg" id="partyCashMsg"></div></div></div>
 
 <div class="modal" id="expense"><div class="box"><h3>Add Expense</h3><div class="fields">
-<div class="field"><label>Category *</label><select id="expCategory"><option>Hotel</option><option>Food</option><option>Tea / Snacks</option><option>Taxi / Cab</option><option>Local Conveyance</option><option>Bus</option><option>Train</option><option>Flight</option><option>Fuel</option><option>Toll / Parking</option><option>Party Entertainment</option><option>Sample / Gift to Party</option><option>Courier / Parcel</option><option>Mobile / Internet</option><option>Stationery / Printing</option><option>Porter / Coolie</option><option>Labour Charges</option><option>Godown / Warehouse</option><option>Vehicle Repair</option><option>Medical</option><option>Laundry</option><option>Bank / ATM Charges</option><option>Misc</option><option>Other</option></select></div>
+<div class="field"><label>Category *</label><input id="expCategory" list="expCategoryList" autocomplete="off" placeholder="Select ya naya likhein"><datalist id="expCategoryList"></datalist></div>
 <div class="field"><label>Amount *</label><input type="number" id="expAmount"></div>
 <div class="field span2"><label>Paid To *</label><input id="expPaidTo"></div>
 <div class="field span2"><label>Bill / Proof (photo)</label><input type="file" id="expProof" accept="image/*" capture="environment"></div>
@@ -338,10 +338,10 @@ let messageTemplates={
   overdue:'⏰ Hisaab Reminder\n{location} trip ka hisaab pending hai.\nDue: {due}\nOutstanding: {balance}'
 };
 let currentUser=null;
-let usersStarted=false,tripsStarted=false,ledgerStarted=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false;
+let usersStarted=false,tripsStarted=false,ledgerStarted=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false;
 let tripOptions={locations:['Surat','Mumbai','Chennai','Udaipur','Ahmedabad','Hyderabad'],purposes:['Exhibition','Client Visit','Sales Tour']};
-const EXPENSE_CATEGORIES=['Hotel','Food','Tea / Snacks','Taxi / Cab','Local Conveyance','Bus','Train','Flight','Fuel','Toll / Parking','Party Entertainment','Sample / Gift to Party','Courier / Parcel','Mobile / Internet','Stationery / Printing','Porter / Coolie','Labour Charges','Godown / Warehouse','Vehicle Repair','Medical','Laundry','Bank / ATM Charges','Misc','Other'];
-let ledgerHeads={cash:'Cash-in-Hand',advance:'Staff Advance A/c',categories:{Hotel:'Travelling Expenses',Food:'Business Promotion Exp.','Tea / Snacks':'Business Promotion Exp.','Taxi / Cab':'Travelling Expenses','Local Conveyance':'Travelling Expenses',Bus:'Travelling Expenses',Train:'Travelling Expenses',Flight:'Travelling Expenses',Fuel:'Travelling Expenses','Toll / Parking':'Travelling Expenses','Party Entertainment':'Business Promotion Exp.','Sample / Gift to Party':'Business Promotion Exp.','Courier / Parcel':'Miscellaneous Expenses','Mobile / Internet':'Miscellaneous Expenses','Stationery / Printing':'Miscellaneous Expenses','Porter / Coolie':'Travelling Expenses','Labour Charges':'Travelling Expenses','Godown / Warehouse':'Miscellaneous Expenses','Vehicle Repair':'Travelling Expenses',Medical:'Miscellaneous Expenses',Laundry:'Travelling Expenses','Bank / ATM Charges':'Miscellaneous Expenses',Misc:'Miscellaneous Expenses',Other:'Miscellaneous Expenses'}};
+let EXPENSE_CATEGORIES=['Hotel','Breakfast','Lunch','Dinner','Food','Tea / Snacks','Taxi / Cab','Local Conveyance','Bus','Train','Flight','Fuel','Toll / Parking','Party Entertainment','Sample / Gift to Party','Courier / Parcel','Mobile / Internet','Stationery / Printing','Porter / Coolie','Labour Charges','Godown / Warehouse','Vehicle Repair','Medical','Laundry','Bank / ATM Charges','Misc','Other'];
+let ledgerHeads={cash:'Cash-in-Hand',advance:'Staff Advance A/c',categories:{Hotel:'Travelling Expenses',Breakfast:'Business Promotion Exp.',Lunch:'Business Promotion Exp.',Dinner:'Business Promotion Exp.',Food:'Business Promotion Exp.','Tea / Snacks':'Business Promotion Exp.','Taxi / Cab':'Travelling Expenses','Local Conveyance':'Travelling Expenses',Bus:'Travelling Expenses',Train:'Travelling Expenses',Flight:'Travelling Expenses',Fuel:'Travelling Expenses','Toll / Parking':'Travelling Expenses','Party Entertainment':'Business Promotion Exp.','Sample / Gift to Party':'Business Promotion Exp.','Courier / Parcel':'Miscellaneous Expenses','Mobile / Internet':'Miscellaneous Expenses','Stationery / Printing':'Miscellaneous Expenses','Porter / Coolie':'Travelling Expenses','Labour Charges':'Travelling Expenses','Godown / Warehouse':'Miscellaneous Expenses','Vehicle Repair':'Travelling Expenses',Medical:'Miscellaneous Expenses',Laundry:'Travelling Expenses','Bank / ATM Charges':'Miscellaneous Expenses',Misc:'Miscellaneous Expenses',Other:'Miscellaneous Expenses'}};
 let activity=[];
 let closeTripId=null,closeTripExpected=0;
 
@@ -517,6 +517,29 @@ function startLedgerHeadsSync(){
   db.collection('te_settings').doc('ledgerHeads').onSnapshot(doc=>{
     if(doc.exists)ledgerHeads=Object.assign({},ledgerHeads,doc.data(),{categories:Object.assign({},ledgerHeads.categories,doc.data().categories||{})});
   },err=>console.error('ledgerHeads sync error',err));
+}
+function renderExpenseCategoryOptions(){
+  const list=$('expCategoryList');
+  if(list)list.innerHTML=EXPENSE_CATEGORIES.map(c=>`<option value="${esc(c)}"></option>`).join('');
+}
+function startExpenseCategoriesSync(){
+  if(expenseCategoriesStarted)return;expenseCategoriesStarted=true;
+  db.collection('te_settings').doc('expenseCategories').onSnapshot(doc=>{
+    if(doc.exists&&Array.isArray(doc.data().list)){
+      doc.data().list.forEach(c=>{
+        if(c&&!EXPENSE_CATEGORIES.some(x=>x.toLowerCase()===String(c).toLowerCase()))EXPENSE_CATEGORIES.push(c);
+      });
+    }
+    renderExpenseCategoryOptions();
+  },err=>console.error('expenseCategories sync error',err));
+}
+async function addExpenseCategoryIfNew(category){
+  if(!category)return;
+  if(EXPENSE_CATEGORIES.some(x=>x.toLowerCase()===category.toLowerCase()))return;
+  EXPENSE_CATEGORIES.push(category);
+  renderExpenseCategoryOptions();
+  try{await db.collection('te_settings').doc('expenseCategories').set({list:EXPENSE_CATEGORIES},{merge:true});}
+  catch(e){console.error('addExpenseCategoryIfNew failed:',e);}
 }
 function startActivitySync(){
   if(activityStarted)return;activityStarted=true;
@@ -811,8 +834,8 @@ async function submitExpense(){
   const trip=mySalesTrip();
   const msg=$('expMsg');
   if(!trip){msg.style.color='#b43a35';msg.textContent='Koi active trip nahi hai.';return}
-  const category=$('expCategory').value,amount=Number($('expAmount').value),paidTo=$('expPaidTo').value.trim(),remark=$('expRemark').value.trim();
-  if(!amount||!paidTo){msg.style.color='#b43a35';msg.textContent='Amount aur Paid To zaroori hain.';return}
+  const category=$('expCategory').value.trim(),amount=Number($('expAmount').value),paidTo=$('expPaidTo').value.trim(),remark=$('expRemark').value.trim();
+  if(!category||!amount||!paidTo){msg.style.color='#b43a35';msg.textContent='Category, Amount aur Paid To zaroori hain.';return}
   if(!remark && !$('expProof').files[0]){msg.style.color='#b43a35';msg.textContent='Bill photo lagayein ya No-Bill reason likhein.';return}
   _expenseSubmitting=true;
   const btn=$('expSubmitBtn');if(btn)btn.disabled=true;
@@ -824,6 +847,7 @@ async function submitExpense(){
     }
     const lg={id:genLedgerId(),tripId:trip.id,type:'expense',amount,category,location:trip.location,paidTo,proofDataUri,remark,byId:currentUser,byName:(myUserObj()||{}).name||currentUser,at:new Date().toISOString()};
     await db.collection('te_ledger').doc(lg.id).set(lg);
+    await addExpenseCategoryIfNew(category);
     hide('expense');
   }finally{
     _expenseSubmitting=false;
@@ -1571,9 +1595,10 @@ function boot(){
   currentUser=localStorage.getItem(SESSION_KEY)||null;
   // Each sync isolated so one failing (e.g. Firebase unavailable) can't stop the rest from
   // starting or block renderAll() below — the page should still show local/cached data.
-  [startUsersSync,startTripsSync,startLedgerSync,startSettingsSync,startOptionsSync,startLedgerHeadsSync,startActivitySync,startTemplatesSync].forEach(fn=>{
+  [startUsersSync,startTripsSync,startLedgerSync,startSettingsSync,startOptionsSync,startLedgerHeadsSync,startActivitySync,startTemplatesSync,startExpenseCategoriesSync].forEach(fn=>{
     try{fn();}catch(e){console.error(fn.name+' failed:',e);}
   });
+  renderExpenseCategoryOptions();
   renderAll();
 }
 document.addEventListener('DOMContentLoaded',boot);
