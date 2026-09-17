@@ -8,7 +8,11 @@ lost) can pick up exactly where the previous session left off. Read this first.
 - User: Praveen Saini (mis@teambgmjaipur.com), MIS department, Bliss Gems & Minerals.
 - Communicate in Hindi/Hinglish. Messages are often typo-heavy/garbled — interpret
   charitably from context rather than asking for clarification on every typo.
-- Work directly on the `main` branch. No feature-branch workflow in normal use.
+- Development branch: `claude/firebase-live-integration-7roibt`. Normal flow per change:
+  commit on that branch → push → open a PR to `main` → mark ready for review → squash-merge
+  → sync the local branch back from `main` (`git fetch origin main <branch> && git merge
+  origin/main --no-edit && git push`). Subscribe to the PR's activity, then unsubscribe
+  once merged. This supersedes any older "work directly on main" instruction.
 - Every commit message ends with the Co-Authored-By / Claude-Session trailer given in
   that session's system reminder (it changes per session — use the current one, don't
   reuse an old trailer verbatim).
@@ -41,14 +45,17 @@ lost) can pick up exactly where the previous session left off. Read this first.
   local `python3 -m http.server` serving `public/` + Playwright screenshots, (c) GitHub
   Actions deploy status as the source of truth for "is it actually live".
 
-## The three apps (all in `public/`, all on one Firebase Hosting site)
+## The four apps (all in `public/`, all on one Firebase Hosting site)
 
 1. **Bliss One hub** — `public/index.html` — https://bliss-gems-one.web.app/
-   App launcher/dashboard; embeds the other two apps in an iframe when opened inline.
+   App launcher/dashboard; embeds the other apps in an iframe when opened inline.
 2. **Parcel Dispatch & Return** — `public/parcel-dispatched/index.html` —
    https://bliss-gems-one.web.app/parcel-dispatched/
 3. **Trip Expense app** — `public/trip-expense-app/index.html` —
    https://bliss-gems-one.web.app/trip-expense-app/
+4. **Stationery Inventory** — `public/stationery-inventory/index.html` —
+   https://bliss-gems-one.web.app/stationery-inventory/ — Stock In/Out entries against an
+   Item master, with low-stock alerts.
 
 ## Shared architecture
 
@@ -162,7 +169,84 @@ lost) can pick up exactly where the previous session left off. Read this first.
     month-over-month spend trend, daily/weekly trend chart, return-rate %, top N parties
     by volume, courier on-time vs delayed.
 
+## Trip Expense app — specifics
+
+- **`te_ledger` entry types**: `advance` / `additional_advance` / `expense` /
+  `transfer_in` / `transfer_out` / `party_cash`. `tripIssued(id)` sums
+  advance+additional_advance+transfer_in+party_cash (money in hand); `tripExpense(id)`
+  sums expense+transfer_out; `tripBalance(id)` = issued − expense.
+- **Company-wide aggregate reports** (Director/Accounts dashboards, Analytics, Bookkeeping
+  → Export Report) must filter on the **literal** `advance`/`expense` types only, never
+  call `tripIssued()`/`tripExpense()` — those include peer-to-peer transfers and party
+  cash, which would double-count money the company itself never issued/spent. This was a
+  real bug in `openReport()`, already fixed — if a similar company-wide total looks
+  inflated, suspect this exact pattern first.
+- **Sales role is hard-locked to the "My Trip" page only**, two enforcement points:
+  1. `applyRoleVisibility()`'s `allowed()` closure checks `myRole()==='sales'` **first**,
+     before any other check, and only allows buttons with no `data-role`/`data-superadmin`/
+     `data-role-or-superadmin` attribute — this overrides `effectiveRole()`'s
+     `superAdminUnlocked ? 'director' : myRole()` fold, which would otherwise let a Sales
+     account see the whole Admin/Director menu whenever Super Admin is unlocked on that
+     device.
+  2. The `#admin` page section (and its nav button) start with `class="on"` in the static
+     HTML. `applyRoleVisibility()`'s auto-redirect-away-from-a-hidden-page logic only
+     considers nav buttons that have a `data-role`/`data-role-or-superadmin` attribute
+     (`firstAllowed`) — and "My Trip" deliberately has neither (it's visible to everyone).
+     So `firstAllowed` can never become the My Trip button, and a **fresh Sales-role login
+     would never get redirected off Admin Control**, silently showing live Admin data on
+     first load even though its nav button was correctly hidden. Fixed with an explicit
+     early branch: `if(myRole()==='sales'){ if current page isn't 'sales' or an
+     appFeatureAccess-granted page, force-click the My Trip nav button; return; }`. Any
+     future role-gated page added with no `data-role` attribute (because it should be
+     visible to everyone) needs the same explicit-branch treatment, not just a button-hide.
+  - An explicit per-user `appFeatureAccess['trip-expense-app']` array (deliberate Admin
+    grant) still overrides both checks above.
+- **Money breakdown tiles** (My Trip page + Admin's per-trip detail modal, shared markup):
+  6 tiles with +/− signs — `COMPANY ADVANCE(+)` `PARTY CASH(+)` `TRANSFER RECEIVED(+)`
+  `TRANSFER SENT(-)` `EXPENSE(-)` `BALANCE`. Mobile CSS: the shared `.money`/`.tripMoney`
+  "last tile spans full width" rule is scoped to `:last-child:nth-child(odd)` — it only
+  fires when the tile count is odd (so it doesn't stretch/misplace a tile on an even grid).
+- **"Add Fund From Party Cash"** (final name, after several renames — do not rename again
+  without the user explicitly asking): a Sales person self-records cash collected from a
+  party to cover expenses; a `party_cash` credit entry, `+` icon matching Add Expense. The
+  actual spend is still tracked via a separate Add Expense entry — this is intentional,
+  not a bug.
+- **Admin Trip Control's name-click filter** scopes the top tiles to one **specific trip**
+  (`tripId`), not every trip belonging to that sales person — a person can have multiple
+  concurrent trips (e.g. running an Ahmedabad trip and an Udaipur trip at once), and
+  filtering by person would wrongly combine them.
+- **Add Expense categories**: 24 categories (Hotel, Food, Breakfast/Lunch/Dinner,
+  Tea/Snacks, Taxi/Cab, Local Conveyance, Bus, Train, Flight, Fuel, Toll/Parking, Party
+  Entertainment, Sample/Gift to Party, Courier/Parcel, Mobile/Internet, Stationery/
+  Printing, Porter/Coolie, Labour Charges, Godown/Warehouse, Vehicle Repair, Medical,
+  Laundry, Bank/ATM Charges, Misc, Other), each mapped to an accounting ledger head in
+  `ledgerHeads.categories`. The field is a searchable `<input list="expCategoryList">` +
+  `<datalist>` (not a `<select>`) — typing a brand-new category on Save auto-syncs it to
+  `te_settings/expenseCategories` so every other Sales person's dropdown gets it as a
+  suggestion too (same self-growing-list pattern as Parcel Dispatch's `courierNames`).
+- **Submit Hisaab** WhatsApps a full breakdown (advance, expense, party cash, transfers,
+  net receivable/payable) to both Admin/Director **and** the Sales person themselves.
+
+## Stationery Inventory — specifics
+
+- Stock In / Stock Out forms' **Item** field is a searchable `<input list="…"> +
+  <datalist>` starting blank (not a pre-filled `<select>` defaulting to whichever item is
+  first in the list — that was a real bug: a wrong-item entry could go unnoticed). A
+  hidden field tracks the resolved item's real Firestore ID for the existing save logic.
+
 ## Bliss One hub — specifics
+
+- **Mobile horizontal-overflow bug (fixed)**: `.shellWrap{align-items:flex-start}` only
+  affects vertical alignment in the normal desktop row layout; the `max-width:900px`
+  media query switches `.shellWrap` to `flex-direction:column` without also correcting
+  `align-items`, so on mobile `align-items:flex-start` became a **horizontal sizing**
+  rule — flex children shrink-to-fit their widest descendant instead of stretching to the
+  viewport width. The Manage panel's Universal Users table (`min-width:760px`, always
+  present in the DOM regardless of whether that panel is open) was the widest descendant,
+  stretching the whole page to ~800px in a 375px viewport. Fixed with
+  `align-items:stretch` on `.shellWrap` inside that same mobile media query. If a future
+  mobile layout looks stretched/cut-off again, check for exactly this pattern: a flex
+  container whose `align-items` value only makes sense for its desktop axis.
 
 - **Manage — Users** panel merges what used to be separate "Staff Accounts" (Firebase
   Auth admins) and "Universal Users" (Doers) into one modal with tabs
