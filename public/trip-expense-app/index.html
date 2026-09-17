@@ -1549,6 +1549,20 @@ function applyRoleVisibility(){
     if(ok&&!firstAllowed)firstAllowed=b;
   });
   document.querySelectorAll('.bottomNav button[data-role], .bottomNav button[data-role-or-superadmin]').forEach(b=>b.classList.toggle('hidden',!allowed(b)));
+  // A Sales-role Doer's only allowed page (My Trip) has no data-role attribute - it's
+  // visible to everyone - so it's never scanned into firstAllowed above, and the generic
+  // fallback below would never redirect a Sales account away from whatever page happened
+  // to be marked "on" in the static HTML (Admin Control, by default) on first load. Handle
+  // Sales explicitly: if they're not already on an allowed page, force them to My Trip.
+  if(myRole()==='sales'){
+    const u=myUserObj();
+    const extra=(u&&u.appFeatureAccess&&u.appFeatureAccess[APP_SLUG])||[];
+    if(currentPageId()!=='sales'&&!extra.includes(currentPageId())){
+      const salesBtn=document.querySelector(`nav button[data-page="sales"]`);
+      if(salesBtn)salesBtn.click();
+    }
+    return;
+  }
   if(!document.querySelector(`nav button:not(.hidden)[onclick*="'${currentPageId()}'"]`) && firstAllowed){
     firstAllowed.click();
   }
