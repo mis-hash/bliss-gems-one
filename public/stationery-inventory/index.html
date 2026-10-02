@@ -809,6 +809,7 @@ function renderManage(){
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
       <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="mRecordsSelectAll" onchange="toggleSelectAllRecords(this.checked)" style="width:auto"> Select All</label>
       <button class="btn small" onclick="bulkDisableRecords()">Disable Selected</button>
+      <button class="btn small" onclick="bulkRestoreRecords()">↩ Restore Selected</button>
       <button class="btn small danger" onclick="bulkPermanentlyDeleteRecords()">🗑 Delete Permanently Selected</button>
     </div>
     <div id="mRecordsList"></div>`;
@@ -856,6 +857,18 @@ async function bulkDisableRecords(){
   }
   renderRecordsManageTab();
   toast(sel.length+' entry/entries disable ho gayi');
+}
+async function bulkRestoreRecords(){
+  if(!canDeleteStockEntries()){alert('Sirf Admin/Director entries restore kar sakte hain.');return}
+  const sel=selectedStockRefs().filter(x=>x.deleted);
+  if(!sel.length){alert('Koi disabled entry select nahi ki.');return}
+  if(!confirm(sel.length+' entry/entries ko Restore karna hai?'))return;
+  for(const r of sel){
+    if(r.kind==='in')await restoreStockIn(r.id);
+    else await restoreStockOut(r.id);
+  }
+  renderRecordsManageTab();
+  toast(sel.length+' entry/entries restore ho gayi');
 }
 async function bulkPermanentlyDeleteRecords(){
   if(!superAdminUnlocked){alert('Sirf Super Admin entries permanently delete kar sakta hai.');return}
