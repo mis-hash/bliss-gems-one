@@ -295,6 +295,7 @@ tbody tr:hover td{background:#f7faf8}
 <button class="tab" data-tab="roles" onclick="mtab(this,'roles')">Team &amp; Access</button>
 <button class="tab superAdminStrict hidden" data-tab="notify" onclick="mtab(this,'notify')">Low Stock Alerts</button>
 <button class="tab superAdminStrict hidden" data-tab="templates" onclick="mtab(this,'templates')">Message Templates</button>
+<button class="tab superAdminStrict hidden" data-tab="records" onclick="mtab(this,'records')">🗑 Manage Records</button>
 </div>
 <div id="manageContent"></div>
 </div></div>
@@ -700,6 +701,32 @@ async function restoreStockOut(id){
   await db.collection('si_items').doc(x.item).update({stock:firebase.firestore.FieldValue.increment(-x.qty)});
   toast('Stock Out entry restored');
 }
+// Permanent delete removes the entry forever (no restore). If it was never disabled first,
+// its stock effect is still live and must be reversed now, same direction as deleteStockIn/Out
+// above - but if it was already disabled (deletedAt set), that reversal already happened once,
+// so doing it again here would double-adjust the item's current stock count.
+async function permanentlyDeleteStockIn(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin stock entry permanently delete kar sakta hai.');return}
+  const x=inLog.find(e=>e.id===id);if(!x)return;
+  const typed=prompt('Yeh Stock In entry Firestore se HAMESHA KE LIYE delete ho jayegi — wapas NAHI aayegi.\n\nItem: '+itemName(x.item)+'\nQty: '+x.qty+'\n\nConfirm karne ke liye "DELETE" type karein:');
+  if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  try{
+    await db.collection('si_stock_in').doc(id).delete();
+    if(!x.deletedAt)await db.collection('si_items').doc(x.item).update({stock:firebase.firestore.FieldValue.increment(-x.qty)});
+  }catch(e){ console.error('permanent delete stock-in failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
+  toast('Stock In entry permanently delete ho gayi');
+}
+async function permanentlyDeleteStockOut(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin stock entry permanently delete kar sakta hai.');return}
+  const x=outLog.find(e=>e.id===id);if(!x)return;
+  const typed=prompt('Yeh Stock Out entry Firestore se HAMESHA KE LIYE delete ho jayegi — wapas NAHI aayegi.\n\nItem: '+itemName(x.item)+'\nQty: '+x.qty+'\n\nConfirm karne ke liye "DELETE" type karein:');
+  if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  try{
+    await db.collection('si_stock_out').doc(id).delete();
+    if(!x.deletedAt)await db.collection('si_items').doc(x.item).update({stock:firebase.firestore.FieldValue.increment(x.qty)});
+  }catch(e){ console.error('permanent delete stock-out failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
+  toast('Stock Out entry permanently delete ho gayi');
+}
 let _addItemSubmitting=false;
 async function addItem(){
   if(_addItemSubmitting)return;
@@ -768,6 +795,39 @@ function renderManage(){
         <div style="display:flex;gap:8px;margin-top:6px"><button class="btn primary small" onclick="saveTemplate('${id}')">Save</button><button class="btn small" onclick="resetTemplate('${id}')">Reset to Default</button></div></div>`;
       }).join('');
   }
+  else if(currentTab==='records'){
+    c.innerHTML=`<p class="note">Stock In/Out entries ko <b>Disable</b> karne par wo Deleted list me chali jaati hain (stock reverse ho jaata hai, Restore ho sakta hai). <b>Permanently Delete</b> karne par entry Firestore se hamesha ke liye hat jaati hai — wapas NAHI aayegi.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
+      <select id="mRecordsType" onchange="renderRecordsManageTab()" style="width:auto"><option value="all">All</option><option value="in">Stock In</option><option value="out">Stock Out</option></select>
+      <input id="mRecordsSearch" placeholder="Search Item / Vendor" oninput="renderRecordsManageTab()" style="flex:1;min-width:160px">
+      <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="mRecordsShowDisabled" onchange="renderRecordsManageTab()" style="width:auto"> Show Disabled</label>
+    </div>
+    <div id="mRecordsList"></div>`;
+    renderRecordsManageTab();
+  }
+}
+function renderRecordsManageTab(){
+  const list=$('mRecordsList');
+  if(!list)return;
+  if(!superAdminUnlocked){list.innerHTML='<div class="note">Sirf Super Admin yeh dekh sakta hai.</div>';return}
+  const type=$('mRecordsType')?.value||'all';
+  const q=($('mRecordsSearch')?.value||'').toLowerCase();
+  const showDisabled=$('mRecordsShowDisabled')?.checked;
+  let ins=inLog.map(x=>({kind:'in',id:x.id,label:itemName(x.item),date:x.date||'',sub:x.vendor||'',qty:x.qty,deleted:!!x.deletedAt}));
+  let outs=outLog.map(x=>({kind:'out',id:x.id,label:itemName(x.item),date:x.date||'',sub:nameOfUserId(x.to)||'',qty:x.qty,deleted:!!x.deletedAt}));
+  let a=[...ins,...outs];
+  if(type==='in')a=a.filter(x=>x.kind==='in');
+  if(type==='out')a=a.filter(x=>x.kind==='out');
+  if(!showDisabled)a=a.filter(x=>!x.deleted);
+  a=a.filter(x=>`${x.label} ${x.sub} ${x.date}`.toLowerCase().includes(q));
+  a.sort((x,y)=>String(y.date).localeCompare(String(x.date)));
+  list.innerHTML=a.length?a.map(x=>{
+    const toggleBtn=x.deleted
+      ?`<button class="btn small" onclick="(async()=>{await ${x.kind==='in'?'restoreStockIn':'restoreStockOut'}('${esc(x.id)}');renderRecordsManageTab()})()">↩ Restore</button>`
+      :`<button class="btn small" onclick="(async()=>{await ${x.kind==='in'?'deleteStockIn':'deleteStockOut'}('${esc(x.id)}');renderRecordsManageTab()})()">Disable</button>`;
+    const permBtn=`<button class="btn small danger" onclick="${x.kind==='in'?'permanentlyDeleteStockIn':'permanentlyDeleteStockOut'}('${esc(x.id)}')">🗑 Delete Permanently</button>`;
+    return `<div class="item"><span><b>${x.kind==='in'?'IN':'OUT'}</b> — ${esc(x.label)} <small>Qty ${x.qty} • ${esc(x.date)} • ${esc(x.sub)}</small>${x.deleted?' <small style="color:#9b1c1c">(DISABLED)</small>':''}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${toggleBtn} ${permBtn}</span></div>`;
+  }).join(''):'<div class="note">Koi record nahi mila.</div>';
 }
 function toggleLowStockRecipient(userId){
   if(!masters.lowStockRecipients)masters.lowStockRecipients=[];

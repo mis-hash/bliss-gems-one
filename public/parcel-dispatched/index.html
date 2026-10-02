@@ -495,7 +495,7 @@ if(window.self!==window.top){
 </div>
 </div></main>
 
-<div class="modal hidden" id="manageModal"><div class="box"><div class="mh"><b>Admin / Backend Masters</b><button class="btn secondary small" onclick="closeManage()">✕</button></div><div class="mb"><div class="tabs"><button class="tab on" data-tab="users" onclick="tab(this,'users')">Universal Users</button><button class="tab" data-tab="shipto" onclick="tab(this,'shipto')">Ship To</button><button class="tab" data-tab="clients" onclick="tab(this,'clients')">Ship To</button><button class="tab" data-tab="brokers" onclick="tab(this,'brokers')">Brokers</button><button class="tab" data-tab="shipthrough" onclick="tab(this,'shipthrough')">Ship Through</button><button class="tab" data-tab="insh" onclick="tab(this,'insh')">INSH Amount</button><button class="tab" data-tab="couriername" onclick="tab(this,'couriername')">Courier Name</button><button class="tab" data-tab="notifycontrol" onclick="tab(this,'notifycontrol')">Notification Control</button><button class="tab" data-tab="messages" onclick="tab(this,'messages')">Message Settings</button><button class="tab" data-tab="watemplates" onclick="tab(this,'watemplates')">WhatsApp Templates</button><button class="tab" data-tab="privacy" onclick="tab(this,'privacy')">Self Remark Privacy</button><button class="tab" data-tab="api" onclick="tab(this,'api')">GREEN-API</button><button class="tab" data-tab="feataccess" onclick="tab(this,'feataccess')">Feature Access Control</button></div><div id="manageContent"></div></div><div class="mf"><span class="note">Data is saved in this browser.</span><button class="btn secondary" onclick="closeManage()">Close</button></div></div></div>
+<div class="modal hidden" id="manageModal"><div class="box"><div class="mh"><b>Admin / Backend Masters</b><button class="btn secondary small" onclick="closeManage()">✕</button></div><div class="mb"><div class="tabs"><button class="tab on" data-tab="users" onclick="tab(this,'users')">Universal Users</button><button class="tab" data-tab="shipto" onclick="tab(this,'shipto')">Ship To</button><button class="tab" data-tab="clients" onclick="tab(this,'clients')">Ship To</button><button class="tab" data-tab="brokers" onclick="tab(this,'brokers')">Brokers</button><button class="tab" data-tab="shipthrough" onclick="tab(this,'shipthrough')">Ship Through</button><button class="tab" data-tab="insh" onclick="tab(this,'insh')">INSH Amount</button><button class="tab" data-tab="couriername" onclick="tab(this,'couriername')">Courier Name</button><button class="tab" data-tab="notifycontrol" onclick="tab(this,'notifycontrol')">Notification Control</button><button class="tab" data-tab="messages" onclick="tab(this,'messages')">Message Settings</button><button class="tab" data-tab="watemplates" onclick="tab(this,'watemplates')">WhatsApp Templates</button><button class="tab" data-tab="privacy" onclick="tab(this,'privacy')">Self Remark Privacy</button><button class="tab" data-tab="api" onclick="tab(this,'api')">GREEN-API</button><button class="tab" data-tab="feataccess" onclick="tab(this,'feataccess')">Feature Access Control</button><button class="tab" data-tab="records" onclick="tab(this,'records')">🗑 Manage Records</button></div><div id="manageContent"></div></div><div class="mf"><span class="note">Data is saved in this browser.</span><button class="btn secondary" onclick="closeManage()">Close</button></div></div></div>
 
 
 <div class="modal hidden" id="allRecordsModal"><div class="box" style="width:min(1100px,100%)">
@@ -1598,11 +1598,11 @@ function renderHistory(){
  const dash=v=>v?esc(v):'<span class="cellDash">—</span>';
  const createdLabel=x=>x.createdAt?new Date(x.createdAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}):'';
  const dispatchAction=x=>x.deletedAt
-   ?`<button class="btn small secondary" onclick="restoreDispatchRecord('${esc(x.parcelId||'')}')">↩ Restore</button>`
-   :`<button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button>${loggedUser()?` <button class="btn small danger" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑</button>`:''}`;
+   ?(superAdminUnlocked?`<button class="btn small secondary" onclick="restoreDispatchRecord('${esc(x.parcelId||'')}')">↩ Restore</button>`:'')
+   :`<button class="btn small secondary" onclick="editRecord('${esc(x.parcelId||'')}')">Open</button>${superAdminUnlocked?` <button class="btn small danger" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑</button>`:''}`;
  const dispatchActionCard=x=>x.deletedAt
-   ?`<button class="btn secondary" style="margin-top:6px" onclick="restoreDispatchRecord('${esc(x.parcelId||'')}')">↩ Restore</button>`
-   :`<button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button>${loggedUser()?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑 Delete</button>`:''}`;
+   ?(superAdminUnlocked?`<button class="btn secondary" style="margin-top:6px" onclick="restoreDispatchRecord('${esc(x.parcelId||'')}')">↩ Restore</button>`:'')
+   :`<button class="btn secondary recordOpenBtn" onclick="editRecord('${esc(x.parcelId||'')}')">Open Record</button>${superAdminUnlocked?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteDispatchRecord('${esc(x.parcelId||'')}')">🗑 Delete</button>`:''}`;
  const slipOwnerName=x=>{const u=users.find(u=>u.id===x.slipFillBy);return u?u.name:''};
  // Every stage locked but no explicit final status set yet - the slip is genuinely done,
  // so say so instead of leaving the Status cell blank.
@@ -1932,7 +1932,42 @@ else if(currentTab==='feataccess'){
    <div style="margin-top:6px;max-height:140px;overflow:auto;border:1px solid #eee;border-radius:6px;padding:6px">${au.map(u=>`<label style="display:block;padding:4px"><input type="checkbox" onchange="toggleFeatureDoerAccess('${f.id}','${esc(u.id)}',this.checked)" ${allowed.includes(u.id)?'checked':''} style="width:auto;margin-right:8px"> ${esc(u.name)}</label>`).join('')}</div></div>`;
  }).join('')}`;
 }
+else if(currentTab==='records'){
+ c.innerHTML=`<h3 style="margin-top:0">🗑 Manage Records (Super Admin)</h3>
+ <div class="note">Record ko <b>Disable</b> karne par wo Deleted list me chala jaata hai (data safe rehta hai, Restore ho sakta hai). <b>Permanently Delete</b> karne par record Firestore se hamesha ke liye hat jayega — wapas NAHI aa sakta.</div>
+ <div class="row" style="margin:10px 0;flex-wrap:wrap;gap:8px">
+   <select id="mRecordsType" onchange="renderRecordsManageTab()" style="width:auto"><option value="all">All</option><option value="dispatch">Dispatch</option><option value="return">Return</option></select>
+   <input id="mRecordsSearch" placeholder="Search ID / Party / Date" oninput="renderRecordsManageTab()" style="flex:1;min-width:160px">
+   <label style="display:flex;align-items:center;gap:4px;white-space:nowrap"><input type="checkbox" id="mRecordsShowDisabled" onchange="renderRecordsManageTab()" style="width:auto"> Show Disabled</label>
+ </div>
+ <div id="mRecordsList"></div>`;
+ renderRecordsManageTab();
+}
 else{c.innerHTML=`<div class="grid"><div class="field span2"><label>GREEN-API Base URL <span class="req">*</span></label><input id="mBase" value="${esc(api.baseUrl||'https://api.green-api.com')}"></div><div class="field"><label>ID Instance <span class="req">*</span></label><input id="mId" value="${esc(api.idInstance||'')}"></div><div class="field"><label>API Token Instance <span class="req">*</span></label><input type="password" id="mToken" value="${esc(api.apiToken||'')}"></div><div class="field full"><button class="btn primary" onclick="saveApi()">Save GREEN-API Settings</button></div></div><div class="note">Simple single-file mode में credentials इस browser के localStorage में save होंगे. Production/public hosting में token server-side रखना ज्यादा सुरक्षित है.</div>`}}
+
+function renderRecordsManageTab(){
+ const list=$('mRecordsList');
+ if(!list)return;
+ if(!superAdminUnlocked){list.innerHTML='<div class="note">Sirf Super Admin yeh dekh sakta hai.</div>';return}
+ const type=$('mRecordsType')?.value||'all';
+ const q=($('mRecordsSearch')?.value||'').toLowerCase();
+ const showDisabled=$('mRecordsShowDisabled')?.checked;
+ let ds=JSON.parse(localStorage.getItem(K.records)||'[]').map(x=>({type:'DISPATCH',id:x.parcelId,label:slipLabel(x),date:x.dispatchDate||'',party:x.shipTo||'',deleted:!!x.deletedAt}));
+ let rs=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').map(x=>({type:'RETURN',id:x.returnId,label:slipLabel(x),date:x.returnDate||'',party:x.returnFrom||'',deleted:!!x.deletedAt}));
+ let a=[...ds,...rs];
+ if(type==='dispatch')a=a.filter(x=>x.type==='DISPATCH');
+ if(type==='return')a=a.filter(x=>x.type==='RETURN');
+ if(!showDisabled)a=a.filter(x=>!x.deleted);
+ a=a.filter(x=>`${x.type} ${x.id} ${x.label} ${x.date} ${x.party}`.toLowerCase().includes(q));
+ a.sort((x,y)=>String(y.date).localeCompare(String(x.date)));
+ list.innerHTML=a.length?a.map(x=>{
+   const disableOrRestoreBtn=x.deleted
+     ?`<button class="btn small secondary" onclick="(async()=>{await ${x.type==='DISPATCH'?'restoreDispatchRecord':'restoreReturnRecord'}('${esc(x.id||'')}');renderRecordsManageTab()})()">↩ Restore</button>`
+     :`<button class="btn small secondary" onclick="(async()=>{await ${x.type==='DISPATCH'?'deleteDispatchRecord':'deleteReturnRecord'}('${esc(x.id||'')}');renderRecordsManageTab()})()">Disable</button>`;
+   const permDeleteBtn=`<button class="btn small danger" onclick="${x.type==='DISPATCH'?'permanentlyDeleteDispatchRecord':'permanentlyDeleteReturnRecord'}('${esc(x.id||'')}')">🗑 Delete Permanently</button>`;
+   return `<div class="item"><span><b>${x.type}</b> — ${esc(x.label||'')} <small>${esc(x.date||'')} • ${esc(x.party||'')}</small>${x.deleted?' <small style="color:#9b1c1c">(DISABLED)</small>':''}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${disableOrRestoreBtn} ${permDeleteBtn}</span></div>`;
+ }).join(''):'<div class="note">Koi record nahi mila.</div>';
+}
 
 function resetDefaultUsers(){
  users=[{"id":"Dummy","name":"Dummy","username":"Dummy","email":"","phone":"1234567890","department":"","active":true},{"id":"ND","name":"NiteshDusad","username":"ND","email":"","phone":"9351140507","department":"","active":true},{"id":"HD","name":"HiteshDUSAD","username":"HD","email":"","phone":"9414752137","department":"","active":true},{"id":"AnkurKhandelwal","name":"Ankur Khandelwal","username":"AnkurKhandelwal","email":"aankur.khandelwal@gmail.com","phone":"9314445552","department":"","active":true},{"id":"NiteshDusad","name":"Nitesh Dusad","username":"NiteshDusad","email":"niteshgems@gmail.com","phone":"9351140507","department":"","active":true},{"id":"RahulVyas","name":"Rahul Kumar Vays","username":"RahulVyas","email":"rahulkumarvyas82@gmail.com","phone":"9166594487","department":"Maintainance","active":true},{"id":"Vikash","name":"Vikash Prajapat","username":"Vikash","email":"vikashprajapatv6@gmail.com","phone":"9079328073","department":"Maintainance","active":true},{"id":"Anil","name":"Anil Saini","username":"Anil","email":"anilsainiamer@gmail.com","phone":"8955366574","department":"Maintainance","active":true},{"id":"Chunnu","name":"Chunnu Khandelwal","username":"Chunnu","email":"saranshkhandelwal914@gmail.com","phone":"7878266001","department":"Inventory","active":true},{"id":"Kamal","name":"Kamal Badaya","username":"Kamal","email":"Kamalbadaya1970@gmail.com","phone":"9829247330","department":"","active":true},{"id":"Sunil","name":"Sunil Shirmal","username":"Sunil","email":"bgmmanufacturing7@gmail.com","phone":"9251983720","department":"Manufacturing","active":true},{"id":"AmitYogi","name":"Amit Yogi","username":"AmitYogi","email":"amit777yogi@gmail.com","phone":"6350122991","department":"Accounts & Finance","active":true},{"id":"Jitendra","name":"Jitendra Sharma","username":"Jitendra","email":"js6503578@gmail.com","phone":"6350122991","department":"Accounts & Finance","active":true},{"id":"Ritika","name":"Ritika Gupta","username":"Ritika","email":"accountshead@teambgmjaipur.com","phone":"9251488653","department":"Accounts & Finance","active":true},{"id":"Akhilesh","name":"Akhilesh Sharma","username":"Akhilesh","email":"financehead@teambgmjaipur.com","phone":"9251488653","department":"Accounts & Finance","active":true},{"id":"MIDAP","name":"Test MIDAP","username":"MIDAP","email":"rahul@minervainfocom.com","phone":"7003169991","department":"","active":true},{"id":"Tarun","name":"Tarun Kushwah","username":"Tarun","email":"aartifcjt@gmail.com","phone":"7851944746","department":"","active":true},{"id":"Kadu","name":"Kadu Saini","username":"Kadu","email":"kadusaini4@gmail.com","phone":"8114479480","department":"Operations","active":true},{"id":"Vijay","name":"Vijay Saini","username":"Vijay","email":"vijaysaini5004@gmail.com","phone":"9251666853","department":"Operations","active":true},{"id":"Dharmendra","name":"Dharmendra Kumar","username":"Dharmendra","email":"dharmendrakumar464666@gmail.com","phone":"7518657751","department":"Operations","active":true},{"id":"Amit","name":"Amit Sharma","username":"Amit","email":"admin@teambgmjaipur.com","phone":"9829760504","department":"Admin","active":true},{"id":"Saaransh","name":"Saaransh Jain","username":"Saaransh","email":"salesbgm.sj@gmail.com","phone":"9251997977","department":"Sales","active":true},{"id":"Vansh","name":"Vansh Khandelwal","username":"Vansh","email":"khandelwalvansh321@gmail.com","phone":"9251554760","department":"Operations","active":true},{"id":"Himanshu","name":"Himanshu Saini","username":"Himanshu","email":"sales.hs@teambgmjaipur.com","phone":"9251554761","department":"Sales","active":true},{"id":"Satish","name":"Satish Gupta","username":"Satish","email":"bgmsales.sg@gmail.com","phone":"9251597492","department":"Sales","active":true},{"id":"Mukund","name":"Mukund Bhukhmaria","username":"Mukund","email":"sales.mb@teambgmjaipur.com","phone":"9251983728","department":"Sales","active":true},{"id":"TK","name":"Tarun Khandelwal","username":"TK","email":"sales.tk@teambgmjaipur.com","phone":"9251597493","department":"Sales","active":true},{"id":"Sneha","name":"Sneha Sahu","username":"Sneha","email":"inventoryhead@teambgmjaipur.com","phone":"9251488655","department":"","active":true},{"id":"Riddhi","name":"Riddhi Gupta","username":"Riddhi","email":"crm@teambgmjaipur.com","phone":"9251983730","department":"Admin","active":true},{"id":"Praveen","name":"Praveen Saini","username":"Praveen","email":"mis@teambgmjaipur.com","phone":"9251487220","department":"MIS","active":true}];
@@ -2663,11 +2698,11 @@ function renderReturnHistory(){
    return {name:u?u.name:pw.toUserId,field};
  };
  const returnAction=r=>r.deletedAt
-   ?`<button class="btn small secondary" onclick="restoreReturnRecord('${esc(r.returnId||'')}')">↩ Restore</button>`
-   :`<button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button>${loggedUser()?` <button class="btn small danger" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑</button>`:''}`;
+   ?(superAdminUnlocked?`<button class="btn small secondary" onclick="restoreReturnRecord('${esc(r.returnId||'')}')">↩ Restore</button>`:'')
+   :`<button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button>${superAdminUnlocked?` <button class="btn small danger" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑</button>`:''}`;
  const returnActionCard=r=>r.deletedAt
-   ?`<button class="btn secondary" style="margin-top:6px" onclick="restoreReturnRecord('${esc(r.returnId||'')}')">↩ Restore</button>`
-   :`<button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button>${loggedUser()?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑 Delete</button>`:''}`;
+   ?(superAdminUnlocked?`<button class="btn secondary" style="margin-top:6px" onclick="restoreReturnRecord('${esc(r.returnId||'')}')">↩ Restore</button>`:'')
+   :`<button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button>${superAdminUnlocked?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑 Delete</button>`:''}`;
  const returnLoadMoreRow=a.length>visible.length?`<tr><td colspan="8" style="text-align:center"><button class="btn secondary small" onclick="loadMoreReturnRecords()">Load More (${a.length-visible.length} more)</button></td></tr>`:'';
  const returnLoadMoreCard=a.length>visible.length?`<div class="note" style="text-align:center"><button class="btn secondary" onclick="loadMoreReturnRecords()">Load More (${a.length-visible.length} more)</button></div>`:'';
  body.innerHTML=(visible.length?visible.map(r=>{const pend=!!pendingMap[r.returnId];const pw=returnPendingWithInfo(r);const pwCell=pend&&pw&&pw.name?`<b>${esc(pw.name)}</b>${pw.field?`<br><small class="cellSub">${esc(pw.field)}</small>`:''}`:dash(pw&&pw.name);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(r))}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${pwCell}</td><td>${pend?pendingBadge(r):esc(returnFinalStatusLabel(r))}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td>${returnAction(r)}</td></tr>`}).join(''):'<tr><td colspan="8">No return records found.</td></tr>')+returnLoadMoreRow;
@@ -3365,12 +3400,13 @@ function unlockStageAsAdmin(){
   toast(stage.name+' unlocked by Admin');
 }
 async function deleteDispatchRecord(parcelId){
+  if(!superAdminUnlocked){alert('Sirf Super Admin record disable kar sakta hai.');return}
   const actor=loggedUser();
-  if(!actor){alert('Record delete karne ke liye pehle login karein.');return}
+  const actorName=actor?.name||'Super Admin',actorId=actor?.id||'';
   const rec=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===parcelId);
   if(!rec)return;
   if(!confirm('Ye record Deleted list me chala jayega (permanent delete nahi hoga, baad me restore kar sakte hain).\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.shipTo||'-')+'\n\nDelete karna hai?'))return;
-  const patch={deletedAt:new Date().toISOString(),deletedBy:actor.name};
+  const patch={deletedAt:new Date().toISOString(),deletedBy:actorName};
   try{ await pdDb.collection('pd_records_cloud').doc(parcelId).update(patch); }
   catch(e){ console.error('delete dispatch record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
   const all=JSON.parse(localStorage.getItem(K.records)||'[]');
@@ -3378,14 +3414,15 @@ async function deleteDispatchRecord(parcelId){
   if(i>=0)all[i]={...all[i],...patch};
   localStorage.setItem(K.records,JSON.stringify(all));
   const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
-  a.unshift({at:new Date().toISOString(),parcelId,userId:actor.id,userName:actor.name,fieldId:'',field:'Record',oldValue:slipLabel(rec),newValue:'',action:'DELETE',reason:''});
+  a.unshift({at:new Date().toISOString(),parcelId,userId:actorId,userName:actorName,fieldId:'',field:'Record',oldValue:slipLabel(rec),newValue:'',action:'DELETE',reason:''});
   localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
   renderHistory();
   toast('Record Deleted list me bhej diya: '+slipLabel(rec));
 }
 async function restoreDispatchRecord(parcelId){
+  if(!superAdminUnlocked){alert('Sirf Super Admin record restore kar sakta hai.');return}
   const actor=loggedUser();
-  if(!actor){alert('Restore karne ke liye pehle login karein.');return}
+  const actorName=actor?.name||'Super Admin',actorId=actor?.id||'';
   const rec=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===parcelId);
   if(!rec)return;
   try{ await pdDb.collection('pd_records_cloud').doc(parcelId).update({deletedAt:firebase.firestore.FieldValue.delete(),deletedBy:firebase.firestore.FieldValue.delete()}); }
@@ -3395,18 +3432,38 @@ async function restoreDispatchRecord(parcelId){
   if(i>=0){delete all[i].deletedAt;delete all[i].deletedBy;}
   localStorage.setItem(K.records,JSON.stringify(all));
   const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
-  a.unshift({at:new Date().toISOString(),parcelId,userId:actor.id,userName:actor.name,fieldId:'',field:'Record',oldValue:'',newValue:slipLabel(rec),action:'RESTORE',reason:''});
+  a.unshift({at:new Date().toISOString(),parcelId,userId:actorId,userName:actorName,fieldId:'',field:'Record',oldValue:'',newValue:slipLabel(rec),action:'RESTORE',reason:''});
   localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
   renderHistory();
   toast('Record restore ho gaya: '+slipLabel(rec));
 }
-async function deleteReturnRecord(returnId){
+async function permanentlyDeleteDispatchRecord(parcelId){
+  if(!superAdminUnlocked){alert('Sirf Super Admin record permanently delete kar sakta hai.');return}
   const actor=loggedUser();
-  if(!actor){alert('Record delete karne ke liye pehle login karein.');return}
+  const actorName=actor?.name||'Super Admin',actorId=actor?.id||'';
+  const rec=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===parcelId);
+  if(!rec)return;
+  const typed=prompt('Yeh record Firestore se HAMESHA KE LIYE delete ho jayega — wapas NAHI aayega.\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.shipTo||'-')+'\n\nConfirm karne ke liye "DELETE" type karein:');
+  if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  try{ await pdDb.collection('pd_records_cloud').doc(parcelId).delete(); }
+  catch(e){ console.error('permanent delete dispatch record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
+  const left=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>x.parcelId!==parcelId);
+  localStorage.setItem(K.records,JSON.stringify(left));
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
+  a.unshift({at:new Date().toISOString(),parcelId,userId:actorId,userName:actorName,fieldId:'',field:'Record',oldValue:slipLabel(rec),newValue:'',action:'PERMANENT_DELETE',reason:''});
+  localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
+  renderHistory();
+  if(typeof renderRecordsManageTab==='function')renderRecordsManageTab();
+  toast('Record permanently delete ho gaya: '+slipLabel(rec));
+}
+async function deleteReturnRecord(returnId){
+  if(!superAdminUnlocked){alert('Sirf Super Admin record disable kar sakta hai.');return}
+  const actor=loggedUser();
+  const actorName=actor?.name||'Super Admin',actorId=actor?.id||'';
   const rec=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').find(x=>x.returnId===returnId);
   if(!rec)return;
   if(!confirm('Ye return record Deleted list me chala jayega (permanent delete nahi hoga, baad me restore kar sakte hain).\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.returnFrom||'-')+'\n\nDelete karna hai?'))return;
-  const patch={deletedAt:new Date().toISOString(),deletedBy:actor.name};
+  const patch={deletedAt:new Date().toISOString(),deletedBy:actorName};
   try{ await pdDb.collection('pd_returns_cloud').doc(returnId).update(patch); }
   catch(e){ console.error('delete return record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
   const all=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]');
@@ -3414,14 +3471,15 @@ async function deleteReturnRecord(returnId){
   if(i>=0)all[i]={...all[i],...patch};
   localStorage.setItem(RETURN_RECORDS_KEY,JSON.stringify(all));
   const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
-  a.unshift({at:new Date().toISOString(),parcelId:returnId,userId:actor.id,userName:actor.name,fieldId:'',field:'Return Record',oldValue:slipLabel(rec),newValue:'',action:'DELETE',reason:''});
+  a.unshift({at:new Date().toISOString(),parcelId:returnId,userId:actorId,userName:actorName,fieldId:'',field:'Return Record',oldValue:slipLabel(rec),newValue:'',action:'DELETE',reason:''});
   localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
   renderReturnHistory();
   toast('Return record Deleted list me bhej diya: '+slipLabel(rec));
 }
 async function restoreReturnRecord(returnId){
+  if(!superAdminUnlocked){alert('Sirf Super Admin record restore kar sakta hai.');return}
   const actor=loggedUser();
-  if(!actor){alert('Restore karne ke liye pehle login karein.');return}
+  const actorName=actor?.name||'Super Admin',actorId=actor?.id||'';
   const rec=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').find(x=>x.returnId===returnId);
   if(!rec)return;
   try{ await pdDb.collection('pd_returns_cloud').doc(returnId).update({deletedAt:firebase.firestore.FieldValue.delete(),deletedBy:firebase.firestore.FieldValue.delete()}); }
@@ -3431,10 +3489,29 @@ async function restoreReturnRecord(returnId){
   if(i>=0){delete all[i].deletedAt;delete all[i].deletedBy;}
   localStorage.setItem(RETURN_RECORDS_KEY,JSON.stringify(all));
   const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
-  a.unshift({at:new Date().toISOString(),parcelId:returnId,userId:actor.id,userName:actor.name,fieldId:'',field:'Return Record',oldValue:'',newValue:slipLabel(rec),action:'RESTORE',reason:''});
+  a.unshift({at:new Date().toISOString(),parcelId:returnId,userId:actorId,userName:actorName,fieldId:'',field:'Return Record',oldValue:'',newValue:slipLabel(rec),action:'RESTORE',reason:''});
   localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
   renderReturnHistory();
   toast('Return record restore ho gaya: '+slipLabel(rec));
+}
+async function permanentlyDeleteReturnRecord(returnId){
+  if(!superAdminUnlocked){alert('Sirf Super Admin record permanently delete kar sakta hai.');return}
+  const actor=loggedUser();
+  const actorName=actor?.name||'Super Admin',actorId=actor?.id||'';
+  const rec=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').find(x=>x.returnId===returnId);
+  if(!rec)return;
+  const typed=prompt('Yeh return record Firestore se HAMESHA KE LIYE delete ho jayega — wapas NAHI aayega.\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.returnFrom||'-')+'\n\nConfirm karne ke liye "DELETE" type karein:');
+  if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  try{ await pdDb.collection('pd_returns_cloud').doc(returnId).delete(); }
+  catch(e){ console.error('permanent delete return record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
+  const left=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').filter(x=>x.returnId!==returnId);
+  localStorage.setItem(RETURN_RECORDS_KEY,JSON.stringify(left));
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]');
+  a.unshift({at:new Date().toISOString(),parcelId:returnId,userId:actorId,userName:actorName,fieldId:'',field:'Return Record',oldValue:slipLabel(rec),newValue:'',action:'PERMANENT_DELETE',reason:''});
+  localStorage.setItem(FIELD_AUDIT_KEY,JSON.stringify(a.slice(0,5000)));
+  renderReturnHistory();
+  if(typeof renderRecordsManageTab==='function')renderRecordsManageTab();
+  toast('Return record permanently delete ho gaya: '+slipLabel(rec));
 }
 function openAuditTrail(){
   $('auditModal').classList.remove('hidden');
