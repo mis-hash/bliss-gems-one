@@ -1943,6 +1943,7 @@ else if(currentTab==='records'){
  <div class="row" style="margin:0 0 8px;gap:8px;flex-wrap:wrap;align-items:center">
    <label style="display:flex;align-items:center;gap:4px;white-space:nowrap"><input type="checkbox" id="mRecordsSelectAll" onchange="toggleSelectAllRecords(this.checked)" style="width:auto"> Select All</label>
    <button class="btn small secondary" onclick="bulkDisableRecords()">Disable Selected</button>
+   <button class="btn small secondary" onclick="bulkRestoreRecords()">↩ Restore Selected</button>
    <button class="btn small danger" onclick="bulkPermanentlyDeleteRecords()">🗑 Delete Permanently Selected</button>
  </div>
  <div id="mRecordsList"></div>`;
@@ -1967,6 +1968,18 @@ async function bulkDisableRecords(){
  }
  renderRecordsManageTab();
  toast(sel.length+' record(s) disable ho gaye');
+}
+async function bulkRestoreRecords(){
+ if(!superAdminUnlocked){alert('Sirf Super Admin record restore kar sakta hai.');return}
+ const sel=selectedRecordRefs().filter(x=>x.deleted);
+ if(!sel.length){alert('Koi disabled record select nahi kiya.');return}
+ if(!confirm(sel.length+' record(s) ko Restore karna hai?'))return;
+ for(const r of sel){
+   if(r.type==='DISPATCH')await restoreDispatchRecord(r.id);
+   else await restoreReturnRecord(r.id);
+ }
+ renderRecordsManageTab();
+ toast(sel.length+' record(s) restore ho gaye');
 }
 async function bulkPermanentlyDeleteRecords(){
  if(!superAdminUnlocked){alert('Sirf Super Admin record permanently delete kar sakta hai.');return}

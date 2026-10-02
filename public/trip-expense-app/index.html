@@ -1424,6 +1424,7 @@ function renderManageRecordsPage(){
   const bulkBar=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
     <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="mrSelectAll" onchange="toggleSelectAllTrips(this.checked)" style="width:auto"> Select All</label>
     <button class="btn danger" onclick="bulkDisableTrips()">Disable Selected</button>
+    <button class="btn" onclick="bulkRestoreTrips()">↩ Restore Selected</button>
     <button class="btn danger" onclick="bulkPermanentlyDeleteTrips()">🗑 Delete Permanently Selected</button>
   </div>`;
   wrap.innerHTML=bulkBar+`<div style="overflow-x:auto"><table class="dtb"><thead><tr><th></th><th>Trip</th><th>Sales Person</th><th>Location</th><th>Status</th><th>Action</th></tr></thead><tbody>`+
@@ -1449,6 +1450,15 @@ async function bulkDisableTrips(){
   for(const r of sel)await deleteTrip(r.id,true);
   renderManageRecordsPage();
   toast(sel.length+' trip(s) disable ho gayi');
+}
+async function bulkRestoreTrips(){
+  if(!canDeleteTrips()){alert('Sirf Admin/Director trips restore kar sakte hain.');return}
+  const sel=selectedTripIds().filter(x=>x.deleted);
+  if(!sel.length){alert('Koi disabled trip select nahi ki.');return}
+  if(!confirm(sel.length+' trip(s) ko Restore karna hai?'))return;
+  for(const r of sel)await restoreTrip(r.id);
+  renderManageRecordsPage();
+  toast(sel.length+' trip(s) restore ho gayi');
 }
 async function bulkPermanentlyDeleteTrips(){
   if(!superAdminUnlocked){alert('Sirf Super Admin trips permanently delete kar sakta hai.');return}
