@@ -1372,10 +1372,10 @@ function renderExplorerPage(){
     return `<tr onclick="openTripDetail('${esc(t.id)}')"><td>${esc(t.id)}</td><td>${esc(t.salesName)}</td><td>${esc(t.location)}</td><td>${esc(t.purpose||'-')}</td><td>${money(issued)}</td><td>${money(expense)}</td><td>${money(balance)}</td><td>${esc(statusLabel)}</td>${canDelete?`<td>${action}</td>`:''}</tr>`;
   }).join('')+`</tbody></table></div>`;
 }
-async function deleteTrip(tripId){
+async function deleteTrip(tripId,skipConfirm){
   if(!canDeleteTrips()){alert('Sirf Admin/Director trip delete kar sakte hain.');return}
   const t=trips.find(x=>x.id===tripId);if(!t)return;
-  if(!confirm('Ye trip Deleted list me chala jayega (permanent delete nahi hoga).\n\nTrip: '+t.id+'\nSales Person: '+(t.salesName||'-')+'\n\nDelete karna hai?'))return;
+  if(!skipConfirm&&!confirm('Ye trip Deleted list me chala jayega (permanent delete nahi hoga).\n\nTrip: '+t.id+'\nSales Person: '+(t.salesName||'-')+'\n\nDelete karna hai?'))return;
   const actor=myUserObj();
   try{ await db.collection('te_trips').doc(tripId).update({deletedAt:new Date().toISOString(),deletedBy:actor?actor.name:'Unknown'}); }
   catch(e){ console.error('delete trip failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
@@ -1398,11 +1398,13 @@ async function deleteAllVisibleTrips(){
   const failed=results.filter(r=>r.status==='rejected').length;
   toast(failed?`${list.length-failed} trip(s) delete hui, ${failed} fail ho gayi.`:`${list.length} trip(s) Deleted list me bhej di gayin.`);
 }
-async function permanentlyDeleteTrip(tripId){
+async function permanentlyDeleteTrip(tripId,skipConfirm){
   if(!superAdminUnlocked){alert('Sirf Super Admin trip permanently delete kar sakta hai.');return}
   const t=allTripsRaw.find(x=>x.id===tripId);if(!t)return;
-  const typed=prompt('Yeh trip Firestore se HAMESHA KE LIYE delete ho jayegi — wapas NAHI aayegi.\n\nTrip: '+t.id+'\nSales Person: '+(t.salesName||'-')+'\n\nConfirm karne ke liye "DELETE" type karein:');
-  if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  if(!skipConfirm){
+    const typed=prompt('Yeh trip Firestore se HAMESHA KE LIYE delete ho jayegi — wapas NAHI aayegi.\n\nTrip: '+t.id+'\nSales Person: '+(t.salesName||'-')+'\n\nConfirm karne ke liye "DELETE" type karein:');
+    if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  }
   try{ await db.collection('te_trips').doc(tripId).delete(); }
   catch(e){ console.error('permanent delete trip failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
   toast('Trip permanently delete ho gayi: '+tripId);
@@ -1419,14 +1421,44 @@ function renderManageRecordsPage(){
   list=list.filter(t=>`${t.id} ${t.salesName||''} ${t.location||''}`.toLowerCase().includes(q));
   list.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   if(!list.length){wrap.innerHTML='<small>Koi trip nahi mili.</small>';return}
-  wrap.innerHTML=`<div style="overflow-x:auto"><table class="dtb"><thead><tr><th>Trip</th><th>Sales Person</th><th>Location</th><th>Status</th><th>Action</th></tr></thead><tbody>`+
+  const bulkBar=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+    <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="mrSelectAll" onchange="toggleSelectAllTrips(this.checked)" style="width:auto"> Select All</label>
+    <button class="btn danger" onclick="bulkDisableTrips()">Disable Selected</button>
+    <button class="btn danger" onclick="bulkPermanentlyDeleteTrips()">🗑 Delete Permanently Selected</button>
+  </div>`;
+  wrap.innerHTML=bulkBar+`<div style="overflow-x:auto"><table class="dtb"><thead><tr><th></th><th>Trip</th><th>Sales Person</th><th>Location</th><th>Status</th><th>Action</th></tr></thead><tbody>`+
   list.map(t=>{
     const deleted=!!t.deletedAt;
     const toggleBtn=deleted
       ?`<button class="btn" onclick="restoreTrip('${esc(t.id)}')">↩ Restore</button>`
       :`<button class="btn danger" onclick="deleteTrip('${esc(t.id)}')">Disable</button>`;
-    return `<tr><td>${esc(t.id)}</td><td>${esc(t.salesName||'-')}</td><td>${esc(t.location||'-')}</td><td>${deleted?'DISABLED':esc(t.status||'-')}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${toggleBtn} <button class="btn danger" onclick="permanentlyDeleteTrip('${esc(t.id)}')">🗑 Delete Permanently</button></td></tr>`;
+    return `<tr><td><input type="checkbox" class="mrChk" data-id="${esc(t.id)}" data-deleted="${deleted?'1':'0'}" style="width:auto"></td><td>${esc(t.id)}</td><td>${esc(t.salesName||'-')}</td><td>${esc(t.location||'-')}</td><td>${deleted?'DISABLED':esc(t.status||'-')}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${toggleBtn} <button class="btn danger" onclick="permanentlyDeleteTrip('${esc(t.id)}')">🗑 Delete Permanently</button></td></tr>`;
   }).join('')+`</tbody></table></div>`;
+}
+function toggleSelectAllTrips(checked){
+  document.querySelectorAll('#mrTripsList .mrChk').forEach(cb=>cb.checked=checked);
+}
+function selectedTripIds(){
+  return [...document.querySelectorAll('#mrTripsList .mrChk:checked')].map(cb=>({id:cb.dataset.id,deleted:cb.dataset.deleted==='1'}));
+}
+async function bulkDisableTrips(){
+  if(!canDeleteTrips()){alert('Sirf Admin/Director trips disable kar sakte hain.');return}
+  const sel=selectedTripIds().filter(x=>!x.deleted);
+  if(!sel.length){alert('Koi trip select nahi ki (ya sab pehle se disabled hain).');return}
+  if(!confirm(sel.length+' trip(s) ko Disable karna hai? (Deleted list me chali jaayengi, Restore ho sakta hai)'))return;
+  for(const r of sel)await deleteTrip(r.id,true);
+  renderManageRecordsPage();
+  toast(sel.length+' trip(s) disable ho gayi');
+}
+async function bulkPermanentlyDeleteTrips(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin trips permanently delete kar sakta hai.');return}
+  const sel=selectedTripIds();
+  if(!sel.length){alert('Koi trip select nahi ki.');return}
+  const typed=prompt(sel.length+' trip(s) Firestore se HAMESHA KE LIYE delete ho jaayengi — wapas NAHI aayengi.\n\nConfirm karne ke liye "DELETE" type karein:');
+  if(typed!=='DELETE'){toast('Bulk permanent delete cancel ho gaya');return}
+  for(const r of sel)await permanentlyDeleteTrip(r.id,true);
+  renderManageRecordsPage();
+  toast(sel.length+' trip(s) permanently delete ho gayi');
 }
 
 /* ===== Activity Log ===== */

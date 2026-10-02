@@ -669,10 +669,10 @@ async function addStockOut(){
 // effect on the item's current stock count so a mistaken entry doesn't leave stock wrong
 // even after it's hidden from the log; restoring re-applies that same effect.
 function canDeleteStockEntries(){return isAdminRole()}
-async function deleteStockIn(id){
+async function deleteStockIn(id,skipConfirm){
   if(!canDeleteStockEntries()){alert('Sirf Admin/Director stock entries delete kar sakte hain.');return}
   const x=inLog.find(e=>e.id===id);if(!x)return;
-  if(!confirm('Ye Stock In entry Deleted list me chali jayegi (permanent delete nahi hoga) aur item ka current stock '+x.qty+' se kam kar diya jayega.\n\nConfirm karein?'))return;
+  if(!skipConfirm&&!confirm('Ye Stock In entry Deleted list me chali jayegi (permanent delete nahi hoga) aur item ka current stock '+x.qty+' se kam kar diya jayega.\n\nConfirm karein?'))return;
   const actor=loggedUser();
   await db.collection('si_stock_in').doc(id).update({deletedAt:new Date().toISOString(),deletedBy:actor?actor.id:'Unknown'});
   await db.collection('si_items').doc(x.item).update({stock:firebase.firestore.FieldValue.increment(-x.qty)});
@@ -685,10 +685,10 @@ async function restoreStockIn(id){
   await db.collection('si_items').doc(x.item).update({stock:firebase.firestore.FieldValue.increment(x.qty)});
   toast('Stock In entry restored');
 }
-async function deleteStockOut(id){
+async function deleteStockOut(id,skipConfirm){
   if(!canDeleteStockEntries()){alert('Sirf Admin/Director stock entries delete kar sakte hain.');return}
   const x=outLog.find(e=>e.id===id);if(!x)return;
-  if(!confirm('Ye Stock Out entry Deleted list me chali jayegi (permanent delete nahi hoga) aur item ka current stock '+x.qty+' se wapas badha diya jayega.\n\nConfirm karein?'))return;
+  if(!skipConfirm&&!confirm('Ye Stock Out entry Deleted list me chali jayegi (permanent delete nahi hoga) aur item ka current stock '+x.qty+' se wapas badha diya jayega.\n\nConfirm karein?'))return;
   const actor=loggedUser();
   await db.collection('si_stock_out').doc(id).update({deletedAt:new Date().toISOString(),deletedBy:actor?actor.id:'Unknown'});
   await db.collection('si_items').doc(x.item).update({stock:firebase.firestore.FieldValue.increment(x.qty)});
@@ -705,22 +705,26 @@ async function restoreStockOut(id){
 // its stock effect is still live and must be reversed now, same direction as deleteStockIn/Out
 // above - but if it was already disabled (deletedAt set), that reversal already happened once,
 // so doing it again here would double-adjust the item's current stock count.
-async function permanentlyDeleteStockIn(id){
+async function permanentlyDeleteStockIn(id,skipConfirm){
   if(!superAdminUnlocked){alert('Sirf Super Admin stock entry permanently delete kar sakta hai.');return}
   const x=inLog.find(e=>e.id===id);if(!x)return;
-  const typed=prompt('Yeh Stock In entry Firestore se HAMESHA KE LIYE delete ho jayegi — wapas NAHI aayegi.\n\nItem: '+itemName(x.item)+'\nQty: '+x.qty+'\n\nConfirm karne ke liye "DELETE" type karein:');
-  if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  if(!skipConfirm){
+    const typed=prompt('Yeh Stock In entry Firestore se HAMESHA KE LIYE delete ho jayegi — wapas NAHI aayegi.\n\nItem: '+itemName(x.item)+'\nQty: '+x.qty+'\n\nConfirm karne ke liye "DELETE" type karein:');
+    if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  }
   try{
     await db.collection('si_stock_in').doc(id).delete();
     if(!x.deletedAt)await db.collection('si_items').doc(x.item).update({stock:firebase.firestore.FieldValue.increment(-x.qty)});
   }catch(e){ console.error('permanent delete stock-in failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
   toast('Stock In entry permanently delete ho gayi');
 }
-async function permanentlyDeleteStockOut(id){
+async function permanentlyDeleteStockOut(id,skipConfirm){
   if(!superAdminUnlocked){alert('Sirf Super Admin stock entry permanently delete kar sakta hai.');return}
   const x=outLog.find(e=>e.id===id);if(!x)return;
-  const typed=prompt('Yeh Stock Out entry Firestore se HAMESHA KE LIYE delete ho jayegi — wapas NAHI aayegi.\n\nItem: '+itemName(x.item)+'\nQty: '+x.qty+'\n\nConfirm karne ke liye "DELETE" type karein:');
-  if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  if(!skipConfirm){
+    const typed=prompt('Yeh Stock Out entry Firestore se HAMESHA KE LIYE delete ho jayegi — wapas NAHI aayegi.\n\nItem: '+itemName(x.item)+'\nQty: '+x.qty+'\n\nConfirm karne ke liye "DELETE" type karein:');
+    if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  }
   try{
     await db.collection('si_stock_out').doc(id).delete();
     if(!x.deletedAt)await db.collection('si_items').doc(x.item).update({stock:firebase.firestore.FieldValue.increment(x.qty)});
@@ -802,6 +806,11 @@ function renderManage(){
       <input id="mRecordsSearch" placeholder="Search Item / Vendor" oninput="renderRecordsManageTab()" style="flex:1;min-width:160px">
       <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="mRecordsShowDisabled" onchange="renderRecordsManageTab()" style="width:auto"> Show Disabled</label>
     </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="mRecordsSelectAll" onchange="toggleSelectAllRecords(this.checked)" style="width:auto"> Select All</label>
+      <button class="btn small" onclick="bulkDisableRecords()">Disable Selected</button>
+      <button class="btn small danger" onclick="bulkPermanentlyDeleteRecords()">🗑 Delete Permanently Selected</button>
+    </div>
     <div id="mRecordsList"></div>`;
     renderRecordsManageTab();
   }
@@ -826,8 +835,40 @@ function renderRecordsManageTab(){
       ?`<button class="btn small" onclick="(async()=>{await ${x.kind==='in'?'restoreStockIn':'restoreStockOut'}('${esc(x.id)}');renderRecordsManageTab()})()">↩ Restore</button>`
       :`<button class="btn small" onclick="(async()=>{await ${x.kind==='in'?'deleteStockIn':'deleteStockOut'}('${esc(x.id)}');renderRecordsManageTab()})()">Disable</button>`;
     const permBtn=`<button class="btn small danger" onclick="${x.kind==='in'?'permanentlyDeleteStockIn':'permanentlyDeleteStockOut'}('${esc(x.id)}')">🗑 Delete Permanently</button>`;
-    return `<div class="item"><span><b>${x.kind==='in'?'IN':'OUT'}</b> — ${esc(x.label)} <small>Qty ${x.qty} • ${esc(x.date)} • ${esc(x.sub)}</small>${x.deleted?' <small style="color:#9b1c1c">(DISABLED)</small>':''}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${toggleBtn} ${permBtn}</span></div>`;
+    const chk=`<input type="checkbox" class="recChk" data-kind="${x.kind}" data-id="${esc(x.id)}" data-deleted="${x.deleted?'1':'0'}" style="width:auto;margin-right:8px">`;
+    return `<div class="item"><span>${chk}<b>${x.kind==='in'?'IN':'OUT'}</b> — ${esc(x.label)} <small>Qty ${x.qty} • ${esc(x.date)} • ${esc(x.sub)}</small>${x.deleted?' <small style="color:#9b1c1c">(DISABLED)</small>':''}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${toggleBtn} ${permBtn}</span></div>`;
   }).join(''):'<div class="note">Koi record nahi mila.</div>';
+}
+function toggleSelectAllRecords(checked){
+  document.querySelectorAll('#mRecordsList .recChk').forEach(cb=>cb.checked=checked);
+}
+function selectedStockRefs(){
+  return [...document.querySelectorAll('#mRecordsList .recChk:checked')].map(cb=>({kind:cb.dataset.kind,id:cb.dataset.id,deleted:cb.dataset.deleted==='1'}));
+}
+async function bulkDisableRecords(){
+  if(!canDeleteStockEntries()){alert('Sirf Admin/Director stock entries disable kar sakte hain.');return}
+  const sel=selectedStockRefs().filter(x=>!x.deleted);
+  if(!sel.length){alert('Koi entry select nahi ki (ya sab pehle se disabled hain).');return}
+  if(!confirm(sel.length+' entry/entries ko Disable karna hai? (Stock reverse hoga, Restore ho sakta hai)'))return;
+  for(const r of sel){
+    if(r.kind==='in')await deleteStockIn(r.id,true);
+    else await deleteStockOut(r.id,true);
+  }
+  renderRecordsManageTab();
+  toast(sel.length+' entry/entries disable ho gayi');
+}
+async function bulkPermanentlyDeleteRecords(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entries permanently delete kar sakta hai.');return}
+  const sel=selectedStockRefs();
+  if(!sel.length){alert('Koi entry select nahi ki.');return}
+  const typed=prompt(sel.length+' entry/entries Firestore se HAMESHA KE LIYE delete ho jaayengi — wapas NAHI aayengi.\n\nConfirm karne ke liye "DELETE" type karein:');
+  if(typed!=='DELETE'){toast('Bulk permanent delete cancel ho gaya');return}
+  for(const r of sel){
+    if(r.kind==='in')await permanentlyDeleteStockIn(r.id,true);
+    else await permanentlyDeleteStockOut(r.id,true);
+  }
+  renderRecordsManageTab();
+  toast(sel.length+' entry/entries permanently delete ho gayi');
 }
 function toggleLowStockRecipient(userId){
   if(!masters.lowStockRecipients)masters.lowStockRecipients=[];
