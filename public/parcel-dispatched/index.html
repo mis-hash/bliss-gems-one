@@ -1940,10 +1940,47 @@ else if(currentTab==='records'){
    <input id="mRecordsSearch" placeholder="Search ID / Party / Date" oninput="renderRecordsManageTab()" style="flex:1;min-width:160px">
    <label style="display:flex;align-items:center;gap:4px;white-space:nowrap"><input type="checkbox" id="mRecordsShowDisabled" onchange="renderRecordsManageTab()" style="width:auto"> Show Disabled</label>
  </div>
+ <div class="row" style="margin:0 0 8px;gap:8px;flex-wrap:wrap;align-items:center">
+   <label style="display:flex;align-items:center;gap:4px;white-space:nowrap"><input type="checkbox" id="mRecordsSelectAll" onchange="toggleSelectAllRecords(this.checked)" style="width:auto"> Select All</label>
+   <button class="btn small secondary" onclick="bulkDisableRecords()">Disable Selected</button>
+   <button class="btn small danger" onclick="bulkPermanentlyDeleteRecords()">🗑 Delete Permanently Selected</button>
+ </div>
  <div id="mRecordsList"></div>`;
  renderRecordsManageTab();
 }
 else{c.innerHTML=`<div class="grid"><div class="field span2"><label>GREEN-API Base URL <span class="req">*</span></label><input id="mBase" value="${esc(api.baseUrl||'https://api.green-api.com')}"></div><div class="field"><label>ID Instance <span class="req">*</span></label><input id="mId" value="${esc(api.idInstance||'')}"></div><div class="field"><label>API Token Instance <span class="req">*</span></label><input type="password" id="mToken" value="${esc(api.apiToken||'')}"></div><div class="field full"><button class="btn primary" onclick="saveApi()">Save GREEN-API Settings</button></div></div><div class="note">Simple single-file mode में credentials इस browser के localStorage में save होंगे. Production/public hosting में token server-side रखना ज्यादा सुरक्षित है.</div>`}}
+
+function toggleSelectAllRecords(checked){
+ document.querySelectorAll('#mRecordsList .recChk').forEach(cb=>cb.checked=checked);
+}
+function selectedRecordRefs(){
+ return [...document.querySelectorAll('#mRecordsList .recChk:checked')].map(cb=>({type:cb.dataset.type,id:cb.dataset.id,deleted:cb.dataset.deleted==='1'}));
+}
+async function bulkDisableRecords(){
+ if(!superAdminUnlocked){alert('Sirf Super Admin record disable kar sakta hai.');return}
+ const sel=selectedRecordRefs().filter(x=>!x.deleted);
+ if(!sel.length){alert('Koi record select nahi kiya (ya sab pehle se disabled hain).');return}
+ if(!confirm(sel.length+' record(s) ko Disable karna hai? (Deleted list me chale jaayenge, Restore ho sakta hai)'))return;
+ for(const r of sel){
+   if(r.type==='DISPATCH')await deleteDispatchRecord(r.id,true);
+   else await deleteReturnRecord(r.id,true);
+ }
+ renderRecordsManageTab();
+ toast(sel.length+' record(s) disable ho gaye');
+}
+async function bulkPermanentlyDeleteRecords(){
+ if(!superAdminUnlocked){alert('Sirf Super Admin record permanently delete kar sakta hai.');return}
+ const sel=selectedRecordRefs();
+ if(!sel.length){alert('Koi record select nahi kiya.');return}
+ const typed=prompt(sel.length+' record(s) Firestore se HAMESHA KE LIYE delete ho jaayenge — wapas NAHI aayenge.\n\nConfirm karne ke liye "DELETE" type karein:');
+ if(typed!=='DELETE'){toast('Bulk permanent delete cancel ho gaya');return}
+ for(const r of sel){
+   if(r.type==='DISPATCH')await permanentlyDeleteDispatchRecord(r.id,true);
+   else await permanentlyDeleteReturnRecord(r.id,true);
+ }
+ renderRecordsManageTab();
+ toast(sel.length+' record(s) permanently delete ho gaye');
+}
 
 function renderRecordsManageTab(){
  const list=$('mRecordsList');
@@ -1965,7 +2002,8 @@ function renderRecordsManageTab(){
      ?`<button class="btn small secondary" onclick="(async()=>{await ${x.type==='DISPATCH'?'restoreDispatchRecord':'restoreReturnRecord'}('${esc(x.id||'')}');renderRecordsManageTab()})()">↩ Restore</button>`
      :`<button class="btn small secondary" onclick="(async()=>{await ${x.type==='DISPATCH'?'deleteDispatchRecord':'deleteReturnRecord'}('${esc(x.id||'')}');renderRecordsManageTab()})()">Disable</button>`;
    const permDeleteBtn=`<button class="btn small danger" onclick="${x.type==='DISPATCH'?'permanentlyDeleteDispatchRecord':'permanentlyDeleteReturnRecord'}('${esc(x.id||'')}')">🗑 Delete Permanently</button>`;
-   return `<div class="item"><span><b>${x.type}</b> — ${esc(x.label||'')} <small>${esc(x.date||'')} • ${esc(x.party||'')}</small>${x.deleted?' <small style="color:#9b1c1c">(DISABLED)</small>':''}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${disableOrRestoreBtn} ${permDeleteBtn}</span></div>`;
+   const chk=`<input type="checkbox" class="recChk" data-type="${x.type}" data-id="${esc(x.id||'')}" data-deleted="${x.deleted?'1':'0'}" style="width:auto;margin-right:8px">`;
+   return `<div class="item"><span>${chk}<b>${x.type}</b> — ${esc(x.label||'')} <small>${esc(x.date||'')} • ${esc(x.party||'')}</small>${x.deleted?' <small style="color:#9b1c1c">(DISABLED)</small>':''}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${disableOrRestoreBtn} ${permDeleteBtn}</span></div>`;
  }).join(''):'<div class="note">Koi record nahi mila.</div>';
 }
 
@@ -3399,13 +3437,13 @@ function unlockStageAsAdmin(){
   applySequenceAndLocks();
   toast(stage.name+' unlocked by Admin');
 }
-async function deleteDispatchRecord(parcelId){
+async function deleteDispatchRecord(parcelId,skipConfirm){
   if(!superAdminUnlocked){alert('Sirf Super Admin record disable kar sakta hai.');return}
   const actor=loggedUser();
   const actorName=actor?.name||'Super Admin',actorId=actor?.id||'';
   const rec=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===parcelId);
   if(!rec)return;
-  if(!confirm('Ye record Deleted list me chala jayega (permanent delete nahi hoga, baad me restore kar sakte hain).\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.shipTo||'-')+'\n\nDelete karna hai?'))return;
+  if(!skipConfirm&&!confirm('Ye record Deleted list me chala jayega (permanent delete nahi hoga, baad me restore kar sakte hain).\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.shipTo||'-')+'\n\nDelete karna hai?'))return;
   const patch={deletedAt:new Date().toISOString(),deletedBy:actorName};
   try{ await pdDb.collection('pd_records_cloud').doc(parcelId).update(patch); }
   catch(e){ console.error('delete dispatch record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
@@ -3437,14 +3475,16 @@ async function restoreDispatchRecord(parcelId){
   renderHistory();
   toast('Record restore ho gaya: '+slipLabel(rec));
 }
-async function permanentlyDeleteDispatchRecord(parcelId){
+async function permanentlyDeleteDispatchRecord(parcelId,skipConfirm){
   if(!superAdminUnlocked){alert('Sirf Super Admin record permanently delete kar sakta hai.');return}
   const actor=loggedUser();
   const actorName=actor?.name||'Super Admin',actorId=actor?.id||'';
   const rec=JSON.parse(localStorage.getItem(K.records)||'[]').find(x=>x.parcelId===parcelId);
   if(!rec)return;
-  const typed=prompt('Yeh record Firestore se HAMESHA KE LIYE delete ho jayega — wapas NAHI aayega.\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.shipTo||'-')+'\n\nConfirm karne ke liye "DELETE" type karein:');
-  if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  if(!skipConfirm){
+    const typed=prompt('Yeh record Firestore se HAMESHA KE LIYE delete ho jayega — wapas NAHI aayega.\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.shipTo||'-')+'\n\nConfirm karne ke liye "DELETE" type karein:');
+    if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  }
   try{ await pdDb.collection('pd_records_cloud').doc(parcelId).delete(); }
   catch(e){ console.error('permanent delete dispatch record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
   const left=JSON.parse(localStorage.getItem(K.records)||'[]').filter(x=>x.parcelId!==parcelId);
@@ -3456,13 +3496,13 @@ async function permanentlyDeleteDispatchRecord(parcelId){
   if(typeof renderRecordsManageTab==='function')renderRecordsManageTab();
   toast('Record permanently delete ho gaya: '+slipLabel(rec));
 }
-async function deleteReturnRecord(returnId){
+async function deleteReturnRecord(returnId,skipConfirm){
   if(!superAdminUnlocked){alert('Sirf Super Admin record disable kar sakta hai.');return}
   const actor=loggedUser();
   const actorName=actor?.name||'Super Admin',actorId=actor?.id||'';
   const rec=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').find(x=>x.returnId===returnId);
   if(!rec)return;
-  if(!confirm('Ye return record Deleted list me chala jayega (permanent delete nahi hoga, baad me restore kar sakte hain).\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.returnFrom||'-')+'\n\nDelete karna hai?'))return;
+  if(!skipConfirm&&!confirm('Ye return record Deleted list me chala jayega (permanent delete nahi hoga, baad me restore kar sakte hain).\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.returnFrom||'-')+'\n\nDelete karna hai?'))return;
   const patch={deletedAt:new Date().toISOString(),deletedBy:actorName};
   try{ await pdDb.collection('pd_returns_cloud').doc(returnId).update(patch); }
   catch(e){ console.error('delete return record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
@@ -3494,14 +3534,16 @@ async function restoreReturnRecord(returnId){
   renderReturnHistory();
   toast('Return record restore ho gaya: '+slipLabel(rec));
 }
-async function permanentlyDeleteReturnRecord(returnId){
+async function permanentlyDeleteReturnRecord(returnId,skipConfirm){
   if(!superAdminUnlocked){alert('Sirf Super Admin record permanently delete kar sakta hai.');return}
   const actor=loggedUser();
   const actorName=actor?.name||'Super Admin',actorId=actor?.id||'';
   const rec=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').find(x=>x.returnId===returnId);
   if(!rec)return;
-  const typed=prompt('Yeh return record Firestore se HAMESHA KE LIYE delete ho jayega — wapas NAHI aayega.\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.returnFrom||'-')+'\n\nConfirm karne ke liye "DELETE" type karein:');
-  if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  if(!skipConfirm){
+    const typed=prompt('Yeh return record Firestore se HAMESHA KE LIYE delete ho jayega — wapas NAHI aayega.\n\nSlip No: '+slipLabel(rec)+'\nParty: '+(rec.returnFrom||'-')+'\n\nConfirm karne ke liye "DELETE" type karein:');
+    if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  }
   try{ await pdDb.collection('pd_returns_cloud').doc(returnId).delete(); }
   catch(e){ console.error('permanent delete return record failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
   const left=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]').filter(x=>x.returnId!==returnId);
