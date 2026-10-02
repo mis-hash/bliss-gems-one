@@ -112,6 +112,7 @@ if(window.self!==window.top){
 <button data-page="director" data-role="director" onclick="go('director',this)">★ Directors</button>
 <button data-page="notify" data-role="director" data-superadmin="1" onclick="go('notify',this)">💬 Notifications</button>
 <button data-page="templates" data-role="director" data-superadmin="1" onclick="go('templates',this)">📝 Message Templates</button>
+<button data-page="manageRecords" data-role="director" data-superadmin="1" onclick="go('manageRecords',this)">🗑 Manage Records</button>
 <button data-page="teamroles" data-role-or-superadmin="admin" onclick="go('teamroles',this)">👥 Team &amp; Roles</button>
 </nav><main>
 
@@ -182,6 +183,17 @@ if(window.self!==window.top){
 
 <section id="templates" class="page"><div class="panel"><div class="ph"><span>Message Templates</span><small style="font-weight:500">{name} {amount} {location} {tripId} {due} {noc} {balance} {returned} {mode} auto-fill karte hain</small></div><div class="pb" id="templatesRows"></div></div></section>
 
+<section id="manageRecords" class="page">
+<div class="hero" style="margin-bottom:12px"><div><h1 style="font-size:20px">Manage Records (Super Admin)</h1><p>Trips ko Disable (safe, restore ho sakta hai) ya Permanently Delete (Firestore se hamesha ke liye hat jayega) karein.</p></div></div>
+<div class="panel"><div class="pb">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <input type="text" id="mrSearch" placeholder="🔎 Trip ID / Sales Person / Location" oninput="renderManageRecordsPage()" style="flex:1;min-width:160px;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+    <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="mrShowDeleted" onchange="renderManageRecordsPage()" style="width:auto"> Show Disabled</label>
+  </div>
+  <div id="mrTripsList"></div>
+</div></div>
+</section>
+
 <section id="teamroles" class="page">
 <div class="hero" style="margin-bottom:12px"><div><h1 style="font-size:20px">Team &amp; Roles</h1><p>Bliss One ke Universal Users me se Trip Expense role assign karein</p></div></div>
 <div class="panel"><div class="pb">
@@ -206,6 +218,7 @@ if(window.self!==window.top){
 <button data-page="director" data-role="director" onclick="mgo('director',this)"><span>★</span>Director</button>
 <button data-page="notify" data-role="director" data-superadmin="1" onclick="mgo('notify',this)"><span>💬</span>Notify</button>
 <button data-page="templates" data-role="director" data-superadmin="1" onclick="mgo('templates',this)"><span>📝</span>Templates</button>
+<button data-page="manageRecords" data-role="director" data-superadmin="1" onclick="mgo('manageRecords',this)"><span>🗑</span>Records</button>
 <button data-page="teamroles" data-role-or-superadmin="admin" onclick="mgo('teamroles',this)"><span>👥</span>Roles</button>
 </div>
 
@@ -1385,6 +1398,36 @@ async function deleteAllVisibleTrips(){
   const failed=results.filter(r=>r.status==='rejected').length;
   toast(failed?`${list.length-failed} trip(s) delete hui, ${failed} fail ho gayi.`:`${list.length} trip(s) Deleted list me bhej di gayin.`);
 }
+async function permanentlyDeleteTrip(tripId){
+  if(!superAdminUnlocked){alert('Sirf Super Admin trip permanently delete kar sakta hai.');return}
+  const t=allTripsRaw.find(x=>x.id===tripId);if(!t)return;
+  const typed=prompt('Yeh trip Firestore se HAMESHA KE LIYE delete ho jayegi — wapas NAHI aayegi.\n\nTrip: '+t.id+'\nSales Person: '+(t.salesName||'-')+'\n\nConfirm karne ke liye "DELETE" type karein:');
+  if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  try{ await db.collection('te_trips').doc(tripId).delete(); }
+  catch(e){ console.error('permanent delete trip failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
+  toast('Trip permanently delete ho gayi: '+tripId);
+}
+
+/* ===== Manage Records (Super Admin) ===== */
+function renderManageRecordsPage(){
+  const wrap=$('mrTripsList');
+  if(!wrap)return;
+  if(!superAdminUnlocked){wrap.innerHTML='<small>Sirf Super Admin yeh dekh sakta hai.</small>';return}
+  const q=($('mrSearch')?.value||'').toLowerCase();
+  const showDeleted=$('mrShowDeleted')&&$('mrShowDeleted').checked;
+  let list=(showDeleted?allTripsRaw:trips).slice();
+  list=list.filter(t=>`${t.id} ${t.salesName||''} ${t.location||''}`.toLowerCase().includes(q));
+  list.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  if(!list.length){wrap.innerHTML='<small>Koi trip nahi mili.</small>';return}
+  wrap.innerHTML=`<div style="overflow-x:auto"><table class="dtb"><thead><tr><th>Trip</th><th>Sales Person</th><th>Location</th><th>Status</th><th>Action</th></tr></thead><tbody>`+
+  list.map(t=>{
+    const deleted=!!t.deletedAt;
+    const toggleBtn=deleted
+      ?`<button class="btn" onclick="restoreTrip('${esc(t.id)}')">↩ Restore</button>`
+      :`<button class="btn danger" onclick="deleteTrip('${esc(t.id)}')">Disable</button>`;
+    return `<tr><td>${esc(t.id)}</td><td>${esc(t.salesName||'-')}</td><td>${esc(t.location||'-')}</td><td>${deleted?'DISABLED':esc(t.status||'-')}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${toggleBtn} <button class="btn danger" onclick="permanentlyDeleteTrip('${esc(t.id)}')">🗑 Delete Permanently</button></td></tr>`;
+  }).join('')+`</tbody></table></div>`;
+}
 
 /* ===== Activity Log ===== */
 function renderActivityPage(){
@@ -1517,6 +1560,7 @@ function renderPage(id){
   else if(id==='activity')renderActivityPage();
   else if(id==='notify')renderNotifyPage();
   else if(id==='teamroles')renderTeamRolesPage();
+  else if(id==='manageRecords')renderManageRecordsPage();
 }
 function currentPageId(){const on=document.querySelector('.page.on');return on?on.id:'admin'}
 function applyRoleVisibility(){
