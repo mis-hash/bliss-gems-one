@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<script>
+/* Crash safety net — same pattern as the other Bliss apps: registered first so a later
+   script error still surfaces as a visible banner instead of a silently dead page. */
+(function(){
+  function showCrashBanner(msg){
+    if(document.getElementById('ftCrashBanner'))return;
+    var b=document.createElement('div');
+    b.id='ftCrashBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b42318;color:#fff;padding:10px 14px;font:600 13px Arial,sans-serif;text-align:center;box-shadow:0 2px 10px #0004';
+    b.innerHTML='⚠ App me error aa gaya hai. Page reload karein.'
+      +' <button type="button" style="margin-left:10px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#b42318;font-weight:700;cursor:pointer" onclick="location.reload()">Reload</button>'
+      +'<div style="font-weight:400;font-size:11px;opacity:.85;margin-top:3px">'+String(msg||'').slice(0,200).replace(/[<>]/g,'')+'</div>';
+    function attach(){document.body&&document.body.prepend(b)}
+    if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach);
+  }
+  window.addEventListener('error',function(e){console.error('Uncaught error:',e.error||e.message);showCrashBanner((e.error&&e.error.message)||e.message);});
+  window.addEventListener('unhandledrejection',function(e){console.error('Unhandled promise rejection:',e.reason);showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));});
+})();
+</script>
+<title>Fuel Tracker</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Same design system as the other Bliss apps, so all apps read as one family. */
+:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
+*{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit}
+h1,h2,h3,.card b,.tabular{font-family:'Manrope',sans-serif}
+.hidden{display:none!important}
+header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.head{height:100%;max-width:1100px;margin:auto;padding:0 18px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:24px;font-weight:900;color:var(--g2)}
+.brand b{color:var(--g);font-size:20px;font-family:'Manrope',sans-serif}
+.brand small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.headRight{display:flex;align-items:center;gap:10px}
+.pillbadge{font-size:13px;font-weight:700;background:var(--mint);color:var(--g);padding:7px 12px;border-radius:999px}
+.btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--g);color:#fff}
+.btn.secondary{background:#eef2f0;color:var(--txt)}
+.btn.danger{background:var(--redbg);color:var(--red)}
+.btn.small{padding:7px 11px;font-size:12px}
+.shell{max-width:1100px;margin:auto;padding:17px 18px 60px}
+.hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px}
+.hero h1{font-size:24px;margin:0 0 5px}
+.hero p{font-size:13px;margin:0;opacity:.9}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+.card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px}
+.card small{font-size:11px;color:var(--muted)}
+.card b{display:block;font-size:22px;margin-top:6px}
+.card.warn{background:var(--amberbg)!important;color:var(--amber)!important}
+.panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:12px}
+.ph{padding:14px 16px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.pb{padding:15px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.field label{display:block;font-size:11px;font-weight:bold;margin-bottom:5px}
+.field input,.field select{width:100%;padding:10px;border:1px solid var(--line);border-radius:7px;font-size:14px;background:#fff;color:var(--txt)}
+.span2{grid-column:1/-1}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 0 9px;border-bottom:1px solid var(--line)}
+td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px;vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:#f7faf8}
+.tablewrap{overflow-x:auto}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font-size:11px;font-weight:700;background:var(--mint);color:var(--g)}
+.item{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #edf1ee;gap:10px;flex-wrap:wrap}
+.item:last-child{border-bottom:0}
+.emptystate{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;text-align:center;font-size:24px}
+.emptystate p{font-size:13.5px;font-weight:600;color:var(--txt);margin:10px 0 2px;font-family:'Work Sans',sans-serif}
+.emptystate small{color:var(--muted);font-size:12px}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:50}
+.modal.show{display:flex}
+.box{width:min(640px,100%);background:#fff;border-radius:14px;padding:19px;max-height:90vh;overflow:auto}
+.box h3{margin:0 0 14px;font-size:19px}
+.note{font-size:12px;color:var(--muted)}
+.gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px}
+.gate h3{font-size:19px}
+.gate p{font-size:13px;color:var(--muted)}
+.gate .btn{margin-top:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:#fff;color:var(--muted);padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--g);border-color:var(--g);color:#fff}
+.thumb{width:44px;height:44px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--line)}
+.lightboxBox{background:transparent;box-shadow:none;max-width:95vw}
+.lightboxBox img{max-width:100%;max-height:85vh;border-radius:10px}
+@media(max-width:720px){
+  header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:20px}.brand b{font-size:16px}.brand small{display:none}
+  .shell{padding:11px 10px 30px}
+  .hero{padding:17px}.hero h1{font-size:20px}
+  .cards{grid-template-columns:1fr 1fr}
+  .grid,.grid3{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div id="gateWrap" style="display:none"><div class="gate" id="gateBox"></div></div>
+
+<div id="appWrap" style="display:none">
+<header><div class="head">
+  <div class="brand"><div class="logo">⛽</div><div><b>Fuel Tracker</b><small>Bliss Gems &amp; Minerals</small></div></div>
+  <div class="headRight">
+    <span class="pillbadge" id="loginBadge">Not Logged In</span>
+    <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
+    <button class="btn superAdminStrict hidden" onclick="openManage()">⚙ Manage</button>
+  </div>
+</div></header>
+
+<div class="shell">
+  <div class="hero">
+    <h1>Vehicle Fuel Log</h1>
+    <p>Har fueling ki entry — meter reading, kharcha aur photo proof ke saath.</p>
+  </div>
+  <div class="cards" id="statTiles"></div>
+
+  <div class="panel">
+    <div class="ph"><span>Nayi Fuel Entry</span><span class="note" id="entryByNote"></span></div>
+    <div class="pb">
+      <div class="grid3">
+        <div class="field"><label>Vehicle Number <span style="color:var(--red)">*</span></label><input id="fVehicle" list="vehicleList" autocomplete="off"><datalist id="vehicleList"></datalist></div>
+        <div class="field"><label>Date</label><input type="date" id="fDate"></div>
+        <div class="field"><label>Unit <span style="color:var(--red)">*</span></label><select id="fUnit"><option value="KM">KM</option><option value="Miles">Miles</option></select></div>
+      </div>
+      <div class="grid3" style="margin-top:10px">
+        <div class="field"><label>Meter Reading Before Fueling <span style="color:var(--red)">*</span></label><input type="number" id="fMeterBefore"></div>
+        <div class="field"><label>Meter Reading After Fueling <span style="color:var(--red)">*</span></label><input type="number" id="fMeterAfter"></div>
+        <div class="field"><label>Fuel Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="fAmount"></div>
+      </div>
+      <div class="grid" style="margin-top:10px">
+        <div class="field"><label>Vehicle Meter Reading Photo</label><input type="file" id="fPhotoVehicle" accept="image/*" capture="environment"></div>
+        <div class="field"><label>Petrol Pump Meter Photo</label><input type="file" id="fPhotoPump" accept="image/*" capture="environment"></div>
+        <div class="field span2"><label>Payment Mode</label><input id="fPaymentMode" list="paymentModeList" placeholder="Cash / UPI / Card / Company Account"><datalist id="paymentModeList"></datalist></div>
+      </div>
+      <div style="margin-top:14px;text-align:right"><button class="btn primary" id="fuelSubmitBtn" onclick="addFuelEntry()">＋ Save Entry</button></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><span>Vehicle-wise Spend</span></div>
+    <div class="pb"><div class="tablewrap"><table>
+      <thead><tr><th>Vehicle</th><th class="num">Entries</th><th class="num">Total Distance</th><th class="num">Total Spend</th><th class="num">Avg Cost / Unit</th></tr></thead>
+      <tbody id="vehicleSpendTable"></tbody>
+    </table></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="ph">
+      <span>Fuel History</span>
+      <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="renderHistory()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
+    </div>
+    <div class="pb"><div class="tablewrap"><table>
+      <thead><tr><th>Date</th><th>Vehicle</th><th>Meter (Before → After)</th><th class="num">Amount</th><th class="num">Cost/Unit</th><th>Payment</th><th>By</th><th>Photos</th><th>Action</th></tr></thead>
+      <tbody id="historyTable"></tbody>
+    </table></div></div>
+  </div>
+</div>
+</div>
+
+<!-- Login modal -->
+<div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
+<h3>Login</h3>
+<div class="field"><label>Username</label><input id="loginUsername" autocomplete="off"></div>
+<div class="field" style="margin-top:8px"><label>Password</label><input id="loginPassword" type="password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<p class="note" id="loginMsg" style="margin:8px 0 0"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeLogin()">Cancel</button><button class="btn primary" onclick="doLogin()">Login</button></div>
+</div></div>
+
+<!-- Super Admin modal -->
+<div class="modal" id="superAdminModal"><div class="box" style="width:min(340px,100%)">
+<h3>🔒 Super Admin</h3>
+<div class="field"><label>Password</label><input id="superAdminPassword" type="password" onkeydown="if(event.key==='Enter')unlockSuperAdmin()"></div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeSuperAdminModal()">Cancel</button><button class="btn primary" onclick="unlockSuperAdmin()">Unlock</button></div>
+</div></div>
+
+<!-- Manage modal -->
+<div class="modal" id="manageModal"><div class="box" style="width:min(640px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Admin / Manage Records</h3><button class="btn small" onclick="closeManage()">✕</button></div>
+<div class="tabs" style="margin:0 0 10px">
+<button class="tab on" data-tab="records" onclick="mtab(this,'records')">🗑 Manage Records</button>
+</div>
+<div id="manageContent"></div>
+</div></div>
+
+<!-- Photo lightbox -->
+<div class="modal" id="photoModal" onclick="closePhotoModal()"><div class="box lightboxBox"><img id="photoModalImg" src=""></div></div>
+
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:14px;right:14px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:13px;line-height:26px;cursor:default;z-index:999999;transition:background .15s">•</button>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
+let db=null;
+try{
+  if(typeof firebase!=='undefined'){
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+  }else{console.error('firebase SDK not loaded — cloud sync unavailable this session');}
+}catch(e){console.error('firebase init failed:',e);}
+// Anonymous auth is a no-op with today's open Firestore rules; it exists so a future
+// rules tightening (requiring request.auth != null) doesn't need a client-code change to
+// go with it. Isolated in its own try/catch and kept out of the Firestore-init block above
+// so a missing/failing auth() call can never affect `db`.
+try{if(typeof firebase!=='undefined'&&firebase.auth)firebase.auth().signInAnonymously().catch(e=>console.error('anon auth failed:',e));}catch(e){console.error('anon auth failed:',e);}
+
+const APP_SLUG='fuel-tracker';
+const UU_COLLECTION='universal_users';
+const SESSION_KEY='pd_logged_user_v1'; // same key as Bliss One hub / other apps — one login everywhere
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const todayISO=()=>new Date().toISOString().slice(0,10);
+const fmtAmt=n=>'₹'+Number(n||0).toLocaleString('en-IN');
+
+let users=[],fuelLog=[];
+let masters={vehicles:[],paymentModes:[]};
+let currentUser=null,currentTab='records';
+let usersStarted=false,fuelStarted=false,mastersStarted=false;
+
+function loggedUser(){return users.find(x=>x.id===currentUser)||null}
+
+/* ===== Super Admin (same shared password as other Bliss apps) ===== */
+const SUPER_ADMIN_PASSWORD_HASH='0cb73e5ce7c7e7b2bc347bc16e73c2a16331fdedaec4c1c787815eab4daa6fad';
+async function sha256Hex(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+let superAdminUnlocked=false;
+let secretAdminTapCount=0,secretAdminTapTimer=null,secretAdminFlashTimer=null;
+function secretAdminTap(){
+  secretAdminTapCount++;
+  const dot=$('secretAdminIcon');
+  if(dot){dot.style.background='rgba(214,48,49,.45)';clearTimeout(secretAdminFlashTimer);secretAdminFlashTimer=setTimeout(()=>{dot.style.background='transparent'},200);}
+  clearTimeout(secretAdminTapTimer);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2500);
+  if(secretAdminTapCount>=10){secretAdminTapCount=0;clearTimeout(secretAdminTapTimer);openSuperAdminModal();}
+}
+function openSuperAdminModal(){
+  if(superAdminUnlocked){renderAll();return}
+  $('superAdminPassword').value='';
+  $('superAdminModal').classList.add('show');
+  setTimeout(()=>$('superAdminPassword')?.focus(),30);
+}
+function closeSuperAdminModal(){$('superAdminModal')?.classList.remove('show')}
+async function unlockSuperAdmin(){
+  const pw=$('superAdminPassword')?.value||'';
+  if((await sha256Hex(pw))!==SUPER_ADMIN_PASSWORD_HASH){alert('Galat password.');return}
+  superAdminUnlocked=true;
+  closeSuperAdminModal();
+  renderAll();
+}
+function silentUnlockSuperAdmin(){ if(!superAdminUnlocked){superAdminUnlocked=true;renderAll();} }
+
+/* ===== Login ===== */
+function loginFromHub(){
+  try{ if(window.self!==window.top && window.top.openStaffLoginModal){window.top.openStaffLoginModal();return;} }catch(e){}
+  openLogin();
+}
+function openLogin(){$('loginModal').classList.add('show');$('loginMsg').textContent='';}
+function closeLogin(){$('loginModal').classList.remove('show')}
+function doLogin(){
+  const uname=$('loginUsername').value.trim(),pass=$('loginPassword').value;
+  const msg=$('loginMsg');
+  if(!uname||!pass){msg.style.color='#b43a35';msg.textContent='Username aur Password dono bharein.';return}
+  const u=users.find(x=>String(x.username||x.id).toLowerCase()===uname.toLowerCase() && x.active!==false);
+  if(!u||pass!==String(u.password||'1234')){msg.style.color='#b43a35';msg.textContent='Invalid Username / Password';return}
+  if(u.appAccess && u.appAccess[APP_SLUG]===false){msg.style.color='#b43a35';msg.textContent='Aapko is app ka access nahi hai.';return}
+  localStorage.setItem(SESSION_KEY,u.id);
+  currentUser=u.id;
+  closeLogin();
+  renderAll();
+}
+function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
+
+/* ===== Firestore sync ===== */
+function startUsersSync(){
+  if(usersStarted||!db)return;usersStarted=true;
+  db.collection(UU_COLLECTION).onSnapshot(snap=>{users=[];snap.forEach(d=>users.push(d.data()));renderAll();},err=>console.error('users sync error',err));
+}
+function startFuelSync(){
+  if(fuelStarted||!db)return;fuelStarted=true;
+  db.collection('fuel_log').orderBy('date','desc').onSnapshot(snap=>{fuelLog=[];snap.forEach(d=>fuelLog.push({id:d.id,...d.data()}));renderAll();},err=>console.error('fuel log sync error',err));
+}
+let mastersSeedChecked=false;
+function seedStarterMastersIfEmpty(){
+  if(mastersSeedChecked||!db)return;mastersSeedChecked=true;
+  db.collection('fv_settings').doc('masters').get().then(doc=>{
+    if(doc.exists)return; // already configured - never overwrite
+    db.collection('fv_settings').doc('masters').set({vehicles:[],paymentModes:['Cash','UPI','Card','Company Account']}).catch(e=>console.error('masters seed failed',e));
+  }).catch(e=>console.error('masters seed check failed',e));
+}
+function startMastersSync(){
+  if(mastersStarted||!db)return;mastersStarted=true;
+  seedStarterMastersIfEmpty();
+  db.collection('fv_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={vehicles:[],paymentModes:[],...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+}
+function saveMasters(){ if(db) db.collection('fv_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
+
+/* ===== Nav / gate ===== */
+function renderGate(){
+  const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
+  const u=loggedUser();
+  if(!currentUser||!u){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    const inFrame=window.self!==window.top;
+    gateBox.innerHTML=inFrame
+      ? `<h3>Login Required</h3><p class="note">Fuel Tracker dekhne ke liye Bliss One dashboard se login karein.</p><button class="btn primary" onclick="loginFromHub()">Login</button>`
+      : `<h3>Login Required</h3><p class="note">Fuel Tracker dekhne ke liye login karein — wahi username/password jo baaki Bliss apps me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
+    return;
+  }
+  if(u.appAccess && u.appAccess[APP_SLUG]===false){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    gateBox.innerHTML=`<h3>No Access</h3>`;
+    return;
+  }
+  gateWrap.style.display='none';appWrap.style.display='';
+}
+function refreshLoginBadge(){
+  const u=loggedUser();
+  $('loginBadge').textContent=u?'👤 '+u.name:'Not Logged In';
+  $('logoutBtn').classList.toggle('hidden',!u);
+  if($('entryByNote'))$('entryByNote').textContent=u?('Logged in as '+u.name):'';
+}
+function applyFeatureVisibility(){
+  document.querySelectorAll('.superAdminStrict').forEach(el=>el.classList.toggle('hidden',!superAdminUnlocked));
+}
+function renderSelects(){
+  if($('vehicleList'))$('vehicleList').innerHTML=(masters.vehicles||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+  if($('paymentModeList'))$('paymentModeList').innerHTML=(masters.paymentModes||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+}
+
+/* ===== Photo compression (client-side, keeps everything on the Spark/free plan — no
+   Firebase Storage bucket needed, photo is stored as a compressed base64 string directly
+   on the Firestore doc) ===== */
+function fileToCompressedDataURL(file,maxDim,quality){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        let w=img.width,h=img.height;
+        if(w>h){ if(w>maxDim){h=Math.round(h*maxDim/w);w=maxDim;} } else { if(h>maxDim){w=Math.round(w*maxDim/h);h=maxDim;} }
+        const canvas=document.createElement('canvas');
+        canvas.width=w;canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg',quality));
+      };
+      img.onerror=reject;
+      img.src=reader.result;
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function compressPhoto(file){
+  if(!file)return null;
+  let url=await fileToCompressedDataURL(file,900,0.6);
+  if(url.length>400000)url=await fileToCompressedDataURL(file,700,0.4);
+  if(url.length>400000)url=await fileToCompressedDataURL(file,500,0.3);
+  return url;
+}
+
+/* ===== Entry form ===== */
+let _fuelSubmitting=false;
+async function addFuelEntry(){
+  if(_fuelSubmitting)return;
+  const vehicle=$('fVehicle').value.trim();
+  const date=$('fDate').value||todayISO();
+  const unit=$('fUnit').value||'KM';
+  const meterBefore=parseFloat($('fMeterBefore').value);
+  const meterAfter=parseFloat($('fMeterAfter').value);
+  const amount=parseFloat($('fAmount').value);
+  const paymentMode=$('fPaymentMode').value.trim();
+  if(!vehicle){alert('Vehicle Number zaroori hai.');return}
+  if(isNaN(meterBefore)||isNaN(meterAfter)){alert('Meter Reading Before/After dono zaroori hain.');return}
+  if(!amount||amount<=0){alert('Fuel Amount sahi se bharein.');return}
+  if(meterAfter<meterBefore){ if(!confirm('After Fueling reading Before Fueling se kam hai. Phir bhi save karein?'))return; }
+  _fuelSubmitting=true;
+  const btn=$('fuelSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const vehiclePhotoFile=$('fPhotoVehicle').files[0]||null;
+    const pumpPhotoFile=$('fPhotoPump').files[0]||null;
+    const [vehiclePhoto,pumpPhoto]=await Promise.all([compressPhoto(vehiclePhotoFile),compressPhoto(pumpPhotoFile)]);
+    const actor=loggedUser();
+    const payload={vehicle,date,unit,meterBefore,meterAfter,amount,paymentMode,by:actor?actor.id:'',at:new Date().toISOString()};
+    if(vehiclePhoto)payload.vehiclePhoto=vehiclePhoto;
+    if(pumpPhoto)payload.pumpPhoto=pumpPhoto;
+    await db.collection('fuel_log').add(payload);
+    if(vehicle && !masters.vehicles.includes(vehicle)){masters.vehicles.push(vehicle);saveMasters();}
+    if(paymentMode && !masters.paymentModes.includes(paymentMode)){masters.paymentModes.push(paymentMode);saveMasters();}
+    $('fVehicle').value='';$('fMeterBefore').value='';$('fMeterAfter').value='';$('fAmount').value='';$('fPaymentMode').value='';
+    $('fPhotoVehicle').value='';$('fPhotoPump').value='';
+    toast('Fuel entry saved');
+  }catch(e){
+    console.error('fuel entry save failed',e);
+    alert('Entry save fail ho gayi, dobara try karein.');
+  }finally{
+    _fuelSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
+}
+
+/* ===== Disable / Restore / Permanent Delete — Super Admin only, no doer access ===== */
+async function deleteFuelEntry(id,skipConfirm){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entry disable kar sakta hai.');return}
+  if(!skipConfirm&&!confirm('Yeh entry Disabled list me chali jayegi (Restore ho sakta hai). Confirm karein?'))return;
+  const actor=loggedUser();
+  await db.collection('fuel_log').doc(id).update({deletedAt:new Date().toISOString(),deletedBy:actor?actor.id:'Unknown'});
+  toast('Entry disabled');
+}
+async function restoreFuelEntry(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin restore kar sakta hai.');return}
+  await db.collection('fuel_log').doc(id).update({deletedAt:firebase.firestore.FieldValue.delete(),deletedBy:firebase.firestore.FieldValue.delete()});
+  toast('Entry restored');
+}
+async function permanentlyDeleteFuelEntry(id,skipConfirm){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entry permanently delete kar sakta hai.');return}
+  const x=fuelLog.find(e=>e.id===id);if(!x)return;
+  if(!skipConfirm){
+    const typed=prompt('Yeh entry Firestore se HAMESHA KE LIYE delete ho jayegi — wapas NAHI aayegi.\n\nVehicle: '+x.vehicle+'\nAmount: '+fmtAmt(x.amount)+'\n\nConfirm karne ke liye "DELETE" type karein:');
+    if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  }
+  try{
+    await db.collection('fuel_log').doc(id).delete();
+  }catch(e){ console.error('permanent delete failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
+  toast('Entry permanently delete ho gayi');
+}
+
+/* ===== Dashboard ===== */
+function nameOfUserId(id){return (users.find(x=>x.id===id)||{}).name||id||'-'}
+function liveFuel(){return fuelLog.filter(x=>!x.deletedAt)}
+function entryDistance(x){ const d=(x.meterAfter||0)-(x.meterBefore||0); return d>0?d:0; }
+function entryCostPerUnit(x){ const d=entryDistance(x); return d>0?(x.amount||0)/d:null; }
+function renderDash(){
+  const live=liveFuel();
+  const totalSpend=live.reduce((s,x)=>s+(x.amount||0),0);
+  const totalDistance=live.reduce((s,x)=>s+entryDistance(x),0);
+  const avgCost=totalDistance>0?totalSpend/totalDistance:0;
+  const tiles=[
+    {label:'TOTAL ENTRIES',val:live.length},
+    {label:'TOTAL FUEL SPEND',val:fmtAmt(totalSpend)},
+    {label:'TOTAL DISTANCE',val:totalDistance.toLocaleString('en-IN')},
+    {label:'AVG COST / UNIT',val:avgCost>0?('₹'+avgCost.toFixed(2)):'-'}
+  ];
+  $('statTiles').innerHTML=tiles.map(t=>`<div class="card"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+}
+function renderVehicleSpend(){
+  const live=liveFuel();
+  const byVehicle={};
+  live.forEach(x=>{
+    const v=x.vehicle||'-';
+    if(!byVehicle[v])byVehicle[v]={entries:0,distance:0,spend:0};
+    byVehicle[v].entries++;
+    byVehicle[v].distance+=entryDistance(x);
+    byVehicle[v].spend+=(x.amount||0);
+  });
+  const rows=Object.entries(byVehicle).sort((a,b)=>b[1].spend-a[1].spend);
+  $('vehicleSpendTable').innerHTML=rows.map(([v,d])=>{
+    const avg=d.distance>0?(d.spend/d.distance).toFixed(2):'-';
+    return `<tr><td><b>${esc(v)}</b></td><td class="num">${d.entries}</td><td class="num">${d.distance.toLocaleString('en-IN')}</td><td class="num">${fmtAmt(d.spend)}</td><td class="num">${avg==='-'?'-':'₹'+avg}</td></tr>`;
+  }).join('')||`<tr><td colspan="5"><div class="emptystate">⛽<p>Koi data nahi hai.</p></div></td></tr>`;
+}
+function deletedInfo(x){return x.deletedAt?`<br><small style="color:var(--muted)">Disabled by ${esc(nameOfUserId(x.deletedBy))}</small>`:''}
+function photoThumbs(x){
+  let html='';
+  if(x.vehiclePhoto)html+=`<img class="thumb" src="${x.vehiclePhoto}" onclick="openPhotoModal('${esc(x.id)}','vehiclePhoto')" title="Vehicle Meter Photo">`;
+  if(x.pumpPhoto)html+=` <img class="thumb" src="${x.pumpPhoto}" onclick="openPhotoModal('${esc(x.id)}','pumpPhoto')" title="Pump Meter Photo">`;
+  return html||'<small class="note">-</small>';
+}
+function openPhotoModal(id,field){
+  const x=fuelLog.find(e=>e.id===id);if(!x||!x[field])return;
+  $('photoModalImg').src=x[field];
+  $('photoModal').classList.add('show');
+}
+function closePhotoModal(){$('photoModal').classList.remove('show');$('photoModalImg').src='';}
+function renderHistory(){
+  const deletedN=fuelLog.filter(x=>x.deletedAt).length;
+  if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
+  if($('deletedCount'))$('deletedCount').textContent=deletedN;
+  const showDeleted=$('showDeleted')&&$('showDeleted').checked;
+  let rows=showDeleted?fuelLog.filter(x=>x.deletedAt):fuelLog.filter(x=>!x.deletedAt);
+  rows=rows.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at||'').localeCompare(String(a.at||'')));
+  $('historyTable').innerHTML=rows.map(x=>{
+    const cost=entryCostPerUnit(x);
+    const adminBtn=x.deletedAt
+      ?(superAdminUnlocked?`<button class="btn small" onclick="restoreFuelEntry('${esc(x.id)}')">↩ Restore</button>`:'')
+      :(superAdminUnlocked?`<button class="btn small danger" onclick="deleteFuelEntry('${esc(x.id)}')">Disable</button>`:'');
+    const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeleteFuelEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
+    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td>${esc(x.vehicle)}</td><td>${x.meterBefore} → ${x.meterAfter} ${esc(x.unit||'KM')}</td><td class="num">${fmtAmt(x.amount)}</td><td class="num">${cost!==null?'₹'+cost.toFixed(2):'-'}</td><td>${esc(x.paymentMode||'-')}</td><td>${esc(nameOfUserId(x.by))}</td><td>${photoThumbs(x)}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${adminBtn} ${permBtn}</td></tr>`;
+  }).join('')||`<tr><td colspan="9"><div class="emptystate">⛽<p>Koi fuel entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
+}
+
+/* ===== Manage panel ===== */
+function openManage(){currentTab='records';$('manageModal').classList.add('show');renderManage()}
+function closeManage(){$('manageModal').classList.remove('show')}
+function mtab(btn,t){currentTab=t;document.querySelectorAll('#manageModal .tab').forEach(x=>x.classList.toggle('on',x===btn));renderManage()}
+function renderManage(){
+  const c=$('manageContent');
+  if(currentTab==='records'){
+    c.innerHTML=`<p class="note">Entry ko <b>Disable</b> karne par wo History se hat jaati hai (Restore ho sakta hai). <b>Permanently Delete</b> karne par entry Firestore se hamesha ke liye hat jaati hai — wapas NAHI aayegi.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
+      <input id="mRecordsSearch" placeholder="Search Vehicle / Payment Mode" oninput="renderRecordsManageTab()" style="flex:1;min-width:160px">
+      <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="mRecordsShowDisabled" onchange="renderRecordsManageTab()" style="width:auto"> Show Disabled</label>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="mRecordsSelectAll" onchange="toggleSelectAllRecords(this.checked)" style="width:auto"> Select All</label>
+      <button class="btn small" onclick="bulkDisableRecords()">Disable Selected</button>
+      <button class="btn small" onclick="bulkRestoreRecords()">↩ Restore Selected</button>
+      <button class="btn small danger" onclick="bulkPermanentlyDeleteRecords()">🗑 Delete Permanently Selected</button>
+    </div>
+    <div id="mRecordsList"></div>`;
+    renderRecordsManageTab();
+  }
+}
+function renderRecordsManageTab(){
+  const list=$('mRecordsList');
+  if(!list)return;
+  if(!superAdminUnlocked){list.innerHTML='<div class="note">Sirf Super Admin yeh dekh sakta hai.</div>';return}
+  const q=($('mRecordsSearch')?.value||'').toLowerCase();
+  const showDisabled=$('mRecordsShowDisabled')?.checked;
+  let a=fuelLog.slice();
+  if(!showDisabled)a=a.filter(x=>!x.deletedAt);
+  a=a.filter(x=>`${x.vehicle||''} ${x.paymentMode||''} ${x.date||''}`.toLowerCase().includes(q));
+  a.sort((x,y)=>String(y.date).localeCompare(String(x.date)));
+  list.innerHTML=a.length?a.map(x=>{
+    const toggleBtn=x.deletedAt
+      ?`<button class="btn small" onclick="(async()=>{await restoreFuelEntry('${esc(x.id)}');renderRecordsManageTab()})()">↩ Restore</button>`
+      :`<button class="btn small" onclick="(async()=>{await deleteFuelEntry('${esc(x.id)}',true);renderRecordsManageTab()})()">Disable</button>`;
+    const permBtn=`<button class="btn small danger" onclick="permanentlyDeleteFuelEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`;
+    const chk=`<input type="checkbox" class="recChk" data-id="${esc(x.id)}" data-deleted="${x.deletedAt?'1':'0'}" style="width:auto;margin-right:8px">`;
+    return `<div class="item"><span>${chk}<b>${esc(x.vehicle)}</b> <small>${fmtAmt(x.amount)} • ${esc(x.date)}</small>${x.deletedAt?' <small style="color:#9b1c1c">(DISABLED)</small>':''}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${toggleBtn} ${permBtn}</span></div>`;
+  }).join(''):'<div class="note">Koi record nahi mila.</div>';
+}
+function toggleSelectAllRecords(checked){
+  document.querySelectorAll('#mRecordsList .recChk').forEach(cb=>cb.checked=checked);
+}
+function selectedFuelRefs(){
+  return [...document.querySelectorAll('#mRecordsList .recChk:checked')].map(cb=>({id:cb.dataset.id,deleted:cb.dataset.deleted==='1'}));
+}
+async function bulkDisableRecords(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entries disable kar sakta hai.');return}
+  const sel=selectedFuelRefs().filter(x=>!x.deleted);
+  if(!sel.length){alert('Koi entry select nahi ki (ya sab pehle se disabled hain).');return}
+  if(!confirm(sel.length+' entry/entries ko Disable karna hai?'))return;
+  for(const r of sel)await deleteFuelEntry(r.id,true);
+  renderRecordsManageTab();
+  toast(sel.length+' entry/entries disable ho gayi');
+}
+async function bulkRestoreRecords(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entries restore kar sakta hai.');return}
+  const sel=selectedFuelRefs().filter(x=>x.deleted);
+  if(!sel.length){alert('Koi disabled entry select nahi ki.');return}
+  if(!confirm(sel.length+' entry/entries ko Restore karna hai?'))return;
+  for(const r of sel)await restoreFuelEntry(r.id);
+  renderRecordsManageTab();
+  toast(sel.length+' entry/entries restore ho gayi');
+}
+async function bulkPermanentlyDeleteRecords(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entries permanently delete kar sakta hai.');return}
+  const sel=selectedFuelRefs();
+  if(!sel.length){alert('Koi entry select nahi ki.');return}
+  const typed=prompt(sel.length+' entry/entries Firestore se HAMESHA KE LIYE delete ho jaayengi — wapas NAHI aayengi.\n\nConfirm karne ke liye "DELETE" type karein:');
+  if(typed!=='DELETE'){toast('Bulk permanent delete cancel ho gaya');return}
+  for(const r of sel)await permanentlyDeleteFuelEntry(r.id,true);
+  renderRecordsManageTab();
+  toast(sel.length+' entry/entries permanently delete ho gayi');
+}
+
+/* ===== Toast ===== */
+let toastTimer=null;
+function toast(msg){
+  let t=$('ftToast');
+  if(!t){t=document.createElement('div');t.id='ftToast';t.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#17211b;color:#fff;padding:9px 16px;border-radius:20px;font-size:12px;z-index:99999;opacity:0;transition:opacity .2s';document.body.appendChild(t);}
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.opacity='0',2200);
+}
+
+function renderAll(){
+  renderGate();
+  refreshLoginBadge();
+  applyFeatureVisibility();
+  renderSelects();
+  renderDash();
+  renderVehicleSpend();
+  renderHistory();
+  if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  currentUser=localStorage.getItem(SESSION_KEY)||null;
+  if($('fDate'))$('fDate').value=todayISO();
+  startUsersSync();
+  startFuelSync();
+  startMastersSync();
+  renderAll();
+});
+window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
+</script>
+</body>
+</html>
