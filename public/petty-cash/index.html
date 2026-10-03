@@ -194,6 +194,7 @@ tbody tr:hover td{background:#f7faf8}
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Admin / Manage Records</h3><button class="btn small" onclick="closeManage()">✕</button></div>
 <div class="tabs" style="margin:0 0 10px">
 <button class="tab on" data-tab="records" onclick="mtab(this,'records')">🗑 Manage Records</button>
+<button class="tab" data-tab="notify" onclick="mtab(this,'notify')">📲 Notify Recipients</button>
 </div>
 <div id="manageContent"></div>
 </div></div>
@@ -224,8 +225,10 @@ const todayISO=()=>new Date().toISOString().slice(0,10);
 const fmtAmt=n=>'₹'+Number(n||0).toLocaleString('en-IN');
 
 let users=[],ledger=[];
+let masters={alertRecipients:[]};
+let api={};
 let currentUser=null,currentTab='records',entryType='in';
-let usersStarted=false,ledgerStarted=false;
+let usersStarted=false,ledgerStarted=false,mastersStarted=false;
 
 function loggedUser(){return users.find(x=>x.id===currentUser)||null}
 
@@ -291,6 +294,60 @@ function startLedgerSync(){
   if(ledgerStarted||!db)return;ledgerStarted=true;
   db.collection('pc_ledger').orderBy('date','desc').onSnapshot(snap=>{ledger=[];snap.forEach(d=>ledger.push({id:d.id,...d.data()}));renderAll();},err=>console.error('ledger sync error',err));
 }
+let mastersSeedChecked=false;
+function seedStarterMastersIfEmpty(){
+  if(mastersSeedChecked||!db)return;mastersSeedChecked=true;
+  db.collection('pc_settings').doc('masters').get().then(doc=>{
+    if(doc.exists)return; // already configured - never overwrite
+    db.collection('pc_settings').doc('masters').set({alertRecipients:[]}).catch(e=>console.error('masters seed failed',e));
+  }).catch(e=>console.error('masters seed check failed',e));
+}
+function startMastersSync(){
+  if(mastersStarted||!db)return;mastersStarted=true;
+  seedStarterMastersIfEmpty();
+  db.collection('pc_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={alertRecipients:[],...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  // Shared GREEN-API WhatsApp credentials - same doc the other Bliss apps already read from,
+  // not a new config this app introduces.
+  db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed',e));
+}
+function saveMasters(){ if(db) db.collection('pc_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
+
+/* ===== WhatsApp (shared GREEN-API credentials, same pattern as Stationery Inventory) ===== */
+function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===10)p='91'+p;return p;}
+async function sendRawWA(phone,message){
+  const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token){console.warn('GREEN-API settings missing');return false}
+  const p=normalizePhone(phone);if(p.length<11)return false;
+  try{
+    const r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
+    return r.ok;
+  }catch(e){console.error('WA send failed:',e);return false}
+}
+// Same threshold as computeHighAmountAlerts() below - this fires the WhatsApp side the
+// moment a qualifying entry is saved, instead of waiting for someone to open the dashboard.
+function notifyHighAmount(a){
+  const configured=(masters.alertRecipients||[]).length>0;
+  const recipients=configured
+    ? users.filter(u=>u.active!==false&&u.phone&&masters.alertRecipients.includes(u.id))
+    : users.filter(u=>u.active!==false&&u.phone&&u.appRoles&&(u.appRoles['bliss-one']==='admin'||u.appRoles['bliss-one']==='director'));
+  if(!recipients.length)return;
+  const label=a.type==='loan'?'High Advance':'High Expense';
+  const who=a.person||a.note||'-';
+  const msg=`⚠️ ${label} Alert — Petty Cash\n\n${who}\nAmount: ${fmtAmt(a.amount)}\nUsual Avg: ${fmtAmt(a.priorAvg)}\nIncrease: +${a.pct.toFixed(0)}%\nDate: ${a.date}`;
+  recipients.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('high amount WA failed:',e)));
+}
+// Uses the ledger state as it stood BEFORE this entry was added (the live onSnapshot sync
+// hasn't caught up yet at this point), which is exactly the "prior entries" baseline
+// computeHighAmountAlerts() below also compares against.
+function checkAndNotifyHighAmount(type,amount,date,person,note){
+  if(type==='in')return;
+  const prior=liveLedger().filter(x=>x.type===type);
+  if(!prior.length)return;
+  const priorAvg=prior.reduce((s,x)=>s+(x.amount||0),0)/prior.length;
+  if(priorAvg<=0)return;
+  const pct=((amount-priorAvg)/priorAvg)*100;
+  if(pct>HIGH_AMOUNT_ALERT_THRESHOLD_PCT)notifyHighAmount({type,amount,priorAvg,pct,date,person,note});
+}
 
 /* ===== Nav / gate ===== */
 function renderGate(){
@@ -341,6 +398,7 @@ async function addLedgerEntry(){
     const actor=loggedUser();
     const payload={type:entryType,amount,date,person,note,by:actor?actor.id:'',at:new Date().toISOString()};
     if(entryType==='loan')payload.repaid=false;
+    checkAndNotifyHighAmount(entryType,amount,date,person,note);
     await db.collection('pc_ledger').add(payload);
     $('entryAmount').value='';$('entryPerson').value='';$('entryNote').value='';
     toast('Entry saved');
@@ -502,6 +560,18 @@ function renderManage(){
     <div id="mRecordsList"></div>`;
     renderRecordsManageTab();
   }
+  else if(currentTab==='notify'){
+    const withPhone=users.filter(u=>u.active!==false && u.phone);
+    const selected=masters.alertRecipients||[];
+    c.innerHTML=`<p class="note">High Amount Alert (High Advance / High Expense) hone par WhatsApp message kisko jaye, yahan se select karein. Kuch bhi select na karein to default Bliss One hub ke Admin/Director (jinke paas phone number hai) ko jayega.</p>`+
+      (withPhone.map(u=>`<div class="item"><span>${esc(u.name)}</span><input type="checkbox" ${selected.includes(u.id)?'checked':''} onchange="toggleAlertRecipient('${esc(u.id)}')"></div>`).join('')||'<div class="note" style="padding:8px 0">Koi active user ka phone number save nahi hai.</div>');
+  }
+}
+function toggleAlertRecipient(userId){
+  if(!masters.alertRecipients)masters.alertRecipients=[];
+  const i=masters.alertRecipients.indexOf(userId);
+  if(i===-1)masters.alertRecipients.push(userId);else masters.alertRecipients.splice(i,1);
+  saveMasters();renderManage();
 }
 function renderRecordsManageTab(){
   const list=$('mRecordsList');
@@ -584,6 +654,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   selectEntryType('in');
   startUsersSync();
   startLedgerSync();
+  startMastersSync();
   renderAll();
 });
 window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
