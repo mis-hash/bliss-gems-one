@@ -146,9 +146,9 @@ tbody tr:hover td{background:#f7faf8}
   </div>
 
   <div class="panel">
-    <div class="ph"><span>Vehicle-wise Spend</span></div>
+    <div class="ph"><span>🚗 Vehicle Performance</span></div>
     <div class="pb"><div class="tablewrap"><table>
-      <thead><tr><th>Vehicle</th><th class="num">Entries</th><th class="num">Total Distance</th><th class="num">Total Spend</th><th class="num">Avg Cost / Unit</th></tr></thead>
+      <thead><tr><th>Vehicle</th><th class="num">Entries</th><th class="num">Total Distance</th><th class="num">Total Spend</th><th class="num">Avg Cost / Unit</th><th>Trend (vs last month)</th><th>Last Fueling</th><th>Performance</th></tr></thead>
       <tbody id="vehicleSpendTable"></tbody>
     </table></div></div>
   </div>
@@ -451,21 +451,64 @@ function renderDash(){
   ];
   $('statTiles').innerHTML=tiles.map(t=>`<div class="card"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
 }
-function renderVehicleSpend(){
+function monthKeyOf(dateStr){return String(dateStr||'').slice(0,7)}
+function prevMonthKey(key){
+  const parts=String(key||'').split('-').map(Number);
+  const y=parts[0],m=parts[1];
+  if(!y||!m)return'';
+  const d=new Date(y,m-2,1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function daysSince(dateStr){
+  if(!dateStr)return null;
+  const ms=new Date(todayISO()).getTime()-new Date(dateStr).getTime();
+  return Math.max(0,Math.round(ms/86400000));
+}
+function renderVehiclePerformance(){
   const live=liveFuel();
+  const nowMonth=monthKeyOf(todayISO());
+  const lastMonth=prevMonthKey(nowMonth);
   const byVehicle={};
   live.forEach(x=>{
     const v=x.vehicle||'-';
-    if(!byVehicle[v])byVehicle[v]={entries:0,distance:0,spend:0};
-    byVehicle[v].entries++;
-    byVehicle[v].distance+=entryDistance(x);
-    byVehicle[v].spend+=(x.amount||0);
+    if(!byVehicle[v])byVehicle[v]={entries:0,distance:0,spend:0,lastDate:'',curMonthDist:0,curMonthSpend:0,lastMonthDist:0,lastMonthSpend:0};
+    const d=byVehicle[v];
+    const dist=entryDistance(x);
+    d.entries++;
+    d.distance+=dist;
+    d.spend+=(x.amount||0);
+    if(!d.lastDate||x.date>d.lastDate)d.lastDate=x.date;
+    const mk=monthKeyOf(x.date);
+    if(mk===nowMonth){d.curMonthDist+=dist;d.curMonthSpend+=(x.amount||0);}
+    else if(mk===lastMonth){d.lastMonthDist+=dist;d.lastMonthSpend+=(x.amount||0);}
   });
-  const rows=Object.entries(byVehicle).sort((a,b)=>b[1].spend-a[1].spend);
+  const vehicles=Object.entries(byVehicle);
+  // Best/Needs Attention badge only makes sense when comparing 2+ vehicles with real distance.
+  const withAvg=vehicles.filter(([,d])=>d.distance>0).map(([v,d])=>({v,avg:d.spend/d.distance}));
+  let bestVehicle=null,worstVehicle=null;
+  if(withAvg.length>1){
+    withAvg.sort((a,b)=>a.avg-b.avg);
+    bestVehicle=withAvg[0].v;
+    worstVehicle=withAvg[withAvg.length-1].v;
+  }
+  const rows=vehicles.sort((a,b)=>b[1].spend-a[1].spend);
   $('vehicleSpendTable').innerHTML=rows.map(([v,d])=>{
-    const avg=d.distance>0?(d.spend/d.distance).toFixed(2):'-';
-    return `<tr><td><b>${esc(v)}</b></td><td class="num">${d.entries}</td><td class="num">${d.distance.toLocaleString('en-IN')}</td><td class="num">${fmtAmt(d.spend)}</td><td class="num">${avg==='-'?'-':'₹'+avg}</td></tr>`;
-  }).join('')||`<tr><td colspan="5"><div class="emptystate">⛽<p>Koi data nahi hai.</p></div></td></tr>`;
+    const avg=d.distance>0?(d.spend/d.distance):null;
+    const curAvg=d.curMonthDist>0?(d.curMonthSpend/d.curMonthDist):null;
+    const lastAvg=d.lastMonthDist>0?(d.lastMonthSpend/d.lastMonthDist):null;
+    let trendHtml='<small class="note">-</small>';
+    if(curAvg!==null&&lastAvg!==null&&lastAvg>0){
+      const pct=((curAvg-lastAvg)/lastAvg)*100;
+      const worse=pct>0;
+      trendHtml=`<span style="color:${worse?'var(--red)':'var(--g)'};font-weight:700">${worse?'▲':'▼'} ${Math.abs(pct).toFixed(0)}%</span>`;
+    }
+    const ds=daysSince(d.lastDate);
+    const lastFuelHtml=d.lastDate?`${esc(d.lastDate)}${ds!==null?'<br><small class="note">'+ds+' din pehle</small>':''}`:'-';
+    let badge='<small class="note">-</small>';
+    if(v===bestVehicle)badge='<span class="pill" style="background:var(--mint);color:var(--g)">🏆 Best</span>';
+    else if(v===worstVehicle)badge='<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ Needs Attention</span>';
+    return `<tr><td><b>${esc(v)}</b></td><td class="num">${d.entries}</td><td class="num">${d.distance.toLocaleString('en-IN')}</td><td class="num">${fmtAmt(d.spend)}</td><td class="num">${avg!==null?'₹'+avg.toFixed(2):'-'}</td><td>${trendHtml}</td><td>${lastFuelHtml}</td><td>${badge}</td></tr>`;
+  }).join('')||`<tr><td colspan="8"><div class="emptystate">⛽<p>Koi data nahi hai.</p></div></td></tr>`;
 }
 function deletedInfo(x){return x.deletedAt?`<br><small style="color:var(--muted)">Disabled by ${esc(nameOfUserId(x.deletedBy))}</small>`:''}
 function photoThumbs(x){
@@ -588,7 +631,7 @@ function renderAll(){
   applyFeatureVisibility();
   renderSelects();
   renderDash();
-  renderVehicleSpend();
+  renderVehiclePerformance();
   renderHistory();
   if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
 }
