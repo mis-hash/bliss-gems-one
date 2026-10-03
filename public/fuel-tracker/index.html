@@ -123,6 +123,8 @@ tbody tr:hover td{background:#f7faf8}
   </div>
   <div class="cards" id="statTiles"></div>
 
+  <div id="mileageAlerts"></div>
+
   <div class="panel">
     <div class="ph"><span>Nayi Fuel Entry</span><span class="note" id="entryByNote"></span></div>
     <div class="pb">
@@ -151,6 +153,11 @@ tbody tr:hover td{background:#f7faf8}
       <thead><tr><th>Vehicle</th><th class="num">Entries</th><th class="num">Total Distance</th><th class="num">Total Spend</th><th class="num">Avg Cost / Unit</th><th>Trend (vs last month)</th><th>Last Fueling</th><th>Performance</th></tr></thead>
       <tbody id="vehicleSpendTable"></tbody>
     </table></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><span>📈 Monthly Spend Trend</span></div>
+    <div class="pb"><div id="monthlyTrendChart"></div></div>
   </div>
 
   <div class="panel">
@@ -510,6 +517,103 @@ function renderVehiclePerformance(){
     return `<tr><td><b>${esc(v)}</b></td><td class="num">${d.entries}</td><td class="num">${d.distance.toLocaleString('en-IN')}</td><td class="num">${fmtAmt(d.spend)}</td><td class="num">${avg!==null?'₹'+avg.toFixed(2):'-'}</td><td>${trendHtml}</td><td>${lastFuelHtml}</td><td>${badge}</td></tr>`;
   }).join('')||`<tr><td colspan="8"><div class="emptystate">⛽<p>Koi data nahi hai.</p></div></td></tr>`;
 }
+// A single fill-up costing much more per unit than that vehicle's own recent history is a
+// useful early signal (fuel theft, a leak, a mechanical fault) - compares the latest live
+// entry's cost/unit against the distance-weighted average of that vehicle's earlier entries.
+const MILEAGE_ALERT_THRESHOLD_PCT=25;
+function computeMileageAlerts(){
+  const live=liveFuel();
+  const byVehicle={};
+  live.forEach(x=>{(byVehicle[x.vehicle]=byVehicle[x.vehicle]||[]).push(x);});
+  const alerts=[];
+  Object.entries(byVehicle).forEach(([v,entries])=>{
+    entries=entries.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.at||'').localeCompare(String(b.at||'')));
+    if(entries.length<2)return;
+    const last=entries[entries.length-1];
+    const lastCost=entryCostPerUnit(last);
+    if(lastCost===null)return;
+    const prior=entries.slice(0,-1);
+    const priorDistance=prior.reduce((s,x)=>s+entryDistance(x),0);
+    const priorSpend=prior.reduce((s,x)=>s+(x.amount||0),0);
+    if(priorDistance<=0)return;
+    const priorAvg=priorSpend/priorDistance;
+    if(priorAvg<=0)return;
+    const pct=((lastCost-priorAvg)/priorAvg)*100;
+    if(pct>MILEAGE_ALERT_THRESHOLD_PCT)alerts.push({vehicle:v,lastCost,priorAvg,pct,date:last.date});
+  });
+  return alerts.sort((a,b)=>b.pct-a.pct);
+}
+function renderMileageAlerts(){
+  const wrap=$('mileageAlerts');
+  if(!wrap)return;
+  const alerts=computeMileageAlerts();
+  if(!alerts.length){
+    wrap.innerHTML=`<div class="panel"><div class="pb" style="display:flex;align-items:center;gap:8px;color:var(--g);font-size:13px;font-weight:600"><span style="font-size:17px">✓</span><span>Sab vehicles normal range mein hain — koi mileage alert nahi.</span></div></div>`;
+    return;
+  }
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>⚠ Mileage Alerts</span></div><div class="pb">${alerts.map(a=>`
+    <div class="item">
+      <span><b>${esc(a.vehicle)}</b> — last fill-up <b>₹${a.lastCost.toFixed(2)}/${esc((fuelLog.find(f=>f.vehicle===a.vehicle)||{}).unit||'unit')}</b> (${esc(a.date)}), usual avg ₹${a.priorAvg.toFixed(2)} <span style="color:var(--red);font-weight:700">(+${a.pct.toFixed(0)}%)</span></span>
+      <span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ Check Mileage</span>
+    </div>`).join('')}</div></div>`;
+}
+
+/* ===== Monthly Spend Trend — single series (overall spend), so one brand hue is correct
+   and no legend is needed; thin bars, rounded data-ends, direct value+month labels, and a
+   lightweight hover tooltip. ===== */
+function lastNMonthKeys(n){
+  const base=new Date(todayISO());
+  const out=[];
+  for(let i=n-1;i>=0;i--){
+    const d=new Date(base.getFullYear(),base.getMonth()-i,1);
+    out.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+  }
+  return out;
+}
+const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function monthLabel(key){
+  const parts=String(key||'').split('-').map(Number);
+  if(!parts[0]||!parts[1])return'-';
+  return MONTH_NAMES[parts[1]-1]+" '"+String(parts[0]).slice(2);
+}
+function showTrendTip(evt,label,val){
+  let t=$('mtTooltip');
+  if(!t){t=document.createElement('div');t.id='mtTooltip';t.style.cssText='position:fixed;pointer-events:none;background:#17211b;color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;z-index:99999;white-space:nowrap';document.body.appendChild(t);}
+  t.textContent=label+': '+fmtAmt(val);
+  t.style.left=(evt.clientX+12)+'px';
+  t.style.top=(evt.clientY-28)+'px';
+  t.style.display='block';
+}
+function hideTrendTip(){const t=$('mtTooltip');if(t)t.style.display='none';}
+function renderMonthlyTrend(){
+  const wrap=$('monthlyTrendChart');
+  if(!wrap)return;
+  const live=liveFuel();
+  const months=lastNMonthKeys(6);
+  const sums=months.map(mk=>live.filter(x=>monthKeyOf(x.date)===mk).reduce((s,x)=>s+(x.amount||0),0));
+  const max=Math.max(...sums,1);
+  const W=600,H=190,padL=8,padR=8,padTop=26,padBottom=30;
+  const plotW=W-padL-padR,plotH=H-padTop-padBottom;
+  const n=months.length,gap=14;
+  const barW=(plotW-gap*(n-1))/n;
+  const baselineY=padTop+plotH;
+  const bars=months.map((mk,i)=>{
+    const val=sums[i];
+    const h=max>0?(val/max)*plotH:0;
+    const x=padL+i*(barW+gap);
+    const y=baselineY-h;
+    return {x,y,w:barW,h,val,label:monthLabel(mk)};
+  });
+  const svgBars=bars.map(b=>`<g>
+    <rect x="${b.x.toFixed(1)}" y="${b.y.toFixed(1)}" width="${b.w.toFixed(1)}" height="${Math.max(b.h,1).toFixed(1)}" rx="4" fill="var(--g)" opacity="0.88" style="cursor:pointer" onmouseenter="showTrendTip(event,'${esc(b.label)}',${b.val})" onmouseleave="hideTrendTip()"></rect>
+    <text x="${(b.x+b.w/2).toFixed(1)}" y="${Math.max(b.y-6,12).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)">${b.val>0?'₹'+Math.round(b.val).toLocaleString('en-IN'):''}</text>
+    <text x="${(b.x+b.w/2).toFixed(1)}" y="${(H-10).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)">${esc(b.label)}</text>
+  </g>`).join('');
+  wrap.innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;max-width:560px">
+    <line x1="${padL}" y1="${baselineY.toFixed(1)}" x2="${W-padR}" y2="${baselineY.toFixed(1)}" stroke="var(--line)" stroke-width="1"></line>
+    ${svgBars}
+  </svg>`;
+}
 function deletedInfo(x){return x.deletedAt?`<br><small style="color:var(--muted)">Disabled by ${esc(nameOfUserId(x.deletedBy))}</small>`:''}
 function photoThumbs(x){
   let html='';
@@ -631,7 +735,9 @@ function renderAll(){
   applyFeatureVisibility();
   renderSelects();
   renderDash();
+  renderMileageAlerts();
   renderVehiclePerformance();
+  renderMonthlyTrend();
   renderHistory();
   if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
 }
