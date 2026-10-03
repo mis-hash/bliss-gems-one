@@ -125,6 +125,8 @@ tbody tr:hover td{background:#f7faf8}
   </div>
   <div class="cards" id="statTiles"></div>
 
+  <div id="highAmountAlerts"></div>
+
   <div class="panel">
     <div class="ph"><span>Nayi Entry</span></div>
     <div class="pb">
@@ -156,7 +158,14 @@ tbody tr:hover td{background:#f7faf8}
         <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="renderLedger()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
       </div>
     </div>
-    <div class="pb"><div class="tablewrap"><table>
+    <div class="pb">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <div class="field" style="width:auto;margin:0"><label>From</label><input type="date" id="histFrom" onchange="renderLedger()" style="width:auto"></div>
+        <div class="field" style="width:auto;margin:0"><label>To</label><input type="date" id="histTo" onchange="renderLedger()" style="width:auto"></div>
+        <div class="field" style="width:auto;flex:1;min-width:160px;margin:0"><label>Person</label><input id="histPerson" placeholder="Search person name" oninput="renderLedger()"></div>
+        <button class="btn small secondary" onclick="clearLedgerFilters()" style="margin-top:17px">✕ Clear Filters</button>
+      </div>
+      <div class="tablewrap"><table>
       <thead><tr><th>Date</th><th>Type</th><th>Person / Note</th><th class="num">Amount</th><th>By</th><th>Action</th></tr></thead>
       <tbody id="ledgerTable"></tbody>
     </table></div></div>
@@ -390,13 +399,56 @@ function computeBalance(){
 }
 function renderDash(){
   const {totalIn,totalOut,outstandingLoans,outstandingCount,balance}=computeBalance();
+  const live=liveLedger();
+  const totalLoanGiven=live.filter(x=>x.type==='loan').reduce((s,x)=>s+(x.amount||0),0);
   const tiles=[
     {label:'CURRENT BALANCE',val:fmtAmt(balance)},
     {label:'TOTAL IN',val:fmtAmt(totalIn)},
     {label:'TOTAL OUT',val:fmtAmt(totalOut)},
+    {label:'TOTAL LOAN GIVEN',val:fmtAmt(totalLoanGiven)},
     {label:'OUTSTANDING LOANS',val:fmtAmt(outstandingLoans)+' ('+outstandingCount+')',warn:outstandingCount>0}
   ];
   $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+}
+// A single Out/Loan entry costing much more than that type's own recent history is worth a
+// second look (same pattern as Fuel Tracker's Mileage Alert) - compares the latest live
+// entry of each type against the average of that type's earlier entries.
+const HIGH_AMOUNT_ALERT_THRESHOLD_PCT=100;
+function computeHighAmountAlerts(){
+  const live=liveLedger();
+  const alerts=[];
+  ['out','loan'].forEach(type=>{
+    let entries=live.filter(x=>x.type===type).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.at||'').localeCompare(String(b.at||'')));
+    if(entries.length<2)return;
+    const last=entries[entries.length-1];
+    const prior=entries.slice(0,-1);
+    const priorAvg=prior.reduce((s,x)=>s+(x.amount||0),0)/prior.length;
+    if(priorAvg<=0)return;
+    const pct=((last.amount-priorAvg)/priorAvg)*100;
+    if(pct>HIGH_AMOUNT_ALERT_THRESHOLD_PCT)alerts.push({type,amount:last.amount,priorAvg,pct,date:last.date,person:last.person,note:last.note});
+  });
+  return alerts.sort((a,b)=>b.pct-a.pct);
+}
+function renderHighAmountAlerts(){
+  const wrap=$('highAmountAlerts');
+  if(!wrap)return;
+  const alerts=computeHighAmountAlerts();
+  if(!alerts.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>⚠ High Amount Alerts</span></div><div class="pb">${alerts.map(a=>{
+    const label=a.type==='loan'?'High Advance':'High Expense';
+    const who=a.person?(' — '+esc(a.person)):(a.note?(' — '+esc(a.note)):'');
+    return `<div class="item">
+      <span><b>${esc(label)}</b>${who} — <b>${fmtAmt(a.amount)}</b> (${esc(a.date)}), usual avg ${fmtAmt(a.priorAvg)} <span style="color:var(--red);font-weight:700">(+${a.pct.toFixed(0)}%)</span></span>
+      <span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ Review</span>
+    </div>`;
+  }).join('')}</div></div>`;
+}
+function clearLedgerFilters(){
+  if($('histFrom'))$('histFrom').value='';
+  if($('histTo'))$('histTo').value='';
+  if($('histPerson'))$('histPerson').value='';
+  if($('histType'))$('histType').value='all';
+  renderLedger();
 }
 function deletedInfo(x){return x.deletedAt?`<br><small style="color:var(--muted)">Disabled by ${esc(nameOfUserId(x.deletedBy))}</small>`:''}
 function renderLedger(){
@@ -405,8 +457,14 @@ function renderLedger(){
   if($('deletedCount'))$('deletedCount').textContent=deletedN;
   const showDeleted=$('showDeleted')&&$('showDeleted').checked;
   const type=$('histType')?.value||'all';
+  const from=$('histFrom')?.value||'';
+  const to=$('histTo')?.value||'';
+  const personQ=($('histPerson')?.value||'').trim().toLowerCase();
   let rows=showDeleted?ledger.filter(x=>x.deletedAt):ledger.filter(x=>!x.deletedAt);
   if(type!=='all')rows=rows.filter(x=>x.type===type);
+  if(from)rows=rows.filter(x=>String(x.date)>=from);
+  if(to)rows=rows.filter(x=>String(x.date)<=to);
+  if(personQ)rows=rows.filter(x=>String(x.person||'').toLowerCase().includes(personQ));
   rows=rows.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at||'').localeCompare(String(a.at||'')));
   $('ledgerTable').innerHTML=rows.map(x=>{
     const pillClass=x.type==='in'?'in':x.type==='out'?'out':'loan';
@@ -515,6 +573,7 @@ function renderAll(){
   refreshLoginBadge();
   applyFeatureVisibility();
   renderDash();
+  renderHighAmountAlerts();
   renderLedger();
   if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
 }
