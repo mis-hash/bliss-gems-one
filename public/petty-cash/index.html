@@ -138,7 +138,7 @@ tbody tr:hover td{background:#f7faf8}
       <div class="grid">
         <div class="field"><label>Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="entryAmount"></div>
         <div class="field"><label>Date</label><input type="date" id="entryDate"></div>
-        <div class="field span2" id="entryPersonField"><label id="entryPersonLabel">Person Name</label><input id="entryPerson" placeholder="Optional"><select id="entryPersonSelect" class="hidden"></select></div>
+        <div class="field span2" id="entryPersonField"><label id="entryPersonLabel">Person Name</label><input id="entryPerson" placeholder="Optional"><select id="entryPersonSelect" class="hidden" onchange="toggleLoanPersonTextVisibility()"></select></div>
         <div class="field span2"><label>Note / Reason</label><input id="entryNote" placeholder="Optional"></div>
       </div>
       <div style="margin-top:14px;text-align:right"><button class="btn primary" id="entrySubmitBtn" onclick="addLedgerEntry()">＋ Save Entry</button></div>
@@ -146,6 +146,7 @@ tbody tr:hover td{background:#f7faf8}
   </div>
 
   <div id="myIssuedCashWrap"></div>
+  <div id="myLoansWrap"></div>
 
   <div class="panel">
     <div class="ph">
@@ -396,10 +397,25 @@ function selectEntryType(t){
   if(t==='out'){
     $('entryPersonLabel').textContent='Issued To (optional — select to let them log their own spend)';
     textInp.classList.add('hidden');sel.classList.remove('hidden');
+  }else if(t==='loan'){
+    $('entryPersonLabel').textContent='Given To *';
+    sel.classList.remove('hidden');
+    textInp.placeholder='Non-staff name (if not in the list above)';
+    toggleLoanPersonTextVisibility();
   }else{
-    $('entryPersonLabel').textContent=t==='loan'?'Given To (Person Name) *':'Person Name';
+    $('entryPersonLabel').textContent='Person Name';
+    textInp.placeholder='Optional';
     textInp.classList.remove('hidden');sel.classList.add('hidden');
   }
+}
+// For a Loan, picking a staff member from the dropdown links it to their login (so they
+// show up in their own "My Loans"); leaving it on "Not linked / outsider" falls back to a
+// plain typed name, since a loan can go to someone with no app account at all.
+function toggleLoanPersonTextVisibility(){
+  if(entryType!=='loan')return;
+  const sel=$('entryPersonSelect'),textInp=$('entryPerson');
+  textInp.classList.toggle('hidden',!!sel.value);
+  if(sel.value)textInp.value='';
 }
 function renderEntryPersonSelect(){
   const sel=$('entryPersonSelect');
@@ -419,18 +435,21 @@ async function addLedgerEntry(){
   if(entryType==='out'){
     personId=$('entryPersonSelect').value||'';
     person=personId?nameOfUserId(personId):'';
+  }else if(entryType==='loan'){
+    personId=$('entryPersonSelect').value||'';
+    person=personId?nameOfUserId(personId):$('entryPerson').value.trim();
   }else{
     person=$('entryPerson').value.trim();
   }
   if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
-  if(entryType==='loan'&&!person){alert('Loan ke liye Person Name zaroori hai.');return}
+  if(entryType==='loan'&&!person){alert('Loan ke liye Person (staff select ya naam type) zaroori hai.');return}
   _entrySubmitting=true;
   const btn=$('entrySubmitBtn');if(btn)btn.disabled=true;
   try{
     const actor=loggedUser();
     const payload={type:entryType,amount,date,person,note,by:actor?actor.id:'',at:new Date().toISOString()};
     if(entryType==='loan')payload.repaid=false;
-    if(entryType==='out'&&personId)payload.personId=personId;
+    if((entryType==='out'||entryType==='loan')&&personId)payload.personId=personId;
     checkAndNotifyHighAmount(entryType,amount,date,person,note);
     await db.collection('pc_ledger').add(payload);
     $('entryAmount').value='';$('entryPerson').value='';$('entryNote').value='';
@@ -531,6 +550,19 @@ async function permanentlyDeleteIssueSpend(id){
   if(!confirm('Yeh spend entry hamesha ke liye delete ho jayegi. Confirm karein?'))return;
   await db.collection('pc_issue_spends').doc(id).delete();
   toast('Spend entry deleted');
+}
+// Read-only status view for loans given to the logged-in user — Outstanding/Repaid only,
+// no spend entries (a Loan is personal money, not something to itemize against).
+function renderMyLoans(){
+  const wrap=$('myLoansWrap');
+  if(!wrap)return;
+  const mine=liveLedger().filter(x=>x.type==='loan'&&x.personId===currentUser);
+  if(!mine.length){wrap.innerHTML='';return;}
+  const rows=mine.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>📋 My Loans</span></div><div class="pb">${rows.map(x=>{
+    const statusChip=x.repaid?'<span class="pill repaid">Repaid</span>':'<span class="pill loan">Outstanding</span>';
+    return `<div class="item"><span><b>${fmtAmt(x.amount)}</b> given on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>${statusChip}</div>`;
+  }).join('')}</div></div>`;
 }
 function computeBalance(){
   const live=liveLedger();
@@ -732,6 +764,7 @@ function renderAll(){
   renderDash();
   renderHighAmountAlerts();
   renderMyIssuedCash();
+  renderMyLoans();
   renderLedger();
   if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
 }
