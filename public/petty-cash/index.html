@@ -224,6 +224,13 @@ tbody tr:hover td{background:#f7faf8}
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditLedgerModal()">Cancel</button><button class="btn primary" onclick="saveEditLedger()">Save</button></div>
 </div></div>
 
+<!-- Spending Detail modal (read-only — anyone looking at the Ledger can see how an issued
+     amount was spent; only the recipient themselves can add to it, from My Petty Cash) -->
+<div class="modal" id="spendingDetailModal"><div class="box" style="width:min(460px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Spending Detail</h3><button class="btn small" onclick="closeSpendingDetailModal()">✕</button></div>
+<div id="spendingDetailContent"></div>
+</div></div>
+
 <!-- Manage modal -->
 <div class="modal" id="manageModal"><div class="box" style="width:min(640px,100%)">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Admin / Manage Records</h3><button class="btn small" onclick="closeManage()">✕</button></div>
@@ -578,6 +585,26 @@ function liveLedger(){return ledger.filter(x=>!x.deletedAt)}
    "the company handed X cash to a person for a purpose," which the recipient should be
    able to account for themselves. ===== */
 function issueSpentTotal(issueId){return issueSpends.filter(s=>s.issueId===issueId&&!s.deletedAt).reduce((s,x)=>s+(x.amount||0),0)}
+// Lets anyone looking at the shared Ledger (Accountant, Admin, Super Admin, or just a
+// curious Doer) see exactly how an issued amount was itemized by its recipient, without
+// needing that recipient's own login - read-only, no add-spend form here (that stays in
+// the recipient's own "Cash Issued to Me" on My Petty Cash).
+function openSpendingDetailModal(issueId){
+  const x=ledger.find(e=>e.id===issueId);
+  if(!x)return;
+  const spent=issueSpentTotal(issueId);
+  const remaining=x.amount-spent;
+  const mySpends=issueSpends.filter(s=>s.issueId===issueId&&!s.deletedAt).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  $('spendingDetailContent').innerHTML=`
+    <div class="item">
+      <span><b>${fmtAmt(x.amount)}</b> issued to <b>${esc(x.person||'-')}</b> on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>
+      <span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>
+    </div>
+    ${mySpends.length?mySpends.map(s=>`<div class="item"><span>${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''}<br><small style="color:var(--muted)">${esc(s.date)} • by ${esc(nameOfUserId(s.by))}</small></span></div>`).join(''):'<div class="note" style="padding:10px 0">Abhi tak koi spending entry nahi daali gayi.</div>'}
+  `;
+  $('spendingDetailModal').classList.add('show');
+}
+function closeSpendingDetailModal(){$('spendingDetailModal')?.classList.remove('show');}
 function renderMyIssuedCash(){
   const wrap=$('myIssuedCashWrap');
   if(!wrap)return;
@@ -765,7 +792,8 @@ function renderLedger(){
       :(superAdminUnlocked?`<button class="btn small danger" onclick="deleteLedgerEntry('${esc(x.id)}')">Disable</button>`:'');
     const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeleteLedgerEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
     const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditLedgerModal('${esc(x.id)}')">✎ Edit</button>`:'';
-    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}</td><td>${esc(x.person||'-')}${x.note?'<br><small style="color:var(--muted)">'+esc(x.note)+'</small>':''}</td><td class="num">${sign}${fmtAmt(x.amount)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${repayBtn} ${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
+    const viewSpendBtn=(x.type==='out'&&x.personId)?`<button class="btn small secondary" onclick="openSpendingDetailModal('${esc(x.id)}')">👁 View Spending</button>`:'';
+    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}</td><td>${esc(x.person||'-')}${x.note?'<br><small style="color:var(--muted)">'+esc(x.note)+'</small>':''}</td><td class="num">${sign}${fmtAmt(x.amount)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${repayBtn} ${viewSpendBtn} ${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
   }).join('')||`<tr><td colspan="6"><div class="emptystate">💵<p>Koi entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
 }
 
