@@ -217,6 +217,7 @@ tbody tr:hover td{background:#f7faf8}
 <div class="tabs" style="margin:0 0 10px">
 <button class="tab on" data-tab="records" onclick="mtab(this,'records')">🗑 Manage Records</button>
 <button class="tab" data-tab="notify" onclick="mtab(this,'notify')">📲 Notify Recipients</button>
+<button class="tab" data-tab="roles" onclick="mtab(this,'roles')">👥 Team &amp; Access</button>
 </div>
 <div id="manageContent"></div>
 </div></div>
@@ -253,6 +254,8 @@ let currentUser=null,currentTab='records',entryType='in';
 let usersStarted=false,ledgerStarted=false,mastersStarted=false,issueSpendsStarted=false;
 
 function loggedUser(){return users.find(x=>x.id===currentUser)||null}
+function myRole(){const u=loggedUser();return (u&&u.appRoles&&u.appRoles[APP_SLUG])||''}
+function canCloseLoan(){return superAdminUnlocked||myRole()==='accountant'||myRole()==='admin'}
 
 /* ===== Super Admin (same shared password as other Bliss apps) ===== */
 const SUPER_ADMIN_PASSWORD_HASH='0cb73e5ce7c7e7b2bc347bc16e73c2a16331fdedaec4c1c787815eab4daa6fad';
@@ -480,7 +483,7 @@ async function addLedgerEntry(){
   }
 }
 async function markLoanRepaid(id){
-  if(!superAdminUnlocked){alert('Sirf Super Admin loan Repaid mark kar sakta hai.');return}
+  if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin loan Repaid mark kar sakte hain.');return}
   const x=ledger.find(e=>e.id===id);if(!x)return;
   if(!confirm('Yeh loan Repaid mark karna hai? Balance mein amount wapas add ho jayega.'))return;
   const actor=loggedUser();
@@ -726,6 +729,25 @@ function renderManage(){
     c.innerHTML=`<p class="note">High Amount Alert (High Advance / High Expense) hone par WhatsApp message kisko jaye, yahan se select karein. Kuch bhi select na karein to default Bliss One hub ke Admin/Director (jinke paas phone number hai) ko jayega.</p>`+
       (withPhone.map(u=>`<div class="item"><span>${esc(u.name)}</span><input type="checkbox" ${selected.includes(u.id)?'checked':''} onchange="toggleAlertRecipient('${esc(u.id)}')"></div>`).join('')||'<div class="note" style="padding:8px 0">Koi active user ka phone number save nahi hai.</div>');
   }
+  else if(currentTab==='roles'){
+    const au=users.filter(u=>u.active!==false);
+    c.innerHTML=`<p class="note">Accountant/Admin role wale users bina Super Admin ke bhi Loan "Mark Repaid" kar sakte hain. Baaki sabke liye yeh "No Access" (sirf Super Admin hi close kar sakta hai).</p>`+au.map(u=>{
+      const role=(u.appRoles&&u.appRoles[APP_SLUG])||'';
+      return `<div class="item">
+        <b style="font-size:13px">${esc(u.name)}</b>
+        <select style="width:auto" onchange="setPettyCashRole('${esc(u.id)}',this.value)">
+          <option value=""${role===''?' selected':''}>No Access</option>
+          <option value="accountant"${role==='accountant'?' selected':''}>Accountant</option>
+          <option value="admin"${role==='admin'?' selected':''}>Admin</option>
+        </select>
+      </div>`;
+    }).join('');
+  }
+}
+function setPettyCashRole(userId,role){
+  if(!db)return;
+  const patch={};patch['appRoles.'+APP_SLUG]=role||firebase.firestore.FieldValue.delete();
+  db.collection(UU_COLLECTION).doc(userId).update(patch).catch(e=>console.error('role save failed',e));
 }
 function toggleAlertRecipient(userId){
   if(!masters.alertRecipients)masters.alertRecipients=[];
