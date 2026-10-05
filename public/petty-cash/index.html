@@ -93,6 +93,10 @@ tbody tr:hover td{background:#f7faf8}
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
 .tab{border:1px solid var(--line);background:#fff;color:var(--muted);padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
 .tab.on{background:var(--g);border-color:var(--g);color:#fff}
+#pageTabs .tab{padding:11px 16px;font-size:13.5px;position:relative}
+.tabBadgeDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin-left:5px}
+.pcPage{display:none}
+.pcPage.on{display:block}
 .typeRow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .typeRow button{flex:1;min-width:110px;padding:13px 10px;font-size:14px}
 #entrySubmitBtn{padding:13px 22px;font-size:14px}
@@ -123,6 +127,12 @@ tbody tr:hover td{background:#f7faf8}
 </div></header>
 
 <div class="shell">
+  <div class="tabs" id="pageTabs" style="margin-bottom:14px">
+    <button class="tab on" data-page="ledger" onclick="goPage('ledger')">📊 Ledger</button>
+    <button class="tab" data-page="my" id="myPageTabBtn" onclick="goPage('my')">👤 My Petty Cash</button>
+  </div>
+
+  <div id="page-ledger" class="pcPage on">
   <div class="hero">
     <h1>Company Petty Cash</h1>
     <p>Ek hi shared cash-box — In / Out / Loan entries, sabko live dikhti hain.</p>
@@ -149,9 +159,6 @@ tbody tr:hover td{background:#f7faf8}
     </div>
   </div>
 
-  <div id="myIssuedCashWrap"></div>
-  <div id="myLoansWrap"></div>
-
   <div class="panel">
     <div class="ph">
       <span>Ledger History</span>
@@ -177,6 +184,13 @@ tbody tr:hover td{background:#f7faf8}
       <thead><tr><th>Date</th><th>Type</th><th>Person / Note</th><th class="num">Amount</th><th>By</th><th>Action</th></tr></thead>
       <tbody id="ledgerTable"></tbody>
     </table></div></div>
+  </div>
+  </div>
+
+  <div id="page-my" class="pcPage">
+    <div id="myIssuedCashWrap"></div>
+    <div id="myLoansWrap"></div>
+    <div id="myPageEmptyState" class="panel hidden"><div class="pb"><div class="emptystate">👤<p>Abhi aapko koi cash issue ya loan nahi diya gaya hai.</p><small>Jab koi aapko Cash Out "Issued To" se dega ya Loan dega, yahan dikhega.</small></div></div></div>
   </div>
 </div>
 </div>
@@ -545,6 +559,23 @@ function renderMyLoans(){
     return `<div class="item"><span><b>${fmtAmt(x.amount)}</b> given on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>${statusChip}</div>`;
   }).join('')}</div></div>`;
 }
+// Drives the "👤 My Petty Cash" tab: renders both of the person's own sections, shows an
+// empty state when neither applies, and puts a dot on the tab itself when something there
+// still needs their attention (an issue not yet fully accounted for, or an outstanding loan).
+function renderMyPage(){
+  renderMyIssuedCash();
+  renderMyLoans();
+  const issued=liveLedger().filter(x=>x.type==='out'&&x.personId===currentUser);
+  const loans=liveLedger().filter(x=>x.type==='loan'&&x.personId===currentUser);
+  if($('myPageEmptyState'))$('myPageEmptyState').classList.toggle('hidden',issued.length>0||loans.length>0);
+  const pending=issued.some(x=>(x.amount-issueSpentTotal(x.id))>0)||loans.some(x=>!x.repaid);
+  const tabBtn=$('myPageTabBtn');
+  if(tabBtn){
+    let dot=tabBtn.querySelector('.tabBadgeDot');
+    if(pending&&!dot){dot=document.createElement('span');dot.className='tabBadgeDot';tabBtn.appendChild(dot);}
+    else if(!pending&&dot)dot.remove();
+  }
+}
 let _issueSpendSubmitting=false;
 async function addIssueSpend(issueId){
   if(_issueSpendSubmitting)return;
@@ -767,6 +798,10 @@ function toast(msg){
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.opacity='0',2200);
 }
 
+function goPage(id){
+  document.querySelectorAll('.pcPage').forEach(p=>p.classList.toggle('on',p.id==='page-'+id));
+  document.querySelectorAll('#pageTabs .tab').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
+}
 function renderAll(){
   renderGate();
   refreshLoginBadge();
@@ -774,8 +809,7 @@ function renderAll(){
   renderEntryPersonSelect();
   renderDash();
   renderHighAmountAlerts();
-  renderMyIssuedCash();
-  renderMyLoans();
+  renderMyPage();
   renderLedger();
   if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
 }
