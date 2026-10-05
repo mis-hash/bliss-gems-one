@@ -128,22 +128,24 @@ tbody tr:hover td{background:#f7faf8}
   <div id="highAmountAlerts"></div>
 
   <div class="panel">
-    <div class="ph"><span>Nayi Entry</span></div>
+    <div class="ph"><span>New Entry</span></div>
     <div class="pb">
       <div class="typeRow">
         <button type="button" class="tab on" id="typeBtn_in" onclick="selectEntryType('in')">➕ Cash In</button>
         <button type="button" class="tab" id="typeBtn_out" onclick="selectEntryType('out')">➖ Cash Out</button>
-        <button type="button" class="tab" id="typeBtn_loan" onclick="selectEntryType('loan')">🤝 Loan Diya</button>
+        <button type="button" class="tab" id="typeBtn_loan" onclick="selectEntryType('loan')">🤝 Loan Given</button>
       </div>
       <div class="grid">
         <div class="field"><label>Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="entryAmount"></div>
         <div class="field"><label>Date</label><input type="date" id="entryDate"></div>
-        <div class="field span2" id="entryPersonField"><label id="entryPersonLabel">Person Name</label><input id="entryPerson" placeholder="Optional"></div>
+        <div class="field span2" id="entryPersonField"><label id="entryPersonLabel">Person Name</label><input id="entryPerson" placeholder="Optional"><select id="entryPersonSelect" class="hidden"></select></div>
         <div class="field span2"><label>Note / Reason</label><input id="entryNote" placeholder="Optional"></div>
       </div>
       <div style="margin-top:14px;text-align:right"><button class="btn primary" id="entrySubmitBtn" onclick="addLedgerEntry()">＋ Save Entry</button></div>
     </div>
   </div>
+
+  <div id="myIssuedCashWrap"></div>
 
   <div class="panel">
     <div class="ph">
@@ -224,11 +226,11 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const todayISO=()=>new Date().toISOString().slice(0,10);
 const fmtAmt=n=>'₹'+Number(n||0).toLocaleString('en-IN');
 
-let users=[],ledger=[];
+let users=[],ledger=[],issueSpends=[];
 let masters={alertRecipients:[]};
 let api={};
 let currentUser=null,currentTab='records',entryType='in';
-let usersStarted=false,ledgerStarted=false,mastersStarted=false;
+let usersStarted=false,ledgerStarted=false,mastersStarted=false,issueSpendsStarted=false;
 
 function loggedUser(){return users.find(x=>x.id===currentUser)||null}
 
@@ -293,6 +295,15 @@ function startUsersSync(){
 function startLedgerSync(){
   if(ledgerStarted||!db)return;ledgerStarted=true;
   db.collection('pc_ledger').orderBy('date','desc').onSnapshot(snap=>{ledger=[];snap.forEach(d=>ledger.push({id:d.id,...d.data()}));renderAll();},err=>console.error('ledger sync error',err));
+}
+// How a person accounts for cash issued (Cash Out) specifically to them - "Spent on X"
+// entries they log themselves against that issue, in "Cash Issued to Me" below. A Loan is
+// money taken for personal use (just Outstanding/Repaid, no spend trail) - this only
+// applies to Cash Out entries that name a recipient. Deliberately a separate collection
+// (not a field on the ledger doc) so multiple spend entries can build up against one issue.
+function startIssueSpendsSync(){
+  if(issueSpendsStarted||!db)return;issueSpendsStarted=true;
+  db.collection('pc_issue_spends').onSnapshot(snap=>{issueSpends=[];snap.forEach(d=>issueSpends.push({id:d.id,...d.data()}));renderAll();},err=>console.error('issue spends sync error',err));
 }
 let mastersSeedChecked=false;
 function seedStarterMastersIfEmpty(){
@@ -381,15 +392,36 @@ function applyFeatureVisibility(){
 function selectEntryType(t){
   entryType=t;
   ['in','out','loan'].forEach(x=>$('typeBtn_'+x).classList.toggle('on',x===t));
-  $('entryPersonLabel').textContent=t==='loan'?'Kisko Diya (Person Name) *':'Person Name';
+  const textInp=$('entryPerson'),sel=$('entryPersonSelect');
+  if(t==='out'){
+    $('entryPersonLabel').textContent='Issued To (optional — select to let them log their own spend)';
+    textInp.classList.add('hidden');sel.classList.remove('hidden');
+  }else{
+    $('entryPersonLabel').textContent=t==='loan'?'Given To (Person Name) *':'Person Name';
+    textInp.classList.remove('hidden');sel.classList.add('hidden');
+  }
+}
+function renderEntryPersonSelect(){
+  const sel=$('entryPersonSelect');
+  if(!sel)return;
+  const cur=sel.value;
+  const au=users.filter(u=>u.active!==false);
+  sel.innerHTML='<option value="">-- Not linked / outsider --</option>'+au.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+  if(au.some(u=>u.id===cur))sel.value=cur;
 }
 let _entrySubmitting=false;
 async function addLedgerEntry(){
   if(_entrySubmitting)return;
   const amount=parseFloat($('entryAmount').value);
   const date=$('entryDate').value||todayISO();
-  const person=$('entryPerson').value.trim();
   const note=$('entryNote').value.trim();
+  let person='',personId='';
+  if(entryType==='out'){
+    personId=$('entryPersonSelect').value||'';
+    person=personId?nameOfUserId(personId):'';
+  }else{
+    person=$('entryPerson').value.trim();
+  }
   if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
   if(entryType==='loan'&&!person){alert('Loan ke liye Person Name zaroori hai.');return}
   _entrySubmitting=true;
@@ -398,9 +430,11 @@ async function addLedgerEntry(){
     const actor=loggedUser();
     const payload={type:entryType,amount,date,person,note,by:actor?actor.id:'',at:new Date().toISOString()};
     if(entryType==='loan')payload.repaid=false;
+    if(entryType==='out'&&personId)payload.personId=personId;
     checkAndNotifyHighAmount(entryType,amount,date,person,note);
     await db.collection('pc_ledger').add(payload);
     $('entryAmount').value='';$('entryPerson').value='';$('entryNote').value='';
+    if($('entryPersonSelect'))$('entryPersonSelect').value='';
     toast('Entry saved');
   }finally{
     _entrySubmitting=false;
@@ -408,6 +442,7 @@ async function addLedgerEntry(){
   }
 }
 async function markLoanRepaid(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin loan Repaid mark kar sakta hai.');return}
   const x=ledger.find(e=>e.id===id);if(!x)return;
   if(!confirm('Yeh loan Repaid mark karna hai? Balance mein amount wapas add ho jayega.'))return;
   const actor=loggedUser();
@@ -446,6 +481,57 @@ async function permanentlyDeleteLedgerEntry(id,skipConfirm){
 /* ===== Dashboard ===== */
 function nameOfUserId(id){return (users.find(x=>x.id===id)||{}).name||id||'-'}
 function liveLedger(){return ledger.filter(x=>!x.deletedAt)}
+/* ===== Cash Issued to Me — self-service spend tracking for Cash Out entries that name a
+   specific recipient. A Loan is personal money (no spend trail needed); this is only for
+   "the company handed X cash to a person for a purpose," which the recipient should be
+   able to account for themselves. ===== */
+function issueSpentTotal(issueId){return issueSpends.filter(s=>s.issueId===issueId&&!s.deletedAt).reduce((s,x)=>s+(x.amount||0),0)}
+function renderMyIssuedCash(){
+  const wrap=$('myIssuedCashWrap');
+  if(!wrap)return;
+  const mine=liveLedger().filter(x=>x.type==='out'&&x.personId===currentUser);
+  if(!mine.length){wrap.innerHTML='';return;}
+  const rows=mine.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>💳 Cash Issued to Me</span></div><div class="pb">${rows.map(x=>{
+    const spent=issueSpentTotal(x.id);
+    const remaining=x.amount-spent;
+    const mySpends=issueSpends.filter(s=>s.issueId===x.id&&!s.deletedAt).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:8px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <span><b>${fmtAmt(x.amount)}</b> issued on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>
+        <span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>
+      </div>
+      ${mySpends.map(s=>`<div style="font-size:12px;color:var(--muted);padding-left:4px">— ${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''} (${esc(s.date)})${superAdminUnlocked?` <button class="btn small danger" style="padding:2px 7px;font-size:10px" onclick="permanentlyDeleteIssueSpend('${esc(s.id)}')">✕</button>`:''}</div>`).join('')}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
+        <input type="number" id="issueSpendAmt_${esc(x.id)}" placeholder="Amount spent" style="width:120px;padding:7px;border:1px solid var(--line);border-radius:7px">
+        <input id="issueSpendNote_${esc(x.id)}" placeholder="Spent on what?" style="flex:1;min-width:140px;padding:7px;border:1px solid var(--line);border-radius:7px">
+        <button class="btn small primary" onclick="addIssueSpend('${esc(x.id)}')">＋ Add Spend</button>
+      </div>
+    </div>`;
+  }).join('')}</div></div>`;
+}
+let _issueSpendSubmitting=false;
+async function addIssueSpend(issueId){
+  if(_issueSpendSubmitting)return;
+  const amtEl=$('issueSpendAmt_'+issueId),noteEl=$('issueSpendNote_'+issueId);
+  const amount=parseFloat(amtEl?.value);
+  const note=(noteEl?.value||'').trim();
+  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  _issueSpendSubmitting=true;
+  try{
+    const actor=loggedUser();
+    await db.collection('pc_issue_spends').add({issueId,amount,note,date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString()});
+    toast('Spend entry added');
+  }finally{
+    _issueSpendSubmitting=false;
+  }
+}
+async function permanentlyDeleteIssueSpend(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin spend entry delete kar sakta hai.');return}
+  if(!confirm('Yeh spend entry hamesha ke liye delete ho jayegi. Confirm karein?'))return;
+  await db.collection('pc_issue_spends').doc(id).delete();
+  toast('Spend entry deleted');
+}
 function computeBalance(){
   const live=liveLedger();
   const totalIn=live.filter(x=>x.type==='in').reduce((s,x)=>s+(x.amount||0),0);
@@ -642,8 +728,10 @@ function renderAll(){
   renderGate();
   refreshLoginBadge();
   applyFeatureVisibility();
+  renderEntryPersonSelect();
   renderDash();
   renderHighAmountAlerts();
+  renderMyIssuedCash();
   renderLedger();
   if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
 }
@@ -655,6 +743,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   startUsersSync();
   startLedgerSync();
   startMastersSync();
+  startIssueSpendsSync();
   renderAll();
 });
 window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
