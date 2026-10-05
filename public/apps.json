@@ -16,5 +16,23 @@
     "name": "Stationery Inventory",
     "pushedAt": 0,
     "enabled": true
+  },
+  {
+    "slug": "petty-cash",
+    "name": "Petty Cash",
+    "pushedAt": 0,
+    "enabled": false
+  },
+  {
+    "slug": "fuel-tracker",
+    "name": "Fuel Tracker",
+    "pushedAt": 0,
+    "enabled": false
+  },
+  {
+    "slug": "purchase-slip",
+    "name": "Purchase Slip",
+    "pushedAt": 0,
+    "enabled": false
   }
 ]
