@@ -601,16 +601,52 @@ function openSpendingDetailModal(issueId){
   const spent=issueSpentTotal(issueId);
   const remaining=x.amount-spent;
   const mySpends=issueSpends.filter(s=>s.issueId===issueId&&!s.deletedAt).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const verifiedBadge=x.verified?'<span class="pill repaid">✓ Verified &amp; Settled</span>':'';
+  const canVerify=canCloseLoan()&&!x.verified;
+  const verifyBtn=canVerify
+    ? (remaining>0
+        ? `<button class="btn small primary" onclick="verifyAndSettleSpending('${esc(issueId)}')">✓ Verify &amp; Receive Remaining ${fmtAmt(remaining)}</button>`
+        : `<button class="btn small primary" onclick="verifyAndSettleSpending('${esc(issueId)}')">✓ Verify Spending (fully spent, nothing to receive)</button>`)
+    : '';
   $('spendingDetailContent').innerHTML=`
     <div class="item">
       <span><b>${fmtAmt(x.amount)}</b> issued to <b>${esc(x.person||'-')}</b> on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>
-      <span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>
+      ${verifiedBadge||`<span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>`}
     </div>
     ${mySpends.length?mySpends.map(s=>`<div class="item"><span>${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''}<br><small style="color:var(--muted)">${esc(s.date)} • by ${esc(nameOfUserId(s.by))}</small></span></div>`).join(''):'<div class="note" style="padding:10px 0">Abhi tak koi spending entry nahi daali gayi.</div>'}
+    ${x.verified?`<p class="note" style="margin-top:10px">Verified by ${esc(nameOfUserId(x.settledBy))} on ${esc((x.settledAt||'').slice(0,10))}${x.returnedAmount?' — '+fmtAmt(x.returnedAmount)+' cash wapas receive hua.':''}</p>`:''}
+    ${verifyBtn?`<div style="margin-top:12px;text-align:right">${verifyBtn}</div>`:''}
   `;
   $('spendingDetailModal').classList.add('show');
 }
 function closeSpendingDetailModal(){$('spendingDetailModal')?.classList.remove('show');}
+// Accounts/Admin/Super Admin confirms the itemized spend entries are legit, and if the
+// recipient physically handed back whatever wasn't spent, that gets recorded as a fresh
+// Cash In entry (so it adds back to the live Current Balance exactly like any other Cash
+// In) - the original issue's own amount still stays Out in full, same as before, so the
+// books show both sides: cash issued, and cash returned.
+async function verifyAndSettleSpending(issueId){
+  if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin spending verify kar sakte hain.');return}
+  const x=ledger.find(e=>e.id===issueId);if(!x)return;
+  const remaining=x.amount-issueSpentTotal(issueId);
+  const msg=remaining>0
+    ? 'Spending verify karein aur '+fmtAmt(remaining)+' cash wapas receive hua confirm karein?\n\nYeh amount ek nayi Cash In entry ke roop mein add ho jayega.'
+    : 'Spending verify karein? (Pura amount spend ho chuka hai, wapas lene ko kuch nahi hai.)';
+  if(!confirm(msg))return;
+  const actor=loggedUser();
+  try{
+    if(remaining>0){
+      await db.collection('pc_ledger').add({
+        type:'in',amount:remaining,date:todayISO(),
+        note:'Balance returned by '+(x.person||'-')+' (issued '+fmtAmt(x.amount)+' on '+x.date+')',
+        person:x.person||'',by:actor?actor.id:'',at:new Date().toISOString()
+      });
+    }
+    await db.collection('pc_ledger').doc(issueId).update({verified:true,settledAt:new Date().toISOString(),settledBy:actor?actor.id:'Unknown',returnedAmount:remaining});
+    closeSpendingDetailModal();
+    toast('Spending verified'+(remaining>0?' aur balance receive ho gaya':''));
+  }catch(e){ console.error('verify/settle failed',e); alert('Fail ho gaya, dobara try karein.'); }
+}
 function renderMyIssuedCash(){
   const wrap=$('myIssuedCashWrap');
   if(!wrap)return;
@@ -623,14 +659,14 @@ function renderMyIssuedCash(){
     return `<div class="item" style="flex-direction:column;align-items:stretch;gap:8px">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
         <span><b>${fmtAmt(x.amount)}</b> issued on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>
-        <span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>
+        ${x.verified?'<span class="pill repaid">✓ Verified &amp; Settled</span>':`<span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>`}
       </div>
       ${mySpends.map(s=>`<div style="font-size:12px;color:var(--muted);padding-left:4px">— ${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''} (${esc(s.date)})${superAdminUnlocked?` <button class="btn small danger" style="padding:2px 7px;font-size:10px" onclick="permanentlyDeleteIssueSpend('${esc(s.id)}')">✕</button>`:''}</div>`).join('')}
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
+      ${x.verified?'':`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
         <input type="number" id="issueSpendAmt_${esc(x.id)}" placeholder="Amount spent" style="width:120px;padding:7px;border:1px solid var(--line);border-radius:7px">
         <input id="issueSpendNote_${esc(x.id)}" placeholder="Spent on what?" style="flex:1;min-width:140px;padding:7px;border:1px solid var(--line);border-radius:7px">
         <button class="btn small primary" onclick="addIssueSpend('${esc(x.id)}')">＋ Add Spend</button>
-      </div>
+      </div>`}
     </div>`;
   }).join('')}</div></div>`;
 }
@@ -666,6 +702,8 @@ function renderMyPage(){
 let _issueSpendSubmitting=false;
 async function addIssueSpend(issueId){
   if(_issueSpendSubmitting)return;
+  const issue=ledger.find(x=>x.id===issueId);
+  if(issue&&issue.verified){alert('Yeh entry Accounts ne already verify/settle kar di hai, ab aur spend add nahi ho sakta.');return}
   const amtEl=$('issueSpendAmt_'+issueId),noteEl=$('issueSpendNote_'+issueId);
   const amount=parseFloat(amtEl?.value);
   const note=(noteEl?.value||'').trim();
@@ -792,6 +830,7 @@ function renderLedger(){
     const pillLabel=x.type==='in'?'IN':x.type==='out'?'OUT':'LOAN';
     const sign=x.type==='in'?'+':'-';
     const loanRepaidBadge=x.type==='loan'?(x.repaid?' <span class="pill repaid">Repaid</span>':' <span class="pill loan">Outstanding</span>'):'';
+    const settledBadge=(x.type==='out'&&x.personId)?(x.verified?' <span class="pill repaid">✓ Settled</span>':' <span class="pill loan">Pending Verify</span>'):'';
     const repayBtn=(x.type==='loan'&&!x.repaid&&!x.deletedAt)?`<button class="btn small" onclick="markLoanRepaid('${esc(x.id)}')">↩ Mark Repaid</button>`:'';
     const adminBtn=x.deletedAt
       ?(superAdminUnlocked?`<button class="btn small" onclick="restoreLedgerEntry('${esc(x.id)}')">↩ Restore</button>`:'')
@@ -799,7 +838,7 @@ function renderLedger(){
     const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeleteLedgerEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
     const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditLedgerModal('${esc(x.id)}')">✎ Edit</button>`:'';
     const viewSpendBtn=(x.type==='out'&&x.personId)?`<button class="btn small secondary" onclick="openSpendingDetailModal('${esc(x.id)}')">👁 View Spending</button>`:'';
-    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}</td><td>${esc(x.person||'-')}${x.note?'<br><small style="color:var(--muted)">'+esc(x.note)+'</small>':''}</td><td class="num">${sign}${fmtAmt(x.amount)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${repayBtn} ${viewSpendBtn} ${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
+    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}${settledBadge}</td><td>${esc(x.person||'-')}${x.note?'<br><small style="color:var(--muted)">'+esc(x.note)+'</small>':''}</td><td class="num">${sign}${fmtAmt(x.amount)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${repayBtn} ${viewSpendBtn} ${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
   }).join('')||`<tr><td colspan="6"><div class="emptystate">💵<p>Koi entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
 }
 
