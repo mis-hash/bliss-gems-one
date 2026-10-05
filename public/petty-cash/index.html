@@ -52,18 +52,12 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 .hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px}
 .hero h1{font-size:24px;margin:0 0 5px}
 .hero p{font-size:13px;margin:0;opacity:.9}
-.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:12px 0}
-.card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px;box-shadow:0 1px 3px rgba(22,36,31,.04);transition:box-shadow .15s,transform .15s}
-.card:hover{box-shadow:0 4px 14px rgba(22,36,31,.08);transform:translateY(-1px)}
-.card .cardIcon{font-size:17px;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;margin-bottom:8px}
-.card small{font-size:10.5px;letter-spacing:.03em;color:var(--muted);font-weight:700}
-.card b{display:block;font-size:21px;margin-top:5px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+.card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px}
+.card small{font-size:11px;color:var(--muted)}
+.card b{display:block;font-size:22px;margin-top:6px}
 .card.warn{background:var(--amberbg)!important;color:var(--amber)!important}
-.card.accent-in .cardIcon{background:var(--mint);color:var(--g)}
-.card.accent-out .cardIcon{background:var(--redbg);color:var(--red)}
-.card.accent-loan .cardIcon{background:var(--amberbg);color:var(--amber)}
-.card.accent-balance .cardIcon{background:#e8eef8;color:#2f5fac}
-.panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:12px;box-shadow:0 1px 3px rgba(22,36,31,.04)}
+.panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:12px}
 .ph{padding:14px 16px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 .pb{padding:15px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -115,9 +109,7 @@ tbody tr:hover td{background:#f7faf8}
   .typeRow{flex-direction:column}
   .typeRow button{min-width:0;width:100%}
   #entrySubmitBtn{width:100%}
-  #quickAddFab.show{display:flex}
 }
-#quickAddFab{display:none;position:fixed;bottom:20px;left:20px;width:54px;height:54px;border-radius:50%;background:var(--g);color:#fff;font-size:26px;border:0;box-shadow:0 4px 14px rgba(38,143,118,.4);cursor:pointer;z-index:999;align-items:center;justify-content:center;font-family:inherit}
 </style>
 </head>
 <body>
@@ -244,7 +236,6 @@ tbody tr:hover td{background:#f7faf8}
 </div></div>
 
 <button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:14px;right:14px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:13px;line-height:26px;cursor:default;z-index:999999;transition:background .15s">•</button>
-<button type="button" id="quickAddFab" onclick="scrollToEntryForm()" title="New Entry">＋</button>
 
 <script>
 const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
@@ -420,7 +411,6 @@ function checkAndNotifyHighAmount(type,amount,date,person,note){
 function renderGate(){
   const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
   const u=loggedUser();
-  if($('quickAddFab'))$('quickAddFab').classList.remove('show');
   if(!currentUser||!u){
     gateWrap.style.display='flex';appWrap.style.display='none';
     const inFrame=window.self!==window.top;
@@ -435,12 +425,6 @@ function renderGate(){
     return;
   }
   gateWrap.style.display='none';appWrap.style.display='';
-  if($('quickAddFab'))$('quickAddFab').classList.add('show');
-}
-function scrollToEntryForm(){
-  goPage('ledger');
-  const amt=$('entryAmount');
-  if(amt){amt.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>amt.focus(),300);}
 }
 function refreshLoginBadge(){
   const u=loggedUser();
@@ -682,13 +666,13 @@ function renderDash(){
   const live=liveLedger();
   const totalLoanGiven=live.filter(x=>x.type==='loan').reduce((s,x)=>s+(x.amount||0),0);
   const tiles=[
-    {label:'CURRENT BALANCE',val:fmtAmt(balance),icon:'💰',accent:'balance'},
-    {label:'TOTAL IN',val:fmtAmt(totalIn),icon:'⬆',accent:'in'},
-    {label:'TOTAL OUT',val:fmtAmt(totalOut),icon:'⬇',accent:'out'},
-    {label:'TOTAL LOAN GIVEN',val:fmtAmt(totalLoanGiven),icon:'🤝',accent:'loan'},
-    {label:'OUTSTANDING LOANS',val:fmtAmt(outstandingLoans)+' ('+outstandingCount+')',icon:'⚠',accent:'loan',warn:outstandingCount>0}
+    {label:'CURRENT BALANCE',val:fmtAmt(balance)},
+    {label:'TOTAL IN',val:fmtAmt(totalIn)},
+    {label:'TOTAL OUT',val:fmtAmt(totalOut)},
+    {label:'TOTAL LOAN GIVEN',val:fmtAmt(totalLoanGiven)},
+    {label:'OUTSTANDING LOANS',val:fmtAmt(outstandingLoans)+' ('+outstandingCount+')',warn:outstandingCount>0}
   ];
-  $('statTiles').innerHTML=tiles.map(t=>`<div class="card accent-${t.accent}${t.warn?' warn':''}"><span class="cardIcon">${t.icon}</span><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+  $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
 }
 // A single Out/Loan entry costing much more than that type's own recent history is worth a
 // second look (same pattern as Fuel Tracker's Mileage Alert) - compares the latest live
