@@ -123,6 +123,7 @@ tbody tr:hover td{background:#f7faf8}
   </div>
   <div class="cards" id="statTiles"></div>
 
+  <div id="serviceReminders"></div>
   <div id="mileageAlerts"></div>
 
   <div class="panel">
@@ -163,7 +164,10 @@ tbody tr:hover td{background:#f7faf8}
   <div class="panel">
     <div class="ph">
       <span>Fuel History</span>
-      <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="renderHistory()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn small secondary" onclick="exportFuelCSV()">⬇ Export CSV</button>
+        <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="renderHistory()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
+      </div>
     </div>
     <div class="pb"><div class="tablewrap"><table>
       <thead><tr><th>Date</th><th>Vehicle</th><th>Meter (Before → After)</th><th class="num">Amount</th><th class="num">Cost/Unit</th><th>Payment</th><th>By</th><th>Photos</th><th>Action</th></tr></thead>
@@ -187,6 +191,22 @@ tbody tr:hover td{background:#f7faf8}
 <h3>🔒 Super Admin</h3>
 <div class="field"><label>Password</label><input id="superAdminPassword" type="password" onkeydown="if(event.key==='Enter')unlockSuperAdmin()"></div>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeSuperAdminModal()">Cancel</button><button class="btn primary" onclick="unlockSuperAdmin()">Unlock</button></div>
+</div></div>
+
+<!-- Edit Entry modal -->
+<div class="modal" id="editFuelModal"><div class="box" style="width:min(460px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Edit Fuel Entry</h3><button class="btn small" onclick="closeEditFuelModal()">✕</button></div>
+<div class="grid3">
+  <div class="field"><label>Date</label><input type="date" id="editFDate"></div>
+  <div class="field"><label>Meter Before</label><input type="number" id="editFMeterBefore"></div>
+  <div class="field"><label>Meter After</label><input type="number" id="editFMeterAfter"></div>
+</div>
+<div class="grid" style="margin-top:10px">
+  <div class="field"><label>Fuel Amount (₹)</label><input type="number" id="editFAmount"></div>
+  <div class="field"><label>Payment Mode</label><input id="editFPaymentMode"></div>
+</div>
+<p class="note" style="margin-top:8px">Vehicle Number aur Photos yahan se edit nahi ho sakte — galat vehicle hone par entry Disable karke nayi entry banayein.</p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditFuelModal()">Cancel</button><button class="btn primary" onclick="saveEditFuel()">Save</button></div>
 </div></div>
 
 <!-- Manage modal -->
@@ -227,7 +247,7 @@ const todayISO=()=>new Date().toISOString().slice(0,10);
 const fmtAmt=n=>'₹'+Number(n||0).toLocaleString('en-IN');
 
 let users=[],fuelLog=[];
-let masters={vehicles:[],paymentModes:[]};
+let masters={vehicles:[],paymentModes:[],vehicleService:{}};
 let currentUser=null,currentTab='records';
 let usersStarted=false,fuelStarted=false,mastersStarted=false;
 
@@ -306,7 +326,7 @@ function seedStarterMastersIfEmpty(){
 function startMastersSync(){
   if(mastersStarted||!db)return;mastersStarted=true;
   seedStarterMastersIfEmpty();
-  db.collection('fv_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={vehicles:[],paymentModes:[],...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  db.collection('fv_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={vehicles:[],paymentModes:[],vehicleService:{},...doc.data()};renderAll();},err=>console.error('masters sync error',err));
 }
 function saveMasters(){ if(db) db.collection('fv_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
 
@@ -439,6 +459,37 @@ async function permanentlyDeleteFuelEntry(id,skipConfirm){
   }catch(e){ console.error('permanent delete failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
   toast('Entry permanently delete ho gayi');
 }
+// Quick typo-fix for the numbers (meter/amount/payment mode/date) - Vehicle and photos stay
+// fixed here; a genuinely wrong vehicle is better fixed via Disable + a fresh entry than
+// half-migrated through this modal.
+let editFuelTarget=null;
+function openEditFuelModal(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entry edit kar sakta hai.');return}
+  const x=fuelLog.find(e=>e.id===id);if(!x)return;
+  editFuelTarget=id;
+  $('editFDate').value=x.date||'';
+  $('editFMeterBefore').value=x.meterBefore??'';
+  $('editFMeterAfter').value=x.meterAfter??'';
+  $('editFAmount').value=x.amount||'';
+  $('editFPaymentMode').value=x.paymentMode||'';
+  $('editFuelModal').classList.add('show');
+}
+function closeEditFuelModal(){$('editFuelModal')?.classList.remove('show');editFuelTarget=null;}
+async function saveEditFuel(){
+  if(!editFuelTarget)return;
+  if(!superAdminUnlocked){alert('Sirf Super Admin entry edit kar sakta hai.');return}
+  const date=$('editFDate').value;
+  const meterBefore=parseFloat($('editFMeterBefore').value);
+  const meterAfter=parseFloat($('editFMeterAfter').value);
+  const amount=parseFloat($('editFAmount').value);
+  const paymentMode=$('editFPaymentMode').value.trim();
+  if(!date){alert('Date zaroori hai.');return}
+  if(isNaN(meterBefore)||isNaN(meterAfter)){alert('Meter Before/After dono zaroori hain.');return}
+  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  await db.collection('fuel_log').doc(editFuelTarget).update({date,meterBefore,meterAfter,amount,paymentMode});
+  closeEditFuelModal();
+  toast('Entry update ho gayi');
+}
 
 /* ===== Dashboard ===== */
 function nameOfUserId(id){return (users.find(x=>x.id===id)||{}).name||id||'-'}
@@ -543,6 +594,50 @@ function computeMileageAlerts(){
   });
   return alerts.sort((a,b)=>b.pct-a.pct);
 }
+// Each vehicle's own fuel history is the only odometer record this app has - no separate
+// "service log," so "last service meter" lives in masters.vehicleService (Super Admin sets
+// it via "Mark Serviced"), and due-ness is just current meter minus that baseline.
+const SERVICE_INTERVAL_KM=5000;
+function latestMeterByVehicle(){
+  const map={};
+  liveFuel().forEach(x=>{
+    const cur=map[x.vehicle];
+    if(!cur||String(x.date)>String(cur.date)||(x.date===cur.date&&String(x.at||'')>String(cur.at||'')))map[x.vehicle]={date:x.date,at:x.at,meter:x.meterAfter};
+  });
+  return map;
+}
+function computeServiceReminders(){
+  const latest=latestMeterByVehicle();
+  const due=[];
+  Object.entries(latest).forEach(([v,info])=>{
+    const lastService=(masters.vehicleService&&masters.vehicleService[v])||0;
+    const sinceService=info.meter-lastService;
+    if(sinceService>=SERVICE_INTERVAL_KM)due.push({vehicle:v,sinceService,currentMeter:info.meter});
+  });
+  return due.sort((a,b)=>b.sinceService-a.sinceService);
+}
+function renderServiceReminders(){
+  const wrap=$('serviceReminders');
+  if(!wrap)return;
+  const due=computeServiceReminders();
+  if(!due.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>🔧 Service Due</span></div><div class="pb">${due.map(d=>`
+    <div class="item">
+      <span><b>${esc(d.vehicle)}</b> — ${d.sinceService.toLocaleString('en-IN')} km since last service (current meter ${d.currentMeter.toLocaleString('en-IN')})</span>
+      ${superAdminUnlocked?`<button class="btn small primary" onclick="markVehicleServiced('${esc(d.vehicle)}')">✓ Mark Serviced</button>`:'<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ Due</span>'}
+    </div>`).join('')}</div></div>`;
+}
+async function markVehicleServiced(vehicle){
+  if(!superAdminUnlocked){alert('Sirf Super Admin service mark kar sakta hai.');return}
+  const latest=latestMeterByVehicle();
+  const meter=(latest[vehicle]||{}).meter||0;
+  if(!confirm(vehicle+' ko abhi service ho gayi (meter '+meter.toLocaleString('en-IN')+') mark karna hai?'))return;
+  if(!masters.vehicleService)masters.vehicleService={};
+  masters.vehicleService[vehicle]=meter;
+  saveMasters();
+  renderServiceReminders();
+  toast('Service mark ho gayi');
+}
 function renderMileageAlerts(){
   const wrap=$('mileageAlerts');
   if(!wrap)return;
@@ -627,20 +722,38 @@ function openPhotoModal(id,field){
   $('photoModal').classList.add('show');
 }
 function closePhotoModal(){$('photoModal').classList.remove('show');$('photoModalImg').src='';}
+function filteredFuelRows(){
+  const showDeleted=$('showDeleted')&&$('showDeleted').checked;
+  let rows=showDeleted?fuelLog.filter(x=>x.deletedAt):fuelLog.filter(x=>!x.deletedAt);
+  return rows.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at||'').localeCompare(String(a.at||'')));
+}
+function downloadCSV(filename,rows){
+  const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+function exportFuelCSV(){
+  const rows=[['Date','Vehicle','Meter Before','Meter After','Distance','Unit','Amount','Cost/Unit','Payment Mode','By']];
+  filteredFuelRows().forEach(x=>{
+    const cost=entryCostPerUnit(x);
+    rows.push([x.date,x.vehicle,x.meterBefore,x.meterAfter,entryDistance(x),x.unit||'KM',x.amount,cost!==null?cost.toFixed(2):'',x.paymentMode||'',nameOfUserId(x.by)]);
+  });
+  downloadCSV('fuel-tracker-log.csv',rows);
+}
 function renderHistory(){
   const deletedN=fuelLog.filter(x=>x.deletedAt).length;
   if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
   if($('deletedCount'))$('deletedCount').textContent=deletedN;
-  const showDeleted=$('showDeleted')&&$('showDeleted').checked;
-  let rows=showDeleted?fuelLog.filter(x=>x.deletedAt):fuelLog.filter(x=>!x.deletedAt);
-  rows=rows.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at||'').localeCompare(String(a.at||'')));
+  const rows=filteredFuelRows();
   $('historyTable').innerHTML=rows.map(x=>{
     const cost=entryCostPerUnit(x);
     const adminBtn=x.deletedAt
       ?(superAdminUnlocked?`<button class="btn small" onclick="restoreFuelEntry('${esc(x.id)}')">↩ Restore</button>`:'')
       :(superAdminUnlocked?`<button class="btn small danger" onclick="deleteFuelEntry('${esc(x.id)}')">Disable</button>`:'');
     const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeleteFuelEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
-    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td>${esc(x.vehicle)}</td><td>${x.meterBefore} → ${x.meterAfter} ${esc(x.unit||'KM')}</td><td class="num">${fmtAmt(x.amount)}</td><td class="num">${cost!==null?'₹'+cost.toFixed(2):'-'}</td><td>${esc(x.paymentMode||'-')}</td><td>${esc(nameOfUserId(x.by))}</td><td>${photoThumbs(x)}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${adminBtn} ${permBtn}</td></tr>`;
+    const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditFuelModal('${esc(x.id)}')">✎ Edit</button>`:'';
+    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td>${esc(x.vehicle)}</td><td>${x.meterBefore} → ${x.meterAfter} ${esc(x.unit||'KM')}</td><td class="num">${fmtAmt(x.amount)}</td><td class="num">${cost!==null?'₹'+cost.toFixed(2):'-'}</td><td>${esc(x.paymentMode||'-')}</td><td>${esc(nameOfUserId(x.by))}</td><td>${photoThumbs(x)}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
   }).join('')||`<tr><td colspan="9"><div class="emptystate">⛽<p>Koi fuel entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
 }
 
@@ -735,6 +848,7 @@ function renderAll(){
   applyFeatureVisibility();
   renderSelects();
   renderDash();
+  renderServiceReminders();
   renderMileageAlerts();
   renderVehiclePerformance();
   renderMonthlyTrend();
