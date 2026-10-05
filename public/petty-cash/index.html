@@ -145,8 +145,7 @@ tbody tr:hover td{background:#f7faf8}
     </div>
   </div>
 
-  <div id="myIssuedCashWrap"></div>
-  <div id="myLoansWrap"></div>
+  <div id="myActivityWrap"></div>
 
   <div class="panel">
     <div class="ph">
@@ -500,18 +499,21 @@ async function permanentlyDeleteLedgerEntry(id,skipConfirm){
 /* ===== Dashboard ===== */
 function nameOfUserId(id){return (users.find(x=>x.id===id)||{}).name||id||'-'}
 function liveLedger(){return ledger.filter(x=>!x.deletedAt)}
-/* ===== Cash Issued to Me — self-service spend tracking for Cash Out entries that name a
-   specific recipient. A Loan is personal money (no spend trail needed); this is only for
-   "the company handed X cash to a person for a purpose," which the recipient should be
-   able to account for themselves. ===== */
+/* ===== My Petty Cash Activity — one combined, clean module for whatever's tied to the
+   logged-in user: Cash Out entries issued to them (with self-service "Spent on X" tracking
+   and a running remaining balance) and Loans given to them (status-only — a Loan is
+   personal money, not something to itemize against). Rendered as a single panel with two
+   subsections, so a person with both sees everything together in one place. ===== */
 function issueSpentTotal(issueId){return issueSpends.filter(s=>s.issueId===issueId&&!s.deletedAt).reduce((s,x)=>s+(x.amount||0),0)}
-function renderMyIssuedCash(){
-  const wrap=$('myIssuedCashWrap');
+function myActivitySectionLabel(label,count){return `<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:${count?'4px 0 10px':'0'}">${esc(label)}</div>`;}
+function renderMyActivity(){
+  const wrap=$('myActivityWrap');
   if(!wrap)return;
-  const mine=liveLedger().filter(x=>x.type==='out'&&x.personId===currentUser);
-  if(!mine.length){wrap.innerHTML='';return;}
-  const rows=mine.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  wrap.innerHTML=`<div class="panel"><div class="ph"><span>💳 Cash Issued to Me</span></div><div class="pb">${rows.map(x=>{
+  const issued=liveLedger().filter(x=>x.type==='out'&&x.personId===currentUser).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const loans=liveLedger().filter(x=>x.type==='loan'&&x.personId===currentUser).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  if(!issued.length&&!loans.length){wrap.innerHTML='';return;}
+
+  const issuedBlock=issued.length?`${myActivitySectionLabel('💳 Cash Issued to Me')}${issued.map(x=>{
     const spent=issueSpentTotal(x.id);
     const remaining=x.amount-spent;
     const mySpends=issueSpends.filter(s=>s.issueId===x.id&&!s.deletedAt).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
@@ -527,7 +529,15 @@ function renderMyIssuedCash(){
         <button class="btn small primary" onclick="addIssueSpend('${esc(x.id)}')">＋ Add Spend</button>
       </div>
     </div>`;
-  }).join('')}</div></div>`;
+  }).join('')}`:'';
+
+  const loansBlock=loans.length?`${myActivitySectionLabel('📋 Loans Given to Me')}${loans.map(x=>{
+    const statusChip=x.repaid?'<span class="pill repaid">Repaid</span>':'<span class="pill loan">Outstanding</span>';
+    return `<div class="item"><span><b>${fmtAmt(x.amount)}</b> given on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>${statusChip}</div>`;
+  }).join('')}`:'';
+
+  const divider=(issued.length&&loans.length)?'<hr style="border:none;border-top:1px solid var(--line);margin:16px 0">':'';
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>💼 My Petty Cash Activity</span></div><div class="pb">${issuedBlock}${divider}${loansBlock}</div></div>`;
 }
 let _issueSpendSubmitting=false;
 async function addIssueSpend(issueId){
@@ -550,19 +560,6 @@ async function permanentlyDeleteIssueSpend(id){
   if(!confirm('Yeh spend entry hamesha ke liye delete ho jayegi. Confirm karein?'))return;
   await db.collection('pc_issue_spends').doc(id).delete();
   toast('Spend entry deleted');
-}
-// Read-only status view for loans given to the logged-in user — Outstanding/Repaid only,
-// no spend entries (a Loan is personal money, not something to itemize against).
-function renderMyLoans(){
-  const wrap=$('myLoansWrap');
-  if(!wrap)return;
-  const mine=liveLedger().filter(x=>x.type==='loan'&&x.personId===currentUser);
-  if(!mine.length){wrap.innerHTML='';return;}
-  const rows=mine.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  wrap.innerHTML=`<div class="panel"><div class="ph"><span>📋 My Loans</span></div><div class="pb">${rows.map(x=>{
-    const statusChip=x.repaid?'<span class="pill repaid">Repaid</span>':'<span class="pill loan">Outstanding</span>';
-    return `<div class="item"><span><b>${fmtAmt(x.amount)}</b> given on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>${statusChip}</div>`;
-  }).join('')}</div></div>`;
 }
 function computeBalance(){
   const live=liveLedger();
@@ -763,8 +760,7 @@ function renderAll(){
   renderEntryPersonSelect();
   renderDash();
   renderHighAmountAlerts();
-  renderMyIssuedCash();
-  renderMyLoans();
+  renderMyActivity();
   renderLedger();
   if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
 }
