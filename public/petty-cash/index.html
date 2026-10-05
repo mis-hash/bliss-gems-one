@@ -166,20 +166,20 @@ tbody tr:hover td{background:#f7faf8}
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button class="btn small secondary" id="histFiltersToggleBtn" onclick="toggleHistFiltersPanel()">🔍 Filters</button>
         <button class="btn small secondary" onclick="exportLedgerCSV()">⬇ Export CSV</button>
-        <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="renderLedger()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
+        <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="onLedgerFilterChange()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
       </div>
     </div>
     <div class="pb">
       <div id="histFiltersPanel" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
-        <div class="field" style="width:auto;margin:0"><label>Type</label><select id="histType" onchange="renderLedger()" style="width:auto;padding:10px;border:1px solid var(--line);border-radius:7px">
+        <div class="field" style="width:auto;margin:0"><label>Type</label><select id="histType" onchange="onLedgerFilterChange()" style="width:auto;padding:10px;border:1px solid var(--line);border-radius:7px">
           <option value="all">All Types</option>
           <option value="in">Cash In</option>
           <option value="out">Cash Out</option>
           <option value="loan">Loan</option>
         </select></div>
-        <div class="field" style="width:auto;margin:0"><label>From</label><input type="date" id="histFrom" onchange="renderLedger()" style="width:auto"></div>
-        <div class="field" style="width:auto;margin:0"><label>To</label><input type="date" id="histTo" onchange="renderLedger()" style="width:auto"></div>
-        <div class="field" style="width:auto;flex:1;min-width:160px;margin:0"><label>Person</label><input id="histPerson" placeholder="Search person name" oninput="renderLedger()"></div>
+        <div class="field" style="width:auto;margin:0"><label>From</label><input type="date" id="histFrom" onchange="onLedgerFilterChange()" style="width:auto"></div>
+        <div class="field" style="width:auto;margin:0"><label>To</label><input type="date" id="histTo" onchange="onLedgerFilterChange()" style="width:auto"></div>
+        <div class="field" style="width:auto;flex:1;min-width:160px;margin:0"><label>Person</label><input id="histPerson" placeholder="Search person name" oninput="onLedgerFilterChange()"></div>
         <button class="btn small secondary" onclick="clearLedgerFilters()" style="margin-top:17px">✕ Clear Filters</button>
       </div>
       <div class="tablewrap"><table>
@@ -975,11 +975,18 @@ function filteredLedgerRows(){
   if(personQ)rows=rows.filter(x=>String(x.person||'').toLowerCase().includes(personQ));
   return rows.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at||'').localeCompare(String(a.at||'')));
 }
+// Keeps the table from rendering hundreds of rows at once as the ledger grows - all
+// filtering/totals still run over the full synced data, only the DOM render is capped.
+// Reset to the first page on any new filter so you don't end up paginated into an empty view.
+let ledgerPageSize=25;
+function onLedgerFilterChange(){ledgerPageSize=25;renderLedger();}
+function loadMoreLedger(){ledgerPageSize+=25;renderLedger();}
 function renderLedger(){
   const deletedN=ledger.filter(x=>x.deletedAt).length;
   if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
   if($('deletedCount'))$('deletedCount').textContent=deletedN;
-  const rows=filteredLedgerRows();
+  const allRows=filteredLedgerRows();
+  const rows=allRows.slice(0,ledgerPageSize);
   $('ledgerTable').innerHTML=rows.map(x=>{
     const pillClass=x.type==='in'?'in':x.type==='out'?'out':'loan';
     const pillLabel=x.type==='in'?'IN':x.type==='out'?'OUT':'LOAN';
@@ -995,6 +1002,13 @@ function renderLedger(){
     const viewSpendBtn=(x.type==='out'&&x.personId)?`<button class="btn small secondary" onclick="openSpendingDetailModal('${esc(x.id)}')">👁 View Spending</button>`:'';
     return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}${settledBadge}</td><td>${esc(x.person||'-')}${x.note?'<br><small style="color:var(--muted)">'+esc(x.note)+'</small>':''}</td><td class="num">${sign}${fmtAmt(x.amount)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${repayBtn} ${viewSpendBtn} ${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
   }).join('')||`<tr><td colspan="6"><div class="emptystate">💵<p>Koi entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
+  if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
+  if(allRows.length>rows.length){
+    const tr=document.createElement('tr');
+    tr.id='ledgerLoadMoreRow';
+    tr.innerHTML=`<td colspan="6" style="text-align:center;padding:14px 0"><button class="btn small secondary" onclick="loadMoreLedger()">Load More (${rows.length} / ${allRows.length})</button></td>`;
+    $('ledgerTable').appendChild(tr);
+  }
 }
 
 /* ===== Manage panel ===== */

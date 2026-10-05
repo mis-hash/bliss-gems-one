@@ -168,7 +168,7 @@ tbody tr:hover td{background:#f7faf8}
       <span>Fuel History</span>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button class="btn small secondary" onclick="exportFuelCSV()">⬇ Export CSV</button>
-        <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="renderHistory()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
+        <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="onFuelFilterChange()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
       </div>
     </div>
     <div class="pb"><div class="tablewrap"><table>
@@ -743,11 +743,15 @@ function exportFuelCSV(){
   });
   downloadCSV('fuel-tracker-log.csv',rows);
 }
+let fuelPageSize=25;
+function onFuelFilterChange(){fuelPageSize=25;renderHistory();}
+function loadMoreFuel(){fuelPageSize+=25;renderHistory();}
 function renderHistory(){
   const deletedN=fuelLog.filter(x=>x.deletedAt).length;
   if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
   if($('deletedCount'))$('deletedCount').textContent=deletedN;
-  const rows=filteredFuelRows();
+  const allRows=filteredFuelRows();
+  const rows=allRows.slice(0,fuelPageSize);
   $('historyTable').innerHTML=rows.map(x=>{
     const cost=entryCostPerUnit(x);
     const adminBtn=x.deletedAt
@@ -757,6 +761,13 @@ function renderHistory(){
     const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditFuelModal('${esc(x.id)}')">✎ Edit</button>`:'';
     return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td>${esc(x.vehicle)}</td><td>${x.meterBefore} → ${x.meterAfter} ${esc(x.unit||'KM')}</td><td class="num">${fmtAmt(x.amount)}</td><td class="num">${cost!==null?'₹'+cost.toFixed(2):'-'}</td><td>${esc(x.paymentMode||'-')}</td><td>${esc(nameOfUserId(x.by))}</td><td>${photoThumbs(x)}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
   }).join('')||`<tr><td colspan="9"><div class="emptystate">⛽<p>Koi fuel entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
+  if($('fuelLoadMoreRow'))$('fuelLoadMoreRow').remove();
+  if(allRows.length>rows.length){
+    const tr=document.createElement('tr');
+    tr.id='fuelLoadMoreRow';
+    tr.innerHTML=`<td colspan="9" style="text-align:center;padding:14px 0"><button class="btn small secondary" onclick="loadMoreFuel()">Load More (${rows.length} / ${allRows.length})</button></td>`;
+    $('historyTable').appendChild(tr);
+  }
 }
 
 /* ===== Manage panel ===== */
