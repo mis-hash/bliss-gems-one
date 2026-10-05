@@ -196,12 +196,33 @@ tbody tr:hover td{background:#f7faf8}
   </div>
 
   <div id="page-team" class="pcPage">
+    <div id="teamAgingAlerts"></div>
     <div class="panel">
-      <div class="ph"><span>👥 Team Overview</span></div>
-      <div class="pb"><div class="tablewrap"><table>
-        <thead><tr><th>Person</th><th class="num">Issued</th><th class="num">Pending (Issued)</th><th class="num">Loans Given</th><th class="num">Outstanding (Loan)</th><th>Action</th></tr></thead>
-        <tbody id="teamOverviewTable"></tbody>
-      </table></div></div>
+      <div class="ph"><span>📊 Top Pending/Outstanding</span></div>
+      <div class="pb"><div id="teamOverviewChart"></div></div>
+    </div>
+    <div class="panel">
+      <div class="ph">
+        <span>👥 Team Overview</span>
+        <button class="btn small secondary" onclick="exportTeamOverviewCSV()">⬇ Export CSV</button>
+      </div>
+      <div class="pb">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+          <input id="teamSearch" placeholder="Search person name" oninput="renderTeamOverview()" style="flex:1;min-width:160px;padding:10px;border:1px solid var(--line);border-radius:7px">
+          <select id="teamSort" onchange="renderTeamOverview()" style="width:auto;padding:10px;border:1px solid var(--line);border-radius:7px">
+            <option value="pending">Sort: Highest Pending First</option>
+            <option value="name">Sort: Name (A-Z)</option>
+            <option value="issued">Sort: Highest Issued First</option>
+          </select>
+          <div class="field" style="width:auto;margin:0"><label>From</label><input type="date" id="teamFrom" onchange="renderTeamOverview()" style="width:auto"></div>
+          <div class="field" style="width:auto;margin:0"><label>To</label><input type="date" id="teamTo" onchange="renderTeamOverview()" style="width:auto"></div>
+          <button class="btn small secondary" onclick="clearTeamFilters()" style="margin-top:17px">✕ Clear</button>
+        </div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Person</th><th class="num">Issued</th><th class="num">Pending (Issued)</th><th class="num">Loans Given</th><th class="num">Outstanding (Loan)</th><th>Action</th></tr></thead>
+          <tbody id="teamOverviewTable"></tbody>
+        </table></div>
+      </div>
     </div>
   </div>
 </div>
@@ -721,30 +742,93 @@ function renderMyPage(){
 // Accountant/Admin/Director-only consolidated view: every person who's had cash issued or
 // a loan given to them, with their totals in one row instead of hunting through the
 // Ledger one entry at a time.
-function renderTeamOverview(){
-  const tbody=$('teamOverviewTable');
-  if(!tbody)return;
-  if(!canCloseLoan()){tbody.innerHTML='';return;}
-  const live=liveLedger();
+const TEAM_AGING_DAYS=15;
+function daysSinceDate(dateStr){
+  if(!dateStr)return 0;
+  const ms=new Date(todayISO()).getTime()-new Date(dateStr).getTime();
+  return Math.max(0,Math.round(ms/86400000));
+}
+function clearTeamFilters(){
+  if($('teamSearch'))$('teamSearch').value='';
+  if($('teamFrom'))$('teamFrom').value='';
+  if($('teamTo'))$('teamTo').value='';
+  if($('teamSort'))$('teamSort').value='pending';
+  renderTeamOverview();
+}
+// Shared by the table, the mini chart, the aging alerts and CSV export, so all four always
+// agree on the same From/To-filtered, searched numbers.
+function computeTeamRows(){
+  if(!canCloseLoan())return [];
+  const from=$('teamFrom')?.value||'',to=$('teamTo')?.value||'';
+  const q=($('teamSearch')?.value||'').trim().toLowerCase();
+  let live=liveLedger();
+  if(from)live=live.filter(x=>String(x.date)>=from);
+  if(to)live=live.filter(x=>String(x.date)<=to);
   const personIds=new Set();
   live.forEach(x=>{if((x.type==='out'||x.type==='loan')&&x.personId)personIds.add(x.personId);});
-  const rows=[...personIds].map(pid=>{
+  let rows=[...personIds].map(pid=>{
     const issued=live.filter(x=>x.type==='out'&&x.personId===pid);
     const loans=live.filter(x=>x.type==='loan'&&x.personId===pid);
     const issuedTotal=issued.reduce((s,x)=>s+(x.amount||0),0);
-    const issuedPending=issued.filter(x=>!x.verified).reduce((s,x)=>s+(x.amount-issueSpentTotal(x.id)),0);
+    const pendingIssues=issued.filter(x=>!x.verified);
+    const issuedPending=pendingIssues.reduce((s,x)=>s+(x.amount-issueSpentTotal(x.id)),0);
     const loansTotal=loans.reduce((s,x)=>s+(x.amount||0),0);
-    const loansOutstanding=loans.filter(x=>!x.repaid).reduce((s,x)=>s+(x.amount||0),0);
-    return {pid,name:nameOfUserId(pid),issuedTotal,issuedPending,loansTotal,loansOutstanding};
-  }).sort((a,b)=>(b.issuedPending+b.loansOutstanding)-(a.issuedPending+a.loansOutstanding));
+    const outstandingLoans=loans.filter(x=>!x.repaid);
+    const loansOutstanding=outstandingLoans.reduce((s,x)=>s+(x.amount||0),0);
+    const oldestPendingDates=[...pendingIssues,...outstandingLoans].map(x=>x.date).sort();
+    const oldestAgeDays=oldestPendingDates.length?daysSinceDate(oldestPendingDates[0]):0;
+    return {pid,name:nameOfUserId(pid),issuedTotal,issuedPending,loansTotal,loansOutstanding,oldestAgeDays,aging:oldestAgeDays>=TEAM_AGING_DAYS};
+  });
+  if(q)rows=rows.filter(r=>r.name.toLowerCase().includes(q));
+  const sortBy=$('teamSort')?.value||'pending';
+  if(sortBy==='name')rows.sort((a,b)=>a.name.localeCompare(b.name));
+  else if(sortBy==='issued')rows.sort((a,b)=>b.issuedTotal-a.issuedTotal);
+  else rows.sort((a,b)=>(b.issuedPending+b.loansOutstanding)-(a.issuedPending+a.loansOutstanding));
+  return rows;
+}
+function renderTeamOverview(){
+  const tbody=$('teamOverviewTable');
+  if(!tbody)return;
+  if(!canCloseLoan()){tbody.innerHTML='';if($('teamAgingAlerts'))$('teamAgingAlerts').innerHTML='';if($('teamOverviewChart'))$('teamOverviewChart').innerHTML='';return;}
+  const rows=computeTeamRows();
   tbody.innerHTML=rows.length?rows.map(r=>`<tr>
-    <td><b>${esc(r.name)}</b></td>
+    <td><b>${esc(r.name)}</b>${r.aging?' <span class="pill" style="background:var(--redbg);color:var(--red)">⚠ Follow-up ('+r.oldestAgeDays+'d)</span>':''}</td>
     <td class="num">${fmtAmt(r.issuedTotal)}</td>
     <td class="num">${r.issuedPending>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.issuedPending)}</span>`:fmtAmt(0)}</td>
     <td class="num">${fmtAmt(r.loansTotal)}</td>
     <td class="num">${r.loansOutstanding>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.loansOutstanding)}</span>`:fmtAmt(0)}</td>
     <td><button class="btn small secondary" onclick="openPersonDetailModal('${esc(r.pid)}')">👁 Details</button></td>
-  </tr>`).join(''):`<tr><td colspan="6"><div class="emptystate">👥<p>Abhi tak kisi ko cash issue ya loan nahi diya gaya.</p></div></td></tr>`;
+  </tr>`).join(''):`<tr><td colspan="6"><div class="emptystate">👥<p>Koi record nahi mila.</p></div></td></tr>`;
+  renderTeamAgingAlerts(rows);
+  renderTeamOverviewChart(rows);
+}
+function renderTeamAgingAlerts(rows){
+  const wrap=$('teamAgingAlerts');
+  if(!wrap)return;
+  const aging=rows.filter(r=>r.aging);
+  if(!aging.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>⚠ Needs Follow-up (${TEAM_AGING_DAYS}+ din se pending)</span></div><div class="pb">${aging.map(r=>`
+    <div class="item"><span><b>${esc(r.name)}</b> — ${r.oldestAgeDays} din se pending (Pending: ${fmtAmt(r.issuedPending)}, Outstanding: ${fmtAmt(r.loansOutstanding)})</span>
+    <button class="btn small secondary" onclick="openPersonDetailModal('${esc(r.pid)}')">👁 Details</button></div>`).join('')}</div></div>`;
+}
+// Single-series magnitude chart (top 5 by pending+outstanding) - one brand hue is correct
+// here since there's only one measure per person, no categorical identity to distinguish.
+function renderTeamOverviewChart(rows){
+  const wrap=$('teamOverviewChart');
+  if(!wrap)return;
+  const top=rows.map(r=>({name:r.name,val:r.issuedPending+r.loansOutstanding})).filter(r=>r.val>0).sort((a,b)=>b.val-a.val).slice(0,5);
+  if(!top.length){wrap.innerHTML='<div class="note">Koi pending/outstanding amount nahi hai.</div>';return;}
+  const max=Math.max(...top.map(r=>r.val),1);
+  wrap.innerHTML=top.map(r=>`
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span>${esc(r.name)}</span><b>${fmtAmt(r.val)}</b></div>
+      <div style="background:var(--mint);border-radius:5px;height:10px;overflow:hidden"><div style="width:${Math.max((r.val/max)*100,3)}%;height:100%;background:var(--g);border-radius:5px"></div></div>
+    </div>`).join('');
+}
+function exportTeamOverviewCSV(){
+  const rows=[['Person','Total Issued','Pending (Issued)','Total Loans Given','Outstanding (Loan)','Needs Follow-up']];
+  computeTeamRows().forEach(r=>rows.push([r.name,r.issuedTotal,r.issuedPending,r.loansTotal,r.loansOutstanding,r.aging?'Yes ('+r.oldestAgeDays+'d)':'No']));
+  downloadCSV('petty-cash-team-overview.csv',rows);
 }
 function openPersonDetailModal(personId){
   const name=nameOfUserId(personId);
