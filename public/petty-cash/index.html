@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<script>
+/* Crash safety net — same pattern as the other Bliss apps: registered first so a later
+   script error still surfaces as a visible banner instead of a silently dead page. */
+(function(){
+  function showCrashBanner(msg){
+    if(document.getElementById('pcCrashBanner'))return;
+    var b=document.createElement('div');
+    b.id='pcCrashBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b42318;color:#fff;padding:10px 14px;font:600 13px Arial,sans-serif;text-align:center;box-shadow:0 2px 10px #0004';
+    b.innerHTML='⚠ App me error aa gaya hai. Page reload karein.'
+      +' <button type="button" style="margin-left:10px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#b42318;font-weight:700;cursor:pointer" onclick="location.reload()">Reload</button>'
+      +'<div style="font-weight:400;font-size:11px;opacity:.85;margin-top:3px">'+String(msg||'').slice(0,200).replace(/[<>]/g,'')+'</div>';
+    function attach(){document.body&&document.body.prepend(b)}
+    if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach);
+  }
+  window.addEventListener('error',function(e){console.error('Uncaught error:',e.error||e.message);showCrashBanner((e.error&&e.error.message)||e.message);});
+  window.addEventListener('unhandledrejection',function(e){console.error('Unhandled promise rejection:',e.reason);showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));});
+})();
+</script>
+<title>Petty Cash</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Same design system as the other Bliss apps, so all apps read as one family. */
+:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
+*{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit}
+h1,h2,h3,.card b,.tabular{font-family:'Manrope',sans-serif}
+.hidden{display:none!important}
+header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.head{height:100%;max-width:1000px;margin:auto;padding:0 18px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:24px;font-weight:900;color:var(--g2)}
+.brand b{color:var(--g);font-size:20px;font-family:'Manrope',sans-serif}
+.brand small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.headRight{display:flex;align-items:center;gap:10px}
+.pillbadge{font-size:13px;font-weight:700;background:var(--mint);color:var(--g);padding:7px 12px;border-radius:999px}
+.btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--g);color:#fff}
+.btn.secondary{background:#eef2f0;color:var(--txt)}
+.btn.danger{background:var(--redbg);color:var(--red)}
+.btn.small{padding:7px 11px;font-size:12px}
+.shell{max-width:1000px;margin:auto;padding:17px 18px 60px}
+.hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px}
+.hero h1{font-size:24px;margin:0 0 5px}
+.hero p{font-size:13px;margin:0;opacity:.9}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+.card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px}
+.card small{font-size:11px;color:var(--muted)}
+.card b{display:block;font-size:22px;margin-top:6px}
+.card.warn{background:var(--amberbg)!important;color:var(--amber)!important}
+.panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:12px}
+.ph{padding:14px 16px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.pb{padding:15px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field label{display:block;font-size:11px;font-weight:bold;margin-bottom:5px}
+.field input,.field select{width:100%;padding:10px;border:1px solid var(--line);border-radius:7px;font-size:14px;background:#fff;color:var(--txt)}
+.span2{grid-column:1/-1}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 0 9px;border-bottom:1px solid var(--line)}
+td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px;vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:#f7faf8}
+.tablewrap{overflow-x:auto}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font-size:11px;font-weight:700}
+.pill.in{background:var(--mint);color:var(--g)}
+.pill.out{background:var(--redbg);color:var(--red)}
+.pill.loan{background:var(--amberbg);color:var(--amber)}
+.pill.repaid{background:#eef2f0;color:var(--muted)}
+.item{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #edf1ee;gap:10px;flex-wrap:wrap}
+.item:last-child{border-bottom:0}
+.emptystate{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;text-align:center;font-size:24px}
+.emptystate p{font-size:13.5px;font-weight:600;color:var(--txt);margin:10px 0 2px;font-family:'Work Sans',sans-serif}
+.emptystate small{color:var(--muted);font-size:12px}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:50}
+.modal.show{display:flex}
+.box{width:min(520px,100%);background:#fff;border-radius:14px;padding:19px;max-height:90vh;overflow:auto}
+.box h3{margin:0 0 14px;font-size:19px}
+.note{font-size:12px;color:var(--muted)}
+.gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px}
+.gate h3{font-size:19px}
+.gate p{font-size:13px;color:var(--muted)}
+.gate .btn{margin-top:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:#fff;color:var(--muted);padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--g);border-color:var(--g);color:#fff}
+#pageTabs .tab{padding:11px 16px;font-size:13.5px;position:relative}
+.tabBadgeDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin-left:5px}
+.pcPage{display:none}
+.pcPage.on{display:block}
+.typeRow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.typeRow button{flex:1;min-width:110px;padding:13px 10px;font-size:14px}
+#entrySubmitBtn{padding:13px 22px;font-size:14px}
+@media(max-width:720px){
+  header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:20px}.brand b{font-size:16px}.brand small{display:none}
+  .shell{padding:11px 10px 30px}
+  .hero{padding:17px}.hero h1{font-size:20px}
+  .cards{grid-template-columns:1fr 1fr}
+  .grid{grid-template-columns:1fr}
+  .typeRow{flex-direction:column}
+  .typeRow button{min-width:0;width:100%}
+  #entrySubmitBtn{width:100%}
+}
+</style>
+</head>
+<body>
+
+<div id="gateWrap" style="display:none"><div class="gate" id="gateBox"></div></div>
+
+<div id="appWrap" style="display:none">
+<header><div class="head">
+  <div class="brand"><div class="logo">₹</div><div><b>Petty Cash</b><small>Bliss Gems &amp; Minerals</small></div></div>
+  <div class="headRight">
+    <span class="pillbadge" id="loginBadge">Not Logged In</span>
+    <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
+    <button class="btn superAdminStrict hidden" onclick="openManage()">⚙ Manage</button>
+  </div>
+</div></header>
+
+<div class="shell">
+  <div class="tabs" id="pageTabs" style="margin-bottom:14px">
+    <button class="tab on" data-page="ledger" onclick="goPage('ledger')">📊 Ledger</button>
+    <button class="tab" data-page="my" id="myPageTabBtn" onclick="goPage('my')">👤 My Petty Cash</button>
+    <button class="tab accountantOnly hidden" data-page="team" onclick="goPage('team')">👥 Team Overview</button>
+  </div>
+
+  <div id="page-ledger" class="pcPage on">
+  <div class="hero">
+    <h1>Company Petty Cash</h1>
+    <p>Ek hi shared cash-box — In / Out / Loan entries, sabko live dikhti hain.</p>
+  </div>
+  <div class="cards" id="statTiles"></div>
+
+  <div id="highAmountAlerts"></div>
+
+  <div class="panel">
+    <div class="ph"><span>New Entry</span></div>
+    <div class="pb">
+      <div class="typeRow">
+        <button type="button" class="tab on" id="typeBtn_in" onclick="selectEntryType('in')">➕ Cash In</button>
+        <button type="button" class="tab" id="typeBtn_out" onclick="selectEntryType('out')">➖ Cash Out</button>
+        <button type="button" class="tab" id="typeBtn_loan" onclick="selectEntryType('loan')">🤝 Loan Given</button>
+      </div>
+      <div class="grid">
+        <div class="field"><label>Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="entryAmount"></div>
+        <div class="field"><label>Date</label><input type="date" id="entryDate"></div>
+        <div class="field span2" id="entryPersonField"><label id="entryPersonLabel">Person Name</label><input id="entryPerson" placeholder="Optional"><select id="entryPersonSelect" class="hidden" onchange="toggleLoanPersonTextVisibility()"></select></div>
+        <div class="field span2"><label>Note / Reason</label><input id="entryNote" placeholder="Optional"></div>
+      </div>
+      <div style="margin-top:14px;text-align:right"><button class="btn primary" id="entrySubmitBtn" onclick="addLedgerEntry()">＋ Save Entry</button></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph">
+      <span>Ledger History</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn small secondary" id="histFiltersToggleBtn" onclick="toggleHistFiltersPanel()">🔍 Filters</button>
+        <button class="btn small secondary" onclick="exportLedgerCSV()">⬇ Export CSV</button>
+        <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="onLedgerFilterChange()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
+      </div>
+    </div>
+    <div class="pb">
+      <div id="histFiltersPanel" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <div class="field" style="width:auto;margin:0"><label>Type</label><select id="histType" onchange="onLedgerFilterChange()" style="width:auto;padding:10px;border:1px solid var(--line);border-radius:7px">
+          <option value="all">All Types</option>
+          <option value="in">Cash In</option>
+          <option value="out">Cash Out</option>
+          <option value="loan">Loan</option>
+        </select></div>
+        <div class="field" style="width:auto;margin:0"><label>From</label><input type="date" id="histFrom" onchange="onLedgerFilterChange()" style="width:auto"></div>
+        <div class="field" style="width:auto;margin:0"><label>To</label><input type="date" id="histTo" onchange="onLedgerFilterChange()" style="width:auto"></div>
+        <div class="field" style="width:auto;flex:1;min-width:160px;margin:0"><label>Person</label><input id="histPerson" placeholder="Search person name" oninput="onLedgerFilterChange()"></div>
+        <button class="btn small secondary" onclick="clearLedgerFilters()" style="margin-top:17px">✕ Clear Filters</button>
+      </div>
+      <div class="tablewrap"><table>
+      <thead><tr><th>Date</th><th>Type</th><th>Person / Note</th><th class="num">Amount</th><th>By</th><th>Action</th></tr></thead>
+      <tbody id="ledgerTable"></tbody>
+    </table></div></div>
+  </div>
+  </div>
+
+  <div id="page-my" class="pcPage">
+    <div id="myIssuedCashWrap"></div>
+    <div id="myLoansWrap"></div>
+    <div id="myPageEmptyState" class="panel hidden"><div class="pb"><div class="emptystate">👤<p>Abhi aapko koi cash issue ya loan nahi diya gaya hai.</p><small>Jab koi aapko Cash Out "Issued To" se dega ya Loan dega, yahan dikhega.</small></div></div></div>
+  </div>
+
+  <div id="page-team" class="pcPage">
+    <div id="teamAgingAlerts"></div>
+    <div class="panel">
+      <div class="ph"><span>📊 Top Pending/Outstanding</span></div>
+      <div class="pb"><div id="teamOverviewChart"></div></div>
+    </div>
+    <div class="panel">
+      <div class="ph">
+        <span>👥 Team Overview</span>
+        <button class="btn small secondary" onclick="exportTeamOverviewCSV()">⬇ Export CSV</button>
+      </div>
+      <div class="pb">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+          <input id="teamSearch" placeholder="Search person name" oninput="renderTeamOverview()" style="flex:1;min-width:160px;padding:10px;border:1px solid var(--line);border-radius:7px">
+          <select id="teamSort" onchange="renderTeamOverview()" style="width:auto;padding:10px;border:1px solid var(--line);border-radius:7px">
+            <option value="pending">Sort: Highest Pending First</option>
+            <option value="name">Sort: Name (A-Z)</option>
+            <option value="issued">Sort: Highest Issued First</option>
+          </select>
+          <div class="field" style="width:auto;margin:0"><label>From</label><input type="date" id="teamFrom" onchange="renderTeamOverview()" style="width:auto"></div>
+          <div class="field" style="width:auto;margin:0"><label>To</label><input type="date" id="teamTo" onchange="renderTeamOverview()" style="width:auto"></div>
+          <button class="btn small secondary" onclick="clearTeamFilters()" style="margin-top:17px">✕ Clear</button>
+        </div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Person</th><th class="num">Issued</th><th class="num">Pending (Issued)</th><th class="num">Loans Given</th><th class="num">Outstanding (Loan)</th><th>Action</th></tr></thead>
+          <tbody id="teamOverviewTable"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Login modal -->
+<div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
+<h3>Login</h3>
+<div class="field"><label>Username</label><input id="loginUsername" autocomplete="off"></div>
+<div class="field" style="margin-top:8px"><label>Password</label><input id="loginPassword" type="password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<p class="note" id="loginMsg" style="margin:8px 0 0"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeLogin()">Cancel</button><button class="btn primary" onclick="doLogin()">Login</button></div>
+</div></div>
+
+<!-- Super Admin modal -->
+<div class="modal" id="superAdminModal"><div class="box" style="width:min(340px,100%)">
+<h3>🔒 Super Admin</h3>
+<div class="field"><label>Password</label><input id="superAdminPassword" type="password" onkeydown="if(event.key==='Enter')unlockSuperAdmin()"></div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeSuperAdminModal()">Cancel</button><button class="btn primary" onclick="unlockSuperAdmin()">Unlock</button></div>
+</div></div>
+
+<!-- Edit Entry modal -->
+<div class="modal" id="editLedgerModal"><div class="box" style="width:min(420px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Edit Entry</h3><button class="btn small" onclick="closeEditLedgerModal()">✕</button></div>
+<div class="grid">
+  <div class="field"><label>Amount (₹)</label><input type="number" id="editAmount"></div>
+  <div class="field"><label>Date</label><input type="date" id="editDate"></div>
+  <div class="field span2"><label>Note / Reason</label><input id="editNote"></div>
+</div>
+<p class="note" style="margin-top:8px">Type (In/Out/Loan) aur Person yahan se edit nahi ho sakte — galat type/person hone par entry Disable karke nayi entry banayein.</p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditLedgerModal()">Cancel</button><button class="btn primary" onclick="saveEditLedger()">Save</button></div>
+</div></div>
+
+<!-- Person Detail modal — full breakdown for one person's Team Overview row -->
+<div class="modal" id="personDetailModal"><div class="box" style="width:min(520px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0" id="personDetailTitle">Person Detail</h3><button class="btn small" onclick="closePersonDetailModal()">✕</button></div>
+<div id="personDetailContent"></div>
+</div></div>
+
+<!-- Spending Detail modal (read-only — anyone looking at the Ledger can see how an issued
+     amount was spent; only the recipient themselves can add to it, from My Petty Cash) -->
+<div class="modal" id="spendingDetailModal"><div class="box" style="width:min(460px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Spending Detail</h3><button class="btn small" onclick="closeSpendingDetailModal()">✕</button></div>
+<div id="spendingDetailContent"></div>
+</div></div>
+
+<!-- Manage modal -->
+<div class="modal" id="manageModal"><div class="box" style="width:min(640px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Admin / Manage Records</h3><button class="btn small" onclick="closeManage()">✕</button></div>
+<div class="tabs" style="margin:0 0 10px">
+<button class="tab on" data-tab="records" onclick="mtab(this,'records')">🗑 Manage Records</button>
+<button class="tab" data-tab="notify" onclick="mtab(this,'notify')">📲 Notify Recipients</button>
+<button class="tab" data-tab="roles" onclick="mtab(this,'roles')">👥 Team &amp; Access</button>
+</div>
+<div id="manageContent"></div>
+</div></div>
+
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:14px;right:14px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:13px;line-height:26px;cursor:default;z-index:999999;transition:background .15s">•</button>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
+let db=null;
+try{
+  if(typeof firebase!=='undefined'){
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+  }else{console.error('firebase SDK not loaded — cloud sync unavailable this session');}
+}catch(e){console.error('firebase init failed:',e);}
+// Anonymous auth is a no-op with today's open Firestore rules; it exists so a future
+// rules tightening (requiring request.auth != null) doesn't need a client-code change to
+// go with it. Isolated in its own try/catch and kept out of the Firestore-init block above
+// so a missing/failing auth() call can never affect `db`.
+try{if(typeof firebase!=='undefined'&&firebase.auth)firebase.auth().signInAnonymously().catch(e=>console.error('anon auth failed:',e));}catch(e){console.error('anon auth failed:',e);}
+
+const APP_SLUG='petty-cash';
+const UU_COLLECTION='universal_users';
+const SESSION_KEY='pd_logged_user_v1'; // same key as Bliss One hub / other apps — one login everywhere
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const todayISO=()=>new Date().toISOString().slice(0,10);
+const fmtAmt=n=>'₹'+Number(n||0).toLocaleString('en-IN');
+
+let users=[],ledger=[],issueSpends=[];
+let masters={alertRecipients:[]};
+let api={};
+let currentUser=null,currentTab='records',entryType='in';
+let usersStarted=false,ledgerStarted=false,mastersStarted=false,issueSpendsStarted=false;
+
+function loggedUser(){return users.find(x=>x.id===currentUser)||null}
+function myRole(){const u=loggedUser();return (u&&u.appRoles&&u.appRoles[APP_SLUG])||''}
+function canCloseLoan(){return superAdminUnlocked||['accountant','admin','director'].includes(myRole())}
+
+/* ===== Super Admin (same shared password as other Bliss apps) ===== */
+const SUPER_ADMIN_PASSWORD_HASH='0cb73e5ce7c7e7b2bc347bc16e73c2a16331fdedaec4c1c787815eab4daa6fad';
+async function sha256Hex(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+let superAdminUnlocked=false;
+let secretAdminTapCount=0,secretAdminTapTimer=null,secretAdminFlashTimer=null;
+function secretAdminTap(){
+  secretAdminTapCount++;
+  const dot=$('secretAdminIcon');
+  if(dot){dot.style.background='rgba(214,48,49,.45)';clearTimeout(secretAdminFlashTimer);secretAdminFlashTimer=setTimeout(()=>{dot.style.background='transparent'},200);}
+  clearTimeout(secretAdminTapTimer);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2500);
+  if(secretAdminTapCount>=10){secretAdminTapCount=0;clearTimeout(secretAdminTapTimer);openSuperAdminModal();}
+}
+function openSuperAdminModal(){
+  if(superAdminUnlocked){renderAll();return}
+  $('superAdminPassword').value='';
+  $('superAdminModal').classList.add('show');
+  setTimeout(()=>$('superAdminPassword')?.focus(),30);
+}
+function closeSuperAdminModal(){$('superAdminModal')?.classList.remove('show')}
+async function unlockSuperAdmin(){
+  const pw=$('superAdminPassword')?.value||'';
+  if((await sha256Hex(pw))!==SUPER_ADMIN_PASSWORD_HASH){alert('Galat password.');return}
+  superAdminUnlocked=true;
+  closeSuperAdminModal();
+  renderAll();
+}
+function silentUnlockSuperAdmin(){ if(!superAdminUnlocked){superAdminUnlocked=true;renderAll();} }
+
+/* ===== Login ===== */
+function loginFromHub(){
+  try{ if(window.self!==window.top && window.top.openStaffLoginModal){window.top.openStaffLoginModal();return;} }catch(e){}
+  openLogin();
+}
+function openLogin(){$('loginModal').classList.add('show');$('loginMsg').textContent='';}
+function closeLogin(){$('loginModal').classList.remove('show')}
+function doLogin(){
+  const uname=$('loginUsername').value.trim(),pass=$('loginPassword').value;
+  const msg=$('loginMsg');
+  if(!uname||!pass){msg.style.color='#b43a35';msg.textContent='Username aur Password dono bharein.';return}
+  const u=users.find(x=>String(x.username||x.id).toLowerCase()===uname.toLowerCase() && x.active!==false);
+  if(!u||pass!==String(u.password||'1234')){msg.style.color='#b43a35';msg.textContent='Invalid Username / Password';return}
+  if(u.appAccess && u.appAccess[APP_SLUG]===false){msg.style.color='#b43a35';msg.textContent='Aapko is app ka access nahi hai.';return}
+  localStorage.setItem(SESSION_KEY,u.id);
+  currentUser=u.id;
+  closeLogin();
+  renderAll();
+}
+function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
+
+/* ===== Firestore sync ===== */
+function startUsersSync(){
+  if(usersStarted||!db)return;usersStarted=true;
+  db.collection(UU_COLLECTION).onSnapshot(snap=>{users=[];snap.forEach(d=>users.push(d.data()));renderAll();},err=>console.error('users sync error',err));
+}
+function startLedgerSync(){
+  if(ledgerStarted||!db)return;ledgerStarted=true;
+  db.collection('pc_ledger').orderBy('date','desc').onSnapshot(snap=>{ledger=[];snap.forEach(d=>ledger.push({id:d.id,...d.data()}));renderAll();},err=>console.error('ledger sync error',err));
+}
+// How a person accounts for cash issued (Cash Out) specifically to them - "Spent on X"
+// entries they log themselves against that issue, in "Cash Issued to Me" below. A Loan is
+// money taken for personal use (just Outstanding/Repaid, no spend trail) - this only
+// applies to Cash Out entries that name a recipient. Deliberately a separate collection
+// (not a field on the ledger doc) so multiple spend entries can build up against one issue.
+function startIssueSpendsSync(){
+  if(issueSpendsStarted||!db)return;issueSpendsStarted=true;
+  db.collection('pc_issue_spends').onSnapshot(snap=>{issueSpends=[];snap.forEach(d=>issueSpends.push({id:d.id,...d.data()}));renderAll();},err=>console.error('issue spends sync error',err));
+}
+let mastersSeedChecked=false;
+function seedStarterMastersIfEmpty(){
+  if(mastersSeedChecked||!db)return;mastersSeedChecked=true;
+  db.collection('pc_settings').doc('masters').get().then(doc=>{
+    if(doc.exists)return; // already configured - never overwrite
+    db.collection('pc_settings').doc('masters').set({alertRecipients:[]}).catch(e=>console.error('masters seed failed',e));
+  }).catch(e=>console.error('masters seed check failed',e));
+}
+function startMastersSync(){
+  if(mastersStarted||!db)return;mastersStarted=true;
+  seedStarterMastersIfEmpty();
+  db.collection('pc_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={alertRecipients:[],...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  // Shared GREEN-API WhatsApp credentials - same doc the other Bliss apps already read from,
+  // not a new config this app introduces.
+  db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed',e));
+}
+function saveMasters(){ if(db) db.collection('pc_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
+
+/* ===== WhatsApp (shared GREEN-API credentials, same pattern as Stationery Inventory) ===== */
+function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===10)p='91'+p;return p;}
+async function sendRawWA(phone,message){
+  const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token){console.warn('GREEN-API settings missing');return false}
+  const p=normalizePhone(phone);if(p.length<11)return false;
+  try{
+    const r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
+    return r.ok;
+  }catch(e){console.error('WA send failed:',e);return false}
+}
+// Same threshold as computeHighAmountAlerts() below - this fires the WhatsApp side the
+// moment a qualifying entry is saved, instead of waiting for someone to open the dashboard.
+function notifyHighAmount(a){
+  const configured=(masters.alertRecipients||[]).length>0;
+  const recipients=configured
+    ? users.filter(u=>u.active!==false&&u.phone&&masters.alertRecipients.includes(u.id))
+    : users.filter(u=>u.active!==false&&u.phone&&u.appRoles&&(u.appRoles['bliss-one']==='admin'||u.appRoles['bliss-one']==='director'));
+  if(!recipients.length)return;
+  const label=a.type==='loan'?'High Advance':'High Expense';
+  const who=a.person||a.note||'-';
+  const msg=`⚠️ ${label} Alert — Petty Cash\n\n${who}\nAmount: ${fmtAmt(a.amount)}\nUsual Avg: ${fmtAmt(a.priorAvg)}\nIncrease: +${a.pct.toFixed(0)}%\nDate: ${a.date}`;
+  recipients.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('high amount WA failed:',e)));
+}
+// Tells the recipient directly (not just Admin) the moment cash/a loan is tagged to them,
+// so they find out about their own "👤 My Petty Cash" tab without having to be told in
+// person or open the app speculatively.
+function notifyRecipientOfNewEntry(type,personId,amount,note){
+  const u=users.find(x=>x.id===personId);
+  if(!u||!u.phone)return;
+  const msg=type==='loan'
+    ? `🤝 Petty Cash — Loan Given\n\nAapko ${fmtAmt(amount)} ka loan diya gaya hai${note?' ('+note+')':''}.\n\nApp mein "👤 My Petty Cash" tab mein status dekh sakte hain.`
+    : `💳 Petty Cash — Cash Issued\n\nAapko ${fmtAmt(amount)} cash issue hua hai${note?' ('+note+')':''}.\n\nApp mein "👤 My Petty Cash" tab se apni spending entries daal sakte hain.`;
+  sendRawWA(u.phone,msg).catch(e=>console.error('recipient notify WA failed:',e));
+}
+// Uses the ledger state as it stood BEFORE this entry was added (the live onSnapshot sync
+// hasn't caught up yet at this point), which is exactly the "prior entries" baseline
+// computeHighAmountAlerts() below also compares against.
+function checkAndNotifyHighAmount(type,amount,date,person,note){
+  if(type==='in')return;
+  const prior=liveLedger().filter(x=>x.type===type);
+  if(!prior.length)return;
+  const priorAvg=prior.reduce((s,x)=>s+(x.amount||0),0)/prior.length;
+  if(priorAvg<=0)return;
+  const pct=((amount-priorAvg)/priorAvg)*100;
+  if(pct>HIGH_AMOUNT_ALERT_THRESHOLD_PCT)notifyHighAmount({type,amount,priorAvg,pct,date,person,note});
+}
+
+/* ===== Nav / gate ===== */
+function renderGate(){
+  const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
+  const u=loggedUser();
+  if(!currentUser||!u){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    const inFrame=window.self!==window.top;
+    gateBox.innerHTML=inFrame
+      ? `<h3>Login Required</h3><p class="note">Petty Cash dekhne ke liye Bliss One dashboard se login karein.</p><button class="btn primary" onclick="loginFromHub()">Login</button>`
+      : `<h3>Login Required</h3><p class="note">Petty Cash dekhne ke liye login karein — wahi username/password jo baaki Bliss apps me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
+    return;
+  }
+  if(u.appAccess && u.appAccess[APP_SLUG]===false){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    gateBox.innerHTML=`<h3>No Access</h3>`;
+    return;
+  }
+  gateWrap.style.display='none';appWrap.style.display='';
+}
+function refreshLoginBadge(){
+  const u=loggedUser();
+  $('loginBadge').textContent=u?'👤 '+u.name:'Not Logged In';
+  $('logoutBtn').classList.toggle('hidden',!u);
+}
+function applyFeatureVisibility(){
+  document.querySelectorAll('.superAdminStrict').forEach(el=>el.classList.toggle('hidden',!superAdminUnlocked));
+  document.querySelectorAll('.accountantOnly').forEach(el=>el.classList.toggle('hidden',!canCloseLoan()));
+  if(!canCloseLoan()&&document.getElementById('page-team')?.classList.contains('on'))goPage('ledger');
+}
+
+/* ===== Entry form ===== */
+function selectEntryType(t){
+  entryType=t;
+  ['in','out','loan'].forEach(x=>$('typeBtn_'+x).classList.toggle('on',x===t));
+  const textInp=$('entryPerson'),sel=$('entryPersonSelect');
+  if(t==='out'){
+    $('entryPersonLabel').textContent='Issued To (optional — select to let them log their own spend)';
+    textInp.classList.add('hidden');sel.classList.remove('hidden');
+  }else if(t==='loan'){
+    $('entryPersonLabel').textContent='Given To *';
+    sel.classList.remove('hidden');
+    textInp.placeholder='Non-staff name (if not in the list above)';
+    toggleLoanPersonTextVisibility();
+  }else{
+    $('entryPersonLabel').textContent='Person Name';
+    textInp.placeholder='Optional';
+    textInp.classList.remove('hidden');sel.classList.add('hidden');
+  }
+}
+// For a Loan, picking a staff member from the dropdown links it to their login (so they
+// show up in their own "My Loans"); leaving it on "Not linked / outsider" falls back to a
+// plain typed name, since a loan can go to someone with no app account at all.
+function toggleLoanPersonTextVisibility(){
+  if(entryType!=='loan')return;
+  const sel=$('entryPersonSelect'),textInp=$('entryPerson');
+  textInp.classList.toggle('hidden',!!sel.value);
+  if(sel.value)textInp.value='';
+}
+function renderEntryPersonSelect(){
+  const sel=$('entryPersonSelect');
+  if(!sel)return;
+  const cur=sel.value;
+  const au=users.filter(u=>u.active!==false);
+  sel.innerHTML='<option value="">-- Not linked / outsider --</option>'+au.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+  if(au.some(u=>u.id===cur))sel.value=cur;
+}
+let _entrySubmitting=false;
+async function addLedgerEntry(){
+  if(_entrySubmitting)return;
+  const amount=parseFloat($('entryAmount').value);
+  const date=$('entryDate').value||todayISO();
+  const note=$('entryNote').value.trim();
+  let person='',personId='';
+  if(entryType==='out'){
+    personId=$('entryPersonSelect').value||'';
+    person=personId?nameOfUserId(personId):'';
+  }else if(entryType==='loan'){
+    personId=$('entryPersonSelect').value||'';
+    person=personId?nameOfUserId(personId):$('entryPerson').value.trim();
+  }else{
+    person=$('entryPerson').value.trim();
+  }
+  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  if(entryType==='loan'&&!person){alert('Loan ke liye Person (staff select ya naam type) zaroori hai.');return}
+  // Cash-box can't hand out more than it actually has - Cash Out and Loan Given are both
+  // real money leaving the box, so both are capped at the Current Balance (Cash In isn't).
+  if(entryType==='out'||entryType==='loan'){
+    const {balance}=computeBalance();
+    if(amount>balance){alert('Current Balance ('+fmtAmt(balance)+') se zyada '+(entryType==='loan'?'Loan':'Cash Out')+' nahi de sakte.');return}
+  }
+  _entrySubmitting=true;
+  const btn=$('entrySubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const actor=loggedUser();
+    const payload={type:entryType,amount,date,person,note,by:actor?actor.id:'',at:new Date().toISOString()};
+    if(entryType==='loan')payload.repaid=false;
+    if((entryType==='out'||entryType==='loan')&&personId)payload.personId=personId;
+    checkAndNotifyHighAmount(entryType,amount,date,person,note);
+    if((entryType==='out'||entryType==='loan')&&personId)notifyRecipientOfNewEntry(entryType,personId,amount,note);
+    await db.collection('pc_ledger').add(payload);
+    $('entryAmount').value='';$('entryPerson').value='';$('entryNote').value='';
+    if($('entryPersonSelect'))$('entryPersonSelect').value='';
+    toast('Entry saved');
+  }finally{
+    _entrySubmitting=false;
+    if(btn)btn.disabled=false;
+  }
+}
+async function markLoanRepaid(id){
+  if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin loan Repaid mark kar sakte hain.');return}
+  const x=ledger.find(e=>e.id===id);if(!x)return;
+  if(!confirm('Yeh loan Repaid mark karna hai? Balance mein amount wapas add ho jayega.'))return;
+  const actor=loggedUser();
+  await db.collection('pc_ledger').doc(id).update({repaid:true,repaidAt:new Date().toISOString(),repaidBy:actor?actor.id:'Unknown'});
+  toast('Loan repaid mark ho gaya');
+}
+
+/* ===== Disable / Restore / Permanent Delete — Super Admin only, no doer access ===== */
+function canManageLedger(){return superAdminUnlocked}
+async function deleteLedgerEntry(id,skipConfirm){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entry disable kar sakta hai.');return}
+  const x=ledger.find(e=>e.id===id);if(!x)return;
+  if(!skipConfirm&&!confirm('Yeh entry Disabled list me chali jayegi (balance se hat jayegi, Restore ho sakta hai). Confirm karein?'))return;
+  const actor=loggedUser();
+  await db.collection('pc_ledger').doc(id).update({deletedAt:new Date().toISOString(),deletedBy:actor?actor.id:'Unknown'});
+  toast('Entry disabled');
+}
+async function restoreLedgerEntry(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin restore kar sakta hai.');return}
+  await db.collection('pc_ledger').doc(id).update({deletedAt:firebase.firestore.FieldValue.delete(),deletedBy:firebase.firestore.FieldValue.delete()});
+  toast('Entry restored');
+}
+async function permanentlyDeleteLedgerEntry(id,skipConfirm){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entry permanently delete kar sakta hai.');return}
+  const x=ledger.find(e=>e.id===id);if(!x)return;
+  if(!skipConfirm){
+    const typed=prompt('Yeh entry Firestore se HAMESHA KE LIYE delete ho jayegi — wapas NAHI aayegi.\n\nType: '+x.type+'\nAmount: '+fmtAmt(x.amount)+'\n\nConfirm karne ke liye "DELETE" type karein:');
+    if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  }
+  try{
+    await db.collection('pc_ledger').doc(id).delete();
+  }catch(e){ console.error('permanent delete failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
+  toast('Entry permanently delete ho gayi');
+}
+// Quick typo-fix for Amount/Date/Note - Type and Person stay fixed here (changing those
+// would mean re-deriving personId linkage etc); a genuinely wrong type/person is better
+// fixed via Disable + a fresh correct entry than half-migrated through this modal.
+let editLedgerTarget=null;
+function openEditLedgerModal(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entry edit kar sakta hai.');return}
+  const x=ledger.find(e=>e.id===id);if(!x)return;
+  editLedgerTarget=id;
+  $('editAmount').value=x.amount||'';
+  $('editDate').value=x.date||'';
+  $('editNote').value=x.note||'';
+  $('editLedgerModal').classList.add('show');
+}
+function closeEditLedgerModal(){$('editLedgerModal')?.classList.remove('show');editLedgerTarget=null;}
+async function saveEditLedger(){
+  if(!editLedgerTarget)return;
+  if(!superAdminUnlocked){alert('Sirf Super Admin entry edit kar sakta hai.');return}
+  const amount=parseFloat($('editAmount').value);
+  const date=$('editDate').value;
+  const note=$('editNote').value.trim();
+  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  if(!date){alert('Date zaroori hai.');return}
+  await db.collection('pc_ledger').doc(editLedgerTarget).update({amount,date,note});
+  closeEditLedgerModal();
+  toast('Entry update ho gayi');
+}
+
+/* ===== Dashboard ===== */
+function nameOfUserId(id){return (users.find(x=>x.id===id)||{}).name||id||'-'}
+function liveLedger(){return ledger.filter(x=>!x.deletedAt)}
+/* ===== Cash Issued to Me — self-service spend tracking for Cash Out entries that name a
+   specific recipient. A Loan is personal money (no spend trail needed); this is only for
+   "the company handed X cash to a person for a purpose," which the recipient should be
+   able to account for themselves. ===== */
+function issueSpentTotal(issueId){return issueSpends.filter(s=>s.issueId===issueId&&!s.deletedAt).reduce((s,x)=>s+(x.amount||0),0)}
+// Lets anyone looking at the shared Ledger (Accountant, Admin, Super Admin, or just a
+// curious Doer) see exactly how an issued amount was itemized by its recipient, without
+// needing that recipient's own login - read-only, no add-spend form here (that stays in
+// the recipient's own "Cash Issued to Me" on My Petty Cash).
+function openSpendingDetailModal(issueId){
+  const x=ledger.find(e=>e.id===issueId);
+  if(!x)return;
+  const spent=issueSpentTotal(issueId);
+  const remaining=x.amount-spent;
+  const mySpends=issueSpends.filter(s=>s.issueId===issueId&&!s.deletedAt).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const verifiedBadge=x.verified?'<span class="pill repaid">✓ Verified &amp; Settled</span>':'';
+  const canVerify=canCloseLoan()&&!x.verified;
+  const verifyBtn=canVerify
+    ? (remaining>0
+        ? `<button class="btn small primary" onclick="verifyAndSettleSpending('${esc(issueId)}')">✓ Verify &amp; Receive Remaining ${fmtAmt(remaining)}</button>`
+        : `<button class="btn small primary" onclick="verifyAndSettleSpending('${esc(issueId)}')">✓ Verify Spending (fully spent, nothing to receive)</button>`)
+    : '';
+  $('spendingDetailContent').innerHTML=`
+    <div class="item">
+      <span><b>${fmtAmt(x.amount)}</b> issued to <b>${esc(x.person||'-')}</b> on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>
+      ${verifiedBadge||`<span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>`}
+    </div>
+    ${mySpends.length?mySpends.map(s=>`<div class="item"><span>${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''}<br><small style="color:var(--muted)">${esc(s.date)} • by ${esc(nameOfUserId(s.by))}</small></span></div>`).join(''):'<div class="note" style="padding:10px 0">Abhi tak koi spending entry nahi daali gayi.</div>'}
+    ${x.verified?`<p class="note" style="margin-top:10px">Verified by ${esc(nameOfUserId(x.settledBy))} on ${esc((x.settledAt||'').slice(0,10))}${x.returnedAmount?' — '+fmtAmt(x.returnedAmount)+' cash wapas receive hua.':''}</p>`:''}
+    ${verifyBtn?`<div style="margin-top:12px;text-align:right">${verifyBtn}</div>`:''}
+  `;
+  $('spendingDetailModal').classList.add('show');
+}
+function closeSpendingDetailModal(){$('spendingDetailModal')?.classList.remove('show');}
+// Accounts/Admin/Super Admin confirms the itemized spend entries are legit, and if the
+// recipient physically handed back whatever wasn't spent, that gets recorded as a fresh
+// Cash In entry (so it adds back to the live Current Balance exactly like any other Cash
+// In) - the original issue's own amount still stays Out in full, same as before, so the
+// books show both sides: cash issued, and cash returned.
+async function verifyAndSettleSpending(issueId){
+  if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin spending verify kar sakte hain.');return}
+  const x=ledger.find(e=>e.id===issueId);if(!x)return;
+  const remaining=x.amount-issueSpentTotal(issueId);
+  const msg=remaining>0
+    ? 'Spending verify karein aur '+fmtAmt(remaining)+' cash wapas receive hua confirm karein?\n\nYeh amount ek nayi Cash In entry ke roop mein add ho jayega.'
+    : 'Spending verify karein? (Pura amount spend ho chuka hai, wapas lene ko kuch nahi hai.)';
+  if(!confirm(msg))return;
+  const actor=loggedUser();
+  try{
+    if(remaining>0){
+      await db.collection('pc_ledger').add({
+        type:'in',amount:remaining,date:todayISO(),
+        note:'Balance returned by '+(x.person||'-')+' (issued '+fmtAmt(x.amount)+' on '+x.date+')',
+        person:x.person||'',by:actor?actor.id:'',at:new Date().toISOString()
+      });
+    }
+    await db.collection('pc_ledger').doc(issueId).update({verified:true,settledAt:new Date().toISOString(),settledBy:actor?actor.id:'Unknown',returnedAmount:remaining});
+    closeSpendingDetailModal();
+    toast('Spending verified'+(remaining>0?' aur balance receive ho gaya':''));
+  }catch(e){ console.error('verify/settle failed',e); alert('Fail ho gaya, dobara try karein.'); }
+}
+function renderMyIssuedCash(){
+  const wrap=$('myIssuedCashWrap');
+  if(!wrap)return;
+  const mine=liveLedger().filter(x=>x.type==='out'&&x.personId===currentUser).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  if(!mine.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>💳 Cash Issued to Me</span></div><div class="pb">${mine.map(x=>{
+    const spent=issueSpentTotal(x.id);
+    const remaining=x.amount-spent;
+    const mySpends=issueSpends.filter(s=>s.issueId===x.id&&!s.deletedAt).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:8px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <span><b>${fmtAmt(x.amount)}</b> issued on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>
+        ${x.verified?'<span class="pill repaid">✓ Verified &amp; Settled</span>':`<span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>`}
+      </div>
+      ${mySpends.map(s=>`<div style="font-size:12px;color:var(--muted);padding-left:4px">— ${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''} (${esc(s.date)})${superAdminUnlocked?` <button class="btn small danger" style="padding:2px 7px;font-size:10px" onclick="permanentlyDeleteIssueSpend('${esc(s.id)}')">✕</button>`:''}</div>`).join('')}
+      ${x.verified?'':`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
+        <input type="number" id="issueSpendAmt_${esc(x.id)}" placeholder="Amount spent" style="width:120px;padding:7px;border:1px solid var(--line);border-radius:7px">
+        <input id="issueSpendNote_${esc(x.id)}" placeholder="Spent on what?" style="flex:1;min-width:140px;padding:7px;border:1px solid var(--line);border-radius:7px">
+        <button class="btn small primary" onclick="addIssueSpend('${esc(x.id)}')">＋ Add Spend</button>
+      </div>`}
+    </div>`;
+  }).join('')}</div></div>`;
+}
+// Read-only status view for loans given to the logged-in user — Outstanding/Repaid only,
+// no spend entries (a Loan is personal money, not something to itemize against).
+function renderMyLoans(){
+  const wrap=$('myLoansWrap');
+  if(!wrap)return;
+  const mine=liveLedger().filter(x=>x.type==='loan'&&x.personId===currentUser).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  if(!mine.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>📋 Loans Given to Me</span></div><div class="pb">${mine.map(x=>{
+    const statusChip=x.repaid?'<span class="pill repaid">Repaid</span>':'<span class="pill loan">Outstanding</span>';
+    return `<div class="item"><span><b>${fmtAmt(x.amount)}</b> given on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>${statusChip}</div>`;
+  }).join('')}</div></div>`;
+}
+// Drives the "👤 My Petty Cash" tab: renders both of the person's own sections, shows an
+// empty state when neither applies, and puts a dot on the tab itself when something there
+// still needs their attention (an issue not yet fully accounted for, or an outstanding loan).
+function renderMyPage(){
+  renderMyIssuedCash();
+  renderMyLoans();
+  const issued=liveLedger().filter(x=>x.type==='out'&&x.personId===currentUser);
+  const loans=liveLedger().filter(x=>x.type==='loan'&&x.personId===currentUser);
+  if($('myPageEmptyState'))$('myPageEmptyState').classList.toggle('hidden',issued.length>0||loans.length>0);
+  const pending=issued.some(x=>(x.amount-issueSpentTotal(x.id))>0)||loans.some(x=>!x.repaid);
+  const tabBtn=$('myPageTabBtn');
+  if(tabBtn){
+    let dot=tabBtn.querySelector('.tabBadgeDot');
+    if(pending&&!dot){dot=document.createElement('span');dot.className='tabBadgeDot';tabBtn.appendChild(dot);}
+    else if(!pending&&dot)dot.remove();
+  }
+}
+// Accountant/Admin/Director-only consolidated view: every person who's had cash issued or
+// a loan given to them, with their totals in one row instead of hunting through the
+// Ledger one entry at a time.
+const TEAM_AGING_DAYS=15;
+function daysSinceDate(dateStr){
+  if(!dateStr)return 0;
+  const ms=new Date(todayISO()).getTime()-new Date(dateStr).getTime();
+  return Math.max(0,Math.round(ms/86400000));
+}
+function clearTeamFilters(){
+  if($('teamSearch'))$('teamSearch').value='';
+  if($('teamFrom'))$('teamFrom').value='';
+  if($('teamTo'))$('teamTo').value='';
+  if($('teamSort'))$('teamSort').value='pending';
+  renderTeamOverview();
+}
+// Shared by the table, the mini chart, the aging alerts and CSV export, so all four always
+// agree on the same From/To-filtered, searched numbers.
+function computeTeamRows(){
+  if(!canCloseLoan())return [];
+  const from=$('teamFrom')?.value||'',to=$('teamTo')?.value||'';
+  const q=($('teamSearch')?.value||'').trim().toLowerCase();
+  let live=liveLedger();
+  if(from)live=live.filter(x=>String(x.date)>=from);
+  if(to)live=live.filter(x=>String(x.date)<=to);
+  const personIds=new Set();
+  live.forEach(x=>{if((x.type==='out'||x.type==='loan')&&x.personId)personIds.add(x.personId);});
+  let rows=[...personIds].map(pid=>{
+    const issued=live.filter(x=>x.type==='out'&&x.personId===pid);
+    const loans=live.filter(x=>x.type==='loan'&&x.personId===pid);
+    const issuedTotal=issued.reduce((s,x)=>s+(x.amount||0),0);
+    const pendingIssues=issued.filter(x=>!x.verified);
+    const issuedPending=pendingIssues.reduce((s,x)=>s+(x.amount-issueSpentTotal(x.id)),0);
+    const loansTotal=loans.reduce((s,x)=>s+(x.amount||0),0);
+    const outstandingLoans=loans.filter(x=>!x.repaid);
+    const loansOutstanding=outstandingLoans.reduce((s,x)=>s+(x.amount||0),0);
+    const oldestPendingDates=[...pendingIssues,...outstandingLoans].map(x=>x.date).sort();
+    const oldestAgeDays=oldestPendingDates.length?daysSinceDate(oldestPendingDates[0]):0;
+    return {pid,name:nameOfUserId(pid),issuedTotal,issuedPending,loansTotal,loansOutstanding,oldestAgeDays,aging:oldestAgeDays>=TEAM_AGING_DAYS};
+  });
+  if(q)rows=rows.filter(r=>r.name.toLowerCase().includes(q));
+  const sortBy=$('teamSort')?.value||'pending';
+  if(sortBy==='name')rows.sort((a,b)=>a.name.localeCompare(b.name));
+  else if(sortBy==='issued')rows.sort((a,b)=>b.issuedTotal-a.issuedTotal);
+  else rows.sort((a,b)=>(b.issuedPending+b.loansOutstanding)-(a.issuedPending+a.loansOutstanding));
+  return rows;
+}
+function renderTeamOverview(){
+  const tbody=$('teamOverviewTable');
+  if(!tbody)return;
+  if(!canCloseLoan()){tbody.innerHTML='';if($('teamAgingAlerts'))$('teamAgingAlerts').innerHTML='';if($('teamOverviewChart'))$('teamOverviewChart').innerHTML='';return;}
+  const rows=computeTeamRows();
+  tbody.innerHTML=rows.length?rows.map(r=>`<tr>
+    <td><b>${esc(r.name)}</b>${r.aging?' <span class="pill" style="background:var(--redbg);color:var(--red)">⚠ Follow-up ('+r.oldestAgeDays+'d)</span>':''}</td>
+    <td class="num">${fmtAmt(r.issuedTotal)}</td>
+    <td class="num">${r.issuedPending>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.issuedPending)}</span>`:fmtAmt(0)}</td>
+    <td class="num">${fmtAmt(r.loansTotal)}</td>
+    <td class="num">${r.loansOutstanding>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.loansOutstanding)}</span>`:fmtAmt(0)}</td>
+    <td><button class="btn small secondary" onclick="openPersonDetailModal('${esc(r.pid)}')">👁 Details</button></td>
+  </tr>`).join(''):`<tr><td colspan="6"><div class="emptystate">👥<p>Koi record nahi mila.</p></div></td></tr>`;
+  renderTeamAgingAlerts(rows);
+  renderTeamOverviewChart(rows);
+}
+function renderTeamAgingAlerts(rows){
+  const wrap=$('teamAgingAlerts');
+  if(!wrap)return;
+  const aging=rows.filter(r=>r.aging);
+  if(!aging.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>⚠ Needs Follow-up (${TEAM_AGING_DAYS}+ din se pending)</span></div><div class="pb">${aging.map(r=>`
+    <div class="item"><span><b>${esc(r.name)}</b> — ${r.oldestAgeDays} din se pending (Pending: ${fmtAmt(r.issuedPending)}, Outstanding: ${fmtAmt(r.loansOutstanding)})</span>
+    <button class="btn small secondary" onclick="openPersonDetailModal('${esc(r.pid)}')">👁 Details</button></div>`).join('')}</div></div>`;
+}
+// Single-series magnitude chart (top 5 by pending+outstanding) - one brand hue is correct
+// here since there's only one measure per person, no categorical identity to distinguish.
+function renderTeamOverviewChart(rows){
+  const wrap=$('teamOverviewChart');
+  if(!wrap)return;
+  const top=rows.map(r=>({name:r.name,val:r.issuedPending+r.loansOutstanding})).filter(r=>r.val>0).sort((a,b)=>b.val-a.val).slice(0,5);
+  if(!top.length){wrap.innerHTML='<div class="note">Koi pending/outstanding amount nahi hai.</div>';return;}
+  const max=Math.max(...top.map(r=>r.val),1);
+  wrap.innerHTML=top.map(r=>`
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span>${esc(r.name)}</span><b>${fmtAmt(r.val)}</b></div>
+      <div style="background:var(--mint);border-radius:5px;height:10px;overflow:hidden"><div style="width:${Math.max((r.val/max)*100,3)}%;height:100%;background:var(--g);border-radius:5px"></div></div>
+    </div>`).join('');
+}
+function exportTeamOverviewCSV(){
+  const rows=[['Person','Total Issued','Pending (Issued)','Total Loans Given','Outstanding (Loan)','Needs Follow-up']];
+  computeTeamRows().forEach(r=>rows.push([r.name,r.issuedTotal,r.issuedPending,r.loansTotal,r.loansOutstanding,r.aging?'Yes ('+r.oldestAgeDays+'d)':'No']));
+  downloadCSV('petty-cash-team-overview.csv',rows);
+}
+function openPersonDetailModal(personId){
+  const name=nameOfUserId(personId);
+  $('personDetailTitle').textContent=name;
+  const issued=liveLedger().filter(x=>x.type==='out'&&x.personId===personId).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const loans=liveLedger().filter(x=>x.type==='loan'&&x.personId===personId).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const issuedHtml=issued.length?issued.map(x=>{
+    const remaining=x.amount-issueSpentTotal(x.id);
+    const spends=issueSpends.filter(s=>s.issueId===x.id&&!s.deletedAt);
+    const statusPill=x.verified?'<span class="pill repaid">✓ Settled</span>':`<span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>`;
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:4px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><span><b>${fmtAmt(x.amount)}</b> issued ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>${statusPill}</div>
+      ${spends.map(s=>`<small style="color:var(--muted);padding-left:4px">— ${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''} (${esc(s.date)})</small>`).join('')}
+    </div>`;
+  }).join(''):'<div class="note" style="padding:8px 0">Koi cash issue nahi hui.</div>';
+  const loansHtml=loans.length?loans.map(x=>`<div class="item"><span><b>${fmtAmt(x.amount)}</b> given ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>${x.repaid?'<span class="pill repaid">Repaid</span>':'<span class="pill loan">Outstanding</span>'}</div>`).join(''):'<div class="note" style="padding:8px 0">Koi loan nahi diya gaya.</div>';
+  $('personDetailContent').innerHTML=`
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:8px">💳 Cash Issued</div>
+    ${issuedHtml}
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:14px 0 8px">📋 Loans Given</div>
+    ${loansHtml}
+  `;
+  $('personDetailModal').classList.add('show');
+}
+function closePersonDetailModal(){$('personDetailModal')?.classList.remove('show');}
+let _issueSpendSubmitting=false;
+async function addIssueSpend(issueId){
+  if(_issueSpendSubmitting)return;
+  const issue=ledger.find(x=>x.id===issueId);
+  if(issue&&issue.verified){alert('Yeh entry Accounts ne already verify/settle kar di hai, ab aur spend add nahi ho sakta.');return}
+  const amtEl=$('issueSpendAmt_'+issueId),noteEl=$('issueSpendNote_'+issueId);
+  const amount=parseFloat(amtEl?.value);
+  const note=(noteEl?.value||'').trim();
+  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  _issueSpendSubmitting=true;
+  try{
+    const actor=loggedUser();
+    await db.collection('pc_issue_spends').add({issueId,amount,note,date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString()});
+    toast('Spend entry added');
+  }finally{
+    _issueSpendSubmitting=false;
+  }
+}
+async function permanentlyDeleteIssueSpend(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin spend entry delete kar sakta hai.');return}
+  if(!confirm('Yeh spend entry hamesha ke liye delete ho jayegi. Confirm karein?'))return;
+  await db.collection('pc_issue_spends').doc(id).delete();
+  toast('Spend entry deleted');
+}
+function computeBalance(){
+  const live=liveLedger();
+  const totalIn=live.filter(x=>x.type==='in').reduce((s,x)=>s+(x.amount||0),0);
+  const totalOut=live.filter(x=>x.type==='out').reduce((s,x)=>s+(x.amount||0),0);
+  const outstandingLoans=live.filter(x=>x.type==='loan'&&!x.repaid).reduce((s,x)=>s+(x.amount||0),0);
+  const outstandingCount=live.filter(x=>x.type==='loan'&&!x.repaid).length;
+  const balance=totalIn-totalOut-outstandingLoans;
+  return {totalIn,totalOut,outstandingLoans,outstandingCount,balance};
+}
+function renderDash(){
+  const {totalIn,totalOut,outstandingLoans,outstandingCount,balance}=computeBalance();
+  const live=liveLedger();
+  const totalLoanGiven=live.filter(x=>x.type==='loan').reduce((s,x)=>s+(x.amount||0),0);
+  const tiles=[
+    {label:'CURRENT BALANCE',val:fmtAmt(balance)},
+    {label:'TOTAL IN',val:fmtAmt(totalIn)},
+    {label:'TOTAL OUT',val:fmtAmt(totalOut)},
+    {label:'TOTAL LOAN GIVEN',val:fmtAmt(totalLoanGiven)},
+    {label:'OUTSTANDING LOANS',val:fmtAmt(outstandingLoans)+' ('+outstandingCount+')',warn:outstandingCount>0}
+  ];
+  $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+}
+// A single Out/Loan entry costing much more than that type's own recent history is worth a
+// second look (same pattern as Fuel Tracker's Mileage Alert) - compares the latest live
+// entry of each type against the average of that type's earlier entries.
+const HIGH_AMOUNT_ALERT_THRESHOLD_PCT=100;
+function computeHighAmountAlerts(){
+  const live=liveLedger();
+  const alerts=[];
+  ['out','loan'].forEach(type=>{
+    let entries=live.filter(x=>x.type===type).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.at||'').localeCompare(String(b.at||'')));
+    if(entries.length<2)return;
+    const last=entries[entries.length-1];
+    const prior=entries.slice(0,-1);
+    const priorAvg=prior.reduce((s,x)=>s+(x.amount||0),0)/prior.length;
+    if(priorAvg<=0)return;
+    const pct=((last.amount-priorAvg)/priorAvg)*100;
+    if(pct>HIGH_AMOUNT_ALERT_THRESHOLD_PCT)alerts.push({type,amount:last.amount,priorAvg,pct,date:last.date,person:last.person,note:last.note});
+  });
+  return alerts.sort((a,b)=>b.pct-a.pct);
+}
+function renderHighAmountAlerts(){
+  const wrap=$('highAmountAlerts');
+  if(!wrap)return;
+  const alerts=computeHighAmountAlerts();
+  if(!alerts.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>⚠ High Amount Alerts</span></div><div class="pb">${alerts.map(a=>{
+    const label=a.type==='loan'?'High Advance':'High Expense';
+    const who=a.person?(' — '+esc(a.person)):(a.note?(' — '+esc(a.note)):'');
+    return `<div class="item">
+      <span><b>${esc(label)}</b>${who} — <b>${fmtAmt(a.amount)}</b> (${esc(a.date)}), usual avg ${fmtAmt(a.priorAvg)} <span style="color:var(--red);font-weight:700">(+${a.pct.toFixed(0)}%)</span></span>
+      <span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ Review</span>
+    </div>`;
+  }).join('')}</div></div>`;
+}
+function clearLedgerFilters(){
+  if($('histFrom'))$('histFrom').value='';
+  if($('histTo'))$('histTo').value='';
+  if($('histPerson'))$('histPerson').value='';
+  if($('histType'))$('histType').value='all';
+  renderLedger();
+}
+// Filters start collapsed - most people just scroll the history, so hiding From/To/Person/
+// Type behind one "🔍 Filters" tap keeps the default view simpler/cleaner, matching the
+// same pattern as the rest of the Bliss app family's optional filter rows.
+function toggleHistFiltersPanel(){
+  const panel=$('histFiltersPanel');
+  if(!panel)return;
+  panel.classList.toggle('hidden');
+}
+function downloadCSV(filename,rows){
+  const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+function exportLedgerCSV(){
+  const rows=[['Date','Type','Person','Note','Amount','By','Status']];
+  filteredLedgerRows().forEach(x=>rows.push([x.date,x.type,x.person||'',x.note||'',x.amount,nameOfUserId(x.by),x.deletedAt?'Disabled':(x.type==='loan'?(x.repaid?'Repaid':'Outstanding'):'Active')]));
+  downloadCSV('petty-cash-ledger.csv',rows);
+}
+function deletedInfo(x){return x.deletedAt?`<br><small style="color:var(--muted)">Disabled by ${esc(nameOfUserId(x.deletedBy))}</small>`:''}
+// Shared by renderLedger() and exportLedgerCSV() so the exported rows always match
+// whatever the History table (and its From/To/Type/Person filters) is currently showing.
+function filteredLedgerRows(){
+  const showDeleted=$('showDeleted')&&$('showDeleted').checked;
+  const type=$('histType')?.value||'all';
+  const from=$('histFrom')?.value||'';
+  const to=$('histTo')?.value||'';
+  const personQ=($('histPerson')?.value||'').trim().toLowerCase();
+  let rows=showDeleted?ledger.filter(x=>x.deletedAt):ledger.filter(x=>!x.deletedAt);
+  if(type!=='all')rows=rows.filter(x=>x.type===type);
+  if(from)rows=rows.filter(x=>String(x.date)>=from);
+  if(to)rows=rows.filter(x=>String(x.date)<=to);
+  if(personQ)rows=rows.filter(x=>String(x.person||'').toLowerCase().includes(personQ));
+  return rows.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at||'').localeCompare(String(a.at||'')));
+}
+// Keeps the table from rendering hundreds of rows at once as the ledger grows - all
+// filtering/totals still run over the full synced data, only the DOM render is capped.
+// Reset to the first page on any new filter so you don't end up paginated into an empty view.
+let ledgerPageSize=25;
+function onLedgerFilterChange(){ledgerPageSize=25;renderLedger();}
+function loadMoreLedger(){ledgerPageSize+=25;renderLedger();}
+function renderLedger(){
+  const deletedN=ledger.filter(x=>x.deletedAt).length;
+  if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
+  if($('deletedCount'))$('deletedCount').textContent=deletedN;
+  const allRows=filteredLedgerRows();
+  const rows=allRows.slice(0,ledgerPageSize);
+  $('ledgerTable').innerHTML=rows.map(x=>{
+    const pillClass=x.type==='in'?'in':x.type==='out'?'out':'loan';
+    const pillLabel=x.type==='in'?'IN':x.type==='out'?'OUT':'LOAN';
+    const sign=x.type==='in'?'+':'-';
+    const loanRepaidBadge=x.type==='loan'?(x.repaid?' <span class="pill repaid">Repaid</span>':' <span class="pill loan">Outstanding</span>'):'';
+    const settledBadge=(x.type==='out'&&x.personId)?(x.verified?' <span class="pill repaid">✓ Settled</span>':' <span class="pill loan">Pending Verify</span>'):'';
+    const repayBtn=(x.type==='loan'&&!x.repaid&&!x.deletedAt)?`<button class="btn small" onclick="markLoanRepaid('${esc(x.id)}')">↩ Mark Repaid</button>`:'';
+    const adminBtn=x.deletedAt
+      ?(superAdminUnlocked?`<button class="btn small" onclick="restoreLedgerEntry('${esc(x.id)}')">↩ Restore</button>`:'')
+      :(superAdminUnlocked?`<button class="btn small danger" onclick="deleteLedgerEntry('${esc(x.id)}')">Disable</button>`:'');
+    const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeleteLedgerEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
+    const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditLedgerModal('${esc(x.id)}')">✎ Edit</button>`:'';
+    const viewSpendBtn=(x.type==='out'&&x.personId)?`<button class="btn small secondary" onclick="openSpendingDetailModal('${esc(x.id)}')">👁 View Spending</button>`:'';
+    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}${settledBadge}</td><td>${esc(x.person||'-')}${x.note?'<br><small style="color:var(--muted)">'+esc(x.note)+'</small>':''}</td><td class="num">${sign}${fmtAmt(x.amount)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${repayBtn} ${viewSpendBtn} ${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
+  }).join('')||`<tr><td colspan="6"><div class="emptystate">💵<p>Koi entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
+  if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
+  if(allRows.length>rows.length){
+    const tr=document.createElement('tr');
+    tr.id='ledgerLoadMoreRow';
+    tr.innerHTML=`<td colspan="6" style="text-align:center;padding:14px 0"><button class="btn small secondary" onclick="loadMoreLedger()">Load More (${rows.length} / ${allRows.length})</button></td>`;
+    $('ledgerTable').appendChild(tr);
+  }
+}
+
+/* ===== Manage panel ===== */
+function openManage(){currentTab='records';$('manageModal').classList.add('show');renderManage()}
+function closeManage(){$('manageModal').classList.remove('show')}
+function mtab(btn,t){currentTab=t;document.querySelectorAll('#manageModal .tab').forEach(x=>x.classList.toggle('on',x===btn));renderManage()}
+function renderManage(){
+  const c=$('manageContent');
+  if(currentTab==='records'){
+    c.innerHTML=`<p class="note">Entry ko <b>Disable</b> karne par wo balance se hat jaati hai (Restore ho sakta hai). <b>Permanently Delete</b> karne par entry Firestore se hamesha ke liye hat jaati hai — wapas NAHI aayegi.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
+      <select id="mRecordsType" onchange="renderRecordsManageTab()" style="width:auto"><option value="all">All</option><option value="in">Cash In</option><option value="out">Cash Out</option><option value="loan">Loan</option></select>
+      <input id="mRecordsSearch" placeholder="Search Person / Note" oninput="renderRecordsManageTab()" style="flex:1;min-width:160px">
+      <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="mRecordsShowDisabled" onchange="renderRecordsManageTab()" style="width:auto"> Show Disabled</label>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="mRecordsSelectAll" onchange="toggleSelectAllRecords(this.checked)" style="width:auto"> Select All</label>
+      <button class="btn small" onclick="bulkDisableRecords()">Disable Selected</button>
+      <button class="btn small" onclick="bulkRestoreRecords()">↩ Restore Selected</button>
+      <button class="btn small danger" onclick="bulkPermanentlyDeleteRecords()">🗑 Delete Permanently Selected</button>
+    </div>
+    <div id="mRecordsList"></div>`;
+    renderRecordsManageTab();
+  }
+  else if(currentTab==='notify'){
+    const withPhone=users.filter(u=>u.active!==false && u.phone);
+    const selected=masters.alertRecipients||[];
+    c.innerHTML=`<p class="note">High Amount Alert (High Advance / High Expense) hone par WhatsApp message kisko jaye, yahan se select karein. Kuch bhi select na karein to default Bliss One hub ke Admin/Director (jinke paas phone number hai) ko jayega.</p>`+
+      (withPhone.map(u=>`<div class="item"><span>${esc(u.name)}</span><input type="checkbox" ${selected.includes(u.id)?'checked':''} onchange="toggleAlertRecipient('${esc(u.id)}')"></div>`).join('')||'<div class="note" style="padding:8px 0">Koi active user ka phone number save nahi hai.</div>');
+  }
+  else if(currentTab==='roles'){
+    const au=users.filter(u=>u.active!==false);
+    c.innerHTML=`<p class="note">Accountant/Admin/Director role wale users bina Super Admin ke bhi Loan "Mark Repaid", spending "Verify &amp; Settle", aur "👥 Team Overview" dekh sakte hain. Baaki sabke liye yeh "No Access" (sirf Super Admin hi kar sakta hai).</p>`+au.map(u=>{
+      const role=(u.appRoles&&u.appRoles[APP_SLUG])||'';
+      return `<div class="item">
+        <b style="font-size:13px">${esc(u.name)}</b>
+        <select style="width:auto" onchange="setPettyCashRole('${esc(u.id)}',this.value)">
+          <option value=""${role===''?' selected':''}>No Access</option>
+          <option value="accountant"${role==='accountant'?' selected':''}>Accountant</option>
+          <option value="admin"${role==='admin'?' selected':''}>Admin</option>
+          <option value="director"${role==='director'?' selected':''}>Director</option>
+        </select>
+      </div>`;
+    }).join('');
+  }
+}
+function setPettyCashRole(userId,role){
+  if(!db)return;
+  const patch={};patch['appRoles.'+APP_SLUG]=role||firebase.firestore.FieldValue.delete();
+  db.collection(UU_COLLECTION).doc(userId).update(patch).catch(e=>console.error('role save failed',e));
+}
+function toggleAlertRecipient(userId){
+  if(!masters.alertRecipients)masters.alertRecipients=[];
+  const i=masters.alertRecipients.indexOf(userId);
+  if(i===-1)masters.alertRecipients.push(userId);else masters.alertRecipients.splice(i,1);
+  saveMasters();renderManage();
+}
+function renderRecordsManageTab(){
+  const list=$('mRecordsList');
+  if(!list)return;
+  if(!superAdminUnlocked){list.innerHTML='<div class="note">Sirf Super Admin yeh dekh sakta hai.</div>';return}
+  const type=$('mRecordsType')?.value||'all';
+  const q=($('mRecordsSearch')?.value||'').toLowerCase();
+  const showDisabled=$('mRecordsShowDisabled')?.checked;
+  let a=ledger.slice();
+  if(type!=='all')a=a.filter(x=>x.type===type);
+  if(!showDisabled)a=a.filter(x=>!x.deletedAt);
+  a=a.filter(x=>`${x.person||''} ${x.note||''} ${x.date||''}`.toLowerCase().includes(q));
+  a.sort((x,y)=>String(y.date).localeCompare(String(x.date)));
+  list.innerHTML=a.length?a.map(x=>{
+    const toggleBtn=x.deletedAt
+      ?`<button class="btn small" onclick="(async()=>{await restoreLedgerEntry('${esc(x.id)}');renderRecordsManageTab()})()">↩ Restore</button>`
+      :`<button class="btn small" onclick="(async()=>{await deleteLedgerEntry('${esc(x.id)}',true);renderRecordsManageTab()})()">Disable</button>`;
+    const permBtn=`<button class="btn small danger" onclick="permanentlyDeleteLedgerEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`;
+    const chk=`<input type="checkbox" class="recChk" data-id="${esc(x.id)}" data-deleted="${x.deletedAt?'1':'0'}" style="width:auto;margin-right:8px">`;
+    return `<div class="item"><span>${chk}<b>${x.type.toUpperCase()}</b> — ${esc(x.person||x.note||'-')} <small>${fmtAmt(x.amount)} • ${esc(x.date)}</small>${x.deletedAt?' <small style="color:#9b1c1c">(DISABLED)</small>':''}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${toggleBtn} ${permBtn}</span></div>`;
+  }).join(''):'<div class="note">Koi record nahi mila.</div>';
+}
+function toggleSelectAllRecords(checked){
+  document.querySelectorAll('#mRecordsList .recChk').forEach(cb=>cb.checked=checked);
+}
+function selectedLedgerRefs(){
+  return [...document.querySelectorAll('#mRecordsList .recChk:checked')].map(cb=>({id:cb.dataset.id,deleted:cb.dataset.deleted==='1'}));
+}
+async function bulkDisableRecords(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entries disable kar sakta hai.');return}
+  const sel=selectedLedgerRefs().filter(x=>!x.deleted);
+  if(!sel.length){alert('Koi entry select nahi ki (ya sab pehle se disabled hain).');return}
+  if(!confirm(sel.length+' entry/entries ko Disable karna hai?'))return;
+  for(const r of sel)await deleteLedgerEntry(r.id,true);
+  renderRecordsManageTab();
+  toast(sel.length+' entry/entries disable ho gayi');
+}
+async function bulkRestoreRecords(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entries restore kar sakta hai.');return}
+  const sel=selectedLedgerRefs().filter(x=>x.deleted);
+  if(!sel.length){alert('Koi disabled entry select nahi ki.');return}
+  if(!confirm(sel.length+' entry/entries ko Restore karna hai?'))return;
+  for(const r of sel)await restoreLedgerEntry(r.id);
+  renderRecordsManageTab();
+  toast(sel.length+' entry/entries restore ho gayi');
+}
+async function bulkPermanentlyDeleteRecords(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entries permanently delete kar sakta hai.');return}
+  const sel=selectedLedgerRefs();
+  if(!sel.length){alert('Koi entry select nahi ki.');return}
+  const typed=prompt(sel.length+' entry/entries Firestore se HAMESHA KE LIYE delete ho jaayengi — wapas NAHI aayengi.\n\nConfirm karne ke liye "DELETE" type karein:');
+  if(typed!=='DELETE'){toast('Bulk permanent delete cancel ho gaya');return}
+  for(const r of sel)await permanentlyDeleteLedgerEntry(r.id,true);
+  renderRecordsManageTab();
+  toast(sel.length+' entry/entries permanently delete ho gayi');
+}
+
+/* ===== Toast ===== */
+let toastTimer=null;
+function toast(msg){
+  let t=$('pcToast');
+  if(!t){t=document.createElement('div');t.id='pcToast';t.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#17211b;color:#fff;padding:9px 16px;border-radius:20px;font-size:12px;z-index:99999;opacity:0;transition:opacity .2s';document.body.appendChild(t);}
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.opacity='0',2200);
+}
+
+function goPage(id){
+  document.querySelectorAll('.pcPage').forEach(p=>p.classList.toggle('on',p.id==='page-'+id));
+  document.querySelectorAll('#pageTabs .tab').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
+}
+function renderAll(){
+  renderGate();
+  refreshLoginBadge();
+  applyFeatureVisibility();
+  renderEntryPersonSelect();
+  renderDash();
+  renderHighAmountAlerts();
+  renderMyPage();
+  renderTeamOverview();
+  renderLedger();
+  if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  currentUser=localStorage.getItem(SESSION_KEY)||null;
+  if($('entryDate'))$('entryDate').value=todayISO();
+  selectEntryType('in');
+  startUsersSync();
+  startLedgerSync();
+  startMastersSync();
+  startIssueSpendsSync();
+  renderAll();
+});
+window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
+</script>
+</body>
+</html>
