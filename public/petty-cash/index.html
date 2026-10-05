@@ -164,6 +164,7 @@ tbody tr:hover td{background:#f7faf8}
       <span>Ledger History</span>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button class="btn small secondary" id="histFiltersToggleBtn" onclick="toggleHistFiltersPanel()">🔍 Filters</button>
+        <button class="btn small secondary" onclick="exportLedgerCSV()">⬇ Export CSV</button>
         <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="renderLedger()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
       </div>
     </div>
@@ -209,6 +210,18 @@ tbody tr:hover td{background:#f7faf8}
 <h3>🔒 Super Admin</h3>
 <div class="field"><label>Password</label><input id="superAdminPassword" type="password" onkeydown="if(event.key==='Enter')unlockSuperAdmin()"></div>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeSuperAdminModal()">Cancel</button><button class="btn primary" onclick="unlockSuperAdmin()">Unlock</button></div>
+</div></div>
+
+<!-- Edit Entry modal -->
+<div class="modal" id="editLedgerModal"><div class="box" style="width:min(420px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Edit Entry</h3><button class="btn small" onclick="closeEditLedgerModal()">✕</button></div>
+<div class="grid">
+  <div class="field"><label>Amount (₹)</label><input type="number" id="editAmount"></div>
+  <div class="field"><label>Date</label><input type="date" id="editDate"></div>
+  <div class="field span2"><label>Note / Reason</label><input id="editNote"></div>
+</div>
+<p class="note" style="margin-top:8px">Type (In/Out/Loan) aur Person yahan se edit nahi ho sakte — galat type/person hone par entry Disable karke nayi entry banayein.</p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditLedgerModal()">Cancel</button><button class="btn primary" onclick="saveEditLedger()">Save</button></div>
 </div></div>
 
 <!-- Manage modal -->
@@ -370,6 +383,17 @@ function notifyHighAmount(a){
   const msg=`⚠️ ${label} Alert — Petty Cash\n\n${who}\nAmount: ${fmtAmt(a.amount)}\nUsual Avg: ${fmtAmt(a.priorAvg)}\nIncrease: +${a.pct.toFixed(0)}%\nDate: ${a.date}`;
   recipients.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('high amount WA failed:',e)));
 }
+// Tells the recipient directly (not just Admin) the moment cash/a loan is tagged to them,
+// so they find out about their own "👤 My Petty Cash" tab without having to be told in
+// person or open the app speculatively.
+function notifyRecipientOfNewEntry(type,personId,amount,note){
+  const u=users.find(x=>x.id===personId);
+  if(!u||!u.phone)return;
+  const msg=type==='loan'
+    ? `🤝 Petty Cash — Loan Given\n\nAapko ${fmtAmt(amount)} ka loan diya gaya hai${note?' ('+note+')':''}.\n\nApp mein "👤 My Petty Cash" tab mein status dekh sakte hain.`
+    : `💳 Petty Cash — Cash Issued\n\nAapko ${fmtAmt(amount)} cash issue hua hai${note?' ('+note+')':''}.\n\nApp mein "👤 My Petty Cash" tab se apni spending entries daal sakte hain.`;
+  sendRawWA(u.phone,msg).catch(e=>console.error('recipient notify WA failed:',e));
+}
 // Uses the ledger state as it stood BEFORE this entry was added (the live onSnapshot sync
 // hasn't caught up yet at this point), which is exactly the "prior entries" baseline
 // computeHighAmountAlerts() below also compares against.
@@ -473,6 +497,7 @@ async function addLedgerEntry(){
     if(entryType==='loan')payload.repaid=false;
     if((entryType==='out'||entryType==='loan')&&personId)payload.personId=personId;
     checkAndNotifyHighAmount(entryType,amount,date,person,note);
+    if((entryType==='out'||entryType==='loan')&&personId)notifyRecipientOfNewEntry(entryType,personId,amount,note);
     await db.collection('pc_ledger').add(payload);
     $('entryAmount').value='';$('entryPerson').value='';$('entryNote').value='';
     if($('entryPersonSelect'))$('entryPersonSelect').value='';
@@ -517,6 +542,32 @@ async function permanentlyDeleteLedgerEntry(id,skipConfirm){
     await db.collection('pc_ledger').doc(id).delete();
   }catch(e){ console.error('permanent delete failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
   toast('Entry permanently delete ho gayi');
+}
+// Quick typo-fix for Amount/Date/Note - Type and Person stay fixed here (changing those
+// would mean re-deriving personId linkage etc); a genuinely wrong type/person is better
+// fixed via Disable + a fresh correct entry than half-migrated through this modal.
+let editLedgerTarget=null;
+function openEditLedgerModal(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entry edit kar sakta hai.');return}
+  const x=ledger.find(e=>e.id===id);if(!x)return;
+  editLedgerTarget=id;
+  $('editAmount').value=x.amount||'';
+  $('editDate').value=x.date||'';
+  $('editNote').value=x.note||'';
+  $('editLedgerModal').classList.add('show');
+}
+function closeEditLedgerModal(){$('editLedgerModal')?.classList.remove('show');editLedgerTarget=null;}
+async function saveEditLedger(){
+  if(!editLedgerTarget)return;
+  if(!superAdminUnlocked){alert('Sirf Super Admin entry edit kar sakta hai.');return}
+  const amount=parseFloat($('editAmount').value);
+  const date=$('editDate').value;
+  const note=$('editNote').value.trim();
+  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  if(!date){alert('Date zaroori hai.');return}
+  await db.collection('pc_ledger').doc(editLedgerTarget).update({amount,date,note});
+  closeEditLedgerModal();
+  toast('Entry update ho gayi');
 }
 
 /* ===== Dashboard ===== */
@@ -671,11 +722,21 @@ function toggleHistFiltersPanel(){
   if(!panel)return;
   panel.classList.toggle('hidden');
 }
+function downloadCSV(filename,rows){
+  const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+function exportLedgerCSV(){
+  const rows=[['Date','Type','Person','Note','Amount','By','Status']];
+  filteredLedgerRows().forEach(x=>rows.push([x.date,x.type,x.person||'',x.note||'',x.amount,nameOfUserId(x.by),x.deletedAt?'Disabled':(x.type==='loan'?(x.repaid?'Repaid':'Outstanding'):'Active')]));
+  downloadCSV('petty-cash-ledger.csv',rows);
+}
 function deletedInfo(x){return x.deletedAt?`<br><small style="color:var(--muted)">Disabled by ${esc(nameOfUserId(x.deletedBy))}</small>`:''}
-function renderLedger(){
-  const deletedN=ledger.filter(x=>x.deletedAt).length;
-  if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
-  if($('deletedCount'))$('deletedCount').textContent=deletedN;
+// Shared by renderLedger() and exportLedgerCSV() so the exported rows always match
+// whatever the History table (and its From/To/Type/Person filters) is currently showing.
+function filteredLedgerRows(){
   const showDeleted=$('showDeleted')&&$('showDeleted').checked;
   const type=$('histType')?.value||'all';
   const from=$('histFrom')?.value||'';
@@ -686,7 +747,13 @@ function renderLedger(){
   if(from)rows=rows.filter(x=>String(x.date)>=from);
   if(to)rows=rows.filter(x=>String(x.date)<=to);
   if(personQ)rows=rows.filter(x=>String(x.person||'').toLowerCase().includes(personQ));
-  rows=rows.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at||'').localeCompare(String(a.at||'')));
+  return rows.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at||'').localeCompare(String(a.at||'')));
+}
+function renderLedger(){
+  const deletedN=ledger.filter(x=>x.deletedAt).length;
+  if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
+  if($('deletedCount'))$('deletedCount').textContent=deletedN;
+  const rows=filteredLedgerRows();
   $('ledgerTable').innerHTML=rows.map(x=>{
     const pillClass=x.type==='in'?'in':x.type==='out'?'out':'loan';
     const pillLabel=x.type==='in'?'IN':x.type==='out'?'OUT':'LOAN';
@@ -697,7 +764,8 @@ function renderLedger(){
       ?(superAdminUnlocked?`<button class="btn small" onclick="restoreLedgerEntry('${esc(x.id)}')">↩ Restore</button>`:'')
       :(superAdminUnlocked?`<button class="btn small danger" onclick="deleteLedgerEntry('${esc(x.id)}')">Disable</button>`:'');
     const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeleteLedgerEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
-    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}</td><td>${esc(x.person||'-')}${x.note?'<br><small style="color:var(--muted)">'+esc(x.note)+'</small>':''}</td><td class="num">${sign}${fmtAmt(x.amount)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${repayBtn} ${adminBtn} ${permBtn}</td></tr>`;
+    const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditLedgerModal('${esc(x.id)}')">✎ Edit</button>`:'';
+    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}</td><td>${esc(x.person||'-')}${x.note?'<br><small style="color:var(--muted)">'+esc(x.note)+'</small>':''}</td><td class="num">${sign}${fmtAmt(x.amount)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${repayBtn} ${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
   }).join('')||`<tr><td colspan="6"><div class="emptystate">💵<p>Koi entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
 }
 
