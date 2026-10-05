@@ -130,6 +130,7 @@ tbody tr:hover td{background:#f7faf8}
   <div class="tabs" id="pageTabs" style="margin-bottom:14px">
     <button class="tab on" data-page="ledger" onclick="goPage('ledger')">📊 Ledger</button>
     <button class="tab" data-page="my" id="myPageTabBtn" onclick="goPage('my')">👤 My Petty Cash</button>
+    <button class="tab accountantOnly hidden" data-page="team" onclick="goPage('team')">👥 Team Overview</button>
   </div>
 
   <div id="page-ledger" class="pcPage on">
@@ -193,6 +194,16 @@ tbody tr:hover td{background:#f7faf8}
     <div id="myLoansWrap"></div>
     <div id="myPageEmptyState" class="panel hidden"><div class="pb"><div class="emptystate">👤<p>Abhi aapko koi cash issue ya loan nahi diya gaya hai.</p><small>Jab koi aapko Cash Out "Issued To" se dega ya Loan dega, yahan dikhega.</small></div></div></div>
   </div>
+
+  <div id="page-team" class="pcPage">
+    <div class="panel">
+      <div class="ph"><span>👥 Team Overview</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Person</th><th class="num">Issued</th><th class="num">Pending (Issued)</th><th class="num">Loans Given</th><th class="num">Outstanding (Loan)</th><th>Action</th></tr></thead>
+        <tbody id="teamOverviewTable"></tbody>
+      </table></div></div>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -222,6 +233,12 @@ tbody tr:hover td{background:#f7faf8}
 </div>
 <p class="note" style="margin-top:8px">Type (In/Out/Loan) aur Person yahan se edit nahi ho sakte — galat type/person hone par entry Disable karke nayi entry banayein.</p>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditLedgerModal()">Cancel</button><button class="btn primary" onclick="saveEditLedger()">Save</button></div>
+</div></div>
+
+<!-- Person Detail modal — full breakdown for one person's Team Overview row -->
+<div class="modal" id="personDetailModal"><div class="box" style="width:min(520px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0" id="personDetailTitle">Person Detail</h3><button class="btn small" onclick="closePersonDetailModal()">✕</button></div>
+<div id="personDetailContent"></div>
 </div></div>
 
 <!-- Spending Detail modal (read-only — anyone looking at the Ledger can see how an issued
@@ -275,7 +292,7 @@ let usersStarted=false,ledgerStarted=false,mastersStarted=false,issueSpendsStart
 
 function loggedUser(){return users.find(x=>x.id===currentUser)||null}
 function myRole(){const u=loggedUser();return (u&&u.appRoles&&u.appRoles[APP_SLUG])||''}
-function canCloseLoan(){return superAdminUnlocked||myRole()==='accountant'||myRole()==='admin'}
+function canCloseLoan(){return superAdminUnlocked||['accountant','admin','director'].includes(myRole())}
 
 /* ===== Super Admin (same shared password as other Bliss apps) ===== */
 const SUPER_ADMIN_PASSWORD_HASH='0cb73e5ce7c7e7b2bc347bc16e73c2a16331fdedaec4c1c787815eab4daa6fad';
@@ -440,6 +457,8 @@ function refreshLoginBadge(){
 }
 function applyFeatureVisibility(){
   document.querySelectorAll('.superAdminStrict').forEach(el=>el.classList.toggle('hidden',!superAdminUnlocked));
+  document.querySelectorAll('.accountantOnly').forEach(el=>el.classList.toggle('hidden',!canCloseLoan()));
+  if(!canCloseLoan()&&document.getElementById('page-team')?.classList.contains('on'))goPage('ledger');
 }
 
 /* ===== Entry form ===== */
@@ -699,6 +718,58 @@ function renderMyPage(){
     else if(!pending&&dot)dot.remove();
   }
 }
+// Accountant/Admin/Director-only consolidated view: every person who's had cash issued or
+// a loan given to them, with their totals in one row instead of hunting through the
+// Ledger one entry at a time.
+function renderTeamOverview(){
+  const tbody=$('teamOverviewTable');
+  if(!tbody)return;
+  if(!canCloseLoan()){tbody.innerHTML='';return;}
+  const live=liveLedger();
+  const personIds=new Set();
+  live.forEach(x=>{if((x.type==='out'||x.type==='loan')&&x.personId)personIds.add(x.personId);});
+  const rows=[...personIds].map(pid=>{
+    const issued=live.filter(x=>x.type==='out'&&x.personId===pid);
+    const loans=live.filter(x=>x.type==='loan'&&x.personId===pid);
+    const issuedTotal=issued.reduce((s,x)=>s+(x.amount||0),0);
+    const issuedPending=issued.filter(x=>!x.verified).reduce((s,x)=>s+(x.amount-issueSpentTotal(x.id)),0);
+    const loansTotal=loans.reduce((s,x)=>s+(x.amount||0),0);
+    const loansOutstanding=loans.filter(x=>!x.repaid).reduce((s,x)=>s+(x.amount||0),0);
+    return {pid,name:nameOfUserId(pid),issuedTotal,issuedPending,loansTotal,loansOutstanding};
+  }).sort((a,b)=>(b.issuedPending+b.loansOutstanding)-(a.issuedPending+a.loansOutstanding));
+  tbody.innerHTML=rows.length?rows.map(r=>`<tr>
+    <td><b>${esc(r.name)}</b></td>
+    <td class="num">${fmtAmt(r.issuedTotal)}</td>
+    <td class="num">${r.issuedPending>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.issuedPending)}</span>`:fmtAmt(0)}</td>
+    <td class="num">${fmtAmt(r.loansTotal)}</td>
+    <td class="num">${r.loansOutstanding>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.loansOutstanding)}</span>`:fmtAmt(0)}</td>
+    <td><button class="btn small secondary" onclick="openPersonDetailModal('${esc(r.pid)}')">👁 Details</button></td>
+  </tr>`).join(''):`<tr><td colspan="6"><div class="emptystate">👥<p>Abhi tak kisi ko cash issue ya loan nahi diya gaya.</p></div></td></tr>`;
+}
+function openPersonDetailModal(personId){
+  const name=nameOfUserId(personId);
+  $('personDetailTitle').textContent=name;
+  const issued=liveLedger().filter(x=>x.type==='out'&&x.personId===personId).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const loans=liveLedger().filter(x=>x.type==='loan'&&x.personId===personId).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const issuedHtml=issued.length?issued.map(x=>{
+    const remaining=x.amount-issueSpentTotal(x.id);
+    const spends=issueSpends.filter(s=>s.issueId===x.id&&!s.deletedAt);
+    const statusPill=x.verified?'<span class="pill repaid">✓ Settled</span>':`<span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>`;
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:4px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><span><b>${fmtAmt(x.amount)}</b> issued ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>${statusPill}</div>
+      ${spends.map(s=>`<small style="color:var(--muted);padding-left:4px">— ${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''} (${esc(s.date)})</small>`).join('')}
+    </div>`;
+  }).join(''):'<div class="note" style="padding:8px 0">Koi cash issue nahi hui.</div>';
+  const loansHtml=loans.length?loans.map(x=>`<div class="item"><span><b>${fmtAmt(x.amount)}</b> given ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>${x.repaid?'<span class="pill repaid">Repaid</span>':'<span class="pill loan">Outstanding</span>'}</div>`).join(''):'<div class="note" style="padding:8px 0">Koi loan nahi diya gaya.</div>';
+  $('personDetailContent').innerHTML=`
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:8px">💳 Cash Issued</div>
+    ${issuedHtml}
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:14px 0 8px">📋 Loans Given</div>
+    ${loansHtml}
+  `;
+  $('personDetailModal').classList.add('show');
+}
+function closePersonDetailModal(){$('personDetailModal')?.classList.remove('show');}
 let _issueSpendSubmitting=false;
 async function addIssueSpend(issueId){
   if(_issueSpendSubmitting)return;
@@ -872,7 +943,7 @@ function renderManage(){
   }
   else if(currentTab==='roles'){
     const au=users.filter(u=>u.active!==false);
-    c.innerHTML=`<p class="note">Accountant/Admin role wale users bina Super Admin ke bhi Loan "Mark Repaid" kar sakte hain. Baaki sabke liye yeh "No Access" (sirf Super Admin hi close kar sakta hai).</p>`+au.map(u=>{
+    c.innerHTML=`<p class="note">Accountant/Admin/Director role wale users bina Super Admin ke bhi Loan "Mark Repaid", spending "Verify &amp; Settle", aur "👥 Team Overview" dekh sakte hain. Baaki sabke liye yeh "No Access" (sirf Super Admin hi kar sakta hai).</p>`+au.map(u=>{
       const role=(u.appRoles&&u.appRoles[APP_SLUG])||'';
       return `<div class="item">
         <b style="font-size:13px">${esc(u.name)}</b>
@@ -880,6 +951,7 @@ function renderManage(){
           <option value=""${role===''?' selected':''}>No Access</option>
           <option value="accountant"${role==='accountant'?' selected':''}>Accountant</option>
           <option value="admin"${role==='admin'?' selected':''}>Admin</option>
+          <option value="director"${role==='director'?' selected':''}>Director</option>
         </select>
       </div>`;
     }).join('');
@@ -973,6 +1045,7 @@ function renderAll(){
   renderDash();
   renderHighAmountAlerts();
   renderMyPage();
+  renderTeamOverview();
   renderLedger();
   if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
 }
