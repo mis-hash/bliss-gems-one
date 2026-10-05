@@ -496,6 +496,12 @@ async function addLedgerEntry(){
   }
   if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
   if(entryType==='loan'&&!person){alert('Loan ke liye Person (staff select ya naam type) zaroori hai.');return}
+  // Cash-box can't hand out more than it actually has - Cash Out and Loan Given are both
+  // real money leaving the box, so both are capped at the Current Balance (Cash In isn't).
+  if(entryType==='out'||entryType==='loan'){
+    const {balance}=computeBalance();
+    if(amount>balance){alert('Current Balance ('+fmtAmt(balance)+') se zyada '+(entryType==='loan'?'Loan':'Cash Out')+' nahi de sakte.');return}
+  }
   _entrySubmitting=true;
   const btn=$('entrySubmitBtn');if(btn)btn.disabled=true;
   try{
