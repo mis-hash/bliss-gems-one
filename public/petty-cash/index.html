@@ -94,13 +94,17 @@ tbody tr:hover td{background:#f7faf8}
 .tab{border:1px solid var(--line);background:#fff;color:var(--muted);padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
 .tab.on{background:var(--g);border-color:var(--g);color:#fff}
 .typeRow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-.typeRow button{flex:1;min-width:110px}
+.typeRow button{flex:1;min-width:110px;padding:13px 10px;font-size:14px}
+#entrySubmitBtn{padding:13px 22px;font-size:14px}
 @media(max-width:720px){
   header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:20px}.brand b{font-size:16px}.brand small{display:none}
   .shell{padding:11px 10px 30px}
   .hero{padding:17px}.hero h1{font-size:20px}
   .cards{grid-template-columns:1fr 1fr}
   .grid{grid-template-columns:1fr}
+  .typeRow{flex-direction:column}
+  .typeRow button{min-width:0;width:100%}
+  #entrySubmitBtn{width:100%}
 }
 </style>
 </head>
@@ -152,17 +156,18 @@ tbody tr:hover td{background:#f7faf8}
     <div class="ph">
       <span>Ledger History</span>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select id="histType" onchange="renderLedger()" style="width:auto;padding:6px 8px;border:1px solid var(--line);border-radius:7px">
-          <option value="all">All Types</option>
-          <option value="in">Cash In</option>
-          <option value="out">Cash Out</option>
-          <option value="loan">Loan</option>
-        </select>
+        <button class="btn small secondary" id="histFiltersToggleBtn" onclick="toggleHistFiltersPanel()">🔍 Filters</button>
         <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="renderLedger()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
       </div>
     </div>
     <div class="pb">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <div id="histFiltersPanel" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <div class="field" style="width:auto;margin:0"><label>Type</label><select id="histType" onchange="renderLedger()" style="width:auto;padding:10px;border:1px solid var(--line);border-radius:7px">
+          <option value="all">All Types</option>
+          <option value="in">Cash In</option>
+          <option value="out">Cash Out</option>
+          <option value="loan">Loan</option>
+        </select></div>
         <div class="field" style="width:auto;margin:0"><label>From</label><input type="date" id="histFrom" onchange="renderLedger()" style="width:auto"></div>
         <div class="field" style="width:auto;margin:0"><label>To</label><input type="date" id="histTo" onchange="renderLedger()" style="width:auto"></div>
         <div class="field" style="width:auto;flex:1;min-width:160px;margin:0"><label>Person</label><input id="histPerson" placeholder="Search person name" oninput="renderLedger()"></div>
@@ -623,6 +628,14 @@ function clearLedgerFilters(){
   if($('histPerson'))$('histPerson').value='';
   if($('histType'))$('histType').value='all';
   renderLedger();
+}
+// Filters start collapsed - most people just scroll the history, so hiding From/To/Person/
+// Type behind one "🔍 Filters" tap keeps the default view simpler/cleaner, matching the
+// same pattern as the rest of the Bliss app family's optional filter rows.
+function toggleHistFiltersPanel(){
+  const panel=$('histFiltersPanel');
+  if(!panel)return;
+  panel.classList.toggle('hidden');
 }
 function deletedInfo(x){return x.deletedAt?`<br><small style="color:var(--muted)">Disabled by ${esc(nameOfUserId(x.deletedBy))}</small>`:''}
 function renderLedger(){
