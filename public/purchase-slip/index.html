@@ -134,24 +134,26 @@ tbody tr:hover td{background:#f7faf8}
         <div class="field"><label>Category</label><input id="pCategory" list="categoryList" placeholder="e.g. Cut Stone"><datalist id="categoryList"></datalist></div>
         <div class="field"><label>Date</label><input type="date" id="pDate"></div>
       </div>
+      <div class="grid3" style="margin-top:10px">
+        <div class="field"><label>From (Party/Source)</label><input id="pFrom" placeholder="Party ka naam"></div>
+        <div class="field"><label>Broker</label><input id="pBroker" placeholder="Optional"></div>
+        <div class="field"><label>Note</label><input id="pNote" placeholder="Optional"></div>
+      </div>
 
       <div class="field span2" style="margin-top:10px">
-        <label>Piece Weights <span style="color:var(--red)">*</span></label>
-        <div style="display:flex;gap:8px">
-          <input type="number" id="pPieceInput" placeholder="Weight" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addPiece();}">
+        <label>Pieces <span style="color:var(--red)">*</span> <small style="font-weight:400;color:var(--muted)">(har piece ke liye weight + teeno Directors ka rate)</small></label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:90px"><label style="font-size:11px">Weight (cts)</label><input type="number" id="pPieceWeight" placeholder="Weight"></div>
+          <div style="flex:1;min-width:80px"><label style="font-size:11px" id="pPieceRateLabel0">AR</label><input type="number" id="pPieceRate0" placeholder="Rate"></div>
+          <div style="flex:1;min-width:80px"><label style="font-size:11px" id="pPieceRateLabel1">HD</label><input type="number" id="pPieceRate1" placeholder="Rate"></div>
+          <div style="flex:1;min-width:80px"><label style="font-size:11px" id="pPieceRateLabel2">ND</label><input type="number" id="pPieceRate2" placeholder="Rate" onkeydown="if(event.key==='Enter'){event.preventDefault();addPiece();}"></div>
           <button type="button" class="btn secondary" onclick="addPiece()">＋ Add Piece</button>
         </div>
         <div id="pPiecesList" style="margin-top:10px"></div>
       </div>
 
-      <div class="grid3" style="margin-top:10px">
-        <div class="field"><label id="pRateLabel0">AR Rate</label><input type="number" id="pRate0" oninput="renderPurchaseCalc()"></div>
-        <div class="field"><label id="pRateLabel1">HD Rate</label><input type="number" id="pRate1" oninput="renderPurchaseCalc()"></div>
-        <div class="field"><label id="pRateLabel2">ND Rate</label><input type="number" id="pRate2" oninput="renderPurchaseCalc()"></div>
-      </div>
       <div class="grid" style="margin-top:10px">
         <div class="field"><label>Adjustment % (+ markup / − discount)</label><input type="number" id="pAdjPct" value="0" oninput="renderPurchaseCalc()"></div>
-        <div class="field"><label>Note</label><input id="pNote" placeholder="Optional"></div>
       </div>
 
       <div class="calcBox" id="purchaseCalcBox"></div>
@@ -193,17 +195,19 @@ tbody tr:hover td{background:#f7faf8}
 </div></div>
 
 <!-- Edit Entry modal -->
-<div class="modal" id="editPurchaseModal"><div class="box" style="width:min(460px,100%)">
+<div class="modal" id="editPurchaseModal"><div class="box" style="width:min(520px,100%)">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Edit Purchase</h3><button class="btn small" onclick="closeEditPurchaseModal()">✕</button></div>
 <div class="grid3">
-  <div class="field"><label id="editRateLabel0">AR Rate</label><input type="number" id="editRate0" oninput="renderEditPurchaseCalc()"></div>
-  <div class="field"><label id="editRateLabel1">HD Rate</label><input type="number" id="editRate1" oninput="renderEditPurchaseCalc()"></div>
-  <div class="field"><label id="editRateLabel2">ND Rate</label><input type="number" id="editRate2" oninput="renderEditPurchaseCalc()"></div>
-</div>
-<div class="grid" style="margin-top:10px">
-  <div class="field"><label>Adjustment %</label><input type="number" id="editAdjPct" oninput="renderEditPurchaseCalc()"></div>
+  <div class="field"><label>From (Party/Source)</label><input id="editPFrom"></div>
+  <div class="field"><label>Broker</label><input id="editPBroker"></div>
   <div class="field"><label>Date</label><input type="date" id="editPDate"></div>
 </div>
+<div class="field" style="margin-top:10px"><label>Note</label><input id="editPNote"></div>
+<div class="field span2" style="margin-top:10px">
+  <label>Pieces <small style="font-weight:400;color:var(--muted)">(sirf rates edit ho sakte hain, weight nahi)</small></label>
+  <div id="editPiecesList"></div>
+</div>
+<div class="field" style="margin-top:10px"><label>Adjustment %</label><input type="number" id="editAdjPct" oninput="renderEditPurchaseCalc()"></div>
 <div class="calcBox" id="editPurchaseCalcBox"></div>
 <p class="note" style="margin-top:8px">Item Name aur Piece Weights yahan se edit nahi ho sakte — galat hone par entry Disable karke nayi entry banayein.</p>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditPurchaseModal()">Cancel</button><button class="btn primary" onclick="saveEditPurchase()">Save</button></div>
@@ -361,18 +365,20 @@ function renderSelects(){
   if($('categoryList'))$('categoryList').innerHTML=(masters.categories||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
   const labels=masters.directorLabels||['AR','HD','ND'];
   [0,1,2].forEach(i=>{
-    if($('pRateLabel'+i))$('pRateLabel'+i).textContent=(labels[i]||('Director '+(i+1)))+' Rate';
-    if($('editRateLabel'+i))$('editRateLabel'+i).textContent=(labels[i]||('Director '+(i+1)))+' Rate';
+    if($('pPieceRateLabel'+i))$('pPieceRateLabel'+i).textContent=labels[i]||('Director '+(i+1));
   });
 }
 
-/* ===== Piece weights (dynamic list) ===== */
+/* ===== Pieces (dynamic list) — each piece carries its own weight + a rate per Director ===== */
 function addPiece(){
-  const inp=$('pPieceInput');
-  const w=parseFloat(inp.value);
+  const labels=masters.directorLabels||['AR','HD','ND'];
+  const w=parseFloat($('pPieceWeight').value);
+  const r0=parseFloat($('pPieceRate0').value),r1=parseFloat($('pPieceRate1').value),r2=parseFloat($('pPieceRate2').value);
   if(!w||w<=0){alert('Weight sahi se bharein.');return}
-  currentPieces.push(w);
-  inp.value='';inp.focus();
+  if([r0,r1,r2].some(r=>isNaN(r))){alert('Is piece ke liye teeno Directors ka rate bharein.');return}
+  currentPieces.push({weight:w,rates:{[labels[0]]:r0,[labels[1]]:r1,[labels[2]]:r2}});
+  $('pPieceWeight').value='';$('pPieceRate0').value='';$('pPieceRate1').value='';$('pPieceRate2').value='';
+  $('pPieceWeight').focus();
   renderPiecesList();
   renderPurchaseCalc();
 }
@@ -384,25 +390,38 @@ function removePiece(i){
 function renderPiecesList(){
   const wrap=$('pPiecesList');
   if(!wrap)return;
-  wrap.innerHTML=currentPieces.map((w,i)=>`<span class="pieceChip">${w}<button type="button" onclick="removePiece(${i})">✕</button></span>`).join('')||'<span class="note">Koi piece add nahi kiya.</span>';
+  const labels=masters.directorLabels||['AR','HD','ND'];
+  wrap.innerHTML=currentPieces.map((p,i)=>{
+    const rateStr=labels.map(l=>l+':'+(p.rates&&p.rates[l]!==undefined?p.rates[l]:'-')).join('  ');
+    return `<span class="pieceChip">${p.weight} cts — ${esc(rateStr)}<button type="button" onclick="removePiece(${i})">✕</button></span>`;
+  }).join('')||'<span class="note">Koi piece add nahi kiya.</span>';
 }
-function totalWeight(pieces){return (pieces||[]).reduce((s,w)=>s+(w||0),0)}
-function computePurchaseCalc(rates,adjPct,pieces){
-  const validRates=rates.filter(r=>r!==null&&r!==undefined&&!isNaN(r)&&r!=='');
-  const avgRate=validRates.length?validRates.reduce((s,r)=>s+r,0)/validRates.length:0;
+function totalWeight(pieces){return (pieces||[]).reduce((s,p)=>s+(p.weight||0),0)}
+// Har Director ka apna average nikalta hai (apne saare pieces ke rates ka average), phir un teeno
+// averages ka overall average hi "Average Rate" hai — ek lot-level shared rate nahi.
+function computePurchaseCalc(pieces,adjPct,labels){
+  pieces=pieces||[];
+  const wt=totalWeight(pieces);
+  const directorAverages=labels.map(label=>{
+    const vals=pieces.map(p=>p.rates&&p.rates[label]).filter(r=>r!==null&&r!==undefined&&r!==''&&!isNaN(r)).map(Number);
+    return vals.length?vals.reduce((s,r)=>s+r,0)/vals.length:null;
+  });
+  const validAvgs=directorAverages.filter(a=>a!==null);
+  const avgRate=validAvgs.length?validAvgs.reduce((s,a)=>s+a,0)/validAvgs.length:0;
   const pct=isNaN(adjPct)?0:adjPct;
   const finalRate=avgRate*(1+pct/100);
-  const wt=totalWeight(pieces);
   const finalPrice=finalRate*wt;
-  return {avgRate,finalRate,totalWt:wt,finalPrice,validCount:validRates.length};
+  return {totalWt:wt,directorAverages,avgRate,finalRate,finalPrice,validCount:validAvgs.length};
 }
 function renderPurchaseCalc(){
-  const rates=[0,1,2].map(i=>parseFloat($('pRate'+i)?.value));
+  const labels=masters.directorLabels||['AR','HD','ND'];
   const adjPct=parseFloat($('pAdjPct')?.value);
-  const calc=computePurchaseCalc(rates,adjPct,currentPieces);
+  const calc=computePurchaseCalc(currentPieces,adjPct,labels);
+  const perDirectorRows=labels.map((l,i)=>`<div class="row"><span>${esc(l)} Average</span><b>${calc.directorAverages[i]!==null?fmtAmt(calc.directorAverages[i]):'-'}</b></div>`).join('');
   $('purchaseCalcBox').innerHTML=`
     <div class="row"><span>Total Weight</span><b>${calc.totalWt}</b></div>
-    <div class="row"><span>Average Rate (${calc.validCount}/3 entered)</span><b>${fmtAmt(calc.avgRate)}</b></div>
+    ${perDirectorRows}
+    <div class="row"><span>Overall Average Rate</span><b>${fmtAmt(calc.avgRate)}</b></div>
     <div class="row"><span>Final Rate (after adjustment)</span><b>${fmtAmt(calc.finalRate)}</b></div>
     <div class="row" style="border-top:1px solid #d7ebe3;margin-top:4px;padding-top:7px"><span>Final Price</span><b style="font-size:16px;color:var(--g)">${fmtAmt(calc.finalPrice)}</b></div>`;
 }
@@ -413,28 +432,26 @@ async function addPurchaseEntry(){
   const itemName=$('pItemName').value.trim();
   const category=$('pCategory').value.trim();
   const date=$('pDate').value||todayISO();
+  const from=$('pFrom').value.trim();
+  const broker=$('pBroker').value.trim();
   const note=$('pNote').value.trim();
-  const rates=[0,1,2].map(i=>parseFloat($('pRate'+i).value));
   const adjPct=parseFloat($('pAdjPct').value)||0;
   if(!itemName){alert('Item Name zaroori hai.');return}
-  if(!currentPieces.length){alert('Kam se kam ek Piece Weight add karein.');return}
-  if(rates.some(r=>isNaN(r))){alert('Teeno Directors ka rate bharein.');return}
-  const calc=computePurchaseCalc(rates,adjPct,currentPieces);
+  if(!currentPieces.length){alert('Kam se kam ek Piece add karein (weight + teeno Directors ka rate).');return}
+  const labels=masters.directorLabels||['AR','HD','ND'];
+  const calc=computePurchaseCalc(currentPieces,adjPct,labels);
   _purchaseSubmitting=true;
   const btn=$('purchaseSubmitBtn');if(btn)btn.disabled=true;
   try{
     const actor=loggedUser();
-    const labels=masters.directorLabels||['AR','HD','ND'];
-    const rateMap={};labels.forEach((l,i)=>rateMap[l]=rates[i]);
     await db.collection('ps_purchases').add({
-      itemName,category,date,note,pieces:currentPieces.slice(),
-      rates:rateMap,avgRate:calc.avgRate,adjPct,finalRate:calc.finalRate,totalWeight:calc.totalWt,finalPrice:calc.finalPrice,
+      itemName,category,date,from,broker,note,pieces:currentPieces.slice(),
+      avgRate:calc.avgRate,adjPct,finalRate:calc.finalRate,totalWeight:calc.totalWt,finalPrice:calc.finalPrice,
       by:actor?actor.id:'',at:new Date().toISOString()
     });
     if(itemName && !masters.itemNames.includes(itemName)){masters.itemNames.push(itemName);saveMasters();}
     if(category && !masters.categories.includes(category)){masters.categories.push(category);saveMasters();}
-    $('pItemName').value='';$('pCategory').value='';$('pNote').value='';
-    [0,1,2].forEach(i=>$('pRate'+i).value='');
+    $('pItemName').value='';$('pCategory').value='';$('pFrom').value='';$('pBroker').value='';$('pNote').value='';
     $('pAdjPct').value='0';
     currentPieces=[];renderPiecesList();renderPurchaseCalc();
     toast('Purchase entry saved');
@@ -471,15 +488,33 @@ async function permanentlyDeletePurchaseEntry(id,skipConfirm){
   toast('Entry permanently delete ho gayi');
 }
 let editPurchaseTarget=null;
+function renderEditPiecesList(pieces,labels){
+  const wrap=$('editPiecesList');if(!wrap)return;
+  wrap.innerHTML=pieces.map((p,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+      <span style="font-size:12.5px;font-weight:700;min-width:70px">${p.weight} cts</span>
+      ${labels.map(l=>`<input type="number" class="editPieceRate" data-piece="${i}" data-label="${esc(l)}" value="${p.rates&&p.rates[l]!==undefined?p.rates[l]:''}" placeholder="${esc(l)}" style="width:80px" oninput="renderEditPurchaseCalc()">`).join('')}
+    </div>`).join('')||'<p class="note">Koi piece nahi hai.</p>';
+}
+function readEditPieces(x){
+  const pieces=(x.pieces||[]).map(p=>({weight:p.weight,rates:{}}));
+  document.querySelectorAll('.editPieceRate').forEach(inp=>{
+    const pi=Number(inp.dataset.piece),label=inp.dataset.label;
+    if(pieces[pi])pieces[pi].rates[label]=parseFloat(inp.value);
+  });
+  return pieces;
+}
 function openEditPurchaseModal(id){
   if(!superAdminUnlocked){alert('Sirf Super Admin entry edit kar sakta hai.');return}
   const x=purchases.find(e=>e.id===id);if(!x)return;
   editPurchaseTarget=id;
   const labels=masters.directorLabels||['AR','HD','ND'];
-  [0,1,2].forEach(i=>{$('editRate'+i).value=(x.rates&&x.rates[labels[i]]!==undefined)?x.rates[labels[i]]:'';});
+  renderEditPiecesList(x.pieces||[],labels);
+  $('editPFrom').value=x.from||'';
+  $('editPBroker').value=x.broker||'';
+  $('editPNote').value=x.note||'';
   $('editAdjPct').value=x.adjPct||0;
   $('editPDate').value=x.date||'';
-  editPurchaseTarget=id;
   renderEditPurchaseCalc();
   $('editPurchaseModal').classList.add('show');
 }
@@ -487,12 +522,15 @@ function closeEditPurchaseModal(){$('editPurchaseModal')?.classList.remove('show
 function renderEditPurchaseCalc(){
   if(!editPurchaseTarget){$('editPurchaseCalcBox').innerHTML='';return}
   const x=purchases.find(e=>e.id===editPurchaseTarget);if(!x)return;
-  const rates=[0,1,2].map(i=>parseFloat($('editRate'+i)?.value));
+  const labels=masters.directorLabels||['AR','HD','ND'];
+  const pieces=readEditPieces(x);
   const adjPct=parseFloat($('editAdjPct')?.value);
-  const calc=computePurchaseCalc(rates,adjPct,x.pieces||[]);
+  const calc=computePurchaseCalc(pieces,adjPct,labels);
+  const perDirectorRows=labels.map((l,i)=>`<div class="row"><span>${esc(l)} Average</span><b>${calc.directorAverages[i]!==null?fmtAmt(calc.directorAverages[i]):'-'}</b></div>`).join('');
   $('editPurchaseCalcBox').innerHTML=`
     <div class="row"><span>Total Weight</span><b>${calc.totalWt}</b></div>
-    <div class="row"><span>Average Rate</span><b>${fmtAmt(calc.avgRate)}</b></div>
+    ${perDirectorRows}
+    <div class="row"><span>Overall Average Rate</span><b>${fmtAmt(calc.avgRate)}</b></div>
     <div class="row"><span>Final Rate</span><b>${fmtAmt(calc.finalRate)}</b></div>
     <div class="row" style="border-top:1px solid #d7ebe3;margin-top:4px;padding-top:7px"><span>Final Price</span><b style="font-size:16px;color:var(--g)">${fmtAmt(calc.finalPrice)}</b></div>`;
 }
@@ -501,14 +539,16 @@ async function saveEditPurchase(){
   if(!superAdminUnlocked){alert('Sirf Super Admin entry edit kar sakta hai.');return}
   const x=purchases.find(e=>e.id===editPurchaseTarget);if(!x)return;
   const labels=masters.directorLabels||['AR','HD','ND'];
-  const rates=[0,1,2].map(i=>parseFloat($('editRate'+i).value));
+  const pieces=readEditPieces(x);
   const adjPct=parseFloat($('editAdjPct').value)||0;
   const date=$('editPDate').value;
-  if(rates.some(r=>isNaN(r))){alert('Teeno rates bharein.');return}
+  const from=$('editPFrom').value.trim();
+  const broker=$('editPBroker').value.trim();
+  const note=$('editPNote').value.trim();
+  if(pieces.some(p=>labels.some(l=>p.rates[l]===undefined||isNaN(p.rates[l])))){alert('Sabhi pieces ke teeno Directors ke rates bharein.');return}
   if(!date){alert('Date zaroori hai.');return}
-  const calc=computePurchaseCalc(rates,adjPct,x.pieces||[]);
-  const rateMap={};labels.forEach((l,i)=>rateMap[l]=rates[i]);
-  await db.collection('ps_purchases').doc(editPurchaseTarget).update({rates:rateMap,avgRate:calc.avgRate,adjPct,finalRate:calc.finalRate,finalPrice:calc.finalPrice,date});
+  const calc=computePurchaseCalc(pieces,adjPct,labels);
+  await db.collection('ps_purchases').doc(editPurchaseTarget).update({pieces,from,broker,note,adjPct,avgRate:calc.avgRate,finalRate:calc.finalRate,finalPrice:calc.finalPrice,date});
   closeEditPurchaseModal();
   toast('Entry update ho gayi');
 }
@@ -546,7 +586,8 @@ function renderPurchaseHistory(){
       ?(superAdminUnlocked?`<button class="btn small" onclick="restorePurchaseEntry('${esc(x.id)}')">↩ Restore</button>`:'')
       :(superAdminUnlocked?`<button class="btn small danger" onclick="deletePurchaseEntry('${esc(x.id)}')">Disable</button>`:'');
     const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeletePurchaseEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
-    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td><b>${esc(x.itemName)}</b>${x.category?'<br><small style="color:var(--muted)">'+esc(x.category)+'</small>':''}</td><td class="num">${x.totalWeight}</td><td class="num">${fmtAmt(x.avgRate)}</td><td class="num">${x.adjPct>0?'+':''}${x.adjPct}%</td><td class="num">${fmtAmt(x.finalRate)}</td><td class="num">${fmtAmt(x.finalPrice)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
+    const subLines=[x.category,(x.from||x.broker)?('From: '+(x.from||'-')+(x.broker?' • Broker: '+x.broker:'')):''].filter(Boolean).map(esc).join('<br>');
+    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td><b>${esc(x.itemName)}</b>${subLines?'<br><small style="color:var(--muted)">'+subLines+'</small>':''}</td><td class="num">${x.totalWeight}</td><td class="num">${fmtAmt(x.avgRate)}</td><td class="num">${x.adjPct>0?'+':''}${x.adjPct}%</td><td class="num">${fmtAmt(x.finalRate)}</td><td class="num">${fmtAmt(x.finalPrice)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
   }).join('')||`<tr><td colspan="9"><div class="emptystate">💎<p>Koi purchase entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
 }
 function downloadCSV(filename,rows){
@@ -557,9 +598,17 @@ function downloadCSV(filename,rows){
 }
 function exportPurchaseCSV(){
   const labels=masters.directorLabels||['AR','HD','ND'];
-  const rows=[['Date','Item','Category','Pieces','Total Weight',...labels.map(l=>l+' Rate'),'Avg Rate','Adj %','Final Rate','Final Price','By']];
+  const rows=[['Date','Item','Category','From','Broker','Piece Weights',...labels.map(l=>l+' Rates (per piece)'),...labels.map(l=>l+' Average'),'Total Weight','Overall Avg Rate','Adj %','Final Rate','Final Price','Note','By']];
   filteredPurchaseRows().forEach(x=>{
-    rows.push([x.date,x.itemName,x.category||'',(x.pieces||[]).join('|'),x.totalWeight,...labels.map(l=>(x.rates&&x.rates[l])||''),x.avgRate.toFixed(2),x.adjPct,x.finalRate.toFixed(2),x.finalPrice.toFixed(2),nameOfUserId(x.by)]);
+    const pieces=x.pieces||[];
+    const calc=computePurchaseCalc(pieces,x.adjPct,labels);
+    rows.push([
+      x.date,x.itemName,x.category||'',x.from||'',x.broker||'',
+      pieces.map(p=>p.weight).join('|'),
+      ...labels.map(l=>pieces.map(p=>(p.rates&&p.rates[l]!==undefined)?p.rates[l]:'').join('|')),
+      ...labels.map((l,i)=>calc.directorAverages[i]!==null?calc.directorAverages[i].toFixed(2):''),
+      x.totalWeight,x.avgRate.toFixed(2),x.adjPct,x.finalRate.toFixed(2),x.finalPrice.toFixed(2),x.note||'',nameOfUserId(x.by)
+    ]);
   });
   downloadCSV('purchase-slip-history.csv',rows);
 }
