@@ -21,7 +21,7 @@
   window.addEventListener('unhandledrejection',function(e){console.error('Unhandled promise rejection:',e.reason);showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));});
 })();
 </script>
-<title>Purchase Slip</title>
+<title>Demo Testing Purchase Item Slip</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -30,7 +30,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* Same design system as the other Bliss apps, so all apps read as one family. */
-:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
+/* Demo/testing theme — deliberately different (violet) from the shared Bliss One
+   teal/mint design system, since this app isn't part of the live suite yet. */
+:root{--g:#6D28D9;--g2:#8B5CF6;--mint:#F2EBFC;--bg:#FDFBFF;--line:#E3D7F5;--txt:#241A33;--muted:#7C6E8C;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
 *{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
 button,input,select,textarea{font:inherit}
 h1,h2,h3,.card b,.tabular{font-family:'Manrope',sans-serif}
@@ -49,7 +51,7 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 .btn.danger{background:var(--redbg);color:var(--red)}
 .btn.small{padding:7px 11px;font-size:12px}
 .shell{max-width:1100px;margin:auto;padding:17px 18px 60px}
-.hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px}
+.hero{background:radial-gradient(circle at 100% 0%,rgba(255,200,120,.32),transparent 55%),linear-gradient(135deg,#5B21B6,#8B5CF6);color:#fff;border-radius:17px;padding:22px}
 .hero h1{font-size:24px;margin:0 0 5px}
 .hero p{font-size:13px;margin:0;opacity:.9}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
@@ -111,7 +113,7 @@ tbody tr:hover td{background:#f7faf8}
 
 <div id="appWrap" style="display:none">
 <header><div class="head">
-  <div class="brand"><div class="logo">💎</div><div><b>Purchase Slip</b><small>Bliss Gems &amp; Minerals</small></div></div>
+  <div class="brand"><div class="logo">🧪</div><div><b>Demo Testing Purchase Item Slip</b><small>Not live yet — testing only</small></div></div>
   <div class="headRight">
     <span class="pillbadge" id="loginBadge">Not Logged In</span>
     <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
@@ -121,7 +123,7 @@ tbody tr:hover td{background:#f7faf8}
 
 <div class="shell">
   <div class="hero">
-    <h1>Stone Purchase Pricing</h1>
+    <h1>🧪 Demo Testing Purchase Item Slip</h1>
     <p>Item aata hai → pieces ka weight → 3 Directors apna rate dete hain → average + adjustment se final price.</p>
   </div>
   <div class="cards" id="statTiles"></div>
