@@ -1877,6 +1877,7 @@ function hideSuperAdminControls(){
   // recompute their visibility so a real Firebase Admin/Director login (independent of
   // Super Admin) keeps its access after Super Admin idle-locks.
   refreshAdminAuthStatus();
+  loadLiveAppsRegistry();
 }
 function resetAdminIdleTimer(){
   if(!superAdminUnlocked)return;
@@ -1891,6 +1892,7 @@ function doUnlockSuperAdmin(){
   showSuperAdminControls();
   closeSuperAdminModal();
   resetAdminIdleTimer();
+  loadLiveAppsRegistry();
 }
 async function unlockSuperAdmin(){
   const value=document.getElementById('superAdminPassword')?.value||'';
