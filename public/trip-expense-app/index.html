@@ -240,7 +240,10 @@ if(window.self!==window.top){
 
 <div class="modal" id="issue"><div class="box"><h3>Issue Trip Amount</h3><div class="fields">
 <div class="field span2"><label>Person *</label><select id="issueSales" onchange="updateIssueSuggestion()"></select></div>
-<div class="field"><label>Location *</label><select id="issueLocation" onchange="handleIssueLocPurposeChange(this,'issueLocation')"></select></div>
+<div class="field span2"><label>Location * <small style="font-weight:400;color:var(--muted)">(ek se zyada shehar ho to sab select karein)</small></label>
+  <div id="issueLocationChecks" style="display:flex;flex-wrap:wrap;gap:8px;border:1px solid var(--line);border-radius:8px;padding:8px;max-height:140px;overflow-y:auto"></div>
+  <button class="btn" type="button" style="margin-top:6px" onclick="startAddNewLocation()">＋ Add new location…</button>
+</div>
 <div class="field"><label>Trip Purpose *</label><select id="issuePurpose" onchange="handleIssueLocPurposeChange(this,'issuePurpose')"></select></div>
 <div class="field span2 hidden" id="issueAddNewRow" style="display:flex;gap:8px;align-items:flex-end">
   <div style="flex:1"><label>New value</label><input id="issueAddNewInput" placeholder="Type new name…"></div>
@@ -308,6 +311,15 @@ if(window.self!==window.top){
 </div></div>
 
 <div class="modal" id="tripDetailModal"><div class="box" style="width:min(560px,100%)"><div id="tripDetailBody"></div><div class="actions"><button class="btn" onclick="hide('tripDetailModal')">Close</button></div></div></div>
+
+<div class="modal" id="editTripModal"><div class="box"><h3>Edit Trip</h3><div class="fields">
+<div class="field span2"><label>Location * <small style="font-weight:400;color:var(--muted)">(ek se zyada shehar ho to sab select karein)</small></label>
+  <div id="editTripLocationChecks" style="display:flex;flex-wrap:wrap;gap:8px;border:1px solid var(--line);border-radius:8px;padding:8px;max-height:140px;overflow-y:auto"></div>
+  <button class="btn" type="button" style="margin-top:6px" onclick="addNewLocationInEditTrip()">＋ Add new location…</button>
+</div>
+<div class="field"><label>Start Date *</label><input type="date" id="editTripStart"></div>
+<div class="field"><label>Hisaab Due *</label><input type="date" id="editTripDue"></div>
+</div><div class="actions"><button class="btn" onclick="hide('editTripModal')">Cancel</button><button class="btn primary" id="editTripSaveBtn" onclick="saveEditTrip()">Save</button></div><div class="msg" id="editTripMsg"></div></div></div>
 
 <script>
 const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
@@ -617,22 +629,38 @@ const NON_ADVANCE_LEDGER_TYPES=['expense','transfer_in','transfer_out','party_ca
 function isOverdue(t){return t.status!=='closed' && t.dueDate && t.dueDate<todayISO()}
 
 /* ===== Issue / Extra / Expense / Hisaab / Close / Book ===== */
-function populateIssueSelects(){
-  const loc=$('issueLocation'),pur=$('issuePurpose');
-  if(!loc||!pur)return;
-  const locVal=loc.value,purVal=pur.value;
-  loc.innerHTML='<option value="">Select…</option>'+tripOptions.locations.map(l=>`<option>${esc(l)}</option>`).join('')+'<option value="__add__">＋ Add new location…</option>';
+function locationCheckboxHtml(l){return `<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;background:var(--mint);border-radius:6px;padding:4px 8px;cursor:pointer"><input type="checkbox" value="${esc(l)}" style="width:auto" onchange="updateIssueSuggestion()"> ${esc(l)}</label>`}
+function getSelectedIssueLocations(){
+  const wrap=$('issueLocationChecks');if(!wrap)return[];
+  return [...wrap.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);
+}
+function populateIssueSelects(preserveChecks){
+  const locWrap=$('issueLocationChecks'),pur=$('issuePurpose');
+  if(!locWrap||!pur)return;
+  const prevChecked=preserveChecks?getSelectedIssueLocations():[];
+  const purVal=pur.value;
+  locWrap.innerHTML=tripOptions.locations.map(locationCheckboxHtml).join('')||'<small style="color:var(--muted)">Koi location nahi hai, "+ Add new location" se banayein.</small>';
+  prevChecked.forEach(v=>{
+    const cb=[...locWrap.querySelectorAll('input[type=checkbox]')].find(c=>c.value===v);
+    if(cb)cb.checked=true;
+  });
   pur.innerHTML='<option value="">Select…</option>'+tripOptions.purposes.map(p=>`<option>${esc(p)}</option>`).join('')+'<option value="__add__">＋ Add new purpose…</option>';
-  if(tripOptions.locations.includes(locVal))loc.value=locVal;
   if(tripOptions.purposes.includes(purVal))pur.value=purVal;
 }
 let issueAddNewTarget=null;
+function startAddNewLocation(){
+  issueAddNewTarget='issueLocation';
+  $('issueAddNewInput').value='';
+  $('issueAddNewInput').placeholder='e.g. Kolkata';
+  $('issueAddNewRow').classList.remove('hidden');
+  $('issueAddNewInput').focus();
+}
 function handleIssueLocPurposeChange(sel,targetId){
   if(sel.value==='__add__'){
     issueAddNewTarget=targetId;
     sel.value='';
     $('issueAddNewInput').value='';
-    $('issueAddNewInput').placeholder=targetId==='issueLocation'?'e.g. Kolkata':'e.g. Vendor Visit';
+    $('issueAddNewInput').placeholder='e.g. Vendor Visit';
     $('issueAddNewRow').classList.remove('hidden');
     $('issueAddNewInput').focus();
     return;
@@ -648,14 +676,21 @@ async function confirmIssueAddNew(){
     if(!tripOptions.purposes.includes(val))tripOptions.purposes.push(val);
   }
   await db.collection('te_settings').doc('options').set(tripOptions,{merge:true});
-  populateIssueSelects();
-  $(issueAddNewTarget).value=val;
+  if(issueAddNewTarget==='issueLocation'){
+    populateIssueSelects(true);
+    const wrap=$('issueLocationChecks');
+    const cb=wrap&&[...wrap.querySelectorAll('input[type=checkbox]')].find(c=>c.value===val);
+    if(cb)cb.checked=true;
+  } else {
+    populateIssueSelects(true);
+    $(issueAddNewTarget).value=val;
+  }
   cancelIssueAddNew();
   updateIssueSuggestion();
 }
 function cancelIssueAddNew(){$('issueAddNewRow').classList.add('hidden');issueAddNewTarget=null}
 function updateIssueSuggestion(){
-  const salesId=$('issueSales').value,loc=$('issueLocation').value,purpose=$('issuePurpose').value;
+  const salesId=$('issueSales').value,loc=getSelectedIssueLocations().join(' & '),purpose=$('issuePurpose').value;
   const box=$('issueSuggestBox');
   if(!salesId||!loc||!purpose){box.style.display='none';return}
   const sales=users.find(u=>u.id===salesId);
@@ -681,7 +716,7 @@ function openIssueModal(){
   $('issueStart').value=todayISO();
   $('issueDue').value='';$('issueAmount').value='';
   populateIssueSelects();
-  $('issueLocation').value='';$('issuePurpose').value='';
+  $('issuePurpose').value='';
   cancelIssueAddNew();
   $('issueSuggestBox').style.display='none';
   $('issueMsg').textContent='';
@@ -690,9 +725,9 @@ function openIssueModal(){
 let _issueSubmitting=false;
 async function submitIssue(){
   if(_issueSubmitting)return;
-  const salesId=$('issueSales').value,location=$('issueLocation').value,purpose=$('issuePurpose').value,start=$('issueStart').value,due=$('issueDue').value,amount=Number($('issueAmount').value);
+  const salesId=$('issueSales').value,location=getSelectedIssueLocations().join(' & '),purpose=$('issuePurpose').value,start=$('issueStart').value,due=$('issueDue').value,amount=Number($('issueAmount').value);
   const msg=$('issueMsg');
-  if(!salesId||!location||!purpose||!start||!due||!amount){msg.style.color='#b43a35';msg.textContent='Sabhi fields bharein.';return}
+  if(!salesId||!location||!purpose||!start||!due||!amount){msg.style.color='#b43a35';msg.textContent='Sabhi fields bharein, kam se kam 1 location select karein.';return}
   _issueSubmitting=true;
   const btn=$('issueSubmitBtn');if(btn)btn.disabled=true;
   try{
@@ -1334,10 +1369,66 @@ function openTripDetail(tripId){
   const entries=tripLedger(tripId).filter(l=>NON_ADVANCE_LEDGER_TYPES.includes(l.type)).sort((a,b)=>b.at.localeCompare(a.at));
   const rows=entries.map(ledgerEntryRow).join('')||'<div class="row"><small>Koi expense nahi hai.</small></div>';
   $('tripDetailBody').innerHTML=`<h3>${esc(t.id)} • ${esc(t.location)}</h3>
-  <p style="font-size:13px;color:var(--muted);margin:-8px 0 12px">${esc(t.salesName)} • ${esc(t.purpose||'')} • Due ${esc(t.dueDate)} ${t.nocNumber?`• NOC ${esc(t.nocNumber)}`:''}</p>
+  <p style="font-size:13px;color:var(--muted);margin:-8px 0 12px">${esc(t.salesName)} • ${esc(t.purpose||'')} • Due ${esc(t.dueDate)} ${t.nocNumber?`• NOC ${esc(t.nocNumber)}`:''} ${canEditTripDates()?`<button class="btn" style="padding:2px 8px;font-size:11px;margin-left:6px" onclick="openEditTripModal('${esc(t.id)}')">✎ Edit Trip</button>`:''}</p>
   <div class="money" style="grid-template-columns:repeat(3,1fr)"><div class="m"><small>COMPANY ADVANCE</small><b>+ ${money(companyAdvance)}</b></div><div class="m"><small>PARTY CASH</small><b>+ ${money(partyCash)}</b></div><div class="m"><small>TRANSFER RECEIVED</small><b>+ ${money(transferReceived)}</b></div><div class="m"><small>TRANSFER SENT</small><b>- ${money(transferSent)}</b></div><div class="m"><small>SPENT</small><b>- ${money(expense)}</b></div><div class="m"><small>BALANCE</small><b>${money(balance)}</b></div></div>
   <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin:14px 0 6px">Activity</div>${rows}`;
   show('tripDetailModal');
+}
+function canEditTripDates(){const r=effectiveRole();return r==='admin'||r==='director'}
+let _editTripId=null;
+function renderEditTripLocationChecks(selected){
+  const wrap=$('editTripLocationChecks');if(!wrap)return;
+  wrap.innerHTML=tripOptions.locations.map(locationCheckboxHtml).join('')||'<small style="color:var(--muted)">Koi location nahi hai, "+ Add new location" se banayein.</small>';
+  wrap.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.removeAttribute('onchange'));
+  (selected||[]).forEach(v=>{
+    const cb=[...wrap.querySelectorAll('input[type=checkbox]')].find(c=>c.value===v);
+    if(cb)cb.checked=true;
+  });
+}
+function getSelectedEditTripLocations(){
+  const wrap=$('editTripLocationChecks');if(!wrap)return[];
+  return [...wrap.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);
+}
+async function addNewLocationInEditTrip(){
+  const val=(prompt('Naya location/shehar ka naam likhein:')||'').trim();
+  if(!val)return;
+  if(!tripOptions.locations.includes(val)){
+    tripOptions.locations.push(val);
+    try{ await db.collection('te_settings').doc('options').set(tripOptions,{merge:true}); }
+    catch(e){ console.error('add location failed',e); }
+  }
+  renderEditTripLocationChecks([...getSelectedEditTripLocations(),val]);
+}
+function openEditTripModal(tripId){
+  if(!canEditTripDates()){alert('Sirf Admin/Director trip edit kar sakte hain.');return}
+  const t=trips.find(x=>x.id===tripId);if(!t)return;
+  _editTripId=tripId;
+  const currentLocations=String(t.location||'').split('&').map(s=>s.trim()).filter(Boolean);
+  renderEditTripLocationChecks(currentLocations);
+  $('editTripStart').value=t.startDate||'';
+  $('editTripDue').value=t.dueDate||'';
+  $('editTripMsg').textContent='';
+  show('editTripModal');
+}
+async function saveEditTrip(){
+  if(!_editTripId)return;
+  const location=getSelectedEditTripLocations().join(' & '),start=$('editTripStart').value,due=$('editTripDue').value;
+  const msg=$('editTripMsg');
+  if(!location||!start||!due){msg.style.color='#b43a35';msg.textContent='Sabhi fields bharein, kam se kam 1 location select karein.';return}
+  if(due<start){msg.style.color='#b43a35';msg.textContent='Due date, Start date se pehle nahi ho sakti.';return}
+  const btn=$('editTripSaveBtn');if(btn)btn.disabled=true;
+  try{
+    await db.collection('te_trips').doc(_editTripId).update({location,startDate:start,dueDate:due});
+  }catch(e){
+    console.error('edit trip failed',e);
+    msg.style.color='#b43a35';msg.textContent='Save fail ho gaya, dobara try karein.';
+    if(btn)btn.disabled=false;
+    return;
+  }
+  if(btn)btn.disabled=false;
+  hide('editTripModal');
+  toast('Trip update ho gayi: '+_editTripId);
+  openTripDetail(_editTripId);
 }
 
 /* ===== Detailed Trips (Explorer) ===== */
