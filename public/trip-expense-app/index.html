@@ -900,6 +900,9 @@ async function submitExpense(){
   const category=$('expCategory').value.trim(),amount=Number($('expAmount').value),paidTo=$('expPaidTo').value.trim(),remark=$('expRemark').value.trim();
   if(!category||!amount||!paidTo){msg.style.color='#b43a35';msg.textContent='Category, Amount aur Paid To zaroori hain.';return}
   if(!remark && !$('expProof').files[0]){msg.style.color='#b43a35';msg.textContent='Bill photo lagayein ya No-Bill reason likhein.';return}
+  const today=todayISO();
+  const isDupe=tripLedger(trip.id).some(l=>l.type==='expense'&&l.category===category&&Number(l.amount)===amount&&String(l.at||'').slice(0,10)===today);
+  if(isDupe && !confirm('Aapne already '+category+' '+money(amount)+' aaj add kiya hai. Phir bhi add karna hai?'))return;
   _expenseSubmitting=true;
   const btn=$('expSubmitBtn');if(btn)btn.disabled=true;
   try{
