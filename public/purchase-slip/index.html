@@ -141,13 +141,10 @@ tbody tr:hover td{background:#f7faf8}
       </div>
 
       <div class="field span2" style="margin-top:10px">
-        <label>Pieces <span style="color:var(--red)">*</span> <small style="font-weight:400;color:var(--muted)">(har piece ke liye weight + teeno Directors ka rate)</small></label>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-          <div style="flex:1;min-width:90px"><label style="font-size:11px">Weight (cts)</label><input type="number" id="pPieceWeight" placeholder="Weight"></div>
-          <div style="flex:1;min-width:80px"><label style="font-size:11px" id="pPieceRateLabel0">AR</label><input type="number" id="pPieceRate0" placeholder="Rate"></div>
-          <div style="flex:1;min-width:80px"><label style="font-size:11px" id="pPieceRateLabel1">HD</label><input type="number" id="pPieceRate1" placeholder="Rate"></div>
-          <div style="flex:1;min-width:80px"><label style="font-size:11px" id="pPieceRateLabel2">ND</label><input type="number" id="pPieceRate2" placeholder="Rate" onkeydown="if(event.key==='Enter'){event.preventDefault();addPiece();}"></div>
-          <button type="button" class="btn secondary" onclick="addPiece()">＋ Add Piece</button>
+        <label>Pieces <span style="color:var(--red)">*</span> <small style="font-weight:400;color:var(--muted)">(pehle sab weights add karein, phir har weight ke saamne teeno Directors ka rate bharein)</small></label>
+        <div style="display:flex;gap:8px">
+          <input type="number" id="pPieceInput" placeholder="Weight" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addPiece();}">
+          <button type="button" class="btn secondary" onclick="addPiece()">＋ Add Weight</button>
         </div>
         <div id="pPiecesList" style="margin-top:10px"></div>
       </div>
@@ -363,22 +360,16 @@ function applyFeatureVisibility(){
 function renderSelects(){
   if($('itemNameList'))$('itemNameList').innerHTML=(masters.itemNames||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
   if($('categoryList'))$('categoryList').innerHTML=(masters.categories||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
-  const labels=masters.directorLabels||['AR','HD','ND'];
-  [0,1,2].forEach(i=>{
-    if($('pPieceRateLabel'+i))$('pPieceRateLabel'+i).textContent=labels[i]||('Director '+(i+1));
-  });
 }
 
-/* ===== Pieces (dynamic list) — each piece carries its own weight + a rate per Director ===== */
+/* ===== Pieces (dynamic list) — weights are added first, then each weight's row takes a
+   rate per Director (table layout, matches filling in a paper slip column by column). ===== */
 function addPiece(){
-  const labels=masters.directorLabels||['AR','HD','ND'];
-  const w=parseFloat($('pPieceWeight').value);
-  const r0=parseFloat($('pPieceRate0').value),r1=parseFloat($('pPieceRate1').value),r2=parseFloat($('pPieceRate2').value);
+  const inp=$('pPieceInput');
+  const w=parseFloat(inp.value);
   if(!w||w<=0){alert('Weight sahi se bharein.');return}
-  if([r0,r1,r2].some(r=>isNaN(r))){alert('Is piece ke liye teeno Directors ka rate bharein.');return}
-  currentPieces.push({weight:w,rates:{[labels[0]]:r0,[labels[1]]:r1,[labels[2]]:r2}});
-  $('pPieceWeight').value='';$('pPieceRate0').value='';$('pPieceRate1').value='';$('pPieceRate2').value='';
-  $('pPieceWeight').focus();
+  currentPieces.push({weight:w,rates:{}});
+  inp.value='';inp.focus();
   renderPiecesList();
   renderPurchaseCalc();
 }
@@ -387,14 +378,22 @@ function removePiece(i){
   renderPiecesList();
   renderPurchaseCalc();
 }
+function syncPieceRatesFromInputs(){
+  document.querySelectorAll('.pieceRateInput').forEach(inp=>{
+    const pi=Number(inp.dataset.piece),label=inp.dataset.label;
+    if(!currentPieces[pi])return;
+    const v=parseFloat(inp.value);
+    currentPieces[pi].rates[label]=isNaN(v)?undefined:v;
+  });
+}
 function renderPiecesList(){
   const wrap=$('pPiecesList');
   if(!wrap)return;
   const labels=masters.directorLabels||['AR','HD','ND'];
-  wrap.innerHTML=currentPieces.map((p,i)=>{
-    const rateStr=labels.map(l=>l+':'+(p.rates&&p.rates[l]!==undefined?p.rates[l]:'-')).join('  ');
-    return `<span class="pieceChip">${p.weight} cts — ${esc(rateStr)}<button type="button" onclick="removePiece(${i})">✕</button></span>`;
-  }).join('')||'<span class="note">Koi piece add nahi kiya.</span>';
+  if(!currentPieces.length){wrap.innerHTML='<span class="note">Koi weight add nahi kiya.</span>';return}
+  wrap.innerHTML=`<div class="tablewrap"><table><thead><tr><th>Weight</th>${labels.map(l=>`<th>${esc(l)}</th>`).join('')}<th></th></tr></thead><tbody>`+
+    currentPieces.map((p,i)=>`<tr><td>${p.weight} cts</td>${labels.map(l=>`<td><input type="number" class="pieceRateInput" data-piece="${i}" data-label="${esc(l)}" value="${p.rates&&p.rates[l]!==undefined?p.rates[l]:''}" placeholder="Rate" style="width:72px" oninput="renderPurchaseCalc()"></td>`).join('')}<td><button type="button" class="btn small danger" onclick="removePiece(${i})">✕</button></td></tr>`).join('')+
+    `</tbody></table></div>`;
 }
 function totalWeight(pieces){return (pieces||[]).reduce((s,p)=>s+(p.weight||0),0)}
 // Har Director ka apna average nikalta hai (apne saare pieces ke rates ka average), phir un teeno
@@ -414,6 +413,7 @@ function computePurchaseCalc(pieces,adjPct,labels){
   return {totalWt:wt,directorAverages,avgRate,finalRate,finalPrice,validCount:validAvgs.length};
 }
 function renderPurchaseCalc(){
+  syncPieceRatesFromInputs();
   const labels=masters.directorLabels||['AR','HD','ND'];
   const adjPct=parseFloat($('pAdjPct')?.value);
   const calc=computePurchaseCalc(currentPieces,adjPct,labels);
@@ -436,9 +436,11 @@ async function addPurchaseEntry(){
   const broker=$('pBroker').value.trim();
   const note=$('pNote').value.trim();
   const adjPct=parseFloat($('pAdjPct').value)||0;
+  syncPieceRatesFromInputs();
   if(!itemName){alert('Item Name zaroori hai.');return}
-  if(!currentPieces.length){alert('Kam se kam ek Piece add karein (weight + teeno Directors ka rate).');return}
+  if(!currentPieces.length){alert('Kam se kam ek Weight add karein.');return}
   const labels=masters.directorLabels||['AR','HD','ND'];
+  if(currentPieces.some(p=>labels.some(l=>p.rates[l]===undefined||isNaN(p.rates[l])))){alert('Har weight ke saamne teeno Directors ka rate bharein.');return}
   const calc=computePurchaseCalc(currentPieces,adjPct,labels);
   _purchaseSubmitting=true;
   const btn=$('purchaseSubmitBtn');if(btn)btn.disabled=true;
