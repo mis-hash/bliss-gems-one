@@ -2489,8 +2489,12 @@ function refreshReturnFieldStates(){
   renderReturnWorkflowStatus();
 }
 function applyReturnSequenceAndLocks(){
-  const fv=$('returnFormView');
-  if(fv&&fv.classList.contains('hidden'))return;
+  // Same guard as Dispatch's applySequenceAndLocks(): #returnModule (the parent) also gets
+  // hidden independently of #returnFormView when switchModule() switches to Dispatch, so it
+  // needs its own check too - otherwise a stray event while it's hidden would misread every
+  // field as "filled" and wrongly auto-lock a stage with blank required fields.
+  const fv=$('returnFormView'),rm=$('returnModule');
+  if((fv&&fv.classList.contains('hidden'))||(rm&&rm.classList.contains('hidden')))return;
   refreshReturnFieldStates();
   autoLockCompletedReturnStage();
 }
@@ -3326,9 +3330,12 @@ function applySequenceAndLocks(){
   // isFieldFilled() treats any field under a .hidden ancestor as "filled" (a pre-existing
   // escape hatch for conditionally-hidden fields like priceWrap). While #dispatchFormView
   // itself is navigationally hidden, every field would misread as filled and wrongly
-  // auto-lock stages — so skip entirely until the form is actually visible.
-  const fv=$('dispatchFormView');
-  if(fv&&fv.classList.contains('hidden'))return;
+  // auto-lock stages — so skip entirely until the form is actually visible. #dispatchModule
+  // (its parent) also gets hidden independently - e.g. showDashboardView() hides it directly
+  // without first hiding #dispatchFormView - and a stray change/blur event reaching here
+  // while it's hidden hit the exact same false-complete bug, so it needs the same guard.
+  const fv=$('dispatchFormView'),dm=$('dispatchModule');
+  if((fv&&fv.classList.contains('hidden'))||(dm&&dm.classList.contains('hidden')))return;
   refreshFieldStates();
   autoLockCompletedStage();
 }
