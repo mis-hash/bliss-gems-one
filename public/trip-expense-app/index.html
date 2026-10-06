@@ -192,6 +192,10 @@ if(window.self!==window.top){
   </div>
   <div id="mrTripsList"></div>
 </div></div>
+<div class="panel"><div class="ph">🧹 Orphaned Ledger Entries</div><div class="pb">
+  <p class="note" style="margin:0 0 10px">Jab koi trip "Delete Permanently" hoti hai, uski advance/expense entries Firestore me reh jaati hain (koi trip inse jude nahi rehta) — aur yeh Bookkeeping/Analytics/Accounts ke company-wide totals ko inflate karte hain, jabki Admin Trip Control sahi dikhata hai (wo sirf live trips se jodta hai).</p>
+  <div id="mrOrphanPanel"></div>
+</div></div>
 </section>
 
 <section id="teamroles" class="page">
@@ -1514,15 +1518,60 @@ async function permanentlyDeleteTrip(tripId,skipConfirm){
     const typed=prompt('Yeh trip Firestore se HAMESHA KE LIYE delete ho jayegi — wapas NAHI aayegi.\n\nTrip: '+t.id+'\nSales Person: '+(t.salesName||'-')+'\n\nConfirm karne ke liye "DELETE" type karein:');
     if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
   }
-  try{ await db.collection('te_trips').doc(tripId).delete(); }
+  try{
+    await db.collection('te_trips').doc(tripId).delete();
+    // Cascade-delete this trip's own ledger entries too, so they don't become orphaned
+    // entries that keep inflating company-wide totals (Bookkeeping/Analytics/Accounts)
+    // after the trip itself is gone — see orphanedLedgerEntries()/cleanupOrphanedLedger().
+    const own=ledger.filter(l=>l.tripId===tripId);
+    for(const l of own){
+      try{ await db.collection('te_ledger').doc(l.id).delete(); }
+      catch(e){ console.error('cascade delete ledger entry failed for',l.id,e); }
+    }
+  }
   catch(e){ console.error('permanent delete trip failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
   toast('Trip permanently delete ho gayi: '+tripId);
 }
 
 /* ===== Manage Records (Super Admin) ===== */
+// A ledger entry is "orphaned" if its tripId doesn't match any trip doc still in Firestore
+// (live or soft-deleted) - this only happens after a trip was "Delete Permanently"-ed, since
+// that only removed the te_trips doc, never the te_ledger entries that pointed at it.
+function orphanedLedgerEntries(){
+  const knownIds=new Set(allTripsRaw.map(t=>t.id));
+  return ledger.filter(l=>!knownIds.has(l.tripId));
+}
+function renderOrphanPanel(){
+  const wrap=$('mrOrphanPanel');
+  if(!wrap)return;
+  if(!superAdminUnlocked){wrap.innerHTML='';return}
+  const orphans=orphanedLedgerEntries();
+  if(!orphans.length){wrap.innerHTML='<small style="color:var(--muted)">Koi orphaned entry nahi mili — sab theek hai.</small>';return}
+  const total=orphans.reduce((s,l)=>s+Number(l.amount||0),0);
+  const byTrip={};orphans.forEach(l=>{byTrip[l.tripId]=(byTrip[l.tripId]||0)+1});
+  const tripIds=Object.keys(byTrip);
+  wrap.innerHTML=`<p class="note" style="margin:0 0 10px;color:#b43a35">${orphans.length} orphaned entries mili (${money(total)} total), ${tripIds.length} deleted trip(s) se: ${tripIds.map(esc).join(', ')}</p>
+  <button class="btn danger" onclick="cleanupOrphanedLedger()">🧹 Clean Up ${orphans.length} Orphaned Entries</button>`;
+}
+async function cleanupOrphanedLedger(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin yeh kar sakta hai.');return}
+  const orphans=orphanedLedgerEntries();
+  if(!orphans.length)return;
+  const total=orphans.reduce((s,l)=>s+Number(l.amount||0),0);
+  const typed=prompt(orphans.length+' orphaned entries ('+money(total)+') Firestore se HAMESHA KE LIYE delete ho jaayengi — yeh already-deleted trips ki entries hain, wapas NAHI aayengi.\n\nConfirm karne ke liye "DELETE" type karein:');
+  if(typed!=='DELETE'){toast('Cleanup cancel ho gaya');return}
+  for(const l of orphans){
+    try{ await db.collection('te_ledger').doc(l.id).delete(); }
+    catch(e){ console.error('orphan cleanup failed for',l.id,e); }
+  }
+  logActivity(((myUserObj()||{}).name||currentUser)+' cleaned up orphaned ledger entries',orphans.length+' entries, '+money(total));
+  toast('Orphaned entries clean ho gayi');
+  renderOrphanPanel();
+}
 function renderManageRecordsPage(){
   const wrap=$('mrTripsList');
   if(!wrap)return;
+  renderOrphanPanel();
   if(!superAdminUnlocked){wrap.innerHTML='<small>Sirf Super Admin yeh dekh sakta hai.</small>';return}
   const q=($('mrSearch')?.value||'').toLowerCase();
   const showDeleted=$('mrShowDeleted')&&$('mrShowDeleted').checked;
