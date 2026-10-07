@@ -299,7 +299,7 @@ if(window.self!==window.top){
 </div></div>
 <div class="field"><label>Broker <span class="req">*</span></label><input id="broker" class="titleCaseField" autocomplete="off" readonly placeholder="Auto from Party Master"></div>
 <div class="field"><label>Ship Through <span class="req">*</span></label><input id="shipThrough" list="shipThroughList" class="titleCaseField" autocomplete="off" onchange="shipChanged();syncShippingSection();notifyDlcIfNeeded()"><datalist id="shipThroughList"></datalist></div>
-<div class="field"><label>INSH Amount <span class="req">*</span></label><input type="number" id="inshAmount" list="inshAmountList" step="0.01"><datalist id="inshAmountList"></datalist></div>
+<div class="field"><label>INSH Amount <span class="req">*</span></label><input type="text" inputmode="decimal" id="inshAmount" list="inshAmountList"><datalist id="inshAmountList"></datalist></div>
 <div class="field"><label>Price Fill <span class="req">*</span></label><select id="priceFill" onchange="priceChanged()"><option value="">Select</option><option>YES</option><option>NO</option></select></div>
 <div class="field hidden" id="priceWrap"><label>Price <span class="req">*</span></label><input type="text" id="price" placeholder="Numeric ya word, jo bhi likhna ho"></div>
 <div class="field span2"><label>Self Remark</label><textarea id="selfRemark" placeholder="Optional • Secret/Code"></textarea>
@@ -895,6 +895,16 @@ let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(
     if(!courierNames.some(x=>String(x).trim().toLowerCase()===n.toLowerCase())){courierNames.push(n);added=true}
   });
   if(added)localStorage.setItem(K.couriernames,JSON.stringify(courierNames));
+})();
+// Same additive merge as courier names above - "0" (no insurance cost) and "N/A" (not
+// applicable, e.g. a non-insured courier) are common real entries that weren't in the
+// quick-pick list, forcing everyone to type them by hand every time.
+(function mergeDefaultInshPresets(){
+  let added=false;
+  ['0','N/A'].forEach(n=>{
+    if(!inshAmountPresets.some(x=>String(x).trim().toLowerCase()===n.toLowerCase())){inshAmountPresets.push(n);added=true}
+  });
+  if(added)localStorage.setItem(K.inshpresets,JSON.stringify(inshAmountPresets));
 })();
 const $=id=>document.getElementById(id);
 
