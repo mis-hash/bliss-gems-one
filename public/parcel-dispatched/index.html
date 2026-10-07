@@ -433,8 +433,8 @@ if(window.self!==window.top){
 <section class="card" id="returnSec3"><h3>3. Return Entry</h3><div class="body"><div class="grid">
 <div class="field"><label>Item Return in Approval By <span class="req">*</span></label><select class="returnPerson" id="approvalReturnBy" data-time="approvalReturnTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="approvalReturnTime" readonly></div>
 <div class="field"><label>No. of Items Return <span class="req">*</span></label><input type="number" id="returnItemCount"></div>
-<div class="field"><label>Not Found Reason <span class="req">*</span></label><select id="notFoundReason"><option value="">Select</option><option>Sample</option><option>Collet</option><option>Party Goods</option><option>Other</option></select></div>
-<div class="field"><label>No. of Items Not Found</label><input type="number" id="itemsNotFoundCount"></div>
+<div class="field hidden" id="notFoundReasonWrap"><label>Not Found Reason <span class="req">*</span></label><select id="notFoundReason"><option value="">Select</option><option>Sample</option><option>Collet</option><option>Party Goods</option><option>Other</option></select></div>
+<div class="field"><label>No. of Items Not Found</label><input type="number" id="itemsNotFoundCount" oninput="returnNotFoundRule()"></div>
 <div class="field"><label>Remarks</label><input id="itemsNotFoundRemark" placeholder="Optional"></div>
 <div class="field"><label>Return to Broker <span class="req">*</span></label><select id="returnToBroker"><option value="">Select</option><option>Done</option><option>Not Required</option></select></div>
 <div class="field"><label>Handover to 506 - Name <span class="req">*</span></label><select class="returnPerson" id="handover506By" data-time="handover506Time"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openReturnTransferTask('handover506By')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="handover506Time" readonly></div>
@@ -809,6 +809,7 @@ function refreshOpenReturnFields(r){
   });
   if(typeof returnPktRule==='function')returnPktRule();
   if(typeof returnParcelTypeRule==='function')returnParcelTypeRule();
+  if(typeof returnNotFoundRule==='function')returnNotFoundRule();
   if(typeof applyReturnSequenceAndLocks==='function')applyReturnSequenceAndLocks();
   // This is the actual real-time path - fires the instant another Doer's edit arrives via
   // Firestore while this slip is open on someone else's screen. It correctly updates the
@@ -2360,6 +2361,7 @@ const RETURN_PERSON_FIELDS=new Set(['returnReceiveBy','returnHandoverChecking','
 function isReturnFieldFilledForRecord(rec,fieldId){
   if(fieldId==='returnAmount' && rec.returnParcelType!=='To Pay')return true;
   if((fieldId==='returnPktBy'||fieldId==='returnPktTime') && rec.returnPktRequired!=='YES')return true;
+  if(fieldId==='notFoundReason' && !(Number(rec.itemsNotFoundCount||0)>0))return true;
   return String(rec[fieldId]||'').trim()!=='';
 }
 function currentPendingReturnAssignee(rec){
@@ -2402,6 +2404,7 @@ function returnStageForElement(el){
 // show/hide rule) - everything else in the list is unconditionally required.
 function returnFieldRequired(fieldId){
   if(fieldId==='returnAmount')return $('returnParcelType')&&$('returnParcelType').value==='To Pay';
+  if(fieldId==='notFoundReason')return Number($('itemsNotFoundCount')&&$('itemsNotFoundCount').value||0)>0;
   return true;
 }
 function isReturnFieldFilled(id){
@@ -2692,6 +2695,7 @@ function clearReturn(){
  populateReturnUsers();
  if(typeof returnPktRule==='function')returnPktRule();
  if(typeof returnParcelTypeRule==='function')returnParcelTypeRule();
+ if(typeof returnNotFoundRule==='function')returnNotFoundRule();
  if(typeof syncAllComboInputs==='function')syncAllComboInputs();
  if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+currentReturnId;
  if($('returnAutoSaveTag'))$('returnAutoSaveTag').textContent='';
@@ -2700,6 +2704,13 @@ function clearReturn(){
 function returnParcelTypeRule(){
  const toPay=$('returnParcelType')&&$('returnParcelType').value==='To Pay';
  if($('returnAmountReq'))$('returnAmountReq').classList.toggle('hidden',!toPay);
+}
+// Not Found Reason only makes sense once at least one item is actually marked not found -
+// mirrors returnParcelTypeRule()'s conditional-requirement pattern above.
+function returnNotFoundRule(){
+ const show=Number(($('itemsNotFoundCount')&&$('itemsNotFoundCount').value)||0)>0;
+ if($('notFoundReasonWrap'))$('notFoundReasonWrap').classList.toggle('hidden',!show);
+ if(!show && $('notFoundReason'))$('notFoundReason').value='';
 }
 function restoreReturn(){
  let raw=localStorage.getItem(RETURN_KEY);if(!raw){if(!currentReturnId)currentReturnId=genReturnId();return}
@@ -2808,6 +2819,7 @@ function openReturnRecord(id,fieldId){
  localStorage.setItem(RETURN_KEY,JSON.stringify(r));
  if(typeof returnPktRule==='function')returnPktRule();
  if(typeof returnParcelTypeRule==='function')returnParcelTypeRule();
+ if(typeof returnNotFoundRule==='function')returnNotFoundRule();
  if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+slipLabel(r);
  showReturnFormView();
  applyReturnSequenceAndLocks();
@@ -2854,7 +2866,7 @@ function populateReturnUsers2(){
 }
 function returnPktRule(){let yes=$('returnPktRequired').value==='YES';$('returnPktByWrap').classList.toggle('hidden',!yes);$('returnPktTimeWrap').classList.toggle('hidden',!yes);if(!yes){$('returnPktBy').value='';$('returnPktTime').value=''}}
 
-document.addEventListener('DOMContentLoaded',()=>{populateReturnUsers2();returnPktRule();returnParcelTypeRule();renderReturnHistory();let rd=$('returnDate');if(rd&&!rd.value)rd.value=new Date().toISOString().slice(0,10);pdStartReturnsSync();});
+document.addEventListener('DOMContentLoaded',()=>{populateReturnUsers2();returnPktRule();returnParcelTypeRule();returnNotFoundRule();renderReturnHistory();let rd=$('returnDate');if(rd&&!rd.value)rd.value=new Date().toISOString().slice(0,10);pdStartReturnsSync();});
 function saveSelfRemarkPrivacy(){
  selfRemarkPrivacy.allowedUsers=[...document.querySelectorAll('.privacyUser:checked')].map(x=>x.value).slice(0,4);
  localStorage.setItem('pd_selfremark_privacy_v1',JSON.stringify(selfRemarkPrivacy));
