@@ -2489,8 +2489,12 @@ function refreshReturnFieldStates(){
   renderReturnWorkflowStatus();
 }
 function applyReturnSequenceAndLocks(){
-  const fv=$('returnFormView');
-  if(fv&&fv.classList.contains('hidden'))return;
+  // Same guard as Dispatch's applySequenceAndLocks(): #returnModule (the parent) also gets
+  // hidden independently of #returnFormView when switchModule() switches to Dispatch, so it
+  // needs its own check too - otherwise a stray event while it's hidden would misread every
+  // field as "filled" and wrongly auto-lock a stage with blank required fields.
+  const fv=$('returnFormView'),rm=$('returnModule');
+  if((fv&&fv.classList.contains('hidden'))||(rm&&rm.classList.contains('hidden')))return;
   refreshReturnFieldStates();
   autoLockCompletedReturnStage();
 }
@@ -2796,7 +2800,7 @@ function openReturnRecord(id,fieldId){
  // Same safety net as editRecord() for Dispatch - re-populate shortly after opening in case
  // the Doer/Party lists were still loading at this exact instant, guarded so it no-ops if
  // the person has since moved to a different record.
- [900,2500].forEach(ms=>setTimeout(()=>{if(currentReturnId===id){if(typeof populateReturnUsers2==='function')populateReturnUsers2();returnControls().forEach((e,i)=>{const k=e.dataset.rkey||('r_'+i);if(e.classList.contains('returnPerson')&&!e.value&&r[k])e.value=r[k];});if(!document.getElementById('returnFrom').value&&r.returnFrom)document.getElementById('returnFrom').value=r.returnFrom;}},ms));
+ [900,2500].forEach(ms=>setTimeout(()=>{if(currentReturnId===id){if(typeof populateReturnUsers2==='function')populateReturnUsers2();returnControls().forEach((e,i)=>{const k=e.dataset.rkey||('r_'+i);if(e.classList.contains('returnPerson')&&!e.value&&r[k])e.value=r[k];});if(!document.getElementById('returnFrom').value&&r.returnFrom)document.getElementById('returnFrom').value=r.returnFrom;if(typeof makeReturnFromCombo==='function')makeReturnFromCombo();}},ms));
 }
 
 function populateReturnUsers2(){
@@ -2810,6 +2814,12 @@ function populateReturnUsers2(){
   document.querySelectorAll('#returnModule .returnPerson').forEach(s=>{let old=(editRec&&editRec[s.id]!==undefined)?editRec[s.id]:s.value;s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});
   let rf=$('returnFrom');
   if(rf){let old=(editRec&&editRec.returnFrom!==undefined)?editRec.returnFrom:rf.value;rf.innerHTML=options(shipTo);if(shipTo.includes(old))rf.value=old}
+  // Return From is shadowed by a comboBox text input (makeReturnFromCombo()) that only
+  // mirrors the real <select>'s value at the moment the combo is built - fixing rf.value
+  // above (e.g. once the party master finishes syncing on this device) never touched that
+  // visible text, so the party looked permanently blank here even though it was saved
+  // correctly and showed fine on the device that picked it. Re-sync the visible combo too.
+  if(typeof makeReturnFromCombo==='function')makeReturnFromCombo();
 }
 function returnPktRule(){let yes=$('returnPktRequired').value==='YES';$('returnPktByWrap').classList.toggle('hidden',!yes);$('returnPktTimeWrap').classList.toggle('hidden',!yes);if(!yes){$('returnPktBy').value='';$('returnPktTime').value=''}}
 
@@ -3326,9 +3336,12 @@ function applySequenceAndLocks(){
   // isFieldFilled() treats any field under a .hidden ancestor as "filled" (a pre-existing
   // escape hatch for conditionally-hidden fields like priceWrap). While #dispatchFormView
   // itself is navigationally hidden, every field would misread as filled and wrongly
-  // auto-lock stages — so skip entirely until the form is actually visible.
-  const fv=$('dispatchFormView');
-  if(fv&&fv.classList.contains('hidden'))return;
+  // auto-lock stages — so skip entirely until the form is actually visible. #dispatchModule
+  // (its parent) also gets hidden independently - e.g. showDashboardView() hides it directly
+  // without first hiding #dispatchFormView - and a stray change/blur event reaching here
+  // while it's hidden hit the exact same false-complete bug, so it needs the same guard.
+  const fv=$('dispatchFormView'),dm=$('dispatchModule');
+  if((fv&&fv.classList.contains('hidden'))||(dm&&dm.classList.contains('hidden')))return;
   refreshFieldStates();
   autoLockCompletedStage();
 }
