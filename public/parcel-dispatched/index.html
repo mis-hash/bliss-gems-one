@@ -2813,7 +2813,21 @@ function populateReturnUsers2(){
   let au=users.filter(u=>u.active!==false);
   document.querySelectorAll('#returnModule .returnPerson').forEach(s=>{let old=(editRec&&editRec[s.id]!==undefined)?editRec[s.id]:s.value;s.innerHTML=options(au,u=>u.id,u=>u.name);if(au.some(u=>u.id===old))s.value=old});
   let rf=$('returnFrom');
-  if(rf){let old=(editRec&&editRec.returnFrom!==undefined)?editRec.returnFrom:rf.value;rf.innerHTML=options(shipTo);if(shipTo.includes(old))rf.value=old}
+  if(rf){
+    let old=(editRec&&editRec.returnFrom!==undefined)?editRec.returnFrom:rf.value;
+    rf.innerHTML=options(shipTo);
+    if(old){
+      // The record's own saved party might not be in the shared Client Master list at
+      // all - typed fresh before it synced, or a party nobody has added to the master
+      // yet. Either way this record DOES have it saved, so always keep it selectable
+      // instead of only restoring it when shipTo happens to already contain it.
+      if(![...rf.options].some(o=>o.value===old)){
+        const opt=document.createElement('option');opt.value=old;opt.textContent=old;
+        rf.appendChild(opt);
+      }
+      rf.value=old;
+    }
+  }
   // Return From is shadowed by a comboBox text input (makeReturnFromCombo()) that only
   // mirrors the real <select>'s value at the moment the combo is built - fixing rf.value
   // above (e.g. once the party master finishes syncing on this device) never touched that
@@ -3010,7 +3024,26 @@ function makeReturnFromCombo(){
   inp.onfocus=()=>{inp.select();draw(true)};
   inp.oninput=()=>draw(false);
   menu.onmousedown=e=>{let o=e.target.closest('[data-v]');if(!o)return;s.value=o.dataset.v;inp.value=o.dataset.v;menu.classList.remove('show');s.dispatchEvent(new Event('change',{bubbles:true}))};
-  inp.onblur=()=>setTimeout(()=>menu.classList.remove('show'),120);
+  inp.onblur=()=>{
+    setTimeout(()=>menu.classList.remove('show'),120);
+    // Confirmed real bug: a party typed here but never clicked from the dropdown (e.g. a
+    // brand-new party not yet in the shared Client Master list) looked saved - the visible
+    // text stayed - but <select>.value silently ignores a value with no matching <option>,
+    // so the real field stayed blank. requiredReturnOk() validates the select, not this
+    // cosmetic text, so the slip passed validation and saved with returnFrom empty - only
+    // the Doer's own still-open tab showed the party name, everyone else correctly saw
+    // blank. Commit whatever was typed as the real value, adding a matching option first
+    // if needed, so a freshly-typed party is never silently lost.
+    const typed=inp.value.trim();
+    if(s.value!==typed){
+      if(typed && ![...s.options].some(o=>o.value===typed)){
+        const opt=document.createElement('option');opt.value=typed;opt.textContent=typed;
+        s.appendChild(opt);
+      }
+      s.value=typed;
+      s.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+  };
 }
 
 function forceVisibleComboMenu(inp,menu){
