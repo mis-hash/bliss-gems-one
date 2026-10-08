@@ -2497,11 +2497,12 @@ function renderReturnWorkflowStatus(){
     let st=locked?'🔒 LOCKED':(done?'✅ COMPLETE':(prev?'🟡 IN PROGRESS':'⛔ WAITING'));
     return `<span style="display:inline-block;margin:4px 10px 4px 0"><b>${esc(s.name)}</b>: ${st}</span>`;
   }).join('');
-  // Tint as soon as a section is fully filled, not only once it's actually locked - same
-  // reasoning as Dispatch's renderWorkflowStatus().
+  // Tint ONLY once a section is actually locked - same reasoning as Dispatch's
+  // renderWorkflowStatus(): a green/checkmarked section that isn't actually locked is
+  // misleading, since the real gate for the next section is the lock, not field-fill state.
   RETURN_STAGE_SEQUENCE.forEach(s=>{
     const sec=$('returnSec'+s.id.replace('rstage',''));
-    if(sec)sec.classList.toggle('stageLocked',!!locks[s.id]||returnStageComplete(s));
+    if(sec)sec.classList.toggle('stageLocked',!!locks[s.id]);
   });
 }
 function refreshReturnFieldStates(){
@@ -3471,12 +3472,17 @@ function renderWorkflowStatus(){
     let st=locked?'🔒 LOCKED':(done?'✅ COMPLETE':(prev?'🟡 IN PROGRESS':'⛔ WAITING'));
     return `<span style="display:inline-block;margin:4px 10px 4px 0"><b>${esc(s.name)}</b>: ${st}</span>`;
   }).join('');
-  // Tint as soon as a section is fully filled, not only once it's actually locked - auto-lock
-  // only advances one stage per edit, so several already-complete sections can otherwise sit
-  // unlocked (and so untinted/looking unfinished) until something else triggers the next tick.
+  // Tint ONLY once a section is actually locked, never just because its fields happen to be
+  // filled - stageComplete(s) alone used to also tint it green, but completion and locking
+  // can genuinely disagree (e.g. data synced in from another device before this one's
+  // auto-lock evaluated it, or the stage's own lock simply hasn't caught up to this exact
+  // tick yet). A green/checkmarked section that isn't actually locked is worse than a one-
+  // tick cosmetic lag: it tells the Doer a section is done when the real gate - the next
+  // section's canEditField()/previousStagesLocked() check - still treats it as incomplete,
+  // producing a confusing "Kindly complete N first" alert on an apparently-finished section.
   STAGE_SEQUENCE.forEach(s=>{
     const sec=$('dispatchSec'+s.id.replace('stage',''));
-    if(sec)sec.classList.toggle('stageLocked',!!locks[s.id]||stageComplete(s));
+    if(sec)sec.classList.toggle('stageLocked',!!locks[s.id]);
   });
   refreshDlcTint();
 }
