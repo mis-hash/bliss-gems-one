@@ -85,6 +85,9 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 .comboOption:hover{background:var(--mint)}
 .comboAddNew{font-weight:700;color:var(--p);border-bottom:1px solid var(--b)}
 .comboAddNew:hover{background:var(--mint)}
+.comboAddForm{display:flex;gap:6px;padding:9px 11px}
+.comboAddForm input{flex:1;padding:7px 8px;border:1px solid var(--b);border-radius:6px;font-size:inherit}
+.comboAddForm button{padding:7px 14px;background:var(--p);color:#fff;border:0;border-radius:6px;cursor:pointer;font-weight:700}
 </style>
 <style id="dropdown-visibility-fix">
 .card,.body,.grid,.field,.comboBox{overflow:visible!important}
@@ -3056,6 +3059,24 @@ function makeReturnFromCombo(){
   }
   let inp=wrap.querySelector('input'),menu=wrap.querySelector('.comboMenu');
   if(document.activeElement!==inp)inp.value=s.value||'';
+
+  // Confirmed real bug: a party typed here but never clicked from the dropdown (e.g. a
+  // brand-new party not yet in the shared Client Master list) looked saved - the visible
+  // text stayed - but <select>.value silently ignores a value with no matching <option>,
+  // so the real field stayed blank. requiredReturnOk() validates the select, not this
+  // cosmetic text, so the slip passed validation and saved with returnFrom empty - only
+  // the Doer's own still-open tab showed the party name, everyone else correctly saw
+  // blank. Commit whatever was typed as the real value, adding a matching option first
+  // if needed, so a freshly-typed party is never silently lost.
+  function commitTyped(typed){
+    if(!typed)return;
+    if(![...s.options].some(o=>o.value===typed)){
+      const opt=document.createElement('option');opt.value=typed;opt.textContent=typed;
+      s.appendChild(opt);
+    }
+    s.value=typed;inp.value=typed;
+    s.dispatchEvent(new Event('change',{bubbles:true}));
+  }
   function draw(showAll){
     let q=showAll?'':inp.value.trim().toLowerCase();
     let list=shipTo.filter(p=>!q||p.toLowerCase().includes(q));
@@ -3064,42 +3085,42 @@ function makeReturnFromCombo(){
     forceVisibleComboMenu(inp,menu);
     menu.classList.add('show');
   }
+  // A native prompt() here looked right in testing but silently did nothing when this app
+  // is opened inline inside the Bliss One hub's iframe (a sandboxed iframe without the
+  // allow-modals flag makes window.prompt()/alert()/confirm() a silent no-op in Chrome -
+  // no dialog, no error, prompt() just returns immediately) - exactly "typed but nothing
+  // got added", confirmed live. An inline text box inside the dropdown itself has no such
+  // dependency on browser modals, so it works the same whether embedded or standalone.
+  function showAddForm(){
+    menu.innerHTML='<div class="comboAddForm"><input type="text" class="comboAddInput" placeholder="Naye party ka naam likhein"><button type="button" class="comboAddBtn">Add</button></div>';
+    forceVisibleComboMenu(inp,menu);
+    menu.classList.add('show');
+    const addInput=menu.querySelector('.comboAddInput'),addBtn=menu.querySelector('.comboAddBtn');
+    addInput.focus();
+    function confirmAdd(){
+      const typed=addInput.value.trim();
+      menu.classList.remove('show');
+      commitTyped(typed);
+    }
+    addBtn.onmousedown=e=>{e.preventDefault();confirmAdd();};
+    addInput.onkeydown=e=>{
+      if(e.key==='Enter'){e.preventDefault();confirmAdd();}
+      else if(e.key==='Escape'){menu.classList.remove('show');draw(true);}
+    };
+    addInput.onblur=()=>{setTimeout(()=>{if(!wrap.contains(document.activeElement))menu.classList.remove('show');},120)};
+  }
   inp.onfocus=()=>{inp.select();draw(true)};
   inp.oninput=()=>draw(false);
   menu.onmousedown=e=>{
-    if(e.target.closest('[data-add]')){
-      e.preventDefault();
-      const typed=(prompt('Naye party ka naam likhein:')||'').trim();
-      menu.classList.remove('show');
-      if(!typed)return;
-      if(![...s.options].some(o=>o.value===typed)){
-        const opt=document.createElement('option');opt.value=typed;opt.textContent=typed;
-        s.appendChild(opt);
-      }
-      s.value=typed;inp.value=typed;
-      s.dispatchEvent(new Event('change',{bubbles:true}));
-      return;
-    }
+    if(e.target.closest('[data-add]')){e.preventDefault();showAddForm();return}
     let o=e.target.closest('[data-v]');if(!o)return;s.value=o.dataset.v;inp.value=o.dataset.v;menu.classList.remove('show');s.dispatchEvent(new Event('change',{bubbles:true}))};
-  inp.onblur=()=>{
+  inp.onblur=e=>{
+    // Focus moving to the inline "Add New Party" box above is still inside this same
+    // widget, not the user leaving it - don't treat the search text as a final commit.
+    if(e&&e.relatedTarget&&wrap.contains(e.relatedTarget))return;
     setTimeout(()=>menu.classList.remove('show'),120);
-    // Confirmed real bug: a party typed here but never clicked from the dropdown (e.g. a
-    // brand-new party not yet in the shared Client Master list) looked saved - the visible
-    // text stayed - but <select>.value silently ignores a value with no matching <option>,
-    // so the real field stayed blank. requiredReturnOk() validates the select, not this
-    // cosmetic text, so the slip passed validation and saved with returnFrom empty - only
-    // the Doer's own still-open tab showed the party name, everyone else correctly saw
-    // blank. Commit whatever was typed as the real value, adding a matching option first
-    // if needed, so a freshly-typed party is never silently lost.
     const typed=inp.value.trim();
-    if(s.value!==typed){
-      if(typed && ![...s.options].some(o=>o.value===typed)){
-        const opt=document.createElement('option');opt.value=typed;opt.textContent=typed;
-        s.appendChild(opt);
-      }
-      s.value=typed;
-      s.dispatchEvent(new Event('change',{bubbles:true}));
-    }
+    if(s.value!==typed)commitTyped(typed);
   };
 }
 
