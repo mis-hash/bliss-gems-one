@@ -83,6 +83,8 @@ header{background:#fff;color:var(--t);padding:12px 15px;position:sticky;top:0;z-
 .comboMenu.show{display:block}
 .comboOption{padding:9px 11px;cursor:pointer}
 .comboOption:hover{background:var(--mint)}
+.comboAddNew{font-weight:700;color:var(--p);border-bottom:1px solid var(--b)}
+.comboAddNew:hover{background:var(--mint)}
 </style>
 <style id="dropdown-visibility-fix">
 .card,.body,.grid,.field,.comboBox{overflow:visible!important}
@@ -3057,13 +3059,28 @@ function makeReturnFromCombo(){
   function draw(showAll){
     let q=showAll?'':inp.value.trim().toLowerCase();
     let list=shipTo.filter(p=>!q||p.toLowerCase().includes(q));
-    menu.innerHTML=list.length?list.map(p=>`<div class="comboOption" data-v="${esc(p)}"><b>${esc(p)}</b></div>`).join(''):'<div class="comboOption">No match</div>';
+    const addNewHtml='<div class="comboOption comboAddNew" data-add="1">➕ Naya Party Add Karo</div>';
+    menu.innerHTML=addNewHtml+(list.length?list.map(p=>`<div class="comboOption" data-v="${esc(p)}"><b>${esc(p)}</b></div>`).join(''):'<div class="comboOption">No match</div>');
     forceVisibleComboMenu(inp,menu);
     menu.classList.add('show');
   }
   inp.onfocus=()=>{inp.select();draw(true)};
   inp.oninput=()=>draw(false);
-  menu.onmousedown=e=>{let o=e.target.closest('[data-v]');if(!o)return;s.value=o.dataset.v;inp.value=o.dataset.v;menu.classList.remove('show');s.dispatchEvent(new Event('change',{bubbles:true}))};
+  menu.onmousedown=e=>{
+    if(e.target.closest('[data-add]')){
+      e.preventDefault();
+      const typed=(prompt('Naye party ka naam likhein:')||'').trim();
+      menu.classList.remove('show');
+      if(!typed)return;
+      if(![...s.options].some(o=>o.value===typed)){
+        const opt=document.createElement('option');opt.value=typed;opt.textContent=typed;
+        s.appendChild(opt);
+      }
+      s.value=typed;inp.value=typed;
+      s.dispatchEvent(new Event('change',{bubbles:true}));
+      return;
+    }
+    let o=e.target.closest('[data-v]');if(!o)return;s.value=o.dataset.v;inp.value=o.dataset.v;menu.classList.remove('show');s.dispatchEvent(new Event('change',{bubbles:true}))};
   inp.onblur=()=>{
     setTimeout(()=>menu.classList.remove('show'),120);
     // Confirmed real bug: a party typed here but never clicked from the dropdown (e.g. a
