@@ -3100,6 +3100,15 @@ function makeReturnFromCombo(){
     function confirmAdd(){
       const typed=addInput.value.trim();
       menu.classList.remove('show');
+      if(!typed)return;
+      // Unlike the type-then-blur safety net below (which only keeps THIS record from
+      // losing an un-mastered name), "+ Naya Party Add Karo" is an explicit add action -
+      // it must land in the shared Client Master so the party shows up in everyone's
+      // dropdown from now on, not just fill this one field locally.
+      if(typeof clientMaster!=='undefined' && !clientMaster.some(x=>String(x.party||'').trim().toLowerCase()===typed.toLowerCase())){
+        clientMaster.push({party:typed,partyCode:'',saleName:'',broker:'',brokerCode:'',address:''});
+        if(typeof saveClientMaster==='function')saveClientMaster();
+      }
       commitTyped(typed);
     }
     addBtn.onmousedown=e=>{e.preventDefault();confirmAdd();};
