@@ -3119,7 +3119,12 @@ function makeSingleSearchCombos(){
    let inp=wrap.querySelector('input'),menu=wrap.querySelector('.comboMenu');
    let old=s.value;
    let actor=loggedUser();
-   let allowedUsers=isSelfOnlyField(s) ? (actor?[actor]:[]) : users.slice();
+   // Self-only normally restricts the dropdown to just the logged-in Doer's own name (actual
+   // work can't be credited to someone else) - but that also stops an Admin/Super Admin from
+   // ever correcting a wrongly-self-filled field (e.g. a Doer picked themselves by mistake
+   // instead of the person a stage was actually handed to). Admin/Super Admin always see the
+   // full list so they can fix it; regular Doers keep the original restriction.
+   let allowedUsers=(superAdminUnlocked||isAdminUser())?users.slice():(isSelfOnlyField(s) ? (actor?[actor]:[]) : users.slice());
    // Preserve historical value so an existing verified name can still display.
    if(old && !allowedUsers.some(u=>u.id===old)){
      const historical=users.find(u=>u.id===old);
@@ -4037,6 +4042,10 @@ function applyWorkerPermissions(){
 }
 function canSelectWorker(select,selectedId){
   if(window.__transferInProgress)return true;
+  // Mirrors the same Admin/Super Admin override in makeSingleSearchCombos()'s dropdown list -
+  // otherwise an Admin could see another Doer's name in the list (once shown it) but still
+  // get rejected and reverted when actually picking it.
+  if(superAdminUnlocked||isAdminUser())return true;
   if(!isSelfOnlyField(select))return true;
   const actor=loggedUser();
   if(!actor){
