@@ -429,6 +429,7 @@ if(window.self!==window.top){
 </div></div></section>
 
 <section class="card" id="returnSec2"><h3>2. Checking & Return Entry Handover</h3><div class="body"><div class="grid">
+<div class="field full"><label>Handed Over By (Section 1)</label><input id="returnHandoverCheckingRef" readonly></div>
 <div class="field"><label>Handover to Weight Check &amp; Lines Tag <span class="req">*</span></label><select class="returnPerson" id="handoverToWeightCheck" data-time="handoverToWeightCheckTime"></select><button type="button" class="btn secondary small no-print" style="margin-top:6px" onclick="openReturnTransferTask('handoverToWeightCheck')">🔄 Transfer</button></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="handoverToWeightCheckTime" readonly></div>
 <div class="field"><label>Weight Check Done By <span class="req">*</span></label><select class="returnPerson" id="returnWeightBy" data-time="returnWeightTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnWeightTime" readonly></div>
 <div class="field"><label>Lines & Tags Checked By <span class="req">*</span></label><select class="returnPerson" id="returnLinesBy" data-time="returnLinesTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnLinesTime" readonly></div>
@@ -436,6 +437,7 @@ if(window.self!==window.top){
 </div></div></section>
 
 <section class="card" id="returnSec3"><h3>3. Return Entry</h3><div class="body"><div class="grid">
+<div class="field full"><label>Handed Over By (Section 2)</label><input id="returnEntryByRef" readonly></div>
 <div class="field"><label>Item Return in Approval By <span class="req">*</span></label><select class="returnPerson" id="approvalReturnBy" data-time="approvalReturnTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="approvalReturnTime" readonly></div>
 <div class="field"><label>No. of Items Return <span class="req">*</span></label><input type="number" id="returnItemCount"></div>
 <div class="field"><label>No. of Items Not Found</label><input type="number" id="itemsNotFoundCount" oninput="returnNotFoundRule()"></div>
@@ -446,6 +448,7 @@ if(window.self!==window.top){
 </div></div></section>
 
 <section class="card" id="returnSec4"><h3>4. PKT / Tag Change & Stock Closing</h3><div class="body"><div class="grid">
+<div class="field full"><label>Handed Over By (Section 3)</label><input id="handover506ByRef" readonly></div>
 <div class="field"><label>PKT Change Required <span class="req">*</span></label><select id="returnPktRequired" onchange="returnPktRule()"><option value="">Select</option><option>YES</option><option>NO</option></select></div>
 <div class="field hidden" id="returnPktByWrap"><label>PKT/Tag Change By <span class="req">*</span></label><select class="returnPerson" id="returnPktBy" data-time="returnPktTime"></select></div>
 <div class="field hidden" id="returnPktTimeWrap"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnPktTime" readonly></div>
@@ -2615,6 +2618,24 @@ function refreshReturnFieldStates(){
     }
   });
   renderReturnWorkflowStatus();
+  if($('returnHandoverCheckingRef'))$('returnHandoverCheckingRef').value=transferChainLabelReturn('returnHandoverChecking');
+  if($('returnEntryByRef'))$('returnEntryByRef').value=transferChainLabelReturn('returnEntryBy');
+  if($('handover506ByRef'))$('handover506ByRef').value=transferChainLabelReturn('handover506By');
+}
+// Same pattern as Dispatch's transferChainLabel(), but keyed by currentReturnId - shows
+// "A → B" when a handover field has been transferred, instead of just the current name, so
+// the next section's readonly mirror of the previous section's handover is informative at a
+// glance (matches Dispatch's "Handed Over By (Section N)" fields, added here on request).
+function transferChainLabelReturn(fieldId){
+  const el=$(fieldId);
+  const current=el?nameOfUserId(el.value):'';
+  const a=JSON.parse(localStorage.getItem(FIELD_AUDIT_KEY)||'[]')
+    .filter(x=>x.action==='TRANSFER'&&x.parcelId===(currentReturnId||'NEW')&&x.fieldId===fieldId)
+    .slice().reverse();
+  if(!a.length)return current||'-';
+  const chain=[nameOfUserId(a[0].oldValue)||a[0].oldValue];
+  a.forEach(x=>chain.push(nameOfUserId(x.newValue)||x.newValue));
+  return chain.filter(Boolean).join(' → ')||'-';
 }
 function applyReturnSequenceAndLocks(){
   // Same guard as Dispatch's applySequenceAndLocks(): #returnModule (the parent) also gets
