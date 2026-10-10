@@ -3521,13 +3521,18 @@ const SELF_ONLY_WORK_FIELDS=new Set([
 function isSelfOnlyField(el){
   return !!(el && SELF_ONLY_WORK_FIELDS.has(el.id));
 }
-// True when `el` is a handover-type person field (not the Doer's own self-only work field,
-// not Parcel Given By which is the initiator) AND some OTHER required field in that same
-// stage is still blank. Selecting a handover name while this is true means the section
-// isn't actually done - the next Doer would get told a section is ready when it isn't.
-// Shared by both modules (STAGE_SEQUENCE / RETURN_STAGE_SEQUENCE), checked at the actual
-// point of selection (personChanged / returnPersonSelected) so an incomplete handover is
-// rejected before anything gets saved or notified, not just reverted after the fact.
+// True when `el` is the stage-COMPLETING handover field (the one that hands the finished
+// section to the next one - always the last person field in that stage's fields list, e.g.
+// handoverToPrepare, returnEntryBy, handover506By) AND some OTHER required field in that same
+// stage is still blank. Selecting it while this is true means the section isn't actually
+// done - the next Doer would get told a section is ready when it isn't. Does NOT apply to a
+// stage's FIRST field even when it's also a non-self-only person field (e.g. Return's
+// "Handover to Weight Check & Lines Tag", the opening assignment field of stage 2) - that's
+// just who's been assigned the work, not a claim the section is finished, so it fills freely
+// like any other field. Shared by both modules (STAGE_SEQUENCE / RETURN_STAGE_SEQUENCE),
+// checked at the actual point of selection (personChanged / returnPersonSelected) so an
+// incomplete handover is rejected before anything gets saved or notified, not just reverted
+// after the fact.
 function handoverStageIncomplete(el){
   // Admin/Super Admin can always correct a handover field, including on old slips that were
   // already left in an inconsistent state (e.g. a handover name picked before this check
@@ -3537,6 +3542,11 @@ function handoverStageIncomplete(el){
   if(!el||!el.id||el.id==='parcelGivenBy'||isSelfOnlyField(el))return false;
   const stage=stageForElement(el)||returnStageForElement(el);
   if(!stage)return false;
+  // The handover field is always paired with its own time field right after it in the
+  // fields array (e.g. [...,'handover506By','handover506Time']), so the second-to-last
+  // entry is the actual person field to gate - everything earlier in the stage (including
+  // the stage's own first field) fills freely.
+  if(el.id!==stage.fields[stage.fields.length-2])return false;
   const checkFilled=STAGE_SEQUENCE.includes(stage)?isFieldFilled:isReturnFieldFilled;
   const skip=new Set([el.id,el.dataset.time].filter(Boolean));
   return stage.fields.some(fid=>!skip.has(fid)&&!checkFilled(fid));
@@ -4118,18 +4128,12 @@ function logWorkerSelection(field,selectedId,el){
  let a=JSON.parse(localStorage.getItem(WORK_AUDIT_KEY)||'[]');a.unshift(row);localStorage.setItem(WORK_AUDIT_KEY,JSON.stringify(a));
  // Parcel Given By is the initiator, not someone a task is being handed to - no notification.
  if(fieldId==='parcelGivenBy')return;
- // Only notify once the REST of this stage's fields are genuinely filled - sending the
- // "new task for you" ping off a handover name picked before the surrounding work is done
- // wrongly tells the next Doer the section is ready when it isn't (the exact complaint: a
- // premature notification from a section that wasn't actually complete yet).
- if(el){
-   const stage=stageForElement(el)||returnStageForElement(el);
-   if(stage){
-     const checkFilled=STAGE_SEQUENCE.includes(stage)?isFieldFilled:isReturnFieldFilled;
-     const skip=new Set([fieldId,el.dataset.time].filter(Boolean));
-     if(stage.fields.some(fid=>!skip.has(fid)&&!checkFilled(fid)))return;
-   }
- }
+ // Backstop for the same check already enforced before this ever gets called (personChanged/
+ // returnPersonSelected reject an incomplete stage-completing handover before saving) - only
+ // suppresses the notification for THAT specific field, never for a stage's own opening
+ // assignment field (e.g. Return's "Handover to Weight Check & Lines Tag"), which should
+ // always notify immediately like any other assignment. See handoverStageIncomplete().
+ if(handoverStageIncomplete(el))return;
  // Respect the same Notification Control toggle personChanged() used to check before its
  // own send was removed (see comment above) - this is now the only place that sends the
  // per-field assignment message, so it must honor the same on/off setting.
