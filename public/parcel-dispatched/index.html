@@ -1037,6 +1037,13 @@ function personChanged(s){
     }
     return;
   }
+  if(handoverStageIncomplete(s)){
+    s.value='';
+    const inp=getComboInput(s);if(inp)inp.value='';
+    if(t)t.value='';
+    alert('Kindly fill all detail fields first.');
+    return;
+  }
   if(t)t.value=now();
   let u=users.find(x=>x.id===s.value);
   if(!u||!u.phone){console.warn('Selected user mobile number not saved.');return}
@@ -1890,7 +1897,19 @@ function editRecord(id,silent){let a=JSON.parse(localStorage.getItem(K.records)|
   // that async Firestore listener timing, force a couple of cheap, harmless re-populates
   // shortly after opening, guarded so they no-op if the person has since moved to a
   // different record.
-  [900,2500].forEach(ms=>setTimeout(()=>{if(editing===id){populate();Object.keys(r).forEach(k=>{const e=$(k);if(e&&e.classList.contains('person')&&(!e.value)&&r[k])e.value=r[k];});}},ms));
+  [900,2500].forEach(ms=>setTimeout(()=>{if(editing===id){populate();Object.keys(r).forEach(k=>{const e=$(k);if(e&&e.classList.contains('person')&&(!e.value)&&r[k])e.value=r[k];});
+    // The fields above may have just been filled in for the first time (the race this
+    // safety net exists for) — the visible searchable combo text box only mirrors the real
+    // <select> at the moment it changes via a user action, so a value restored here
+    // programmatically leaves the combo box LOOKING blank even though the real select (and
+    // therefore stage-completeness) is correct - re-sync it so the Doer doesn't see an empty
+    // "Weight Checked By" etc. on a field that's actually filled.
+    if(typeof syncAllComboInputs==='function')syncAllComboInputs();
+    // Re-run the stage-complete/auto-lock check, otherwise a stage that's now genuinely
+    // complete stays silently unlocked forever, and the next section keeps refusing with
+    // "Kindly complete N first" even though N looks done.
+    applySequenceAndLocks();
+  }},ms));
   if(!silent){showDispatchFormView();const _fid=window._pendingOpenFieldId;window._pendingOpenFieldId=null;const _target=_fid?$(_fid):null;if(_target)_target.scrollIntoView({behavior:'smooth',block:'center'});else scrollTo({top:0,behavior:'smooth'});toast('Editing '+id)}}
 function openManage(){currentTab='users';$('manageModal').classList.remove('hidden');renderManage()}function closeManage(){$('manageModal').classList.add('hidden');populate();shipChanged()}function tab(b,t){currentTab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));renderManage()}
 function renderManage(){let c=$('manageContent');if(currentTab==='users'){c.innerHTML=`<div class="grid"><div class="field"><label>User Name <span class="req">*</span></label><input id="mUserName"></div><div class="field"><label>Username <span class="req">*</span></label><input id="mUsername"></div><div class="field"><label>Mobile Number <span class="req">*</span></label><input id="mUserPhone" placeholder="10 digit or 91..."></div><div class="field"><label>Department <span class="req">*</span></label><input id="mDepartment"></div><div class="field"><label>&nbsp; <span class="req">*</span></label><button class="btn primary" onclick="addUser()">Add Universal User</button></div></div><div class="note">Handover dropdowns me sabhi active Doers dikhenge. Actual-work fields (Slip Fill, Weight Check, Lines & Tags, Noted By, Item Packed etc.) me logged-in user sirf apna naam fill kar sakta hai. Dusre Doer ka actual-work naam us Doer ki login ID se hi fill hoga. New user ka default password 1234 hai.</div><div style="margin:8px 0"><button class="btn secondary small" onclick="resetDefaultUsers()">↻ Reset Default Doers</button></div><div>${users.map((u,i)=>`<div class="item"><span><b>${esc(u.name)}</b> <small>(${esc(u.username||u.id)})</small><br><small>${esc(u.phone)} • ${esc(u.department||'No Department')} • ${u.active===false?'INACTIVE':'ACTIVE'}</small><br><small>Analytics Dashboard: <select onchange="setParcelDashboardRole(${i},this.value)" style="font-size:11px;padding:2px 4px"><option value=""${!(u.appRoles&&u.appRoles['parcel-dispatched'])?' selected':''}>No Access</option><option value="admin"${u.appRoles&&u.appRoles['parcel-dispatched']==='admin'?' selected':''}>Admin</option><option value="director"${u.appRoles&&u.appRoles['parcel-dispatched']==='director'?' selected':''}>Director</option></select></small></span><span><button class="btn small secondary" onclick="toggleUser(${i})">${u.active===false?'Activate':'Deactivate'}</button> <button class="btn small secondary" onclick="editUser(${i})">Edit</button> <button class="btn small secondary" onclick="resetUserPassword(${i})">Reset Password</button> <button class="btn small danger" onclick="delUser(${i})">Delete</button></span></div>`).join('')}</div>`}
@@ -2427,6 +2446,9 @@ function isReturnFieldFilled(id){
   if(!e)return true;
   if(e.classList.contains('hidden')||e.closest('.hidden'))return true;
   if(!returnFieldRequired(id))return true;
+  // "0" is a non-empty string and would otherwise count as filled — but 0 items returned
+  // is not a completed count, it's a blank field someone didn't actually fill in.
+  if(id==='returnItemCount')return Number(e.value)>0;
   return String(e.value||'').trim()!=='';
 }
 function returnStageComplete(stage){
@@ -2499,7 +2521,10 @@ function renderReturnWorkflowStatus(){
   const locks=getReturnStageLocks();
   box.innerHTML=RETURN_STAGE_SEQUENCE.map(s=>{
     const done=returnStageComplete(s),locked=!!locks[s.id],prev=previousReturnStagesLocked(s);
-    let st=locked?'🔒 LOCKED':(done?'✅ COMPLETE':(prev?'🟡 IN PROGRESS':'⛔ WAITING'));
+    // Check prev BEFORE done: a stage isn't really "complete" if it isn't even reachable yet
+    // (previous stage not locked) - showing green here while an earlier section still blocks
+    // everything is exactly what made section 1 look stuck while section 2 showed COMPLETE.
+    let st=locked?'🔒 LOCKED':(!prev?'⛔ WAITING':(done?'✅ COMPLETE':'🟡 IN PROGRESS'));
     return `<span style="display:inline-block;margin:4px 10px 4px 0"><b>${esc(s.name)}</b>: ${st}</span>`;
   }).join('');
   // Tint ONLY once a section is actually locked - same reasoning as Dispatch's
@@ -2559,6 +2584,14 @@ function returnPersonSelected(s){
     saveReturn(true);
     return;
   }
+  if(handoverStageIncomplete(s)){
+    const inp=getComboInput(s);if(inp)inp.value='';
+    s.value='';
+    if(t)t.value='';
+    saveReturn(true);
+    alert('Kindly fill all detail fields first.');
+    return;
+  }
   if(t)t.value=returnNow();
   saveReturn(true);
   // The "you've been assigned this task" WhatsApp message is sent by logWorkerSelection()
@@ -2586,6 +2619,17 @@ function openReturnTransferTask(fieldId){
   if(stage && !locks[stage.id] && !previousReturnStagesLocked(stage)){
     alert('Ye task abhi transfer ke liye available nahi hai — sequence me pichla stage lock nahi hua hai.');
     return;
+  }
+  // Handover ka matlab hai ki is stage ka baaki kaam ho chuka hai — is field (aur uske
+  // apne time field) ko chhodkar, stage ke baaki saare required fields pehle se bhare hone
+  // chahiye, warna agla Doer ko pata hi nahi chalega ki kya complete hai.
+  if(stage && !locks[stage.id]){
+    const skip=new Set([fieldId, el.dataset.time].filter(Boolean));
+    const incomplete=stage.fields.filter(fid=>!skip.has(fid) && !isReturnFieldFilled(fid));
+    if(incomplete.length){
+      alert('Kindly fill all detail fields first.');
+      return;
+    }
   }
   if(stage && locks[stage.id] && !superAdminUnlocked && locks[stage.id].lockedBy!==actor.id){
     alert('Ye section lock ho chuka hai. Sirf jisne is section ko lock kiya tha (ya Super Admin), wahi ab bhi task transfer kar sakta hai.');
@@ -2796,6 +2840,7 @@ function renderReturnHistory(){
    const field=pw.fieldId?fieldLabel($(pw.fieldId)):'';
    return {name:u?u.name:pw.toUserId,field};
  };
+ const returnCreatedLabel=r=>r.createdAt?new Date(r.createdAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}):'';
  const returnAction=r=>r.deletedAt
    ?(superAdminUnlocked?`<button class="btn small secondary" onclick="restoreReturnRecord('${esc(r.returnId||'')}')">↩ Restore</button>`:'')
    :`<button class="btn small secondary" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open</button>${superAdminUnlocked?` <button class="btn small danger" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑</button>`:''}`;
@@ -2804,8 +2849,8 @@ function renderReturnHistory(){
    :`<button class="btn secondary recordOpenBtn" onclick="openReturnRecord('${esc(r.returnId||'')}')">Open Record</button>${superAdminUnlocked?`<button class="btn secondary" style="margin-top:6px;color:#9b1c1c" onclick="deleteReturnRecord('${esc(r.returnId||'')}')">🗑 Delete</button>`:''}`;
  const returnLoadMoreRow=a.length>visible.length?`<tr><td colspan="8" style="text-align:center"><button class="btn secondary small" onclick="loadMoreReturnRecords()">Load More (${a.length-visible.length} more)</button></td></tr>`:'';
  const returnLoadMoreCard=a.length>visible.length?`<div class="note" style="text-align:center"><button class="btn secondary" onclick="loadMoreReturnRecords()">Load More (${a.length-visible.length} more)</button></div>`:'';
- body.innerHTML=(visible.length?visible.map(r=>{const pend=!!pendingMap[r.returnId];const pw=returnPendingWithInfo(r);const pwCell=pend&&pw&&pw.name?`<b>${esc(pw.name)}</b>${pw.field?`<br><small class="cellSub">${esc(pw.field)}</small>`:''}`:dash(pw&&pw.name);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(r))}</b></td><td>${dash(r.returnDate)}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${pwCell}</td><td>${pend?pendingBadge(r):esc(returnFinalStatusLabel(r))}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td>${returnAction(r)}</td></tr>`}).join(''):'<tr><td colspan="8">No return records found.</td></tr>')+returnLoadMoreRow;
- if($('returnMobileCards'))$('returnMobileCards').innerHTML=(visible.length?visible.map(r=>{const pend=!!pendingMap[r.returnId];const pw=returnPendingWithInfo(r);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(r))}</b>${pend?pendingBadge(r):`<span>${esc(returnFinalStatusLabel(r))}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div>${pw&&pw.name?`<div><small>Pending With</small><strong>${esc(pw.name)}${pw.field?' — '+esc(pw.field):''}</strong></div>`:''}</div>${returnActionCard(r)}</div>`}).join(''):'<div class="note">No return records.</div>')+returnLoadMoreCard;
+ body.innerHTML=(visible.length?visible.map(r=>{const pend=!!pendingMap[r.returnId];const pw=returnPendingWithInfo(r);const created=returnCreatedLabel(r);const pwCell=pend&&pw&&pw.name?`<b>${esc(pw.name)}</b>${pw.field?`<br><small class="cellSub">${esc(pw.field)}</small>`:''}`:dash(pw&&pw.name);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(r))}</b></td><td>${dash(r.returnDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${dash(r.returnFrom)}</td><td>${dash(r.returnThrough)}</td><td>${pwCell}</td><td>${pend?pendingBadge(r):esc(returnFinalStatusLabel(r))}</td><td>${r.savedAt?esc(new Date(r.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td>${returnAction(r)}</td></tr>`}).join(''):'<tr><td colspan="8">No return records found.</td></tr>')+returnLoadMoreRow;
+ if($('returnMobileCards'))$('returnMobileCards').innerHTML=(visible.length?visible.map(r=>{const pend=!!pendingMap[r.returnId];const pw=returnPendingWithInfo(r);const created=returnCreatedLabel(r);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(r))}</b>${pend?pendingBadge(r):`<span>${esc(returnFinalStatusLabel(r))}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(r.returnDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${esc(r.returnFrom||'-')}</strong></div><div><small>Courier</small><strong>${esc(r.returnThrough||'-')}</strong></div>${pw&&pw.name?`<div><small>Pending With</small><strong>${esc(pw.name)}${pw.field?' — '+esc(pw.field):''}</strong></div>`:''}</div>${returnActionCard(r)}</div>`}).join(''):'<div class="note">No return records.</div>')+returnLoadMoreCard;
 }
 
 function openAllRecords(){ openRecordType('dispatch'); }
@@ -2845,7 +2890,19 @@ function openReturnRecord(id,fieldId){
  // Same safety net as editRecord() for Dispatch - re-populate shortly after opening in case
  // the Doer/Party lists were still loading at this exact instant, guarded so it no-ops if
  // the person has since moved to a different record.
- [900,2500].forEach(ms=>setTimeout(()=>{if(currentReturnId===id){if(typeof populateReturnUsers2==='function')populateReturnUsers2();returnControls().forEach((e,i)=>{const k=e.dataset.rkey||('r_'+i);if(e.classList.contains('returnPerson')&&!e.value&&r[k])e.value=r[k];});if(!document.getElementById('returnFrom').value&&r.returnFrom)document.getElementById('returnFrom').value=r.returnFrom;if(typeof makeReturnFromCombo==='function')makeReturnFromCombo();}},ms));
+ [900,2500].forEach(ms=>setTimeout(()=>{if(currentReturnId===id){if(typeof populateReturnUsers2==='function')populateReturnUsers2();returnControls().forEach((e,i)=>{const k=e.dataset.rkey||('r_'+i);if(e.classList.contains('returnPerson')&&!e.value&&r[k])e.value=r[k];});if(!document.getElementById('returnFrom').value&&r.returnFrom)document.getElementById('returnFrom').value=r.returnFrom;if(typeof makeReturnFromCombo==='function')makeReturnFromCombo();
+   // Same fix as Dispatch's editRecord(): the person-fields above may have just been
+   // filled in for the first time (the race this safety net exists for) — the visible
+   // searchable combo text box only mirrors the real <select> on a user-driven change, so a
+   // value restored here programmatically leaves the combo box LOOKING blank even though the
+   // real select is correct - re-sync it so the Doer doesn't see an empty name on a field
+   // that's actually filled.
+   if(typeof syncAllComboInputs==='function')syncAllComboInputs();
+   // Re-run the stage-complete/auto-lock check, otherwise a stage that's now genuinely
+   // complete stays silently unlocked, and the next section keeps refusing with "Kindly
+   // complete N first" even though N looks fully filled on screen.
+   applyReturnSequenceAndLocks();
+ }},ms));
 }
 
 function populateReturnUsers2(){
@@ -3352,6 +3409,21 @@ const SELF_ONLY_WORK_FIELDS=new Set([
 function isSelfOnlyField(el){
   return !!(el && SELF_ONLY_WORK_FIELDS.has(el.id));
 }
+// True when `el` is a handover-type person field (not the Doer's own self-only work field,
+// not Parcel Given By which is the initiator) AND some OTHER required field in that same
+// stage is still blank. Selecting a handover name while this is true means the section
+// isn't actually done - the next Doer would get told a section is ready when it isn't.
+// Shared by both modules (STAGE_SEQUENCE / RETURN_STAGE_SEQUENCE), checked at the actual
+// point of selection (personChanged / returnPersonSelected) so an incomplete handover is
+// rejected before anything gets saved or notified, not just reverted after the fact.
+function handoverStageIncomplete(el){
+  if(!el||!el.id||el.id==='parcelGivenBy'||isSelfOnlyField(el))return false;
+  const stage=stageForElement(el)||returnStageForElement(el);
+  if(!stage)return false;
+  const checkFilled=STAGE_SEQUENCE.includes(stage)?isFieldFilled:isReturnFieldFilled;
+  const skip=new Set([el.id,el.dataset.time].filter(Boolean));
+  return stage.fields.some(fid=>!skip.has(fid)&&!checkFilled(fid));
+}
 function loggedUser(){
   let id=localStorage.getItem(SESSION_KEY);
   return users.find(u=>u.id===id && u.active!==false)||null;
@@ -3516,7 +3588,10 @@ function renderWorkflowStatus(){
   const locks=getStageLocks();
   box.innerHTML=STAGE_SEQUENCE.map((s,i)=>{
     const done=stageComplete(s),locked=!!locks[s.id],prev=previousStagesLocked(s);
-    let st=locked?'🔒 LOCKED':(done?'✅ COMPLETE':(prev?'🟡 IN PROGRESS':'⛔ WAITING'));
+    // Check prev BEFORE done: a stage isn't really "complete" if it isn't even reachable yet
+    // (previous stage not locked) - showing green here while an earlier section still blocks
+    // everything is misleading (see the matching fix/comment on Return's renderReturnWorkflowStatus()).
+    let st=locked?'🔒 LOCKED':(!prev?'⛔ WAITING':(done?'✅ COMPLETE':'🟡 IN PROGRESS'));
     return `<span style="display:inline-block;margin:4px 10px 4px 0"><b>${esc(s.name)}</b>: ${st}</span>`;
   }).join('');
   // Tint ONLY once a section is actually locked, never just because its fields happen to be
@@ -3912,6 +3987,18 @@ function logWorkerSelection(field,selectedId,el){
  let a=JSON.parse(localStorage.getItem(WORK_AUDIT_KEY)||'[]');a.unshift(row);localStorage.setItem(WORK_AUDIT_KEY,JSON.stringify(a));
  // Parcel Given By is the initiator, not someone a task is being handed to - no notification.
  if(fieldId==='parcelGivenBy')return;
+ // Only notify once the REST of this stage's fields are genuinely filled - sending the
+ // "new task for you" ping off a handover name picked before the surrounding work is done
+ // wrongly tells the next Doer the section is ready when it isn't (the exact complaint: a
+ // premature notification from a section that wasn't actually complete yet).
+ if(el){
+   const stage=stageForElement(el)||returnStageForElement(el);
+   if(stage){
+     const checkFilled=STAGE_SEQUENCE.includes(stage)?isFieldFilled:isReturnFieldFilled;
+     const skip=new Set([fieldId,el.dataset.time].filter(Boolean));
+     if(stage.fields.some(fid=>!skip.has(fid)&&!checkFilled(fid)))return;
+   }
+ }
  // Respect the same Notification Control toggle personChanged() used to check before its
  // own send was removed (see comment above) - this is now the only place that sends the
  // per-field assignment message, so it must honor the same on/off setting.
@@ -4009,6 +4096,16 @@ document.addEventListener('change',e=>{
      e.target.value='';
      const inp=getComboInput(e.target);if(inp)inp.value='';
      const t=e.target.dataset.time?$(e.target.dataset.time):null;if(t)t.value='';
+     return;
+   }
+   // Backstop for the same check personChanged()/returnPersonSelected() already do before
+   // saving - covers any path that sets .value and fires 'change' without going through
+   // those (e.g. the combo box's own s.onchange override). See handoverStageIncomplete().
+   if(handoverStageIncomplete(e.target)){
+     e.target.value='';
+     const inp=getComboInput(e.target);if(inp)inp.value='';
+     const t=e.target.dataset.time?$(e.target.dataset.time):null;if(t)t.value='';
+     alert('Kindly fill all detail fields first.');
      return;
    }
    let label=e.target.closest('.field')?.querySelector('label')?.textContent.replace('*','').trim()||'Work By';
