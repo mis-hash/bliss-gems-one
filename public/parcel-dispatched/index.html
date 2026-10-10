@@ -419,8 +419,8 @@ if(window.self!==window.top){
 <section class="card" id="returnSec1"><h3>1. Parcel Receive & Handover</h3><div class="body"><div class="grid">
 <div class="field"><label>Date <span class="req">*</span></label><input type="date" id="returnDate"></div>
 <div class="field"><label>Return From <span class="req">*</span></label><select id="returnFrom"></select></div>
-<div class="field"><label>Return Through <span class="req">*</span></label><select id="returnThrough"><option value="">Select</option><option>Courier</option><option>Hand Delivery</option><option>Staff</option></select></div>
-<div class="field"><label>Courier Name</label><input id="returnCourierName" list="courierNameList" class="titleCaseField" autocomplete="off" placeholder="Select ya type karein"></div>
+<div class="field"><label>Return Through <span class="req">*</span></label><select id="returnThrough" onchange="returnThroughRule()"><option value="">Select</option><option>Courier</option><option>Hand Delivery</option><option>Staff</option></select></div>
+<div class="field"><label>Courier Name <span class="req hidden" id="returnCourierNameReq">*</span></label><input id="returnCourierName" list="courierNameList" class="titleCaseField" autocomplete="off" placeholder="Select ya type karein"></div>
 <div class="field"><label>Parcel Receive By <span class="req">*</span></label><select class="returnPerson" id="returnReceiveBy" data-time="returnReceiveTime"></select></div><div class="field"><label>Time <span class="req">*</span></label><input class="returnTime" id="returnReceiveTime" readonly></div>
 <div class="field"><label>Parcel Type <span class="req">*</span></label><select id="returnParcelType" onchange="returnParcelTypeRule()"><option value="">Select</option><option>Local</option><option>Paid</option><option>To Pay</option></select></div>
 <div class="field"><label>Amount <span class="req hidden" id="returnAmountReq">*</span></label><input type="number" id="returnAmount"></div>
@@ -816,7 +816,7 @@ function refreshOpenReturnFields(r){
     e.value=r[k];
   });
   if(typeof returnPktRule==='function')returnPktRule();
-  if(typeof returnParcelTypeRule==='function')returnParcelTypeRule();
+  if(typeof returnParcelTypeRule==='function')returnParcelTypeRule();if(typeof returnThroughRule==='function')returnThroughRule();
   if(typeof returnNotFoundRule==='function')returnNotFoundRule();
   if(typeof applyReturnSequenceAndLocks==='function')applyReturnSequenceAndLocks();
   // This is the actual real-time path - fires the instant another Doer's edit arrives via
@@ -2452,7 +2452,7 @@ function populateReturnUsers(){
   });
 }
 const RETURN_STAGE_SEQUENCE=[
-  {id:'rstage1',name:'1. Parcel Receive & Handover',fields:['returnDate','returnFrom','returnThrough','returnReceiveBy','returnReceiveTime','returnParcelType','returnAmount','returnItemsReceived','returnHandoverChecking','handoverCheckingTime']},
+  {id:'rstage1',name:'1. Parcel Receive & Handover',fields:['returnDate','returnFrom','returnThrough','returnCourierName','returnReceiveBy','returnReceiveTime','returnParcelType','returnAmount','returnItemsReceived','returnHandoverChecking','handoverCheckingTime']},
   {id:'rstage2',name:'2. Checking & Return Entry Handover',fields:['handoverToWeightCheck','handoverToWeightCheckTime','returnWeightBy','returnWeightTime','returnLinesBy','returnLinesTime','returnEntryBy','returnEntryTime']},
   {id:'rstage3',name:'3. Return Entry',fields:['approvalReturnBy','approvalReturnTime','returnItemCount','notFoundReason','returnToBroker','handover506By','handover506Time']},
   {id:'rstage4',name:'4. PKT / Tag Change & Stock Closing',fields:['returnPktRequired','returnPktBy','returnPktTime','stockBoxesBy','stockBoxesTime']}
@@ -2464,6 +2464,7 @@ const RETURN_STAGE_SEQUENCE=[
 const RETURN_PERSON_FIELDS=new Set(['returnReceiveBy','returnHandoverChecking','handoverToWeightCheck','returnWeightBy','returnLinesBy','returnEntryBy','approvalReturnBy','handover506By','returnPktBy','stockBoxesBy']);
 function isReturnFieldFilledForRecord(rec,fieldId){
   if(fieldId==='returnAmount' && rec.returnParcelType!=='To Pay')return true;
+  if(fieldId==='returnCourierName' && rec.returnThrough!=='Courier')return true;
   if((fieldId==='returnPktBy'||fieldId==='returnPktTime') && rec.returnPktRequired!=='YES')return true;
   if(fieldId==='notFoundReason' && !(Number(rec.itemsNotFoundCount||0)>0))return true;
   return String(rec[fieldId]||'').trim()!=='';
@@ -2508,6 +2509,7 @@ function returnStageForElement(el){
 // show/hide rule) - everything else in the list is unconditionally required.
 function returnFieldRequired(fieldId){
   if(fieldId==='returnAmount')return $('returnParcelType')&&$('returnParcelType').value==='To Pay';
+  if(fieldId==='returnCourierName')return $('returnThrough')&&$('returnThrough').value==='Courier';
   if(fieldId==='notFoundReason')return Number($('itemsNotFoundCount')&&$('itemsNotFoundCount').value||0)>0;
   return true;
 }
@@ -2536,10 +2538,15 @@ function canEditReturnField(el){
   const stage=returnStageForElement(el);
   if(!stage)return true;
   const locks=getReturnStageLocks();
-  // Locked = closed to everyone, including whoever locked it. Only Admin Unlock reopens it
-  // (matches Dispatch - no self-correction window). Transfer is the one deliberate exception,
-  // gated separately in openReturnTransferTask() before it ever gets here.
-  if(locks[stage.id])return false;
+  // Matches Dispatch's canEditField(): the Doer who locked a section can still fix it
+  // themselves within STAGE_SELF_CORRECTION_WINDOW_MS of locking - after that, only Admin
+  // Unlock reopens it. Transfer is a separate deliberate exception, gated in
+  // openReturnTransferTask() before it ever gets here.
+  if(locks[stage.id]){
+    const lock=locks[stage.id],actor=loggedUser();
+    const withinWindow=lock.lockedAt&&(Date.now()-new Date(lock.lockedAt).getTime())<=STAGE_SELF_CORRECTION_WINDOW_MS;
+    return !!(actor&&lock.lockedBy===actor.id&&withinWindow);
+  }
   return previousReturnStagesLocked(stage);
 }
 function currentEditableReturnStage(){
@@ -2842,7 +2849,7 @@ function clearReturn(){
  let x=$('returnDate');if(x)x.value=new Date().toISOString().slice(0,10);
  populateReturnUsers();
  if(typeof returnPktRule==='function')returnPktRule();
- if(typeof returnParcelTypeRule==='function')returnParcelTypeRule();
+ if(typeof returnParcelTypeRule==='function')returnParcelTypeRule();if(typeof returnThroughRule==='function')returnThroughRule();
  if(typeof returnNotFoundRule==='function')returnNotFoundRule();
  if(typeof syncAllComboInputs==='function')syncAllComboInputs();
  if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+currentReturnId;
@@ -2852,6 +2859,13 @@ function clearReturn(){
 function returnParcelTypeRule(){
  const toPay=$('returnParcelType')&&$('returnParcelType').value==='To Pay';
  if($('returnAmountReq'))$('returnAmountReq').classList.toggle('hidden',!toPay);
+}
+// Courier Name is only actually required when Return Through is "Courier" - mirrors
+// returnParcelTypeRule()'s conditional-requirement pattern above (and returnFieldRequired()'s
+// matching gate), since a Hand Delivery/Staff return has no courier to name.
+function returnThroughRule(){
+ const byCourier=$('returnThrough')&&$('returnThrough').value==='Courier';
+ if($('returnCourierNameReq'))$('returnCourierNameReq').classList.toggle('hidden',!byCourier);
 }
 // Not Found Reason only makes sense once at least one item is actually marked not found -
 // mirrors returnParcelTypeRule()'s conditional-requirement pattern above.
@@ -2967,7 +2981,7 @@ function openReturnRecord(id,fieldId){
  returnControls().forEach((e,i)=>{let k=e.dataset.rkey||('r_'+i);e.value=r[k]??''});
  localStorage.setItem(RETURN_KEY,JSON.stringify(r));
  if(typeof returnPktRule==='function')returnPktRule();
- if(typeof returnParcelTypeRule==='function')returnParcelTypeRule();
+ if(typeof returnParcelTypeRule==='function')returnParcelTypeRule();if(typeof returnThroughRule==='function')returnThroughRule();
  if(typeof returnNotFoundRule==='function')returnNotFoundRule();
  if($('returnIdTag'))$('returnIdTag').textContent='Return No: '+slipLabel(r);
  showReturnFormView();
@@ -3027,7 +3041,7 @@ function populateReturnUsers2(){
 }
 function returnPktRule(){let yes=$('returnPktRequired').value==='YES';$('returnPktByWrap').classList.toggle('hidden',!yes);$('returnPktTimeWrap').classList.toggle('hidden',!yes);if(!yes){$('returnPktBy').value='';$('returnPktTime').value=''}}
 
-document.addEventListener('DOMContentLoaded',()=>{populateReturnUsers2();returnPktRule();returnParcelTypeRule();returnNotFoundRule();renderReturnHistory();let rd=$('returnDate');if(rd&&!rd.value)rd.value=new Date().toISOString().slice(0,10);pdStartReturnsSync();});
+document.addEventListener('DOMContentLoaded',()=>{populateReturnUsers2();returnPktRule();returnParcelTypeRule();returnThroughRule();returnNotFoundRule();renderReturnHistory();let rd=$('returnDate');if(rd&&!rd.value)rd.value=new Date().toISOString().slice(0,10);pdStartReturnsSync();});
 function saveSelfRemarkPrivacy(){
  selfRemarkPrivacy.allowedUsers=[...document.querySelectorAll('.privacyUser:checked')].map(x=>x.value).slice(0,4);
  localStorage.setItem('pd_selfremark_privacy_v1',JSON.stringify(selfRemarkPrivacy));
@@ -3592,13 +3606,20 @@ function previousStagesLocked(stage){
   }
   return true;
 }
+// Self-correction window: the Doer who locked a section can still fix it themselves for a
+// short while after locking - after that, only unlockStageAsAdmin() (Admin/Super Admin) can
+// reopen it. Bounded to a fixed time (not "until the next stage also locks") so a slip can't
+// be reopened indefinitely just because the next Doer hasn't acted yet.
+const STAGE_SELF_CORRECTION_WINDOW_MS=15*60*1000;
 function canEditField(el){
   const stage=stageForElement(el);
   if(!stage)return true;
   const locks=getStageLocks();
-  // Once a section is locked, it is closed to everyone — including the Doer who locked it.
-  // Only Admin Unlock (unlockStageAsAdmin) can reopen it. No self-correction window.
-  if(locks[stage.id])return false;
+  if(locks[stage.id]){
+    const lock=locks[stage.id],actor=loggedUser();
+    const withinWindow=lock.lockedAt&&(Date.now()-new Date(lock.lockedAt).getTime())<=STAGE_SELF_CORRECTION_WINDOW_MS;
+    return !!(actor&&lock.lockedBy===actor.id&&withinWindow);
+  }
   return previousStagesLocked(stage);
 }
 // A field disabled/readonly because an earlier section isn't complete yet gives no feedback
@@ -4321,6 +4342,12 @@ function setSuperAdminVisibility(show){
 // Analytics Dashboard, so it doesn't need the 10-tap Super Admin gesture separately.
 function canAccessManagePanel(){
   if(superAdminUnlocked)return true;
+  // department==='Admin' (isAdminUser()) is a separate admin path already used to let an
+  // Admin correct a self-only field or an incomplete handover - without also counting here,
+  // that same Admin couldn't see the "Admin Unlock" button at all (it's a .superAdminOnly
+  // element, gated by this function) and so could never actually unlock a locked stage to
+  // fix a plain field like "No. of Items Received" inside it.
+  if(isAdminUser())return true;
   const u=loggedUser();
   const role=u&&u.appRoles&&u.appRoles['parcel-dispatched'];
   return role==='admin'||role==='director';
