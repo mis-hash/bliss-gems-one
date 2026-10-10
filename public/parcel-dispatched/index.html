@@ -3484,6 +3484,11 @@ function isSelfOnlyField(el){
 // point of selection (personChanged / returnPersonSelected) so an incomplete handover is
 // rejected before anything gets saved or notified, not just reverted after the fact.
 function handoverStageIncomplete(el){
+  // Admin/Super Admin can always correct a handover field, including on old slips that were
+  // already left in an inconsistent state (e.g. a handover name picked before this check
+  // existed) - otherwise nobody could ever fix/clean up exactly the records this check is
+  // meant to prevent more of. Regular Doers still get the full validation below.
+  if(superAdminUnlocked||isAdminUser())return false;
   if(!el||!el.id||el.id==='parcelGivenBy'||isSelfOnlyField(el))return false;
   const stage=stageForElement(el)||returnStageForElement(el);
   if(!stage)return false;
