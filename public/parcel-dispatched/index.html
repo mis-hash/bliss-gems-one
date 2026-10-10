@@ -3155,7 +3155,12 @@ function makeSingleSearchCombos(){
    function draw(showAll){
      let q=showAll?'':inp.value.trim().toLowerCase();
      let actor=loggedUser();
-     let source=isSelfOnlyField(s) ? (actor?[actor]:[]) : users.slice();
+     // Same Admin/Super Admin override as allowedUsers above and canSelectWorker() below -
+     // without it, the dropdown MENU (what's actually shown while typing/searching) stayed
+     // restricted to the actor's own name even though the underlying <select> and the
+     // selection check were already fixed, so an Admin searching for another Doer's name on
+     // a self-only field found no match to click at all.
+     let source=(superAdminUnlocked||isAdminUser())?users.slice():(isSelfOnlyField(s) ? (actor?[actor]:[]) : users.slice());
      let list=source.slice().sort((a,b)=>a.name.localeCompare(b.name)).filter(u=>!q||u.name.toLowerCase().includes(q)||String(u.username||'').toLowerCase().includes(q)||String(u.department||'').toLowerCase().includes(q));
      menu.innerHTML=list.length?list.map(u=>`<div class="comboOption" data-v="${esc(u.id)}"><b>${esc(u.name)}</b>${u.department?`<small style="display:block;opacity:.65">${esc(u.department)}</small>`:''}</div>`).join(''):'<div class="comboOption">No match</div>';
      positionMenu();
@@ -4021,8 +4026,11 @@ function applyWorkerPermissions(){
       return;
     }
 
-    // Existing value by another doer is historical and cannot be overwritten by this login.
-    if(s.value && (!actor || s.value!==actor.id)){
+    // Existing value by another doer is historical and cannot be overwritten by this login -
+    // except for Admin/Super Admin, who need to actually be able to type/search in the box
+    // to correct a self-only field someone filled with the wrong name by mistake (matches the
+    // same override already applied to the dropdown list and canSelectWorker()).
+    if(s.value && (!actor || s.value!==actor.id) && !(superAdminUnlocked||isAdminUser())){
       if(inp){
         inp.readOnly=true;
         inp.title='Verified work: only the doer who performed this work can change it from their own login.';
