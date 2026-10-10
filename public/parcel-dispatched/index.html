@@ -289,7 +289,7 @@ if(window.self!==window.top){
 <div class="recordSummary" id="dispatchRecordSummary"></div>
 <label id="hideEmptyDraftsWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="hideEmptyDrafts" onchange="renderHistory()" style="width:auto"> Hide empty drafts (<span id="hideEmptyDraftsCount">0</span>)</label>
 <label id="showDeletedDispatchWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--m);margin:-4px 0 10px;cursor:pointer"><input type="checkbox" id="showDeletedDispatch" onchange="renderHistory()" style="width:auto"> 🗑 Show Deleted (<span id="deletedDispatchCount">0</span>)</label>
-<div class="table desktopRecords"><table><thead><tr><th>Parcel ID</th><th>Date</th><th>Ship To</th><th>Slip Owner</th><th>Courier</th><th>Broker</th><th>AWB</th><th>Pending With</th><th>Status</th><th>Action</th></tr></thead><tbody id="history"></tbody></table></div>
+<div class="table desktopRecords"><table><thead><tr><th>Parcel ID</th><th>Date</th><th>Ship To</th><th>Slip Owner</th><th>Courier</th><th>Broker</th><th>AWB</th><th>Pending With</th><th>Status</th><th>Saved At</th><th>Action</th></tr></thead><tbody id="history"></tbody></table></div>
 <div id="dispatchMobileCards" class="mobileRecordCards"></div>
 </div></section>
 </div>
@@ -1188,6 +1188,19 @@ function startDelayAlertWatch(){
 }
 document.addEventListener('DOMContentLoaded',startDelayAlertWatch);
 document.addEventListener('DOMContentLoaded',()=>{if(typeof startWaReminderWatch==='function')startWaReminderWatch()});
+// Catch up OLD slips saved before the auto-lock race fix, once Firestore's onSnapshot sync
+// (started earlier in this script) has had a few seconds to replace the local cache with the
+// real cloud data - running on a stale/incomplete cache would just safely no-op on whatever
+// isn't complete yet, and the next page load (or the live sync callbacks already wired
+// elsewhere) catches it up anyway, so this is a one-shot best-effort pass, not the only pass.
+document.addEventListener('DOMContentLoaded',()=>{
+  setTimeout(()=>{
+    if(typeof backfillMissingStageLocks==='function')backfillMissingStageLocks();
+    if(typeof backfillMissingReturnStageLocks==='function')backfillMissingReturnStageLocks();
+    if(typeof renderHistory==='function')renderHistory();
+    if(typeof renderReturnHistory==='function')renderReturnHistory();
+  },4000);
+});
 function mask(p){p=String(p);return p.length>4?'••••••'+p.slice(-4):p}
 function normalizePhone(p){let n=String(p||'').replace(/\D/g,'');if(n.length===10)n='91'+n;return n}
 function parcelOpenLink(parcelId,fieldId){
@@ -1463,7 +1476,7 @@ function genId(){
   do{ id=`PD-${ds}-${(Date.now().toString(36)+Math.random().toString(36).slice(2,6)).slice(-6).toUpperCase()}`; }while(existing.has(id));
   return id;
 }
-function persistParcelRecord(){let d=formData();let a=JSON.parse(localStorage.getItem(K.records)||'[]'),i=a.findIndex(x=>x.parcelId===d.parcelId);if(i>=0)a[i]={...a[i],...d};else a.unshift(d);localStorage.setItem(K.records,JSON.stringify(a));editing=d.parcelId;renderHistory();pdPushRecordToCloud(a.find(x=>x.parcelId===d.parcelId));return d}
+function persistParcelRecord(){let d=formData();d.savedAt=new Date().toISOString();let a=JSON.parse(localStorage.getItem(K.records)||'[]'),i=a.findIndex(x=>x.parcelId===d.parcelId);if(i>=0)a[i]={...a[i],...d};else a.unshift(d);localStorage.setItem(K.records,JSON.stringify(a));editing=d.parcelId;renderHistory();pdPushRecordToCloud(a.find(x=>x.parcelId===d.parcelId));return d}
 function markAutoSaved(){let t=$('autoSaveTag');if(t)t.textContent='✓ Saved '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}
 function autoSaveParcel(){
   // Looser than the manual Save gate — appears in Recent Dispatch Records as soon as
@@ -1568,6 +1581,60 @@ function currentPendingAssignee(rec){
   if(!firstIncompleteStage)return null;
   return{toUserId:lastPerson,fieldId:lastPersonField,stageName:firstIncompleteStage.name};
 }
+// One-time (and safely repeatable) catch-up for OLD slips saved before the auto-lock race
+// fix: a stage whose fields were already genuinely complete in the saved record, but that
+// never actually got locked (so it kept showing stuck/not-green and blocking the next
+// section), gets locked now using the same field-complete logic currentPendingAssignee()
+// already uses. Stops at the first stage that ISN'T actually complete, so the sequential
+// lock order is never violated - never touches an already-locked stage or a record's own
+// data, only adds a missing lock entry. Safe to call repeatedly (every page load): a fully
+// caught-up record is a no-op.
+function backfillMissingStageLocks(){
+  try{
+    const records=JSON.parse(localStorage.getItem(K.records)||'[]');
+    const allLocks=JSON.parse(localStorage.getItem(APPROVAL_LOCK_KEY)||'{}');
+    let changed=false;
+    records.forEach(rec=>{
+      if(!rec.parcelId)return;
+      const locks=allLocks[rec.parcelId]||{};
+      for(const stage of STAGE_SEQUENCE){
+        if(locks[stage.id])continue;
+        const complete=stage.fields.every(fid=>{
+          const gate=PD_CONDITIONAL_FIELDS[fid];
+          if(gate&&rec[gate]!=='YES')return true;
+          const val=rec[fid];
+          return val!==undefined&&val!==null&&String(val).trim()!=='';
+        });
+        if(!complete)break;
+        locks[stage.id]={lockedAt:rec.savedAt||rec.createdAt||new Date().toISOString(),lockedBy:'system',lockedByName:'Auto (existing data)'};
+        changed=true;
+      }
+      if(Object.keys(locks).length)allLocks[rec.parcelId]=locks;
+    });
+    if(changed)localStorage.setItem(APPROVAL_LOCK_KEY,JSON.stringify(allLocks));
+  }catch(e){console.error('backfillMissingStageLocks failed:',e)}
+}
+// Same catch-up as backfillMissingStageLocks() above, for Return records.
+function backfillMissingReturnStageLocks(){
+  try{
+    const records=JSON.parse(localStorage.getItem(RETURN_RECORDS_KEY)||'[]');
+    const allLocks=JSON.parse(localStorage.getItem(RETURN_APPROVAL_LOCK_KEY)||'{}');
+    let changed=false;
+    records.forEach(rec=>{
+      if(!rec.returnId)return;
+      const locks=allLocks[rec.returnId]||{};
+      for(const stage of RETURN_STAGE_SEQUENCE){
+        if(locks[stage.id])continue;
+        const complete=stage.fields.every(fid=>isReturnFieldFilledForRecord(rec,fid));
+        if(!complete)break;
+        locks[stage.id]={lockedAt:rec.savedAt||rec.createdAt||new Date().toISOString(),lockedBy:'system',lockedByName:'Auto (existing data)'};
+        changed=true;
+      }
+      if(Object.keys(locks).length)allLocks[rec.returnId]=locks;
+    });
+    if(changed)localStorage.setItem(RETURN_APPROVAL_LOCK_KEY,JSON.stringify(allLocks));
+  }catch(e){console.error('backfillMissingReturnStageLocks failed:',e)}
+}
 // Shared by Dispatch and Return's Recent Records tables.
 function pendingBadge(x){
   if(!x.createdAt)return '<span class="pendingBadge" style="padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700">📝 Pending</span>';
@@ -1654,9 +1721,9 @@ function renderHistory(){
    const field=pw.fieldId?fieldLabel($(pw.fieldId)):'';
    return {name:u?u.name:pw.toUserId,field};
  };
- const dispatchLoadMoreRow=a.length>visible.length?`<tr><td colspan="10" style="text-align:center"><button class="btn secondary small" onclick="loadMoreDispatchRecords()">Load More (${a.length-visible.length} more)</button></td></tr>`:'';
+ const dispatchLoadMoreRow=a.length>visible.length?`<tr><td colspan="11" style="text-align:center"><button class="btn secondary small" onclick="loadMoreDispatchRecords()">Load More (${a.length-visible.length} more)</button></td></tr>`:'';
  const dispatchLoadMoreCard=a.length>visible.length?`<div class="note" style="text-align:center"><button class="btn secondary" onclick="loadMoreDispatchRecords()">Load More (${a.length-visible.length} more)</button></div>`:'';
- $('history').innerHTML=(visible.length?visible.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);const pw=pendingWithInfo(x);const pwCell=pend&&pw&&pw.name?`<b>${esc(pw.name)}</b>${pw.field?`<br><small class="cellSub">${esc(pw.field)}</small>`:''}`:dash(pw&&pw.name);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(slipOwnerName(x))}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pwCell}</td><td>${pend?pendingBadge(x):esc(finalStatusLabel(x))}</td><td>${dispatchAction(x)}</td></tr>`}).join(''):'<tr><td colspan="10">No records.</td></tr>')+dispatchLoadMoreRow;
+ $('history').innerHTML=(visible.length?visible.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);const pw=pendingWithInfo(x);const pwCell=pend&&pw&&pw.name?`<b>${esc(pw.name)}</b>${pw.field?`<br><small class="cellSub">${esc(pw.field)}</small>`:''}`:dash(pw&&pw.name);return `<tr class="${pend?'pendingRow':''}"><td><b>${esc(slipLabel(x))}</b></td><td>${dash(x.shippingDate||x.dispatchDate)}${created?`<br><small class="cellSub">Created ${esc(created)}</small>`:''}</td><td>${isEmptyDraft(x)?'<span class="cellDash">Empty draft</span>':dash(x.shipTo)}</td><td>${dash(slipOwnerName(x))}</td><td>${dash(x.courierName||x.shipThrough)}</td><td>${dash(x.broker)}</td><td>${dash(x.awbNo)}</td><td>${pwCell}</td><td>${pend?pendingBadge(x):esc(finalStatusLabel(x))}</td><td>${x.savedAt?esc(new Date(x.savedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})):'<span class="cellDash">—</span>'}</td><td>${dispatchAction(x)}</td></tr>`}).join(''):'<tr><td colspan="11">No records.</td></tr>')+dispatchLoadMoreRow;
  if($('dispatchMobileCards'))$('dispatchMobileCards').innerHTML=(visible.length?visible.map(x=>{const pend=isRecordPending(x.parcelId);const created=createdLabel(x);const pw=pendingWithInfo(x);return `<div class="recordCard${pend?' pending':''}"><div class="recordCardTop"><b>${esc(slipLabel(x))}</b>${pend?pendingBadge(x):`<span>${esc(finalStatusLabel(x))}</span>`}</div><div class="recordCardGrid"><div><small>Date</small><strong>${esc(x.shippingDate||x.dispatchDate||'-')}</strong></div><div><small>Created</small><strong>${created?esc(created):'-'}</strong></div><div><small>Party</small><strong>${isEmptyDraft(x)?'Empty draft':esc(x.shipTo||'-')}</strong></div><div><small>Slip Owner</small><strong>${esc(slipOwnerName(x)||'-')}</strong></div><div><small>Courier</small><strong>${esc(x.courierName||x.shipThrough||'-')}</strong></div><div><small>Broker</small><strong>${esc(x.broker||'-')}</strong></div><div><small>AWB</small><strong>${esc(x.awbNo||'-')}</strong></div>${pw&&pw.name?`<div><small>Pending With</small><strong>${esc(pw.name)}${pw.field?' — '+esc(pw.field):''}</strong></div>`:''}</div>${dispatchActionCard(x)}</div>`}).join(''):'<div class="note">No records.</div>')+dispatchLoadMoreCard;
  renderDashboard();
 }
