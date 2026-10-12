@@ -21,13 +21,13 @@
     "slug": "petty-cash",
     "name": "Petty Cash",
     "pushedAt": 0,
-    "enabled": false
+    "enabled": true
   },
   {
     "slug": "fuel-tracker",
     "name": "Fuel Tracker",
     "pushedAt": 0,
-    "enabled": false
+    "enabled": true
   },
   {
     "slug": "purchase-slip",
