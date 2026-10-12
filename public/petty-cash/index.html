@@ -49,13 +49,10 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 .btn.danger{background:var(--redbg);color:var(--red)}
 .btn.small{padding:7px 11px;font-size:12px}
 .shell{max-width:1000px;margin:auto;padding:17px 18px 60px}
-.hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+.hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px}
 .hero h1{font-size:24px;margin:0 0 5px}
 .hero p{font-size:13px;margin:0;opacity:.9}
-.heroStat{text-align:right}
-.heroStat small{display:block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.85}
-.heroStat b{display:block;font-size:30px;font-family:'Manrope',sans-serif;margin-top:3px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
 .card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px}
 .card small{font-size:11px;color:var(--muted)}
 .card b{display:block;font-size:22px;margin-top:6px}
@@ -138,9 +135,8 @@ tbody tr:hover td{background:#f7faf8}
 
   <div id="page-ledger" class="pcPage on">
   <div class="hero">
-    <div><h1>Company Petty Cash</h1>
-    <p>Ek hi shared cash-box — In / Out / Loan entries, sabko live dikhti hain.</p></div>
-    <div class="heroStat"><small>Current Balance</small><b id="heroBalance">₹0</b></div>
+    <h1>Company Petty Cash</h1>
+    <p>Ek hi shared cash-box — In / Out / Loan entries, sabko live dikhti hain.</p>
   </div>
   <div class="cards" id="statTiles"></div>
 
@@ -895,8 +891,8 @@ function renderDash(){
   const {totalIn,totalOut,outstandingLoans,outstandingCount,balance}=computeBalance();
   const live=liveLedger();
   const totalLoanGiven=live.filter(x=>x.type==='loan').reduce((s,x)=>s+(x.amount||0),0);
-  if($('heroBalance'))$('heroBalance').textContent=fmtAmt(balance);
   const tiles=[
+    {label:'CURRENT BALANCE',val:fmtAmt(balance)},
     {label:'TOTAL IN',val:fmtAmt(totalIn)},
     {label:'TOTAL OUT',val:fmtAmt(totalOut)},
     {label:'TOTAL LOAN GIVEN',val:fmtAmt(totalLoanGiven)},
