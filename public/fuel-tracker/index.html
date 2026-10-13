@@ -21,7 +21,7 @@
   window.addEventListener('unhandledrejection',function(e){console.error('Unhandled promise rejection:',e.reason);showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));});
 })();
 </script>
-<title>Fuel Tracker</title>
+<title>Vehicle Tracker</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -91,9 +91,18 @@ tbody tr:hover td{background:#f7faf8}
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
 .tab{border:1px solid var(--line);background:#fff;color:var(--muted);padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
 .tab.on{background:var(--g);border-color:var(--g);color:#fff}
+.pageTabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.pageTabs .tab{padding:10px 15px;font-size:13px}
+.ftPage{display:none}
+.ftPage.on{display:block}
 .thumb{width:44px;height:44px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--line)}
 .lightboxBox{background:transparent;box-shadow:none;max-width:95vw}
 .lightboxBox img{max-width:100%;max-height:85vh;border-radius:10px}
+.mobileCards{display:none}
+.docCard{border:1px solid var(--line);border-radius:11px;padding:12px;margin-bottom:10px}
+.docCard .dcTop{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
+.docCard .dcLabel{font-weight:700;font-size:13.5px}
+.docCard .dcMeta{font-size:12px;color:var(--muted)}
 @media(max-width:720px){
   header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:20px}.brand b{font-size:16px}.brand small{display:none}
   .shell{padding:11px 10px 30px}
@@ -101,6 +110,8 @@ tbody tr:hover td{background:#f7faf8}
   .cards{grid-template-columns:1fr 1fr}
   .grid,.grid3{grid-template-columns:1fr}
   #fuelSubmitBtn{width:100%}
+  .desktopTable{display:none}
+  .mobileCards{display:block}
 }
 </style>
 </head>
@@ -110,7 +121,7 @@ tbody tr:hover td{background:#f7faf8}
 
 <div id="appWrap" style="display:none">
 <header><div class="head">
-  <div class="brand"><div class="logo">⛽</div><div><b>Fuel Tracker</b><small>Bliss Gems &amp; Minerals</small></div></div>
+  <div class="brand"><div class="logo">🚗</div><div><b>Vehicle Tracker</b><small>Bliss Gems &amp; Minerals</small></div></div>
   <div class="headRight">
     <span class="pillbadge" id="loginBadge">Not Logged In</span>
     <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
@@ -119,65 +130,179 @@ tbody tr:hover td{background:#f7faf8}
 </div></header>
 
 <div class="shell">
-  <div class="hero">
-    <h1>Vehicle Fuel Log</h1>
-    <p>Har fueling ki entry — meter reading, kharcha aur photo proof ke saath.</p>
+  <datalist id="vehicleList"></datalist>
+  <datalist id="paymentModeList"></datalist>
+
+  <div class="pageTabs">
+    <button class="tab on" data-page="dashboard" onclick="goPage('dashboard')">📊 Dashboard</button>
+    <button class="tab" data-page="vehicles" onclick="goPage('vehicles')">🚗 Vehicles</button>
+    <button class="tab" data-page="documents" onclick="goPage('documents')">📄 Documents</button>
+    <button class="tab" data-page="fuel" onclick="goPage('fuel')">⛽ Fuel</button>
+    <button class="tab" data-page="service" onclick="goPage('service')">🔧 Service &amp; Repair</button>
   </div>
-  <div class="cards" id="statTiles"></div>
 
-  <div id="serviceReminders"></div>
-  <div id="mileageAlerts"></div>
+  <div id="page-dashboard" class="ftPage on">
+    <div class="hero">
+      <h1>Vehicle Tracker</h1>
+      <p>Fuel, Service/Repair, Insurance/PUC/Permit — ek hi jagah complete vehicle tracking.</p>
+    </div>
+    <div class="cards" id="statTiles"></div>
 
-  <div class="panel">
-    <div class="ph"><span>New Fuel Entry</span><span class="note" id="entryByNote"></span></div>
-    <div class="pb">
-      <div class="grid3">
-        <div class="field"><label>Vehicle Number <span style="color:var(--red)">*</span></label><input id="fVehicle" list="vehicleList" autocomplete="off"><datalist id="vehicleList"></datalist></div>
-        <div class="field"><label>Date</label><input type="date" id="fDate"></div>
-        <div class="field"><label>Unit <span style="color:var(--red)">*</span></label><select id="fUnit"><option value="KM">KM</option><option value="Miles">Miles</option></select></div>
+    <div id="serviceReminders"></div>
+    <div id="cleaningReminders"></div>
+    <div id="mileageAlerts"></div>
+    <div id="docAlerts"></div>
+
+    <div class="panel">
+      <div class="ph"><span>🚗 Vehicle Performance</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Vehicle</th><th class="num">Entries</th><th class="num">Total Distance</th><th class="num">Total Spend</th><th class="num">Avg Cost / Unit</th><th>Trend (vs last month)</th><th>Last Fueling</th><th>Performance</th></tr></thead>
+        <tbody id="vehicleSpendTable"></tbody>
+      </table></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><span>💰 Total Vehicle Cost (Fuel + Service/Repair + Documents)</span></div>
+      <div class="pb">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+          <button class="tab" id="costRangeBtn_3" onclick="setCostRangeQuick('3')">3 Months</button>
+          <button class="tab" id="costRangeBtn_6" onclick="setCostRangeQuick('6')">6 Months</button>
+          <button class="tab" id="costRangeBtn_12" onclick="setCostRangeQuick('12')">1 Year</button>
+          <button class="tab on" id="costRangeBtn_all" onclick="setCostRangeQuick('all')">All Time</button>
+          <input type="date" id="costRangeFrom" onchange="setCostRangeCustom()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+          <span class="note">to</span>
+          <input type="date" id="costRangeTo" onchange="setCostRangeCustom()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+        </div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Vehicle</th><th class="num">Fuel</th><th class="num">Service/Repair</th><th class="num">Documents</th><th class="num">Total</th></tr></thead>
+          <tbody id="vehicleTotalCostTable"></tbody>
+        </table></div>
       </div>
-      <div class="grid3" style="margin-top:10px">
-        <div class="field"><label>Meter Reading Before Fueling <span style="color:var(--red)">*</span></label><input type="number" id="fMeterBefore"></div>
-        <div class="field"><label>Meter Reading After Fueling <span style="color:var(--red)">*</span></label><input type="number" id="fMeterAfter"></div>
-        <div class="field"><label>Fuel Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="fAmount"></div>
-      </div>
-      <div class="grid" style="margin-top:10px">
-        <div class="field"><label>Vehicle Meter Reading Photo</label><input type="file" id="fPhotoVehicle" accept="image/*" capture="environment"></div>
-        <div class="field"><label>Petrol Pump Meter Photo</label><input type="file" id="fPhotoPump" accept="image/*" capture="environment"></div>
-        <div class="field span2"><label>Payment Mode</label><input id="fPaymentMode" list="paymentModeList" placeholder="Cash / UPI / Card / Company Account"><datalist id="paymentModeList"></datalist></div>
-      </div>
-      <div style="margin-top:14px;text-align:right"><button class="btn primary" id="fuelSubmitBtn" onclick="addFuelEntry()">＋ Save Entry</button></div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><span>📈 Monthly Spend Trend</span></div>
+      <div class="pb"><div id="monthlyTrendChart"></div></div>
     </div>
   </div>
 
-  <div class="panel">
-    <div class="ph"><span>🚗 Vehicle Performance</span></div>
-    <div class="pb"><div class="tablewrap"><table>
-      <thead><tr><th>Vehicle</th><th class="num">Entries</th><th class="num">Total Distance</th><th class="num">Total Spend</th><th class="num">Avg Cost / Unit</th><th>Trend (vs last month)</th><th>Last Fueling</th><th>Performance</th></tr></thead>
-      <tbody id="vehicleSpendTable"></tbody>
-    </table></div></div>
+  <div id="page-vehicles" class="ftPage">
+    <div class="panel">
+      <div class="ph"><span>🚗 Vehicles</span><button class="btn small primary" onclick="openAddVehicleModal()">＋ Add Vehicle</button></div>
+      <div class="pb" id="vehiclesListWrap"></div>
+    </div>
   </div>
 
-  <div class="panel">
-    <div class="ph"><span>📈 Monthly Spend Trend</span></div>
-    <div class="pb"><div id="monthlyTrendChart"></div></div>
-  </div>
-
-  <div class="panel">
-    <div class="ph">
-      <span>Fuel History</span>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <button class="btn small secondary" onclick="exportFuelCSV()">⬇ Export CSV</button>
-        <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="onFuelFilterChange()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
+  <div id="page-documents" class="ftPage">
+    <div class="panel">
+      <div class="ph"><span>New Document Entry</span></div>
+      <div class="pb"><button class="btn primary" style="width:100%" onclick="openNewDocumentModal()">📄 ＋ Document Renew / Update</button></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span>📋 All Documents (Insurance / PUC / Permit / RC / Parking)</span></div>
+      <div class="pb">
+        <div class="tablewrap desktopTable"><table>
+          <thead><tr><th>Vehicle</th><th>Document</th><th>Start</th><th>Expiry</th><th class="num">Cost</th><th>Status</th><th>Soft Copy</th><th>Note</th></tr></thead>
+          <tbody id="allDocumentsTable"></tbody>
+        </table></div>
+        <div id="allDocumentsCards" class="mobileCards"></div>
       </div>
     </div>
-    <div class="pb"><div class="tablewrap"><table>
-      <thead><tr><th>Date</th><th>Vehicle</th><th>Meter (Before → After)</th><th class="num">Amount</th><th class="num">Cost/Unit</th><th>Payment</th><th>By</th><th>Photos</th><th>Action</th></tr></thead>
-      <tbody id="historyTable"></tbody>
-    </table></div></div>
+  </div>
+
+  <div id="page-fuel" class="ftPage">
+    <div class="panel">
+      <div class="ph"><span>New Fuel Entry</span><span class="note" id="entryByNote"></span></div>
+      <div class="pb"><button class="btn primary" style="width:100%" onclick="openNewFuelModal()">⛽ ＋ Fuel Entry</button></div>
+    </div>
+    <div class="panel">
+      <div class="ph">
+        <span>Fuel History</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn small secondary" onclick="exportFuelCSV()">⬇ Export CSV</button>
+          <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="onFuelFilterChange()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
+        </div>
+      </div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Date</th><th>Vehicle</th><th>Meter (Before → After)</th><th class="num">Amount</th><th class="num">Cost/Unit</th><th>Payment</th><th>By</th><th>Photos</th><th>Action</th></tr></thead>
+        <tbody id="historyTable"></tbody>
+      </table></div></div>
+    </div>
+  </div>
+
+  <div id="page-service" class="ftPage">
+    <div class="panel">
+      <div class="ph"><span>New Service / Repair Entry</span></div>
+      <div class="pb"><button class="btn primary" style="width:100%" onclick="openNewServiceModal()">🔧 ＋ Service / Repair Entry</button></div>
+    </div>
+    <div class="panel">
+      <div class="ph">
+        <span>Service &amp; Repair History</span>
+        <label id="showDeletedServiceWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeletedService" onchange="renderServiceHistory()" style="width:auto"> 🗑 Show Disabled (<span id="deletedServiceCount">0</span>)</label>
+      </div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Date</th><th>Vehicle</th><th>Type</th><th class="num">Amount</th><th>Note</th><th>Photo</th><th>By</th><th>Action</th></tr></thead>
+        <tbody id="serviceTable"></tbody>
+      </table></div></div>
+    </div>
   </div>
 </div>
 </div>
+
+<!-- New Fuel Entry modal -->
+<div class="modal" id="newFuelModal"><div class="box" style="width:min(560px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">⛽ New Fuel Entry</h3><button class="btn small" onclick="closeNewFuelModal()">✕</button></div>
+<div class="grid3">
+  <div class="field"><label>Vehicle Number <span style="color:var(--red)">*</span></label><input id="fVehicle" list="vehicleList" autocomplete="off"></div>
+  <div class="field"><label>Date</label><input type="date" id="fDate"></div>
+  <div class="field"><label>Unit <span style="color:var(--red)">*</span></label><select id="fUnit"><option value="KM">KM</option><option value="Miles">Miles</option></select></div>
+</div>
+<div class="grid3" style="margin-top:10px">
+  <div class="field"><label>Meter Reading Before Fueling <span style="color:var(--red)">*</span></label><input type="number" id="fMeterBefore"></div>
+  <div class="field"><label>Meter Reading After Fueling <span style="color:var(--red)">*</span></label><input type="number" id="fMeterAfter"></div>
+  <div class="field"><label>Fuel Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="fAmount"></div>
+</div>
+<div class="grid" style="margin-top:10px">
+  <div class="field"><label>Vehicle Meter Reading Photo</label><input type="file" id="fPhotoVehicle" accept="image/*" capture="environment"></div>
+  <div class="field"><label>Petrol Pump Meter Photo</label><input type="file" id="fPhotoPump" accept="image/*" capture="environment"></div>
+  <div class="field span2"><label>Payment Mode</label><input id="fPaymentMode" list="paymentModeList" placeholder="Cash / UPI / Card / Company Account"></div>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeNewFuelModal()">Cancel</button><button class="btn primary" id="fuelSubmitBtn" onclick="addFuelEntry()">＋ Save Entry</button></div>
+</div></div>
+
+<!-- Add Vehicle modal -->
+<div class="modal" id="addVehicleModal"><div class="box" style="width:min(460px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">🚗 Vehicle Onboard Karein</h3><button class="btn small" onclick="closeAddVehicleModal()">✕</button></div>
+<div class="grid">
+  <div class="field span2"><label>Vehicle Number <span style="color:var(--red)">*</span></label><input id="avNumber" placeholder="e.g. RJ14 AB 1234"></div>
+  <div class="field span2"><label>Vehicle Name / Model</label><input id="avName" placeholder="e.g. Delivery Van, TVS iQube, Honda City"></div>
+  <div class="field"><label>Vehicle Category</label><select id="avCategory"><option value="Car">🚗 Car</option><option value="Bike">🏍 Bike</option><option value="Scooter">🛵 Scooter (Activa etc.)</option><option value="Van">🚐 Van</option><option value="Other">Other</option></select></div>
+  <div class="field"><label>Vehicle Type</label><select id="avFuelType"><option value="Fuel">⛽ Fuel (Petrol/Diesel/CNG)</option><option value="Electric">⚡ Electric (EV)</option></select></div>
+  <div class="field"><label>Current Meter Reading <span style="color:var(--red)">*</span></label><input type="number" id="avMeter" placeholder="e.g. 15000"></div>
+  <div class="field span2"><label>Last Service Date</label><input type="date" id="avLastService"></div>
+  <div class="field span2"><label>Responsible Doer (is gaadi ka alert kisko jaaye)</label><select id="avResponsibleDoer"><option value="">-- Select --</option></select></div>
+</div>
+<div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.4px;margin:14px 0 6px">DOCUMENTS (jo apply ho wahi bharein, baaki khaali chhod dein)</div>
+<div id="avDocsWrap"></div>
+<p class="note" style="margin-top:8px">Document expiry hone par is Doer, Admin aur Accounts ko alert jayega. Baad mein Vehicles tab mein kisi bhi document ki pill par click karke renew/update bhi kar sakte hain.</p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeAddVehicleModal()">Cancel</button><button class="btn primary" onclick="onboardVehicle()">＋ Onboard Vehicle</button></div>
+</div></div>
+
+<!-- New Service/Repair Entry modal -->
+<div class="modal" id="newServiceModal"><div class="box" style="width:min(460px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">🔧 New Service / Repair Entry</h3><button class="btn small" onclick="closeNewServiceModal()">✕</button></div>
+<div class="grid3">
+  <div class="field"><label>Vehicle Number <span style="color:var(--red)">*</span></label><input id="sVehicle" list="vehicleList" autocomplete="off"></div>
+  <div class="field"><label>Type</label><select id="sType"><option>Service</option><option>Repair</option><option>Tyre Change</option><option>Other</option></select></div>
+  <div class="field"><label>Date</label><input type="date" id="sDate"></div>
+</div>
+<div class="grid" style="margin-top:10px">
+  <div class="field"><label>Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="sAmount"></div>
+  <div class="field"><label>Note (kaam kya hua)</label><input id="sNote" placeholder="e.g. Brake pads change"></div>
+  <div class="field span2"><label>Bill Photo</label><input type="file" id="sPhoto" accept="image/*" capture="environment"></div>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeNewServiceModal()">Cancel</button><button class="btn primary" id="serviceSubmitBtn" onclick="addServiceEntry()">＋ Save Entry</button></div>
+</div></div>
 
 <!-- Login modal -->
 <div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
@@ -209,6 +334,49 @@ tbody tr:hover td{background:#f7faf8}
 </div>
 <p class="note" style="margin-top:8px">Vehicle Number aur Photos yahan se edit nahi ho sakte — galat vehicle hone par entry Disable karke nayi entry banayein.</p>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditFuelModal()">Cancel</button><button class="btn primary" onclick="saveEditFuel()">Save</button></div>
+</div></div>
+
+<!-- Edit Service Entry modal -->
+<div class="modal" id="editServiceModal"><div class="box" style="width:min(420px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Edit Service/Repair Entry</h3><button class="btn small" onclick="closeEditServiceModal()">✕</button></div>
+<div class="grid">
+  <div class="field"><label>Date</label><input type="date" id="editSDate"></div>
+  <div class="field"><label>Amount (₹)</label><input type="number" id="editSAmount"></div>
+  <div class="field span2"><label>Note</label><input id="editSNote"></div>
+</div>
+<p class="note" style="margin-top:8px">Vehicle Number aur Type yahan se edit nahi ho sakte.</p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditServiceModal()">Cancel</button><button class="btn primary" onclick="saveEditService()">Save</button></div>
+</div></div>
+
+<!-- New Document Entry modal -->
+<div class="modal" id="newDocumentModal"><div class="box" style="width:min(420px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">📄 Document Renew / Update</h3><button class="btn small" onclick="closeNewDocumentModal()">✕</button></div>
+<div class="grid">
+  <div class="field span2"><label>Vehicle Number <span style="color:var(--red)">*</span></label><input id="ndVehicle" list="vehicleList" autocomplete="off"></div>
+  <div class="field span2"><label>Document Type</label><select id="ndDocType"></select></div>
+  <div class="field"><label>Start Date</label><input type="date" id="ndStart"></div>
+  <div class="field"><label>Expiry / End Date <span style="color:var(--red)">*</span></label><input type="date" id="ndEnd"></div>
+</div>
+<div class="field" style="margin-top:8px"><label>Renewal Cost (₹, optional)</label><input type="number" id="ndCost" placeholder="0"></div>
+<div class="field" style="margin-top:8px"><label>Note (optional)</label><input id="ndNote" placeholder="e.g. Policy number"></div>
+<div class="field" style="margin-top:8px"><label>Document Photo (optional)</label><input type="file" id="ndPhoto" accept="image/*" capture="environment"></div>
+<p class="note" style="margin-top:8px">Vehicle pehle se onboard hona chahiye (Vehicles tab se). Naya expiry date set karne par purana record Renewal History mein save ho jayega.</p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeNewDocumentModal()">Cancel</button><button class="btn primary" onclick="addDocumentEntry()">＋ Save Entry</button></div>
+</div></div>
+
+<!-- Edit Vehicle Document modal -->
+<div class="modal" id="editDocModal"><div class="box" style="width:min(380px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0" id="editDocTitle">Document</h3><button class="btn small" onclick="closeEditDocModal()">✕</button></div>
+<div class="grid">
+  <div class="field"><label>Start Date</label><input type="date" id="editDocStart"></div>
+  <div class="field"><label>Expiry Date</label><input type="date" id="editDocExpiry"></div>
+</div>
+<div class="field" style="margin-top:8px"><label>Renewal Cost (₹, optional)</label><input type="number" id="editDocCost" placeholder="0"></div>
+<div class="field" style="margin-top:8px"><label>Note (optional)</label><input id="editDocNote" placeholder="e.g. Policy number"></div>
+<div class="field" style="margin-top:8px"><label>Document Photo (optional)</label><input type="file" id="editDocPhoto" accept="image/*" capture="environment"></div>
+<p class="note" style="margin-top:8px">Date khaali chhod kar Save karne se yeh document "Set karein" status mein wapas chala jayega. Naya expiry date set karne par purana record neeche "Renewal History" mein save ho jayega.</p>
+<div id="editDocHistory"></div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditDocModal()">Cancel</button><button class="btn primary" onclick="saveVehicleDoc()">Save</button></div>
 </div></div>
 
 <!-- Manage modal -->
@@ -248,10 +416,10 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const todayISO=()=>new Date().toISOString().slice(0,10);
 const fmtAmt=n=>'₹'+Number(n||0).toLocaleString('en-IN');
 
-let users=[],fuelLog=[];
-let masters={vehicles:[],paymentModes:[],vehicleService:{}};
+let users=[],fuelLog=[],serviceLog=[];
+let masters={vehicles:[],paymentModes:[],vehicleService:{},vehicleServiceDate:{},vehicleCleaning:{},vehicleDocs:{},vehicleMeta:{}};
 let currentUser=null,currentTab='records';
-let usersStarted=false,fuelStarted=false,mastersStarted=false;
+let usersStarted=false,fuelStarted=false,mastersStarted=false,serviceStarted=false;
 
 function loggedUser(){return users.find(x=>x.id===currentUser)||null}
 
@@ -317,22 +485,30 @@ function startFuelSync(){
   if(fuelStarted||!db)return;fuelStarted=true;
   db.collection('fuel_log').orderBy('date','desc').onSnapshot(snap=>{fuelLog=[];snap.forEach(d=>fuelLog.push({id:d.id,...d.data()}));renderAll();},err=>console.error('fuel log sync error',err));
 }
+function startServiceSync(){
+  if(serviceStarted||!db)return;serviceStarted=true;
+  db.collection('vehicle_service_log').orderBy('date','desc').onSnapshot(snap=>{serviceLog=[];snap.forEach(d=>serviceLog.push({id:d.id,...d.data()}));renderAll();},err=>console.error('service log sync error',err));
+}
 let mastersSeedChecked=false;
 function seedStarterMastersIfEmpty(){
   if(mastersSeedChecked||!db)return;mastersSeedChecked=true;
   db.collection('fv_settings').doc('masters').get().then(doc=>{
     if(doc.exists)return; // already configured - never overwrite
-    db.collection('fv_settings').doc('masters').set({vehicles:[],paymentModes:['Cash','UPI','Card','Company Account']}).catch(e=>console.error('masters seed failed',e));
+    db.collection('fv_settings').doc('masters').set({vehicles:[],paymentModes:['Cash','UPI','Card','Company Account'],vehicleService:{},vehicleDocs:{}}).catch(e=>console.error('masters seed failed',e));
   }).catch(e=>console.error('masters seed check failed',e));
 }
 function startMastersSync(){
   if(mastersStarted||!db)return;mastersStarted=true;
   seedStarterMastersIfEmpty();
-  db.collection('fv_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={vehicles:[],paymentModes:[],vehicleService:{},...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  db.collection('fv_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={vehicles:[],paymentModes:[],vehicleService:{},vehicleServiceDate:{},vehicleCleaning:{},vehicleDocs:{},vehicleMeta:{},...doc.data()};renderAll();},err=>console.error('masters sync error',err));
 }
 function saveMasters(){ if(db) db.collection('fv_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
 
 /* ===== Nav / gate ===== */
+function goPage(id){
+  document.querySelectorAll('.ftPage').forEach(p=>p.classList.toggle('on',p.id==='page-'+id));
+  document.querySelectorAll('.pageTabs .tab').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
+}
 function renderGate(){
   const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
   const u=loggedUser();
@@ -340,8 +516,8 @@ function renderGate(){
     gateWrap.style.display='flex';appWrap.style.display='none';
     const inFrame=window.self!==window.top;
     gateBox.innerHTML=inFrame
-      ? `<h3>Login Required</h3><p class="note">Fuel Tracker dekhne ke liye Bliss One dashboard se login karein.</p><button class="btn primary" onclick="loginFromHub()">Login</button>`
-      : `<h3>Login Required</h3><p class="note">Fuel Tracker dekhne ke liye login karein — wahi username/password jo baaki Bliss apps me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
+      ? `<h3>Login Required</h3><p class="note">Vehicle Tracker dekhne ke liye Bliss One dashboard se login karein.</p><button class="btn primary" onclick="loginFromHub()">Login</button>`
+      : `<h3>Login Required</h3><p class="note">Vehicle Tracker dekhne ke liye login karein — wahi username/password jo baaki Bliss apps me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
     return;
   }
   if(u.appAccess && u.appAccess[APP_SLUG]===false){
@@ -363,6 +539,12 @@ function applyFeatureVisibility(){
 function renderSelects(){
   if($('vehicleList'))$('vehicleList').innerHTML=(masters.vehicles||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
   if($('paymentModeList'))$('paymentModeList').innerHTML=(masters.paymentModes||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+  if($('avResponsibleDoer')){
+    const cur=$('avResponsibleDoer').value;
+    const au=users.filter(u=>u.active!==false);
+    $('avResponsibleDoer').innerHTML='<option value="">-- Select --</option>'+au.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+    if(au.some(u=>u.id===cur))$('avResponsibleDoer').value=cur;
+  }
 }
 
 /* ===== Photo compression (client-side, keeps everything on the Spark/free plan — no
@@ -397,6 +579,14 @@ async function compressPhoto(file){
 }
 
 /* ===== Entry form ===== */
+function openNewFuelModal(){
+  $('fVehicle').value='';$('fMeterBefore').value='';$('fMeterAfter').value='';$('fAmount').value='';$('fPaymentMode').value='';
+  if($('fPhotoVehicle'))$('fPhotoVehicle').value='';
+  if($('fPhotoPump'))$('fPhotoPump').value='';
+  $('fDate').value=todayISO();
+  $('newFuelModal').classList.add('show');
+}
+function closeNewFuelModal(){$('newFuelModal')?.classList.remove('show');}
 let _fuelSubmitting=false;
 async function addFuelEntry(){
   if(_fuelSubmitting)return;
@@ -426,6 +616,7 @@ async function addFuelEntry(){
     if(paymentMode && !masters.paymentModes.includes(paymentMode)){masters.paymentModes.push(paymentMode);saveMasters();}
     $('fVehicle').value='';$('fMeterBefore').value='';$('fMeterAfter').value='';$('fAmount').value='';$('fPaymentMode').value='';
     $('fPhotoVehicle').value='';$('fPhotoPump').value='';
+    closeNewFuelModal();
     toast('Fuel entry saved');
   }catch(e){
     console.error('fuel entry save failed',e);
@@ -461,9 +652,6 @@ async function permanentlyDeleteFuelEntry(id,skipConfirm){
   }catch(e){ console.error('permanent delete failed',e); alert('Delete fail ho gaya, dobara try karein.'); return; }
   toast('Entry permanently delete ho gayi');
 }
-// Quick typo-fix for the numbers (meter/amount/payment mode/date) - Vehicle and photos stay
-// fixed here; a genuinely wrong vehicle is better fixed via Disable + a fresh entry than
-// half-migrated through this modal.
 let editFuelTarget=null;
 function openEditFuelModal(id){
   if(!superAdminUnlocked){alert('Sirf Super Admin entry edit kar sakta hai.');return}
@@ -543,7 +731,6 @@ function renderVehiclePerformance(){
     else if(mk===lastMonth){d.lastMonthDist+=dist;d.lastMonthSpend+=(x.amount||0);}
   });
   const vehicles=Object.entries(byVehicle);
-  // Best/Needs Attention badge only makes sense when comparing 2+ vehicles with real distance.
   const withAvg=vehicles.filter(([,d])=>d.distance>0).map(([v,d])=>({v,avg:d.spend/d.distance}));
   let bestVehicle=null,worstVehicle=null;
   if(withAvg.length>1){
@@ -570,9 +757,6 @@ function renderVehiclePerformance(){
     return `<tr><td><b>${esc(v)}</b></td><td class="num">${d.entries}</td><td class="num">${d.distance.toLocaleString('en-IN')}</td><td class="num">${fmtAmt(d.spend)}</td><td class="num">${avg!==null?'₹'+avg.toFixed(2):'-'}</td><td>${trendHtml}</td><td>${lastFuelHtml}</td><td>${badge}</td></tr>`;
   }).join('')||`<tr><td colspan="8"><div class="emptystate">⛽<p>Koi data nahi hai.</p></div></td></tr>`;
 }
-// A single fill-up costing much more per unit than that vehicle's own recent history is a
-// useful early signal (fuel theft, a leak, a mechanical fault) - compares the latest live
-// entry's cost/unit against the distance-weighted average of that vehicle's earlier entries.
 const MILEAGE_ALERT_THRESHOLD_PCT=25;
 function computeMileageAlerts(){
   const live=liveFuel();
@@ -596,15 +780,23 @@ function computeMileageAlerts(){
   });
   return alerts.sort((a,b)=>b.pct-a.pct);
 }
-// Each vehicle's own fuel history is the only odometer record this app has - no separate
-// "service log," so "last service meter" lives in masters.vehicleService (Super Admin sets
-// it via "Mark Serviced"), and due-ness is just current meter minus that baseline.
 const SERVICE_INTERVAL_KM=5000;
+const SERVICE_INTERVAL_DAYS=90;
+function lastServiceDateOf(v){
+  return (masters.vehicleServiceDate&&masters.vehicleServiceDate[v])||(masters.vehicleMeta&&masters.vehicleMeta[v]&&masters.vehicleMeta[v].lastServiceDate)||'';
+}
 function latestMeterByVehicle(){
   const map={};
   liveFuel().forEach(x=>{
     const cur=map[x.vehicle];
     if(!cur||String(x.date)>String(cur.date)||(x.date===cur.date&&String(x.at||'')>String(cur.at||'')))map[x.vehicle]={date:x.date,at:x.at,meter:x.meterAfter};
+  });
+  // No fuel entries yet for a freshly-onboarded vehicle - fall back to the meter reading
+  // captured at onboarding time, so Service Due / current-meter display isn't just blank.
+  (masters.vehicles||[]).forEach(v=>{
+    if(!map[v]&&masters.vehicleMeta&&masters.vehicleMeta[v]&&masters.vehicleMeta[v].onboardMeter!=null){
+      map[v]={date:masters.vehicleMeta[v].onboardDate||todayISO(),at:'',meter:masters.vehicleMeta[v].onboardMeter};
+    }
   });
   return map;
 }
@@ -614,20 +806,28 @@ function computeServiceReminders(){
   Object.entries(latest).forEach(([v,info])=>{
     const lastService=(masters.vehicleService&&masters.vehicleService[v])||0;
     const sinceService=info.meter-lastService;
-    if(sinceService>=SERVICE_INTERVAL_KM)due.push({vehicle:v,sinceService,currentMeter:info.meter});
+    const kmDue=sinceService>=SERVICE_INTERVAL_KM;
+    const lastDate=lastServiceDateOf(v);
+    const daysSinceService=lastDate?daysSince(lastDate):null;
+    const dateDue=daysSinceService!=null&&daysSinceService>=SERVICE_INTERVAL_DAYS;
+    if(kmDue||dateDue)due.push({vehicle:v,sinceService,currentMeter:info.meter,kmDue,dateDue,daysSinceService,lastDate});
   });
-  return due.sort((a,b)=>b.sinceService-a.sinceService);
+  return due.sort((a,b)=>(b.sinceService||0)-(a.sinceService||0));
 }
 function renderServiceReminders(){
   const wrap=$('serviceReminders');
   if(!wrap)return;
   const due=computeServiceReminders();
   if(!due.length){wrap.innerHTML='';return;}
-  wrap.innerHTML=`<div class="panel"><div class="ph"><span>🔧 Service Due</span></div><div class="pb">${due.map(d=>`
-    <div class="item">
-      <span><b>${esc(d.vehicle)}</b> — ${d.sinceService.toLocaleString('en-IN')} km since last service (current meter ${d.currentMeter.toLocaleString('en-IN')})</span>
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>🔧 Service Due</span></div><div class="pb">${due.map(d=>{
+    const reasons=[];
+    if(d.kmDue)reasons.push(d.sinceService.toLocaleString('en-IN')+' km since last service');
+    if(d.dateDue)reasons.push(d.daysSinceService+' din se service nahi hui'+(d.lastDate?' (last: '+esc(d.lastDate)+')':' (last service date pata nahi)'));
+    return `<div class="item">
+      <span><b>${esc(d.vehicle)}</b> — ${reasons.join(' • ')} (current meter ${d.currentMeter.toLocaleString('en-IN')})</span>
       ${superAdminUnlocked?`<button class="btn small primary" onclick="markVehicleServiced('${esc(d.vehicle)}')">✓ Mark Serviced</button>`:'<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ Due</span>'}
-    </div>`).join('')}</div></div>`;
+    </div>`;
+  }).join('')}</div></div>`;
 }
 async function markVehicleServiced(vehicle){
   if(!superAdminUnlocked){alert('Sirf Super Admin service mark kar sakta hai.');return}
@@ -636,9 +836,58 @@ async function markVehicleServiced(vehicle){
   if(!confirm(vehicle+' ko abhi service ho gayi (meter '+meter.toLocaleString('en-IN')+') mark karna hai?'))return;
   if(!masters.vehicleService)masters.vehicleService={};
   masters.vehicleService[vehicle]=meter;
+  if(!masters.vehicleServiceDate)masters.vehicleServiceDate={};
+  masters.vehicleServiceDate[vehicle]=todayISO();
   saveMasters();
   renderServiceReminders();
   toast('Service mark ho gayi');
+}
+/* ===== Weekly Vehicle Cleaning task — simple, fixed to the calendar week: every
+   Monday a fresh cleaning task starts for each vehicle, due until marked clean that
+   same week. No day-counting, just "cleaned since this Monday or not". ===== */
+function mostRecentMonday(){
+  const d=new Date(todayISO());
+  const day=d.getDay(); // 0=Sun..6=Sat
+  const diffFromMonday=(day===0?6:day-1);
+  d.setDate(d.getDate()-diffFromMonday);
+  return d.toISOString().slice(0,10);
+}
+function computeCleaningReminders(){
+  const weekStart=mostRecentMonday();
+  const due=[];
+  (masters.vehicles||[]).forEach(v=>{
+    const lastCleaned=(masters.vehicleCleaning&&masters.vehicleCleaning[v])||'';
+    if(!lastCleaned||lastCleaned<weekStart)due.push({vehicle:v,lastCleaned});
+  });
+  return due;
+}
+function renderCleaningReminders(){
+  const wrap=$('cleaningReminders');
+  if(!wrap)return;
+  const due=computeCleaningReminders();
+  if(!due.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>🧽 Is Hafte ki Cleaning Due (har Monday se naya)</span></div><div class="pb">${due.map(d=>{
+    const meta=(masters.vehicleMeta&&masters.vehicleMeta[d.vehicle])||{};
+    const doerName=meta.responsibleDoer?nameOfUserId(meta.responsibleDoer):null;
+    const recipients=[doerName,'Admin','Accounts'].filter(Boolean).join(', ');
+    const reason=d.lastCleaned?'Is hafte abhi clean nahi hui (last: '+esc(d.lastCleaned)+')':'Kabhi clean mark nahi hui';
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:4px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <span><b>${esc(d.vehicle)}</b> — ${reason}</span>
+        ${superAdminUnlocked?`<button class="btn small primary" onclick="markVehicleCleaned('${esc(d.vehicle)}')">✓ Mark Cleaned</button>`:'<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ Due</span>'}
+      </div>
+      <small class="note">📲 WhatsApp jayega: ${esc(recipients)} (app khulte hi — real sending GREEN-API connect hone ke baad)</small>
+    </div>`;
+  }).join('')}</div></div>`;
+}
+async function markVehicleCleaned(vehicle){
+  if(!superAdminUnlocked){alert('Sirf Super Admin cleaning mark kar sakta hai.');return}
+  if(!confirm(vehicle+' ko abhi clean kiya gaya mark karna hai?'))return;
+  if(!masters.vehicleCleaning)masters.vehicleCleaning={};
+  masters.vehicleCleaning[vehicle]=todayISO();
+  saveMasters();
+  renderCleaningReminders();
+  toast('Cleaning mark ho gayi');
 }
 function renderMileageAlerts(){
   const wrap=$('mileageAlerts');
@@ -655,9 +904,416 @@ function renderMileageAlerts(){
     </div>`).join('')}</div></div>`;
 }
 
-/* ===== Monthly Spend Trend — single series (overall spend), so one brand hue is correct
-   and no legend is needed; thin bars, rounded data-ends, direct value+month labels, and a
-   lightweight hover tooltip. ===== */
+/* ===== Vehicle Documents (Insurance / PUC / Permit / RC / Parking Pass) =====
+   Stored on the same masters doc as vehicleService — one small record per
+   vehicle+doc-type, Super Admin only to edit. No background job can run on
+   the Spark plan, so "alert" here means: show a banner the moment anyone
+   opens the app while a document is within 15 days of (or past) expiry —
+   not a true scheduled push. */
+const DOC_TYPES=[{key:'insurance',label:'Insurance',icon:'🛡'},{key:'puc',label:'PUC',icon:'🌫'},{key:'permit',label:'Permit',icon:'📄'},{key:'rc',label:'RC / Road Tax',icon:'🪪'},{key:'parking',label:'Parking Pass',icon:'🅿️'}];
+const CATEGORY_ICONS={Car:'🚗',Bike:'🏍',Scooter:'🛵',Van:'🚐',Truck:'🚚',Other:'🚗'};
+function openAddVehicleModal(){
+  $('avNumber').value='';$('avMeter').value='';$('avLastService').value='';
+  if($('avName'))$('avName').value='';
+  if($('avCategory'))$('avCategory').value='Car';
+  if($('avResponsibleDoer'))$('avResponsibleDoer').value='';
+  if($('avFuelType'))$('avFuelType').value='Fuel';
+  if($('avDocsWrap')){
+    $('avDocsWrap').innerHTML=DOC_TYPES.map(dt=>`<div class="grid" style="margin-bottom:8px">
+      <div class="field"><label>${dt.icon} ${esc(dt.label)} — Start</label><input type="date" id="avDocStart_${dt.key}"></div>
+      <div class="field"><label>${dt.icon} ${esc(dt.label)} — End</label><input type="date" id="avDocEnd_${dt.key}"></div>
+    </div>`).join('');
+  }
+  $('addVehicleModal').classList.add('show');
+}
+function closeAddVehicleModal(){$('addVehicleModal')?.classList.remove('show');}
+function onboardVehicle(){
+  const number=$('avNumber').value.trim();
+  const meter=parseFloat($('avMeter').value);
+  const lastService=$('avLastService').value;
+  const responsibleDoer=$('avResponsibleDoer')?$('avResponsibleDoer').value:'';
+  const fuelType=$('avFuelType')?$('avFuelType').value:'Fuel';
+  const category=$('avCategory')?$('avCategory').value:'Car';
+  const name=$('avName')?$('avName').value.trim():'';
+  if(!number){alert('Vehicle Number zaroori hai.');return}
+  if(isNaN(meter)){alert('Current Meter Reading zaroori hai.');return}
+  if(!masters.vehicles)masters.vehicles=[];
+  if(!masters.vehicles.includes(number))masters.vehicles.push(number);
+  if(!masters.vehicleMeta)masters.vehicleMeta={};
+  masters.vehicleMeta[number]={onboardMeter:meter,onboardDate:todayISO(),lastServiceDate:lastService||'',responsibleDoer,fuelType,category,name};
+  DOC_TYPES.forEach(dt=>{
+    const startEl=$('avDocStart_'+dt.key),endEl=$('avDocEnd_'+dt.key);
+    const startDate=startEl?startEl.value:'',expiryDate=endEl?endEl.value:'';
+    if(!startDate&&!expiryDate)return;
+    if(!masters.vehicleDocs)masters.vehicleDocs={};
+    if(!masters.vehicleDocs[number])masters.vehicleDocs[number]={};
+    masters.vehicleDocs[number][dt.key]={startDate,expiryDate,note:''};
+  });
+  if(lastService){
+    if(!masters.vehicleService)masters.vehicleService={};
+    masters.vehicleService[number]=meter;
+  }
+  saveMasters();
+  closeAddVehicleModal();
+  toast('Vehicle onboard ho gaya');
+}
+const DOC_ALERT_DAYS=15;
+function docDaysLeft(expiryDate){
+  if(!expiryDate)return null;
+  const ms=new Date(expiryDate).getTime()-new Date(todayISO()).getTime();
+  return Math.round(ms/86400000);
+}
+function computeDocAlerts(){
+  const alerts=[];
+  (masters.vehicles||[]).forEach(v=>{
+    const vd=(masters.vehicleDocs&&masters.vehicleDocs[v])||{};
+    const meta=(masters.vehicleMeta&&masters.vehicleMeta[v])||{};
+    const doerName=meta.responsibleDoer?nameOfUserId(meta.responsibleDoer):null;
+    DOC_TYPES.forEach(dt=>{
+      const rec=vd[dt.key];
+      if(!rec||!rec.expiryDate)return;
+      const days=docDaysLeft(rec.expiryDate);
+      if(days<=DOC_ALERT_DAYS)alerts.push({vehicle:v,docKey:dt.key,docLabel:dt.label,expiryDate:rec.expiryDate,days,doerName});
+    });
+  });
+  return alerts.sort((a,b)=>a.days-b.days);
+}
+function renderDocAlerts(){
+  const wrap=$('docAlerts');
+  if(!wrap)return;
+  const alerts=computeDocAlerts();
+  if(!alerts.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>📋 Document Alerts</span></div><div class="pb">${alerts.map(a=>{
+    const expired=a.days<0;
+    const recipients=[a.doerName,'Admin','Accounts'].filter(Boolean).join(', ');
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:4px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <span><b>${esc(a.vehicle)}</b> — ${esc(a.docLabel)} ${expired?`<span style="color:var(--red);font-weight:700">EXPIRED</span> (${esc(a.expiryDate)})`:`expire ho raha hai <b>${a.days} din</b> mein (${esc(a.expiryDate)})`}</span>
+        <span class="pill" style="background:${expired?'var(--redbg)':'var(--amberbg)'};color:${expired?'var(--red)':'var(--amber)'}">${expired?'⛔ Expired':'⚠ Renew Soon'}</span>
+      </div>
+      <small class="note">📲 WhatsApp jayega: ${esc(recipients)} (app khulte hi — real sending GREEN-API connect hone ke baad)</small>
+    </div>`;
+  }).join('')}</div></div>`;
+}
+function renderVehicleDocuments(){
+  const wrap=$('vehiclesListWrap');
+  if(!wrap)return;
+  const vehicles=masters.vehicles||[];
+  if(!vehicles.length){wrap.innerHTML=`<div class="emptystate">🚗<p>Koi vehicle onboard nahi hua abhi.</p><small>Upar se "+ Add Vehicle" se pehla vehicle onboard karein.</small></div>`;return;}
+  const latest=latestMeterByVehicle();
+  wrap.innerHTML=vehicles.map(v=>{
+    const vd=(masters.vehicleDocs&&masters.vehicleDocs[v])||{};
+    const meta=(masters.vehicleMeta&&masters.vehicleMeta[v])||{};
+    const ins=vd.insurance||{};
+    const curMeter=(latest[v]||{}).meter;
+    const pills=DOC_TYPES.map(dt=>{
+      const rec=vd[dt.key];
+      const days=rec&&rec.expiryDate?docDaysLeft(rec.expiryDate):null;
+      let bg='var(--mint)',color='var(--g)',statusText='Set karein';
+      if(days!=null){
+        if(days<0){bg='var(--redbg)';color='var(--red)';statusText='Expired '+esc(rec.expiryDate);}
+        else if(days<=DOC_ALERT_DAYS){bg='var(--amberbg)';color='var(--amber)';statusText=days+' din baaki ('+esc(rec.expiryDate)+')';}
+        else{statusText='Valid tak '+esc(rec.expiryDate);}
+      }
+      const clickable=superAdminUnlocked?` onclick="openEditVehicleDocModal('${esc(v)}','${dt.key}')" style="cursor:pointer"`:'';
+      const photoBtn=rec&&rec.photo?` <button class="btn small secondary" style="padding:2px 6px;font-size:10px" onclick="event.stopPropagation();showDocPhoto('${esc(v)}','${dt.key}')" title="Photo dekhein">📷</button>`:'';
+      return `<span class="pill" style="background:${bg};color:${color}"${clickable}>${dt.icon} ${esc(dt.label)}: ${statusText}</span>${photoBtn}`;
+    }).join(' ');
+    const doerName=meta.responsibleDoer?nameOfUserId(meta.responsibleDoer):null;
+    const catIcon=CATEGORY_ICONS[meta.category]||'🚗';
+    const evBadge=meta.fuelType==='Electric'?' <span class="pill" style="background:var(--mint);color:var(--g)">⚡ EV</span>':'';
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:8px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><b style="font-size:15px">${catIcon} ${esc(v)}${meta.name?' — '+esc(meta.name):''}</b>${evBadge}<span class="note">Current Meter: <b>${curMeter!=null?curMeter.toLocaleString('en-IN'):'-'}</b></span></div>
+      <div class="note">Insurance: ${ins.startDate?esc(ins.startDate):'-'} → ${ins.expiryDate?esc(ins.expiryDate):'-'}${meta.lastServiceDate?' • Last Service: '+esc(meta.lastServiceDate):''}${doerName?' • Responsible: '+esc(doerName):''}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${pills}</div>
+    </div>`;
+  }).join('');
+}
+function renderAllDocumentsTable(){
+  const wrap=$('allDocumentsTable');
+  if(!wrap)return;
+  const rows=[];
+  (masters.vehicles||[]).forEach(v=>{
+    const vd=(masters.vehicleDocs&&masters.vehicleDocs[v])||{};
+    DOC_TYPES.forEach(dt=>{
+      const rec=vd[dt.key];
+      if(!rec||!rec.expiryDate)return;
+      const days=docDaysLeft(rec.expiryDate);
+      let statusHtml;
+      if(days<0)statusHtml=`<span class="pill" style="background:var(--redbg);color:var(--red)">⛔ Expired</span>`;
+      else if(days<=DOC_ALERT_DAYS)statusHtml=`<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ ${days} din baaki</span>`;
+      else statusHtml=`<span class="pill" style="background:var(--mint);color:var(--g)">✓ Valid</span>`;
+      rows.push({vehicle:v,docKey:dt.key,label:dt.icon+' '+dt.label,startDate:rec.startDate||'-',expiryDate:rec.expiryDate,cost:rec.cost||0,statusHtml,note:rec.note||'-',days,hasPhoto:!!rec.photo});
+    });
+  });
+  rows.sort((a,b)=>a.days-b.days);
+  wrap.innerHTML=rows.length?rows.map(r=>{
+    const photoHtml=r.hasPhoto?`<button class="btn small secondary" style="padding:2px 8px;font-size:11px" onclick="showDocPhoto('${esc(r.vehicle)}','${r.docKey}')">📷 View</button>`:'<small class="note">-</small>';
+    return `<tr><td><b>${esc(r.vehicle)}</b></td><td>${esc(r.label)}</td><td>${esc(r.startDate)}</td><td>${esc(r.expiryDate)}</td><td class="num">${r.cost?fmtAmt(r.cost):'-'}</td><td>${r.statusHtml}</td><td>${photoHtml}</td><td>${esc(r.note)}</td></tr>`;
+  }).join(''):`<tr><td colspan="8"><div class="emptystate">📋<p>Abhi koi document set nahi hua.</p><small>Upar se "Document Renew / Update" se pehla document set karein.</small></div></td></tr>`;
+  const cardsWrap=$('allDocumentsCards');
+  if(cardsWrap){
+    cardsWrap.innerHTML=rows.length?rows.map(r=>{
+      const photoBtn=r.hasPhoto?`<button class="btn small secondary" style="padding:3px 9px;font-size:11px;margin-top:6px" onclick="showDocPhoto('${esc(r.vehicle)}','${r.docKey}')">📷 Soft Copy Dekhein</button>`:'';
+      return `<div class="docCard">
+        <div class="dcTop"><span class="dcLabel">${esc(r.vehicle)} — ${esc(r.label)}</span>${r.statusHtml}</div>
+        <div class="dcMeta">${esc(r.startDate)} → ${esc(r.expiryDate)}${r.cost?' • '+fmtAmt(r.cost):''}${r.note!=='-'?' • '+esc(r.note):''}</div>
+        ${photoBtn}
+      </div>`;
+    }).join(''):`<div class="emptystate">📋<p>Abhi koi document set nahi hua.</p><small>Upar se "Document Renew / Update" se pehla document set karein.</small></div>`;
+  }
+}
+let editDocTarget=null;
+function openEditVehicleDocModal(vehicle,docKey){
+  if(!superAdminUnlocked){alert('Sirf Super Admin document update kar sakta hai.');return}
+  editDocTarget={vehicle,docKey};
+  const dt=DOC_TYPES.find(d=>d.key===docKey);
+  const rec=(masters.vehicleDocs&&masters.vehicleDocs[vehicle]&&masters.vehicleDocs[vehicle][docKey])||{};
+  $('editDocTitle').textContent=dt.icon+' '+dt.label+' — '+vehicle;
+  $('editDocStart').value=rec.startDate||'';
+  $('editDocExpiry').value=rec.expiryDate||'';
+  $('editDocCost').value=rec.cost||'';
+  $('editDocNote').value=rec.note||'';
+  if($('editDocPhoto'))$('editDocPhoto').value='';
+  const history=(rec.history||[]).slice().reverse();
+  if($('editDocHistory')){
+    $('editDocHistory').innerHTML=history.length?`<div style="margin-top:12px"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.4px;margin-bottom:6px">RENEWAL HISTORY</div>${history.map(h=>
+      `<div class="item" style="padding:7px 0"><span>${h.startDate?esc(h.startDate)+' → ':''}${esc(h.expiryDate||'-')} tak valid tha${h.cost?' • '+fmtAmt(h.cost):''}${h.note?' • '+esc(h.note):''}</span><small class="note">Renewed on ${esc(h.renewedAt||'-')}</small></div>`
+    ).join('')}</div>`:'';
+  }
+  $('editDocModal').classList.add('show');
+}
+function closeEditDocModal(){$('editDocModal')?.classList.remove('show');editDocTarget=null;}
+function showDocPhoto(vehicle,docKey){
+  const rec=(masters.vehicleDocs&&masters.vehicleDocs[vehicle]&&masters.vehicleDocs[vehicle][docKey])||{};
+  if(!rec.photo)return;
+  $('photoModalImg').src=rec.photo;
+  $('photoModal').classList.add('show');
+}
+// Shared by both entry points into document saving: the per-pill Edit modal (Vehicles
+// tab) and the New Document Entry modal (Documents tab). A genuine renewal (expiry
+// actually changing from a previously-set one) archives the old record instead of
+// silently overwriting it, so past renewals stay visible. Returns true if a renewal
+// was archived, so callers can tailor their toast message.
+async function saveDocRecord(vehicle,docKey,startDate,expiryDate,costRaw,note,photoFile){
+  const cost=costRaw?parseFloat(costRaw):null;
+  const newPhoto=await compressPhoto(photoFile);
+  if(!masters.vehicleDocs)masters.vehicleDocs={};
+  if(!masters.vehicleDocs[vehicle])masters.vehicleDocs[vehicle]={};
+  const existing=masters.vehicleDocs[vehicle][docKey]||{};
+  const history=(existing.history||[]).slice();
+  const renewed=!!(existing.expiryDate && expiryDate && existing.expiryDate!==expiryDate);
+  if(renewed){
+    const {history:_old,...prevSnapshot}=existing;
+    history.push({...prevSnapshot,renewedAt:todayISO()});
+  }
+  masters.vehicleDocs[vehicle][docKey]=expiryDate?{...existing,startDate,expiryDate,cost,note,...(newPhoto?{photo:newPhoto}:{}),history}:null;
+  saveMasters();
+  return renewed;
+}
+async function saveVehicleDoc(){
+  if(!editDocTarget)return;
+  const startDate=$('editDocStart').value;
+  const expiryDate=$('editDocExpiry').value;
+  const costVal=$('editDocCost').value;
+  const note=$('editDocNote').value.trim();
+  const photoFile=$('editDocPhoto')?($('editDocPhoto').files[0]||null):null;
+  const renewed=await saveDocRecord(editDocTarget.vehicle,editDocTarget.docKey,startDate,expiryDate,costVal,note,photoFile);
+  closeEditDocModal();
+  toast('Document update ho gaya'+(renewed?' — purana record history mein save ho gaya':''));
+  renderVehicleDocuments();
+  renderAllDocumentsTable();
+  renderDocAlerts();
+}
+function openNewDocumentModal(){
+  $('ndVehicle').value='';$('ndStart').value='';$('ndEnd').value='';$('ndCost').value='';$('ndNote').value='';
+  if($('ndPhoto'))$('ndPhoto').value='';
+  if($('ndDocType'))$('ndDocType').innerHTML=DOC_TYPES.map(dt=>`<option value="${dt.key}">${dt.icon} ${esc(dt.label)}</option>`).join('');
+  $('newDocumentModal').classList.add('show');
+}
+function closeNewDocumentModal(){$('newDocumentModal')?.classList.remove('show');}
+async function addDocumentEntry(){
+  const vehicle=$('ndVehicle').value.trim();
+  const docKey=$('ndDocType').value;
+  if(!vehicle){alert('Vehicle Number zaroori hai.');return}
+  if(!masters.vehicles||!masters.vehicles.includes(vehicle)){alert('Yeh vehicle pehle onboard karein (Vehicles tab se "+ Add Vehicle").');return}
+  const startDate=$('ndStart').value;
+  const expiryDate=$('ndEnd').value;
+  if(!expiryDate){alert('Expiry / End Date zaroori hai.');return}
+  const costVal=$('ndCost').value;
+  const note=$('ndNote').value.trim();
+  const photoFile=$('ndPhoto')?($('ndPhoto').files[0]||null):null;
+  const renewed=await saveDocRecord(vehicle,docKey,startDate,expiryDate,costVal,note,photoFile);
+  closeNewDocumentModal();
+  toast('Document entry save ho gayi'+(renewed?' — purana record history mein chala gaya':''));
+  renderVehicleDocuments();
+  renderAllDocumentsTable();
+  renderDocAlerts();
+}
+
+/* ===== Service & Repair Log — separate from Fuel, same shared pattern (Super
+   Admin only can Edit/Disable/Restore/Permanently Delete, same as Fuel). ===== */
+function liveService(){return serviceLog.filter(x=>!x.deletedAt)}
+const SERVICE_TYPES=['Service','Repair','Tyre Change','Other'];
+let _serviceSubmitting=false;
+function openNewServiceModal(){
+  $('sVehicle').value='';$('sAmount').value='';$('sNote').value='';
+  $('sType').value='Service';
+  $('sDate').value=todayISO();
+  if($('sPhoto'))$('sPhoto').value='';
+  $('newServiceModal').classList.add('show');
+}
+function closeNewServiceModal(){$('newServiceModal')?.classList.remove('show');}
+async function addServiceEntry(){
+  if(_serviceSubmitting)return;
+  const vehicle=$('sVehicle').value.trim();
+  const type=$('sType').value||'Service';
+  const date=$('sDate').value||todayISO();
+  const amount=parseFloat($('sAmount').value);
+  const note=$('sNote').value.trim();
+  if(!vehicle){alert('Vehicle Number zaroori hai.');return}
+  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  _serviceSubmitting=true;
+  const btn=$('serviceSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const billPhotoFile=$('sPhoto')?($('sPhoto').files[0]||null):null;
+    const billPhoto=await compressPhoto(billPhotoFile);
+    const actor=loggedUser();
+    const payload={vehicle,type,date,amount,note,by:actor?actor.id:'',at:new Date().toISOString()};
+    if(billPhoto)payload.billPhoto=billPhoto;
+    await db.collection('vehicle_service_log').add(payload);
+    let mastersChanged=false;
+    if(vehicle && !masters.vehicles.includes(vehicle)){masters.vehicles.push(vehicle);mastersChanged=true;}
+    if(type==='Service'){
+      if(!masters.vehicleServiceDate)masters.vehicleServiceDate={};
+      if(!masters.vehicleServiceDate[vehicle]||date>masters.vehicleServiceDate[vehicle]){masters.vehicleServiceDate[vehicle]=date;mastersChanged=true;}
+    }
+    if(mastersChanged)saveMasters();
+    $('sVehicle').value='';$('sAmount').value='';$('sNote').value='';
+    if($('sPhoto'))$('sPhoto').value='';
+    closeNewServiceModal();
+    toast('Service/Repair entry saved');
+  }finally{
+    _serviceSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
+}
+async function deleteServiceEntry(id,skipConfirm){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entry disable kar sakta hai.');return}
+  if(!skipConfirm&&!confirm('Yeh entry Disabled list me chali jayegi. Confirm karein?'))return;
+  const actor=loggedUser();
+  await db.collection('vehicle_service_log').doc(id).update({deletedAt:new Date().toISOString(),deletedBy:actor?actor.id:'Unknown'});
+  toast('Entry disabled');
+}
+async function restoreServiceEntry(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin restore kar sakta hai.');return}
+  await db.collection('vehicle_service_log').doc(id).update({deletedAt:firebase.firestore.FieldValue.delete(),deletedBy:firebase.firestore.FieldValue.delete()});
+  toast('Entry restored');
+}
+async function permanentlyDeleteServiceEntry(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin permanently delete kar sakta hai.');return}
+  const typed=prompt('Yeh entry HAMESHA KE LIYE delete ho jayegi. Confirm karne ke liye "DELETE" type karein:');
+  if(typed!=='DELETE'){toast('Permanent delete cancel ho gaya');return}
+  await db.collection('vehicle_service_log').doc(id).delete();
+  toast('Entry permanently delete ho gayi');
+}
+let editServiceTarget=null;
+function openEditServiceModal(id){
+  if(!superAdminUnlocked){alert('Sirf Super Admin entry edit kar sakta hai.');return}
+  const x=serviceLog.find(e=>e.id===id);if(!x)return;
+  editServiceTarget=id;
+  $('editSDate').value=x.date||'';
+  $('editSAmount').value=x.amount||'';
+  $('editSNote').value=x.note||'';
+  $('editServiceModal').classList.add('show');
+}
+function closeEditServiceModal(){$('editServiceModal')?.classList.remove('show');editServiceTarget=null;}
+async function saveEditService(){
+  if(!editServiceTarget)return;
+  const date=$('editSDate').value;
+  const amount=parseFloat($('editSAmount').value);
+  const note=$('editSNote').value.trim();
+  if(!date){alert('Date zaroori hai.');return}
+  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  await db.collection('vehicle_service_log').doc(editServiceTarget).update({date,amount,note});
+  closeEditServiceModal();
+  toast('Entry update ho gayi');
+}
+function showServicePhoto(id){
+  const x=serviceLog.find(e=>e.id===id);if(!x||!x.billPhoto)return;
+  $('photoModalImg').src=x.billPhoto;
+  $('photoModal').classList.add('show');
+}
+function renderServiceHistory(){
+  const showDeleted=$('showDeletedService')&&$('showDeletedService').checked;
+  const deletedN=serviceLog.filter(x=>x.deletedAt).length;
+  if($('showDeletedServiceWrap'))$('showDeletedServiceWrap').classList.toggle('hidden',!deletedN);
+  if($('deletedServiceCount'))$('deletedServiceCount').textContent=deletedN;
+  const rows=(showDeleted?serviceLog.filter(x=>x.deletedAt):serviceLog.filter(x=>!x.deletedAt)).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at||'').localeCompare(String(a.at||'')));
+  $('serviceTable').innerHTML=rows.map(x=>{
+    const adminBtn=x.deletedAt
+      ?(superAdminUnlocked?`<button class="btn small" onclick="restoreServiceEntry('${esc(x.id)}')">↩ Restore</button>`:'')
+      :(superAdminUnlocked?`<button class="btn small danger" onclick="deleteServiceEntry('${esc(x.id)}')">Disable</button>`:'');
+    const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeleteServiceEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
+    const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditServiceModal('${esc(x.id)}')">✎ Edit</button>`:'';
+    const photoHtml=x.billPhoto?`<img class="thumb" src="${x.billPhoto}" onclick="showServicePhoto('${esc(x.id)}')" title="Bill Photo">`:'<small class="note">-</small>';
+    return `<tr><td>${esc(x.date)}${x.deletedAt?`<br><small style="color:var(--muted)">Disabled by ${esc(nameOfUserId(x.deletedBy))}</small>`:''}</td><td>${esc(x.vehicle)}</td><td>${esc(x.type||'Service')}</td><td class="num">${fmtAmt(x.amount)}</td><td>${esc(x.note||'-')}</td><td>${photoHtml}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
+  }).join('')||`<tr><td colspan="8"><div class="emptystate">🔧<p>Koi Service/Repair entry nahi hai.</p></div></td></tr>`;
+}
+
+/* ===== Combined Total Vehicle Cost (Fuel + Service/Repair + Documents) ===== */
+let costRangeQuick='all';
+function monthsAgoISO(n){ const d=new Date(todayISO()); d.setMonth(d.getMonth()-n); return d.toISOString().slice(0,10); }
+function resolveCostDateRange(){
+  const fromEl=$('costRangeFrom'),toEl=$('costRangeTo');
+  const customFrom=fromEl?fromEl.value:'',customTo=toEl?toEl.value:'';
+  if(customFrom||customTo)return {from:customFrom,to:customTo};
+  if(costRangeQuick==='3')return {from:monthsAgoISO(3),to:''};
+  if(costRangeQuick==='6')return {from:monthsAgoISO(6),to:''};
+  if(costRangeQuick==='12')return {from:monthsAgoISO(12),to:''};
+  return {from:'',to:''};
+}
+function setCostRangeQuick(range){
+  costRangeQuick=range;
+  if($('costRangeFrom'))$('costRangeFrom').value='';
+  if($('costRangeTo'))$('costRangeTo').value='';
+  ['3','6','12','all'].forEach(r=>{const b=$('costRangeBtn_'+r);if(b)b.classList.toggle('on',r===range);});
+  renderVehicleTotalCost();
+}
+function setCostRangeCustom(){
+  ['3','6','12','all'].forEach(r=>{const b=$('costRangeBtn_'+r);if(b)b.classList.remove('on');});
+  renderVehicleTotalCost();
+}
+function computeVehicleTotalCost(){
+  const {from,to}=resolveCostDateRange();
+  const inRange=d=>{ if(!d)return true; if(from&&d<from)return false; if(to&&d>to)return false; return true; };
+  const byVehicle={};
+  function ensure(v){ byVehicle[v]=byVehicle[v]||{fuel:0,service:0,docs:0}; return byVehicle[v]; }
+  liveFuel().filter(x=>inRange(x.date)).forEach(x=>{ensure(x.vehicle||'-').fuel+=(x.amount||0);});
+  liveService().filter(x=>inRange(x.date)).forEach(x=>{ensure(x.vehicle||'-').service+=(x.amount||0);});
+  (masters.vehicles||[]).forEach(v=>{
+    const vd=(masters.vehicleDocs&&masters.vehicleDocs[v])||{};
+    DOC_TYPES.forEach(dt=>{
+      const rec=vd[dt.key];
+      if(!rec)return;
+      let sum=0;
+      if(rec.cost&&inRange(rec.startDate))sum+=rec.cost;
+      (rec.history||[]).forEach(h=>{ if(h.cost&&inRange(h.startDate))sum+=h.cost; });
+      if(sum>0)ensure(v).docs+=sum;
+    });
+  });
+  return Object.entries(byVehicle).map(([v,d])=>({vehicle:v,fuel:d.fuel,service:d.service,docs:d.docs,total:d.fuel+d.service+d.docs})).sort((a,b)=>b.total-a.total);
+}
+function renderVehicleTotalCost(){
+  const wrap=$('vehicleTotalCostTable');
+  if(!wrap)return;
+  const rows=computeVehicleTotalCost();
+  wrap.innerHTML=rows.length?rows.map(r=>`<tr><td><b>${esc(r.vehicle)}</b></td><td class="num">${fmtAmt(r.fuel)}</td><td class="num">${fmtAmt(r.service)}</td><td class="num">${fmtAmt(r.docs)}</td><td class="num"><b>${fmtAmt(r.total)}</b></td></tr>`).join(''):`<tr><td colspan="5"><div class="emptystate">💰<p>Koi data nahi hai.</p></div></td></tr>`;
+}
+
+/* ===== Monthly Spend Trend — single series (overall fuel spend), so one brand hue is
+   correct and no legend is needed; thin bars, rounded data-ends, direct value+month
+   labels, and a lightweight hover tooltip. ===== */
 function lastNMonthKeys(n){
   const base=new Date(todayISO());
   const out=[];
@@ -862,9 +1518,15 @@ function renderAll(){
   renderSelects();
   renderDash();
   renderServiceReminders();
+  renderCleaningReminders();
   renderMileageAlerts();
+  renderDocAlerts();
+  renderVehicleDocuments();
+  renderAllDocumentsTable();
   renderVehiclePerformance();
+  renderVehicleTotalCost();
   renderMonthlyTrend();
+  renderServiceHistory();
   renderHistory();
   if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
 }
@@ -872,8 +1534,10 @@ function renderAll(){
 document.addEventListener('DOMContentLoaded',()=>{
   currentUser=localStorage.getItem(SESSION_KEY)||null;
   if($('fDate'))$('fDate').value=todayISO();
+  if($('sDate'))$('sDate').value=todayISO();
   startUsersSync();
   startFuelSync();
+  startServiceSync();
   startMastersSync();
   renderAll();
 });
