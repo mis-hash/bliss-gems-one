@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<script>
+/* Crash safety net — same pattern as the other Bliss apps: registered first so a later
+   script error still surfaces as a visible banner instead of a silently dead page. */
+(function(){
+  function showCrashBanner(msg){
+    if(document.getElementById('ppeCrashBanner'))return;
+    var b=document.createElement('div');
+    b.id='ppeCrashBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b42318;color:#fff;padding:10px 14px;font:600 13px Arial,sans-serif;text-align:center;box-shadow:0 2px 10px #0004';
+    b.innerHTML='⚠ App me error aa gaya hai. Page reload karein.'
+      +' <button type="button" style="margin-left:10px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#b42318;font-weight:700;cursor:pointer" onclick="location.reload()">Reload</button>'
+      +'<div style="font-weight:400;font-size:11px;opacity:.85;margin-top:3px">'+String(msg||'').slice(0,200).replace(/[<>]/g,'')+'</div>';
+    function attach(){document.body&&document.body.prepend(b)}
+    if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach);
+  }
+  window.addEventListener('error',function(e){console.error('Uncaught error:',e.error||e.message);showCrashBanner((e.error&&e.error.message)||e.message);});
+  window.addEventListener('unhandledrejection',function(e){console.error('Unhandled promise rejection:',e.reason);showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));});
+})();
+</script>
+<title>Purchase Price Estimator — Bliss Gems</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F7F5; --surface:#FFFFFF; --surface-sunken:#F8FAF9; --ink:#17211B; --ink-soft:#66756C; --line:#D9E2DC; --line-strong:#C3D2C9;
+  --green:#268F76; --green2:#3FAF93; --green-dark:#1B7A63; --mint:#E8F8F2; --mint-line:#CFE8D7;
+  --warn:#FFF7DD; --warn-line:#F0DF9E; --warn-ink:#8A6D12;
+  --red:#B42318; --red-dark:#8A1A10; --red-bg:#FBEAE8;
+  --navy:var(--green); --navy-dark:var(--green-dark); --navy-bg:var(--mint); --navy-line:var(--mint-line);
+  --green-bg:var(--mint);
+  --radius-lg:20px; --radius-md:14px; --radius-sm:10px;
+  --shadow-sm:0 1px 2px rgba(23,33,27,.04), 0 2px 8px rgba(23,33,27,.05);
+  --shadow-md:0 4px 16px rgba(23,33,27,.05);
+  --shadow-btn:0 4px 14px rgba(38,143,118,.18);
+  --shadow-hero:0 10px 30px rgba(38,143,118,.14);
+  --font-display:'Inter',system-ui,sans-serif; --font-body:'Inter',system-ui,sans-serif; --font-mono:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:var(--font-body);background:var(--bg);color:var(--ink);font-size:14.5px;line-height:1.5;min-height:100vh}
+button,input{font:inherit}
+input::placeholder{color:var(--ink-soft)}
+
+/* ===== Header ===== */
+header{height:64px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30;display:flex;align-items:center}
+.head{max-width:1180px;margin:0 auto;padding:0 18px;display:flex;align-items:center;gap:12px;width:100%}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--mint);color:var(--green);display:grid;place-items:center;font-size:28px;font-weight:900;flex:none;box-shadow:var(--shadow-sm)}
+.brand{min-width:0;flex:1}
+.brand b{font-size:15.5px;display:block;font-weight:700;letter-spacing:-.01em;font-family:var(--font-display);color:var(--ink)}
+.brand small{font-size:11px;color:var(--ink-soft);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-mono)}
+.liveBadge{display:flex;align-items:center;gap:6px;background:var(--mint);color:var(--green-dark);font-size:10.5px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid var(--mint-line);flex:none;white-space:nowrap}
+.liveDot{width:6px;height:6px;border-radius:50%;background:var(--green2);box-shadow:0 0 0 0 rgba(38,143,118,.6);animation:pulseDot 1.8s infinite}
+@keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(38,143,118,.5)}70%{box-shadow:0 0 0 7px rgba(38,143,118,0)}100%{box-shadow:0 0 0 0 rgba(38,143,118,0)}}
+@media(max-width:560px){.liveBadge span.lbl{display:none}}
+
+.shell{max-width:1180px;margin:0 auto;padding:20px 16px 100px}
+
+/* ===== Hero ===== */
+.hero{position:relative;background:linear-gradient(135deg,var(--green-dark),var(--green2));color:#fff;border-radius:var(--radius-lg);padding:24px 26px;margin-bottom:18px;box-shadow:var(--shadow-hero)}
+.hero .eyebrow{display:inline-block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:4px 12px;margin-bottom:10px;font-weight:600}
+.hero h1{margin:0;font-size:20px;font-family:var(--font-display);font-weight:700;letter-spacing:-.01em;color:#fff}
+.hero p{margin:6px 0 0;font-size:12.5px;color:rgba(255,255,255,.85);max-width:680px}
+
+/* ===== Stat tiles ===== */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+.stat{background:var(--surface);border:1.5px solid var(--line);border-radius:var(--radius-md);padding:14px 16px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden}
+.stat .ic{position:absolute;top:14px;right:14px;font-size:16px;opacity:.5}
+.stat small{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);font-weight:600}
+.stat b{display:block;font-size:22px;margin-top:5px;font-weight:700;font-family:var(--font-mono);color:var(--navy)}
+.stat.accent b{color:var(--green-dark)}
+.stat .bar{height:4px;border-radius:3px;background:var(--surface-sunken);margin-top:10px;overflow:hidden}
+.stat .bar i{display:block;height:100%;background:var(--navy);border-radius:3px;transition:width .5s cubic-bezier(.22,.9,.3,1)}
+
+/* ===== Panels ===== */
+.panel{background:var(--surface);border:1.5px solid var(--line);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm);margin-bottom:18px}
+.ph{padding:14px 18px;border-bottom:1.5px solid var(--line);font-weight:700;font-size:14.5px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-family:var(--font-display);color:var(--ink)}
+.ph small{display:block;font-size:11.5px;color:var(--ink-soft);font-weight:500;margin-top:2px;font-family:var(--font-mono)}
+.ph .countChip{background:var(--navy-bg);color:var(--navy);font-weight:600;font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--navy-line);font-family:var(--font-mono)}
+.pb{padding:18px}
+
+.field label{display:block;font-size:11px;font-weight:600;margin-bottom:6px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em}
+.field input{width:100%;padding:11px 12px;border:1.5px solid var(--line-strong);border-radius:var(--radius-md);font-size:14px;background:var(--surface);color:var(--ink);transition:border-color .15s, box-shadow .15s}
+.field input:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px rgba(38,143,118,.14)}
+.comboBox{position:relative}
+.comboMenu{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:220px;overflow-y:auto;background:var(--surface);border:1.5px solid var(--line-strong);border-radius:var(--radius-md);box-shadow:var(--shadow-md);z-index:50}
+.comboMenu.show{display:block}
+.comboOption{padding:10px 13px;font-size:13.5px;cursor:pointer}
+.comboOption:hover{background:var(--mint)}
+.comboEmpty{padding:10px 13px;font-size:12.5px;color:var(--ink-soft)}
+.comboAddNew{font-weight:700;color:var(--green-dark);border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);z-index:1}
+.comboAddNew:hover{background:var(--mint)}
+.headerGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:16px}
+.headerGrid.cols2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:800px){.headerGrid.cols2{grid-template-columns:1fr}}
+
+.btn{border:1.5px solid var(--line-strong);border-radius:var(--radius-md);padding:10px 16px;font-size:13px;font-weight:600;background:var(--surface);color:var(--ink);cursor:pointer;transition:transform .08s ease, background .08s ease;box-shadow:var(--shadow-sm)}
+.btn:active{transform:translateY(1px);background:var(--surface-sunken)}
+.btn.primary{background:var(--navy);color:#fff;border:none;box-shadow:var(--shadow-btn);font-weight:700}
+.btn.danger{background:var(--red-bg);color:var(--red-dark);border-color:#F3B8B8}
+.btn.small{padding:6px 11px;font-size:11.5px;border-radius:var(--radius-sm)}
+.btn.block{width:100%;text-align:center}
+.dealFilterBtn.active{background:var(--green);color:#fff;border-color:var(--green)}
+tr.completedRow{background:var(--mint)}
+tr.completedRow:hover{background:var(--mint)}
+.btnRow{margin-top:14px;display:flex;gap:9px;flex-wrap:wrap}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);font-weight:700;padding:10px 10px;border-bottom:1.5px solid var(--line);background:var(--surface-sunken);white-space:nowrap;font-family:var(--font-mono)}
+th input{width:100%;min-width:90px;padding:5px 6px;border:1px solid var(--line-strong);border-radius:6px;font-size:10.5px;font-weight:700;text-align:center;background:var(--surface);color:var(--navy);font-family:var(--font-mono)}
+td{padding:10px 10px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle}
+td input{width:84px;padding:8px 9px;border:1.5px solid var(--line-strong);border-radius:var(--radius-sm);font-size:13.5px;font-family:var(--font-mono);color:var(--ink)}
+.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--font-mono)}
+.pos{color:var(--green-dark);font-weight:700}
+.neg{color:var(--red-dark);font-weight:700}
+.readonly{background:var(--mint);color:var(--green-dark);font-weight:700}
+.costcell{background:var(--warn);color:var(--warn-ink);font-weight:700}
+th.costHead{background:var(--warn);color:var(--warn-ink)}
+tfoot td{font-weight:700;background:var(--surface-sunken);border-top:2px solid var(--line-strong)}
+.empty{padding:36px 20px;text-align:center;color:var(--ink-soft);font-size:12.5px}
+
+.bigResult{background:var(--surface);border:1.5px solid var(--line-strong);border-left:4px solid var(--navy);border-radius:var(--radius-md);padding:16px;text-align:center;position:relative;overflow:hidden;box-shadow:var(--shadow-sm)}
+.bigResult small{font-size:10.5px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-family:var(--font-mono)}
+.bigResult b{display:block;font-size:24px;color:var(--navy);margin-top:5px;font-weight:700;transition:color .2s;font-family:var(--font-mono)}
+.bigResult b.neg{color:var(--red-dark)}
+.resultGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.tableWrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* value flash animation on update */
+.flash{animation:flashPop .4s ease}
+@keyframes flashPop{0%{transform:scale(1.08);color:var(--green-dark)}100%{transform:scale(1)}}
+
+/* ===== Mobile: convert data tables into cards ===== */
+@media(max-width:800px){
+  .grid3,.headerGrid,.resultGrid{grid-template-columns:1fr}
+}
+@media(max-width:700px){
+  #mobilePreviewBtn{display:none}
+  .shell{padding:14px 10px 110px}
+  .hero{padding:18px 18px}
+}
+
+/* shrink the Wt/HD/ND/TK input columns so all 4 fit on one phone screen without horizontal scroll */
+@media(max-width:480px){
+  .itemTable th{padding:6px 4px;font-size:9px}
+  .itemTable th input{width:100%;min-width:52px;padding:3px 3px;font-size:9px}
+  .itemTable td{padding:6px 4px}
+  .itemTable td input{width:50px;padding:6px 4px;font-size:12px}
+  /* Guess Avg (5th column): let its header wrap to two lines (was forcing the column wide via nowrap) and shrink its own font/padding, so its value fits fully in the space left after Wt/HD/ND/TK instead of getting cut off */
+  .itemTable th:nth-child(5){padding:6px 4px;font-size:8.5px;white-space:normal;line-height:1.25}
+  .itemTable td:nth-child(5){padding:6px 4px;font-size:11px}
+  /* After Final Price (6th column) header: same wrap treatment — "After Final Price" was too long and cramped against Guess Avg */
+  .itemTable th:nth-child(6){padding:6px 4px;font-size:8.5px;white-space:normal;line-height:1.25}
+  .itemTable td:nth-child(6){padding:6px 4px;font-size:11px}
+  /* Remove-lot button: icon-only and compact on mobile, so the row doesn't feel cramped */
+  .itemTable td:nth-child(8){padding:6px 4px}
+  .removeLotBtn{padding:6px 8px;font-size:13px;border-radius:50%;line-height:1}
+  .removeLotBtn .btnLabel{display:none}
+  /* Deals History Open/Delete: icon-only and compact on mobile — was wrapping to two tall lines per button */
+  .dealRowActions{white-space:nowrap}
+  .dealActionBtn{padding:6px 8px;font-size:13px;border-radius:50%;line-height:1;margin:2px}
+  .dealActionBtn .btnLabel{display:none}
+}
+
+/* plain typing box — no native up/down spinner arrows on number fields */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield}
+
+/* Browser's native date-picker calendar icon defaults to a blue/grey tint that clashes
+   with the green theme — recolor it toward the brand green instead. */
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%) saturate(1368%) hue-rotate(121deg) brightness(93%) contrast(94%);cursor:pointer}
+
+/* sticky live summary bar on mobile */
+.mobileLiveBar{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);border-top:1.5px solid var(--line);box-shadow:0 -8px 24px rgba(17,24,39,.08);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:none;gap:10px;align-items:center}
+.mobileLiveBar.show{display:flex}
+.mobileLiveBar .seg{flex:1;text-align:center}
+.mobileLiveBar .seg small{display:block;font-size:9px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.mobileLiveBar .seg b{display:block;font-size:14.5px;margin-top:2px;color:var(--navy);font-family:var(--font-mono);font-weight:700}
+.mobileLiveBar .seg b.neg{color:var(--red-dark)}
+.mobileLiveBar .divider{width:1px;height:28px;background:var(--line)}
+@media(min-width:701px){.mobileLiveBar{display:none !important}}
+
+/* detail expand row */
+/* Visually ties this block to the deal row directly above it (not the one below) and
+   keeps a clear boundary before the next deal row starts, so an opened breakdown never
+   reads as belonging to the wrong slip. */
+.detailBlock{padding:14px 18px;background:var(--surface-sunken);border-left:4px solid var(--green-dark);border-bottom:3px solid var(--line-strong)}
+.breakdownTable{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}
+.breakdownTable th,.breakdownTable td{border-right:1px solid var(--line);white-space:nowrap}
+.breakdownTable th:last-child,.breakdownTable td:last-child{border-right:0}
+.detailLabel{font-size:11.5px;color:var(--ink-soft);margin-bottom:8px;font-weight:700;font-family:var(--font-mono)}
+
+/* ===== Desktop: Mobile Preview toggle ===== */
+#mobilePreviewWrap{display:none;justify-content:center;padding:30px 16px;background:var(--surface-sunken);min-height:calc(100vh - 64px)}
+#mobilePreviewWrap.show{display:flex}
+.phoneFrame{width:390px;max-width:100%;height:812px;border:10px solid #1a1a1a;border-radius:38px;overflow:hidden;box-shadow:0 24px 60px rgba(17,24,39,.25);position:relative;background:#000}
+.phoneFrame::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:22px;background:#1a1a1a;border-radius:0 0 14px 14px;z-index:2}
+.phoneFrame iframe{width:100%;height:100%;border:0;display:block;background:#fff}
+
+/* ===== Print: clean physical slip ===== */
+.printOnly{display:none}
+@media print{
+  body{background:#fff}
+  header,.hero,.grid3,#mobilePreviewBtn,.mobileLiveBar,#dealResultGrid,.btnRow,.ph .countChip,#mobilePreviewWrap,#dealHistoryPanel,.no-print,#finalTotalBox,#dueDateBox{display:none !important}
+  .shell{padding:0;max-width:100%}
+  .panel{box-shadow:none;border:1px solid #999}
+  .ph{background:#fff}
+  .printOnly{display:block}
+  .printOnly.printSummaryRow{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .printSummaryRow small{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.03em;color:#4a5a52;font-weight:700;margin-bottom:3px}
+  .printSummaryRow b{display:block;font-size:17px;color:#000}
+  .itemTable th:last-child,.itemTable td:last-child{display:none}
+  input{border:none !important;background:transparent !important;padding:2px 0 !important;box-shadow:none !important;color:#000 !important}
+  .readonly,.costcell{background:#F2F2F2 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  th,td{border-color:#999}
+}
+</style>
+</head>
+<body>
+
+<header><div class="head">
+  <div class="logo">b</div>
+  <div class="brand"><b>Purchase Price Estimator</b></div>
+  <button class="btn small" id="mobilePreviewBtn" onclick="toggleMobilePreview()">📱 Mobile Preview</button>
+  <div class="liveBadge"><span class="liveDot"></span><span class="lbl">Live Calculation</span></div>
+</div></header>
+
+<div id="mainContent">
+<div class="shell">
+  <div class="hero">
+    <span class="eyebrow">Bliss Gems — Purchase Tool</span>
+  </div>
+
+  <div class="grid3">
+    <div class="stat"><span class="ic">📦</span><small>Historical Deals</small><b id="sDeals">0</b><div class="bar"><i id="sDealsBar" style="width:0%"></i></div></div>
+    <div class="stat accent"><span class="ic">📊</span><small>Learned Markup %</small><b id="sMarkup">0%</b><div class="bar"><i id="sMarkupBar" style="width:0%"></i></div></div>
+    <div class="stat"><span class="ic">₹</span><small>Total Diff (₹)</small><b id="sDiff">₹0</b><div class="bar"><i id="sDiffBar" style="width:0%"></i></div></div>
+  </div>
+
+  <div class="panel" id="dealFormPanel">
+    <div class="ph no-print">
+      <span id="dealFormTitle">➕ New Deal</span>
+      <button class="btn small" onclick="startNewDeal()">🆕 Start New</button>
+    </div>
+    <div class="pb">
+      <div class="no-print" id="draftStatusWrap" style="display:none;margin-bottom:12px">
+        <small id="draftStatus" style="color:var(--green-dark);font-weight:600"></small>
+      </div>
+      <div class="printOnly" id="printHeader" style="margin-bottom:14px">
+        <h2 style="margin:0 0 4px;font-family:var(--font-display)">🧾 Purchase Slip — Bliss Gems</h2>
+        <div style="font-size:12px;color:#444">Slip No. <span id="printSlipNo"></span> · <span id="printDate"></span></div>
+      </div>
+
+      <div class="resultGrid" id="dealResultGrid" style="display:none;margin-bottom:18px">
+        <div class="bigResult"><small>Guess Avg Total</small><b id="rAvgTotal">₹0</b></div>
+        <div class="bigResult"><small>Final Total</small><b id="rFinalTotal">₹0</b></div>
+        <div class="bigResult"><small>Diff %</small><b id="rDiffPct">0%</b></div>
+      </div>
+      <div id="lotBreakdownList" class="no-print" style="display:none;margin:-8px 0 18px;border:1.5px solid var(--line);border-left:4px solid var(--green);border-radius:var(--radius-md);overflow:hidden"></div>
+
+      <div id="dealTopFieldsWrap" style="border:1.5px solid var(--line);border-radius:var(--radius-md);background:var(--surface-sunken);padding:16px;margin-bottom:16px">
+        <div class="headerGrid" style="margin-bottom:0">
+          <div class="field"><label>Slip No.</label><input id="hSlipNo" readonly style="background:var(--surface);color:var(--ink-soft);font-family:var(--font-mono)"></div>
+          <div class="field">
+            <label>Party Name</label>
+            <div class="comboBox" id="partyCombo">
+              <input type="text" id="hParty" autocomplete="off" oninput="onComboInput('party')" onfocus="onComboFocus('party')" onblur="autoFillBrokerForParty(this.value)">
+              <div class="comboMenu" id="partyMenu" onmousedown="handleComboMouseDown(event,'party')"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Broker</label>
+            <div class="comboBox" id="brokerCombo">
+              <input type="text" id="hBroker" autocomplete="off" oninput="onComboInput('broker')" onfocus="onComboFocus('broker')">
+              <div class="comboMenu" id="brokerMenu" onmousedown="handleComboMouseDown(event,'broker')"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="itemsContainer"></div>
+
+      <div id="finalTotalWrap">
+        <div id="finalTotalBox" style="border:1.5px solid var(--mint-line);border-radius:var(--radius-md);background:var(--mint);padding:16px;margin-top:14px">
+          <label style="display:block;font-size:12px;font-weight:800;margin-bottom:6px;color:var(--green-dark);text-transform:uppercase;letter-spacing:.03em">Final Purchase Total (₹) — once deal is closed</label>
+          <input type="number" id="hFinalTotal" oninput="finalTotalAuto=false;onFinalTotalInput()" style="width:100%;padding:13px 14px;border:2px solid var(--green2);border-radius:var(--radius-md);font-size:18px;font-weight:800;color:var(--green-dark);background:var(--surface)">
+        </div>
+        <div id="dueDateBox" style="margin-top:14px">
+          <label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em">Due Date (optional — fill once finalized)</label>
+          <input type="date" id="hDueDate" oninput="onDueDateInput()" style="width:100%;padding:11px 14px;border:1.5px solid var(--line-strong);border-radius:var(--radius-md);font-size:14px;color:var(--ink);background:var(--surface)">
+        </div>
+        <div class="printOnly printSummaryRow" id="printSummaryRow" style="border:1.5px solid var(--mint-line);border-radius:var(--radius-md);background:var(--mint);padding:14px 16px;margin-top:14px">
+          <div><small>Guess Avg Total</small><b id="psAvgTotal">₹0</b></div>
+          <div><small>Final Total</small><b id="psFinalTotal">—</b></div>
+          <div><small>Amt Diff</small><b id="psAmtDiff">—</b></div>
+          <div><small>Diff %</small><b id="psDiffPct">—</b></div>
+          <div id="psDueDateWrap" style="display:none"><small>Due Date</small><b id="psDueDate"></b></div>
+        </div>
+      </div>
+
+      <div class="btnRow" style="margin-top:14px">
+        <button class="btn primary" style="flex:1" onclick="printSlip()">🖨️ Print Slip</button>
+        <button class="btn" style="flex:1;background:#E9FBF2;border-color:#B8E8CE;color:#128C4A" onclick="shareSlipOnWhatsApp()">📤 Share on WhatsApp</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="dealHistoryPanel">
+    <div class="ph">Deals History <span class="countChip" id="dealCountLabel">0 deals</span></div>
+    <div class="pb" style="padding-bottom:0">
+      <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+        <input type="text" id="dealSearch" placeholder="🔍 Search party, broker, item or slip no..." oninput="renderDealHistory()" style="flex:1;min-width:220px;padding:10px 13px;border:1.5px solid var(--line-strong);border-radius:var(--radius-md);font-size:13.5px;background:var(--surface);color:var(--ink)">
+        <div style="display:flex;gap:6px">
+          <button class="btn small dealFilterBtn active" data-filter="all" onclick="setDealFilter('all')">All</button>
+          <button class="btn small dealFilterBtn" data-filter="pending" onclick="setDealFilter('pending')">Pending</button>
+          <button class="btn small dealFilterBtn" data-filter="completed" onclick="setDealFilter('completed')">Completed</button>
+        </div>
+      </div>
+    </div>
+    <div class="tableWrap">
+    <table id="dealTable">
+      <thead><tr><th>Slip No.</th><th>Party / Item</th><th class="num">Avg Total</th><th class="num">Final Total</th><th class="num">Diff</th><th class="num">Diff %</th><th></th></tr></thead>
+      <tbody id="dealBody"></tbody>
+    </table>
+    </div>
+    <div class="empty" id="dealEmpty">No deals saved yet.</div>
+  </div>
+</div>
+
+<div class="mobileLiveBar" id="mobileLiveBar">
+  <div class="seg"><small>Avg</small><b id="mAvg">₹0</b></div>
+  <div class="divider"></div>
+  <div class="seg"><small>Final</small><b id="mFinal">—</b></div>
+  <div class="divider"></div>
+  <div class="seg"><small>Diff %</small><b id="mDiff">—</b></div>
+</div>
+</div>
+
+<div id="mobilePreviewWrap">
+  <div class="phoneFrame"><iframe id="mobilePreviewFrame" title="Mobile preview"></iframe></div>
+</div>
+
+<script>
+const LS_DEALS='purchase_price_deals_v2';
+const LS_SLIP_SEQ='purchase_price_slip_seq_v1';
+const ITEM_NAME_SEED = ["Amethyst", "AMETRINE PL TUMBLE", "AQUA", "AQUA ELON BEADS", "AQUA GF", "AQUA MELON BEADS", "Aquamarine", "AS PER DESCRIPTION", "AS PER SHEET", "Black Onyx", "BLACK ONYX SUGAR LOAF", "BLACK OPAL", "BLUE GF", "BLUE SAPP MELON", "BURMA RUBY", "Burma Tourmaline", "CATS EYE", "Citrine", "CITRINE CUT", "CORAL", "CORAL MELON BEADS", "CORAL WITH DIAMOND POLKI AND GOLD", "EM", "EM R", "EME", "EME PL MANI", "EME PL TUUMBLE", "EME R", "EME R CUT STONE", "EME R DROPS", "EME R MELON BEADS", "EME R PEAR CABS", "EME RUSSIAN", "EME ZAM", "EME ZAM CABS", "EME ZAM CARVING", "EME ZAM CUT STONE", "EME ZAM FACTED TABIZ", "EME ZAM FANCY CUT STONE", "EME ZAM OCT CUT", "EME ZAM OVAL CABS", "EME ZAM PL CAB", "EME.ZAM fancy cut", "EMERALD", "EMERALD & POLKI", "EMERALD CABS", "EMERALD CARVED WITH POLKI", "EMERALD CUT STONE", "EMERALD FLAT", "EMERALD OCTO CUT", "EMERALD R", "EMERALD R CUT STONE", "EMERALD R CUT STONE SD", "EMERALD R KUNDAN POLKI TUMBLE", "EMERALD R PL BEADS", "Emerald Russian", "Emerald ZAB CABS", "Emerald zam", "EMERALD ZAM OCT CUT", "EMERALD ZAM ROSE CUT", "EMERALD ZAMBIA", "EMERALD ZAMBIA HEART CUT", "EMERALD ZAMBIAN", "ETH OPAL", "ETH OPAL CABS", "ETH OPAL PEAR CABS", "ETH OPAL PL CABS", "ETHOPION OPAL", "GREEN AMETHYST", "GREEN SYNTHETIC", "GREEN TOUR", "GREEN TOURMALINE", "IOLITE", "Kunzite", "KUNZITE CUT STONE", "KUNZITE PEAR CUT", "LION BRACELET", "MIX STONE", "MIX STONES", "MORGANITE", "MORGANITE BEADS", "MORGANITE CABS", "MORGANITE CARVING", "MORGANITE PEAR CABS", "MORGANITE PINK", "MORGANITE QCTA", "MOTI", "MULTI STONE", "MULTI TOUR", "MULTI TOUR CABS", "Multi tourmaline", "NAVAGRAH", "NAVARATAN", "NAVGRAH", "NAVRATAN", "NR", "OPAL", "OPAL BLACK DYED", "OPAL BR", "PEACH MOONSTONE", "PEARLS", "PERIDOT", "PERIDOT FACT TABIZ", "PINK AMETHYST", "PINK OPAL", "PINK TOUR", "PINK TOUR BADAM", "PINK TOUR CAB", "PINK TOUR CABS", "PINK TOUR CARVING PAIR", "PINK TOUR CUT STONE", "PINK TOUR FACTED BADAM", "PINK TOUR OVAL ROSECUT", "PINK TOUR ROSE CUT", "PINK TOUR TUIPS", "PINK TOURMALINE", "PINK TOURMALINE CABS", "PINK TOURMALINE CARVING", "PINK TOURMALINE CUT STONE", "ROSE QUARTZ", "RUBY", "RUBY BURMA", "RUBY GF", "RUBY GF BADAM", "RUBY GF CABS", "RUBY GF CUT STONE", "RUBY GF FACT TYRE", "RUBY GF MOZ", "RUBY GF MOZ CUT STONE", "RUBY GF MOZ FUNCY CUT", "RUBY GF MOZ PL DROPS", "RUBY GF MOZ ROSE CUT", "RUBY GF RED", "RUBY MOZ", "RUBY MOZ GF", "RUBY MOZ GF CUT", "RUBY MOZ GF FACT ROSE CUT", "RUBY MOZ GF FACTED ROSECUT", "RUBY MOZ HEATED", "RUBY MOZAMBIQE", "RUBY PL DROPS", "RUBYLITE", "RUBYLITE CUT STONE", "RUSSIAN EMERALD", "SKY BT", "Tanzanite", "TANZANITE CAB", "Tanzanite CABS", "TANZANITE CUT", "TANZANITE PL DROP", "TANZANITE QCTA", "Tanzanite ROUGH", "TOUR", "TOUR CUT", "TOUR FLAT", "TOUR GREEN", "TOUR PINK", "TOUR TAPER", "Tourmaline", "TZ", "TZ & AQUA", "TZ CABS", "TZ FLAT", "Tz, Ruby", "YELLOW SAPP", "YELLOW SAPP CABS", "YELLOW SAPP OVAL CAB", "YELLOW SAPPHIRE", "YELLOW SAPPHIRE CABS"];
+const BROKER_NAME_SEED = ["A-SELF", "AFJAL BHAI", "AJAY JI AGARWAL", "ANIL JI KHANDELWAL", "ANKIT JI KALA", "ANURAG JI", "ASHISH JI SURANA", "B-SELF", "BCB JI", "CHINTU JI BEWAL", "DEEPAK JI HYD", "GC JI", "GCC JI", "GIRIRAJ PRASAD JI", "GYAN JI CHAJED", "LOKESH JI HYD", "MADHUSUDAN JI AGARWAL", "MAHESH JI GLG", "MS JI", "PD JI", "PRAKASH JI DUSAD", "PULKIT JI JAIN JPR", "RAHUL JI ROHIT JI", "RAJESH JI AGARWAL", "RAJNEESH JI PAREEK", "RAJU JI KACHAWA", "SACHIN JI HYD", "SELF", "SHUBHAM JI AGARWAL", "TASKIN BHAI", "UTTAM JI", "VIKAS JI PODDAR"];
+let deals = JSON.parse(localStorage.getItem(LS_DEALS)||'[]');
+function newItem(name){ return {name: name||'', lots:[{wt:'', g1:'', g2:'', g3:''}]}; }
+let items = [newItem()]; // current in-progress deal's items: {name, lots:[{wt,g1,g2,g3}]}
+let g1Name='Hitesh Dusad', g2Name='Nitesh Dusad', g3Name='Ankur Khandelwal'; // the 3 Directors who each give their own guess rate, shared across every item's table
+function updateLabel(which, val){
+  if(which==='g1') g1Name = val||'Hitesh Dusad';
+  if(which==='g2') g2Name = val||'Nitesh Dusad';
+  if(which==='g3') g3Name = val||'Ankur Khandelwal';
+  renderItems();
+}
+let currentDealId = null; // id of the deal in `deals` currently being edited (null = fresh unsaved draft)
+let finalTotalAuto = true; // while true, Final Purchase Total auto-fills with Guess Avg Total until the user types their own value
+
+function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function ensureDealIds(){
+  let changed = false;
+  deals.forEach(d=>{ if(!d.id){ d.id = genId(); changed = true; } });
+  if(changed) localStorage.setItem(LS_DEALS, JSON.stringify(deals));
+}
+ensureDealIds();
+
+function nextSlipNo(){
+  const n = (Number(localStorage.getItem(LS_SLIP_SEQ))||0) + 1;
+  localStorage.setItem(LS_SLIP_SEQ, String(n));
+  return 'BG-'+String(n).padStart(4,'0');
+}
+
+function saveDeals(){ localStorage.setItem(LS_DEALS, JSON.stringify(deals)); renderSummary(); renderDealHistory(); }
+function money(n){ return '₹'+Math.round(Number(n||0)).toLocaleString('en-IN'); }
+function formatDueDate(isoStr){
+  const d = new Date(isoStr+'T00:00:00');
+  return isNaN(d) ? isoStr : d.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+}
+function esc(s){ return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+/* ===== Party/Broker/Item Name searchable dropdown (same pattern as Bliss One / Parcel Dispatch combos) ===== */
+function comboInputId(which, idx){ return which==='party' ? 'hParty' : which==='broker' ? 'hBroker' : `itemNameInput${idx}`; }
+function comboMenuId(which, idx){ return which==='party' ? 'partyMenu' : which==='broker' ? 'brokerMenu' : `itemNameMenu${idx}`; }
+function comboOptions(which){
+  if(which==='party') return [...new Set(deals.map(d=>d.party).filter(Boolean))];
+  if(which==='broker') return [...new Set([...BROKER_NAME_SEED, ...deals.map(d=>d.broker).filter(Boolean)])];
+  const historical = deals.flatMap(d=>Array.isArray(d.itemNames)?d.itemNames:[]);
+  return [...new Set([...ITEM_NAME_SEED, ...historical])].sort((a,b)=>a.localeCompare(b));
+}
+function renderComboMenu(which, idx){
+  const inputEl = document.getElementById(comboInputId(which, idx));
+  const menuEl = document.getElementById(comboMenuId(which, idx));
+  if(!inputEl || !menuEl) return;
+  const all = comboOptions(which);
+  const q = inputEl.value.trim().toLowerCase();
+  const filtered = (q ? all.filter(x=>x.toLowerCase().includes(q)) : all).slice(0,60);
+  const addNewHtml = which==='item' ? `<div class="comboOption comboAddNew" data-value="__ADD_NEW__">➕ Add New Item</div>` : '';
+  menuEl.innerHTML = addNewHtml + (filtered.length
+    ? filtered.map(x=> which==='party'
+        ? `<div class="comboOption" data-value="${esc(x)}"><div style="font-weight:700">${esc(x)}</div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px">Broker: ${esc(latestBrokerForParty(x)||'—')}</div></div>`
+        : `<div class="comboOption" data-value="${esc(x)}">${esc(x)}</div>`
+      ).join('')
+    : `<div class="comboEmpty">${all.length ? 'No match — will be added as new' : 'No saved names yet — type to add new'}</div>`);
+  menuEl.classList.add('show');
+}
+function onComboInput(which, idx){
+  if(which==='item') updateItemName(idx, document.getElementById(comboInputId('item', idx)).value);
+  renderComboMenu(which, idx);
+  autoSaveDraft();
+}
+function onComboFocus(which, idx){ renderComboMenu(which, idx); }
+function handleComboMouseDown(e, which, idx){
+  const opt = e.target.closest('.comboOption');
+  if(!opt) return;
+  e.preventDefault();
+  const val = opt.dataset.value;
+  const inputEl = document.getElementById(comboInputId(which, idx));
+  if(val==='__ADD_NEW__'){
+    inputEl.value = '';
+    if(which==='item') updateItemName(idx, '');
+    inputEl.focus();
+    renderComboMenu(which, idx);
+    return;
+  }
+  inputEl.value = val;
+  document.getElementById(comboMenuId(which, idx)).classList.remove('show');
+  if(which==='item') updateItemName(idx, val);
+  if(which==='party') autoFillBrokerForParty(val);
+  autoSaveDraft();
+}
+/* most recent Broker this Party was dealt through, from this tool's own saved deal history */
+function latestBrokerForParty(partyName){
+  const q = (partyName||'').trim().toLowerCase();
+  if(!q) return '';
+  for(let i=deals.length-1;i>=0;i--){
+    if((deals[i].party||'').trim().toLowerCase()===q && deals[i].broker) return deals[i].broker;
+  }
+  return '';
+}
+/* when a Party is picked/typed, auto-fill Broker from that party's most recent past deal — never overwrites a Broker the user already typed */
+function autoFillBrokerForParty(partyName){
+  const brokerInput = document.getElementById('hBroker');
+  if(!brokerInput || brokerInput.value.trim()) return;
+  const broker = latestBrokerForParty(partyName);
+  if(broker) brokerInput.value = broker;
+}
+document.addEventListener('click', (e)=>{
+  document.querySelectorAll('.comboBox').forEach(box=>{
+    if(!box.contains(e.target)){
+      const menu = box.querySelector('.comboMenu');
+      if(menu) menu.classList.remove('show');
+    }
+  });
+});
+
+/* ===== tiny helper: flash an element when its text changes (adds "live" feel) ===== */
+function setFlash(el, text){
+  if(!el) return;
+  if(el.textContent === text) return;
+  el.textContent = text;
+  el.classList.remove('flash');
+  // restart animation
+  void el.offsetWidth;
+  el.classList.add('flash');
+}
+
+/* ===== Current Deal: multiple Items, each with multiple weight-lots ===== */
+function addItem(){ items.push(newItem()); renderItems(); }
+function deleteItem(idx){
+  items.splice(idx,1);
+  if(!items.length) items.push(newItem());
+  renderItems();
+}
+function updateItemName(idx, val){ items[idx].name = val; }
+function addLot(itemIdx){
+  items[itemIdx].lots.push({wt:'', g1:'', g2:'', g3:''});
+  renderItems();
+}
+function updateLot(itemIdx, lotIdx, field, val){
+  items[itemIdx].lots[lotIdx][field] = val===''? '' : Number(val);
+  renderItems();
+}
+function deleteLot(itemIdx, lotIdx){
+  items[itemIdx].lots.splice(lotIdx,1);
+  if(!items[itemIdx].lots.length) items[itemIdx].lots.push({wt:'', g1:'', g2:'', g3:''});
+  renderItems();
+}
+
+function lotAvg(lot){
+  const vals = [lot.g1, lot.g2, lot.g3].filter(v=>v!=='' && v!=null && !isNaN(v));
+  if(!vals.length) return 0;
+  return vals.reduce((a,b)=>a+Number(b),0)/vals.length;
+}
+function itemAvgTotal(item){ return item.lots.reduce((s,l)=>s+lotAvg(l),0); }
+function itemWtTotal(item){ return item.lots.reduce((s,l)=>s+(Number(l.wt)||0),0); }
+function currentAvgTotal(){ return items.reduce((s,it)=>s+itemAvgTotal(it),0); }
+function currentWtTotal(){ return items.reduce((s,it)=>s+itemWtTotal(it),0); }
+
+function renderItems(){
+  const container = document.getElementById('itemsContainer');
+  const g1n = g1Name||'G1';
+  const g2n = g2Name||'G2';
+  const g3n = g3Name||'G3';
+  // Read-only here - Final Purchase Total / Due Date live outside this container (see
+  // #finalTotalWrap in the static HTML) and are never touched by this rebuild, so typing
+  // in them is never interrupted. refreshFinalTotalDependents() below patches everything
+  // that depends on their value (After Final/Final Cost cells, breakdown list, result
+  // tiles, print summary) without recreating any input.
+  const finalTotalInput = document.getElementById('hFinalTotal');
+  const finalTotal = finalTotalInput ? (Number(finalTotalInput.value)||0) : 0;
+  const avgTotal = currentAvgTotal();
+  const diffPct = (finalTotal>0 && avgTotal>0) ? ((finalTotal-avgTotal)/avgTotal*100) : null;
+
+  container.innerHTML = items.map((item, ii)=>{
+    let finalCostTotal = 0;
+    const rowsHtml = item.lots.map((l, li)=>{
+      const avg = lotAvg(l);
+      const afterFinal = diffPct!==null ? avg*(1+diffPct/100) : null;
+      const wt = Number(l.wt)||0;
+      const finalCost = afterFinal!==null ? wt*afterFinal : null;
+      if(finalCost!==null) finalCostTotal += finalCost;
+      return `<tr>
+        <td data-label="Wt (ct)"><input type="number" value="${l.wt}" onchange="updateLot(${ii},${li},'wt',this.value)"></td>
+        <td data-label="${esc(g1n)}"><input type="number" value="${l.g1}" onchange="updateLot(${ii},${li},'g1',this.value)"></td>
+        <td data-label="${esc(g2n)}"><input type="number" value="${l.g2}" onchange="updateLot(${ii},${li},'g2',this.value)"></td>
+        <td data-label="${esc(g3n)}"><input type="number" value="${l.g3}" onchange="updateLot(${ii},${li},'g3',this.value)"></td>
+        <td class="num readonly" data-label="Guess Avg">${money(avg)}</td>
+        <td class="num readonly" data-label="After Final" id="afterFinal_${ii}_${li}">${afterFinal!==null? money(afterFinal) : '—'}</td>
+        <td class="num costcell" data-label="Final Cost" id="finalCost_${ii}_${li}">${finalCost!==null? money(finalCost) : '—'}</td>
+        <td data-label="Remove">${item.lots.length>1 ? `<button class="btn small danger removeLotBtn" title="Remove lot" onclick="deleteLot(${ii},${li})">✕<span class="btnLabel"> Remove</span></button>` : ''}</td>
+      </tr>`;
+    }).join('');
+
+    const wtTotal = itemWtTotal(item);
+    const itemAvg = itemAvgTotal(item);
+
+    return `<div class="panel" style="margin-bottom:14px">
+      <div class="ph" style="align-items:flex-start">
+        <div class="field" style="margin-bottom:0;flex:1;max-width:320px">
+          <label>Item Name</label>
+          <div class="comboBox" id="itemNameCombo${ii}">
+            <input type="text" id="itemNameInput${ii}" autocomplete="off" value="${esc(item.name)}" oninput="onComboInput('item',${ii})" onfocus="onComboFocus('item',${ii})">
+            <div class="comboMenu" id="itemNameMenu${ii}" onmousedown="handleComboMouseDown(event,'item',${ii})"></div>
+          </div>
+        </div>
+      </div>
+      <div class="pb">
+        <div class="tableWrap">
+        <table class="itemTable">
+          <thead><tr>
+            <th>Wt (ct)</th>
+            <th><input type="text" value="${esc(g1n)}" onchange="updateLabel('g1',this.value)"></th>
+            <th><input type="text" value="${esc(g2n)}" onchange="updateLabel('g2',this.value)"></th>
+            <th><input type="text" value="${esc(g3n)}" onchange="updateLabel('g3',this.value)"></th>
+            <th>Guess Avg</th><th>After Final Price</th><th class="costHead">Final Cost</th><th></th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+          <tfoot><tr>
+            <td data-label="Total Weight"><span>Total: ${Math.round(wtTotal*100)/100} ct</span></td>
+            <td class="footSpacer"></td><td class="footSpacer"></td><td class="footSpacer"></td>
+            <td class="num readonly" data-label="Guess Avg Total">${money(itemAvg)}</td>
+            <td class="num readonly" data-label="After Final">—</td>
+            <td class="num costcell" data-label="Final Cost Total" id="finalCostTotal_${ii}">${diffPct!==null? money(finalCostTotal) : '—'}</td>
+            <td class="footSpacer"></td>
+          </tr></tfoot>
+        </table>
+        </div>
+        <div class="btnRow"><button class="btn small" onclick="addLot(${ii})">➕ Add Lot</button></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  refreshFinalTotalDependents();
+}
+
+/* ===== Everything that depends on Final Purchase Total / Due Date, patched in place.
+   #hFinalTotal and #hDueDate themselves live in the static #finalTotalWrap (outside
+   #itemsContainer) and are never recreated, so this can run on every keystroke in Final
+   Total without ever stealing focus or the mobile keyboard. ===== */
+function refreshFinalTotalDependents(){
+  const finalTotalInput = document.getElementById('hFinalTotal');
+  const avgTotal = currentAvgTotal();
+  if(finalTotalAuto) finalTotalInput.value = avgTotal>0 ? String(Math.round(avgTotal)) : '';
+  const finalTotal = Number(finalTotalInput.value)||0;
+  const diffPct = (finalTotal>0 && avgTotal>0) ? ((finalTotal-avgTotal)/avgTotal*100) : null;
+  const dueDateValueStr = document.getElementById('hDueDate').value;
+
+  const lotBreakdownRows = [];
+  items.forEach((item,ii)=>{
+    let finalCostTotal = 0;
+    item.lots.forEach((l,li)=>{
+      const avg = lotAvg(l);
+      const afterFinal = diffPct!==null ? avg*(1+diffPct/100) : null;
+      const wt = Number(l.wt)||0;
+      const finalCost = afterFinal!==null ? wt*afterFinal : null;
+      if(finalCost!==null) finalCostTotal += finalCost;
+      if(avg>0) lotBreakdownRows.push({ itemName: item.name.trim()||'Item', wt, avg, finalCost, diffPct });
+      const afterEl = document.getElementById('afterFinal_'+ii+'_'+li);
+      if(afterEl) afterEl.textContent = afterFinal!==null? money(afterFinal) : '—';
+      const costEl = document.getElementById('finalCost_'+ii+'_'+li);
+      if(costEl) costEl.textContent = finalCost!==null? money(finalCost) : '—';
+    });
+    const totalEl = document.getElementById('finalCostTotal_'+ii);
+    if(totalEl) totalEl.textContent = diffPct!==null? money(finalCostTotal) : '—';
+  });
+
+  const breakdownList = document.getElementById('lotBreakdownList');
+  if(lotBreakdownRows.length>1){
+    breakdownList.style.display = 'block';
+    const breakdownSlipNo = document.getElementById('hSlipNo').value || '—';
+    breakdownList.innerHTML = `<div style="padding:8px 14px;background:var(--mint);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--green-dark)">🔽 Lot-wise Breakdown for ${esc(breakdownSlipNo)}</div>` + lotBreakdownRows.map((r,i)=>{
+      const pctStr = r.diffPct!==null ? (r.diffPct>=0?'+':'')+r.diffPct.toFixed(1)+'%' : '—';
+      const pctCls = r.diffPct!==null && r.diffPct<0 ? 'neg' : 'pos';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;${i?'border-top:1px solid var(--line);':''}font-size:12.5px">
+        <span style="color:var(--ink-soft);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.itemName)} <span style="font-family:var(--font-mono)">(${r.wt}ct)</span></span>
+        <span style="display:flex;gap:14px;font-family:var(--font-mono);font-weight:700;flex:none">
+          <span style="color:var(--green-dark)">${money(r.avg)}</span>
+          <span class="${pctCls}">${pctStr}</span>
+          <span style="color:var(--warn-ink)">${r.finalCost!==null?money(r.finalCost):'—'}</span>
+        </span>
+      </div>`;
+    }).join('');
+  } else {
+    breakdownList.style.display = 'none';
+    breakdownList.innerHTML = '';
+  }
+
+  const resultGrid = document.getElementById('dealResultGrid');
+  const mBar = document.getElementById('mobileLiveBar');
+  if(avgTotal>0 && finalTotal>0){
+    resultGrid.style.display='grid';
+    setFlash(document.getElementById('rAvgTotal'), money(avgTotal));
+    setFlash(document.getElementById('rFinalTotal'), money(finalTotal));
+    const pct = diffPct;
+    const rDiffEl = document.getElementById('rDiffPct');
+    rDiffEl.classList.toggle('neg', pct<0);
+    setFlash(rDiffEl, (pct>=0?'+':'')+pct.toFixed(1)+'%');
+    mBar.classList.add('show');
+    setFlash(document.getElementById('mAvg'), money(avgTotal));
+    setFlash(document.getElementById('mFinal'), money(finalTotal));
+    const mDiffEl = document.getElementById('mDiff');
+    mDiffEl.classList.toggle('neg', pct<0);
+    setFlash(mDiffEl, (pct>=0?'+':'')+pct.toFixed(1)+'%');
+  } else if(avgTotal>0){
+    resultGrid.style.display='none';
+    mBar.classList.add('show');
+    setFlash(document.getElementById('mAvg'), money(avgTotal));
+    setFlash(document.getElementById('mFinal'), '—');
+    setFlash(document.getElementById('mDiff'), '—');
+  } else {
+    resultGrid.style.display='none';
+    mBar.classList.remove('show');
+  }
+
+  setFlash(document.getElementById('psAvgTotal'), money(avgTotal));
+  setFlash(document.getElementById('psFinalTotal'), finalTotal>0?money(finalTotal):'—');
+  setFlash(document.getElementById('psAmtDiff'), diffPct!==null ? (finalTotal-avgTotal>=0?'+':'')+money(finalTotal-avgTotal) : '—');
+  setFlash(document.getElementById('psDiffPct'), diffPct!==null ? (diffPct>=0?'+':'')+diffPct.toFixed(1)+'%' : '—');
+  const dueWrap = document.getElementById('psDueDateWrap');
+  if(dueDateValueStr){ dueWrap.style.display='block'; document.getElementById('psDueDate').textContent = formatDueDate(dueDateValueStr); }
+  else dueWrap.style.display='none';
+}
+function onFinalTotalInput(){
+  refreshFinalTotalDependents();
+  autoSaveDraft();
+}
+function onDueDateInput(){
+  refreshFinalTotalDependents();
+  autoSaveDraft();
+}
+
+/* ===== Live auto-save: the open deal saves itself continuously, no manual "Save" step ===== */
+function autoSaveDraft(){
+  const party = document.getElementById('hParty').value.trim();
+  const broker = document.getElementById('hBroker').value.trim();
+  const avgTotal = currentAvgTotal();
+  const finalTotal = Number(document.getElementById('hFinalTotal').value)||0;
+  const dueDate = document.getElementById('hDueDate').value;
+  const hasLots = items.some(it=>it.lots.length);
+  const statusWrap = document.getElementById('draftStatusWrap');
+  const statusEl = document.getElementById('draftStatus');
+  if(!hasLots || avgTotal<=0){ statusWrap.style.display='none'; return; }
+
+  const itemNames = items.map(it=>it.name.trim()).filter(Boolean);
+  const note = [party,broker].filter(Boolean).join(' — ') || 'Untitled Deal';
+  // Slip No. is already generated the moment the New Deal screen opens (see startNewDeal()/
+  // page load below) — reuse it here instead of generating a second one, so the number the
+  // user saw on screen is exactly the one that gets saved.
+  if(!currentDealId){ currentDealId = genId(); if(!document.getElementById('hSlipNo').value) document.getElementById('hSlipNo').value = nextSlipNo(); }
+  const slipNo = document.getElementById('hSlipNo').value || nextSlipNo();
+  const record = { id: currentDealId, slipNo, note, party, broker, itemNames, g1Name, g2Name, g3Name,
+    avg: avgTotal, final: finalTotal, dueDate, items: JSON.parse(JSON.stringify(items)) };
+  const idx = deals.findIndex(d=>d.id===currentDealId);
+  if(idx>=0) deals[idx] = record; else deals.push(record);
+  saveDeals();
+
+  statusWrap.style.display='block';
+  statusEl.textContent = '✓ Auto-saved — Slip '+slipNo;
+  document.getElementById('dealFormTitle').textContent = '✏️ Editing '+slipNo+(note!=='Untitled Deal' ? ' — '+note : '');
+}
+
+function startNewDeal(){
+  currentDealId = null;
+  finalTotalAuto = true;
+  items = [newItem()];
+  ['hParty','hBroker','hFinalTotal','hDueDate'].forEach(id=>document.getElementById(id).value='');
+  // Slip No. shows right away, like a physical purchase slip already has its number
+  // printed before anyone fills it in — not just after the first lot is entered.
+  document.getElementById('hSlipNo').value = nextSlipNo();
+  document.getElementById('draftStatusWrap').style.display = 'none';
+  document.getElementById('dealFormTitle').textContent = '➕ New Deal';
+  renderItems();
+}
+
+function openDeal(id){
+  const d = deals.find(x=>x.id===id);
+  if(!d) return;
+  currentDealId = d.id;
+  finalTotalAuto = false; // preserve this saved deal's own Final Total, don't silently auto-overwrite it
+  document.getElementById('hParty').value = d.party||'';
+  document.getElementById('hBroker').value = d.broker||'';
+  document.getElementById('hSlipNo').value = d.slipNo||'';
+  g1Name = d.g1Name||'Hitesh Dusad';
+  g2Name = d.g2Name||'Nitesh Dusad';
+  g3Name = d.g3Name||'Ankur Khandelwal';
+  document.getElementById('hFinalTotal').value = d.final||'';
+  document.getElementById('hDueDate').value = d.dueDate||'';
+  items = Array.isArray(d.items) ? JSON.parse(JSON.stringify(d.items))
+    : [{name: d.item||'', lots: Array.isArray(d.lots)?JSON.parse(JSON.stringify(d.lots)):[]}];
+  if(!items.length) items = [newItem()];
+  renderItems();
+  document.getElementById('dealFormTitle').textContent = '✏️ Editing '+(d.slipNo||'')+(d.note!=='Untitled Deal' && d.note ? ' — '+d.note : '');
+  document.getElementById('draftStatusWrap').style.display = 'block';
+  document.getElementById('draftStatus').textContent = '✓ Auto-saved — Slip '+(d.slipNo||'');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ===== Historical Deals & Summary ===== */
+function deleteDeal(id){
+  if(!confirm('Delete this deal?')) return;
+  const idx = deals.findIndex(d=>d.id===id);
+  if(idx<0) return;
+  deals.splice(idx,1);
+  if(currentDealId===id) startNewDeal();
+  saveDeals();
+}
+function completedDeals(){ return deals.filter(d=>d.final>0); }
+function historicalMarkupPct(){
+  const completed = completedDeals();
+  if(!completed.length) return 0;
+  const sumAvg = completed.reduce((s,d)=>s+d.avg,0);
+  const sumFinal = completed.reduce((s,d)=>s+d.final,0);
+  if(sumAvg<=0) return 0;
+  return ((sumFinal-sumAvg)/sumAvg)*100;
+}
+let expandedDeals = {}; // index -> true/false
+let dealFilter = 'all'; // 'all' | 'pending' | 'completed'
+function setDealFilter(f){
+  dealFilter = f;
+  document.querySelectorAll('.dealFilterBtn').forEach(b=>b.classList.toggle('active', b.dataset.filter===f));
+  renderDealHistory();
+}
+function toggleDealExpand(id){ expandedDeals[id] = !expandedDeals[id]; renderDealHistory(); }
+function renderDealHistory(){
+  const body = document.getElementById('dealBody');
+  const empty = document.getElementById('dealEmpty');
+  const table = document.getElementById('dealTable');
+  document.getElementById('dealCountLabel').textContent = deals.length+' deals';
+  if(!deals.length){ table.style.display='none'; empty.textContent='No deals saved yet.'; empty.style.display='block'; return; }
+  ensureDealIds();
+
+  const searchEl = document.getElementById('dealSearch');
+  const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+  let visible = deals.map((d,i)=>({d,i}));
+  if(dealFilter==='pending') visible = visible.filter(x=>!(x.d.final>0));
+  if(dealFilter==='completed') visible = visible.filter(x=>x.d.final>0);
+  if(q){
+    visible = visible.filter(x=>{
+      const itemList = Array.isArray(x.d.items) ? x.d.items : [{name:x.d.item||''}];
+      const itemNames = itemList.map(it=>it.name||'').join(' ');
+      const hay = [x.d.party, x.d.broker, x.d.slipNo, itemNames].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  // pending deals first (need attention), newest first within each group
+  visible.sort((a,b)=>{
+    const aPending = !(a.d.final>0), bPending = !(b.d.final>0);
+    if(aPending !== bPending) return aPending ? -1 : 1;
+    return b.i - a.i;
+  });
+
+  if(!visible.length){ table.style.display='none'; empty.textContent='No matching deals.'; empty.style.display='block'; return; }
+  table.style.display='table'; empty.style.display='none';
+
+  body.innerHTML = visible.map(({d})=>{
+    const id = d.id;
+    const isCompleted = d.final>0;
+    // backward-compat: older saved deals used a single item+lots, not an items array
+    const itemList = Array.isArray(d.items) ? d.items : [{name: d.item||'', lots: Array.isArray(d.lots)?d.lots:[]}];
+    const lotCount = itemList.reduce((s,it)=>s+(Array.isArray(it.lots)?it.lots.length:0),0);
+    const itemNamesLabel = itemList.map(it=>it.name).filter(Boolean).join(', ');
+    const diff = d.final-d.avg;
+    const pct = d.avg>0 ? (diff/d.avg*100) : 0;
+    const cls = diff>=0?'pos':'neg';
+    const isOpen = !!expandedDeals[id];
+    const partyBroker = [d.party, d.broker].filter(Boolean).join(' — ') || d.note || 'Untitled Deal';
+    const titleLine = [partyBroker, itemNamesLabel].filter(Boolean).join(' · ');
+    const statusTag = isCompleted
+      ? `<span style="color:var(--green-dark);font-weight:700">✓ Completed</span>`
+      : `<span style="color:var(--ink-soft);font-weight:700">● Pending</span>`;
+    const row = `<tr class="${isCompleted?'completedRow':''}"><td style="font-family:var(--font-mono);color:var(--ink-soft)">${esc(d.slipNo||'—')}</td><td>${esc(titleLine)} <small style="color:var(--ink-soft)">(${lotCount} lots)</small><br><small>${statusTag}</small></td><td class="num">${money(d.avg)}</td><td class="num">${d.final>0?money(d.final):'—'}</td><td class="num ${cls}">${d.final>0?(diff>=0?'+':'')+money(diff):'—'}</td><td class="num ${cls}">${d.final>0?(diff>=0?'+':'')+pct.toFixed(1)+'%':'—'}</td><td class="dealRowActions"><button class="btn small dealActionBtn" title="View lot-wise breakdown" onclick="toggleDealExpand('${id}')">${isOpen?'🔽':'👁'}<span class="btnLabel"> View</span></button> <button class="btn small dealActionBtn" title="Open" onclick="openDeal('${id}')">✏️<span class="btnLabel"> Open</span></button> <button class="btn small dealActionBtn" title="Print / PDF" onclick="printDealFromHistory('${id}')">🖨️<span class="btnLabel"> Print</span></button> <button class="btn small dealActionBtn" title="Share on WhatsApp" onclick="shareDealFromHistory('${id}')">📤<span class="btnLabel"> Share</span></button> <button class="btn small danger dealActionBtn" title="Delete" onclick="deleteDeal('${id}')">✕<span class="btnLabel"> Delete</span></button></td></tr>`;
+    if(!isOpen || !lotCount) return row;
+    const dp = d.avg>0 ? ((d.final-d.avg)/d.avg*100) : 0;
+    const itemBlocks = itemList.map(it=>{
+      const lotArr = Array.isArray(it.lots)? it.lots : [];
+      if(!lotArr.length) return '';
+      const detailRows = lotArr.map(l=>{
+        const avg = [l.g1,l.g2,l.g3].filter(v=>v!=='' && v!=null && !isNaN(v));
+        const avgVal = avg.length? avg.reduce((a,b)=>a+Number(b),0)/avg.length : 0;
+        const after = avgVal*(1+dp/100);
+        const wt = Number(l.wt)||0;
+        return `<tr><td>${esc(l.wt)} ct</td><td class="num">${money(l.g1)}</td><td class="num">${money(l.g2)}</td><td class="num">${money(l.g3)}</td><td class="num">${money(avgVal)}</td><td class="num">${money(after)}</td><td class="num costcell">${money(wt*after)}</td></tr>`;
+      }).join('');
+      return `<div style="margin-bottom:14px">
+        <div class="detailLabel" style="font-size:12.5px">${esc(it.name||'Item')}</div>
+        <div class="tableWrap">
+        <table class="breakdownTable" style="width:100%"><thead><tr>
+          <th>Wt (ct)</th><th>${esc(d.g1Name||'G1')}</th><th>${esc(d.g2Name||'G2')}</th><th>${esc(d.g3Name||'G3')}</th><th>Guess Avg</th><th>After Final Price</th><th class="costHead">Final Cost</th>
+        </tr></thead><tbody>${detailRows}</tbody></table>
+        </div>
+      </div>`;
+    }).join('');
+    // Same background tint as the row it belongs to (continues the mint of a completed
+    // row with no seam) PLUS a blank spacer row after it (full white gap, no border) before
+    // whatever comes next - so the breakdown visually fuses with the row ABOVE and always
+    // has daylight between it and the row below, instead of looking symmetric either way.
+    const detail = `<tr><td colspan="7" style="padding:0">
+      <div class="detailBlock" style="background:${isCompleted?'var(--mint)':'var(--surface-sunken)'}">
+        <div class="detailLabel" style="margin-bottom:12px">🔽 LOT-WISE BREAKDOWN FOR <span style="color:var(--green-dark)">${esc(d.slipNo||'—')}</span> — ${esc(d.party||'')}${d.broker?' · '+esc(d.broker):''} <span style="font-weight:400;text-transform:none;color:var(--ink-soft)">(belongs to the row above ↑)</span></div>
+        ${itemBlocks}
+      </div>
+    </td></tr>
+    <tr style="background:transparent"><td colspan="7" style="padding:7px 0;border:0;background:transparent"></td></tr>`;
+    return row + detail;
+  }).join('');
+}
+function renderSummary(){
+  const pct = historicalMarkupPct();
+  const completed = completedDeals();
+  const sumAvg = completed.reduce((s,d)=>s+d.avg,0);
+  const sumFinal = completed.reduce((s,d)=>s+d.final,0);
+  setFlash(document.getElementById('sDeals'), String(deals.length));
+  setFlash(document.getElementById('sMarkup'), (pct>=0?'+':'')+pct.toFixed(1)+'%');
+  setFlash(document.getElementById('sDiff'), money(sumFinal-sumAvg));
+  document.getElementById('sDealsBar').style.width = Math.min(100, deals.length*10)+'%';
+  document.getElementById('sMarkupBar').style.width = Math.min(100, Math.abs(pct)*3)+'%';
+  document.getElementById('sDiffBar').style.width = sumAvg>0 ? Math.min(100, Math.abs(sumFinal-sumAvg)/sumAvg*100) + '%' : '0%';
+}
+/* ===== Mobile Preview (desktop can preview the phone layout without resizing) ===== */
+function toggleMobilePreview(){
+  const wrap = document.getElementById('mobilePreviewWrap');
+  const btn = document.getElementById('mobilePreviewBtn');
+  const main = document.getElementById('mainContent');
+  if(wrap.classList.contains('show')){
+    wrap.classList.remove('show');
+    main.style.display = '';
+    btn.textContent = '📱 Mobile Preview';
+  } else {
+    document.getElementById('mobilePreviewFrame').src = location.pathname + '?embedded=1';
+    wrap.classList.add('show');
+    main.style.display = 'none';
+    btn.textContent = '🖥️ Desktop View';
+  }
+}
+if(new URLSearchParams(location.search).get('embedded')==='1'){
+  const btn = document.getElementById('mobilePreviewBtn');
+  if(btn) btn.style.display = 'none';
+}
+
+function printSlip(){
+  document.getElementById('printSlipNo').textContent = document.getElementById('hSlipNo').value || '—';
+  window.print();
+}
+window.addEventListener('afterprint', ()=>{ autoSaveDraft(); });
+
+/* ===== WhatsApp Share: same deal data as the Print Slip, as a plain-text message ===== */
+function buildSlipShareText(){
+  const slipNo = document.getElementById('hSlipNo').value || '—';
+  const party = document.getElementById('hParty').value.trim() || '—';
+  const broker = document.getElementById('hBroker').value.trim() || '—';
+  const finalTotalInput = document.getElementById('hFinalTotal');
+  const finalTotal = finalTotalInput ? Number(finalTotalInput.value)||0 : 0;
+  const dateStr = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+  const lines = [
+    '*Purchase Slip — Bliss Gems*',
+    `Slip No: ${slipNo}  |  Date: ${dateStr}`,
+    `Party: ${party}`,
+    `Broker: ${broker}`,
+    ''
+  ];
+  items.forEach(item=>{
+    lines.push(`*${item.name.trim() || 'Item'}*`);
+    item.lots.forEach(l=>{
+      const avg = lotAvg(l);
+      lines.push(`  Wt ${l.wt||0}ct — ${g1Name}:${l.g1||0} ${g2Name}:${l.g2||0} ${g3Name}:${l.g3||0} → Avg ${money(avg)}`);
+    });
+  });
+  lines.push('');
+  lines.push(`Final Purchase Total: ${finalTotal>0 ? money(finalTotal) : '—'}`);
+  return lines.join('\n');
+}
+function shareSlipOnWhatsApp(){
+  const text = buildSlipShareText();
+  window.open('https://wa.me/?text='+encodeURIComponent(text), '_blank');
+}
+/* Deals History: Print/Share directly on a past deal without a separate Open step first */
+function printDealFromHistory(id){ openDeal(id); printSlip(); }
+function shareDealFromHistory(id){ openDeal(id); shareSlipOnWhatsApp(); }
+
+const printDateEl = document.getElementById('printDate');
+if(printDateEl) printDateEl.textContent = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+
+if(!document.getElementById('hSlipNo').value) document.getElementById('hSlipNo').value = nextSlipNo();
+renderItems();
+renderSummary();
+renderDealHistory();
+</script>
+</body>
+</html>

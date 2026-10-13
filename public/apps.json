@@ -25,13 +25,13 @@
   },
   {
     "slug": "fuel-tracker",
-    "name": "Fuel Tracker",
+    "name": "Vehicle Tracker",
     "pushedAt": 0,
     "enabled": false
   },
   {
-    "slug": "purchase-slip",
-    "name": "Purchase Slip",
+    "slug": "purchase-price-estimator",
+    "name": "Purchase Price Estimator",
     "pushedAt": 0,
     "enabled": false
   }
