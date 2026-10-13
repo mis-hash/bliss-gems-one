@@ -378,6 +378,10 @@ function nextSlipNo(){
 
 function saveDeals(){ localStorage.setItem(LS_DEALS, JSON.stringify(deals)); renderSummary(); renderDealHistory(); }
 function money(n){ return '₹'+Math.round(Number(n||0)).toLocaleString('en-IN'); }
+// Combined/blended reference rates (sum ÷ total weight) land well under ₹1 for typical
+// weights, so money()'s whole-rupee rounding would show "₹0" for every one of them — show
+// 2 decimals instead so the number stays readable.
+function moneyDec(n){ return '₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function formatDueDate(isoStr){
   const d = new Date(isoStr+'T00:00:00');
   return isNaN(d) ? isoStr : d.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
@@ -497,10 +501,19 @@ function lotAvg(lot){
   if(!vals.length) return 0;
   return vals.reduce((a,b)=>a+Number(b),0)/vals.length;
 }
-function itemAvgTotal(item){ return item.lots.reduce((s,l)=>s+lotAvg(l),0); }
+function lotGuessCost(lot){ return (Number(lot.wt)||0) * lotAvg(lot); }
+// Guess Avg Total must be a real guessed ₹ VALUE (so it can sensibly auto-fill Final
+// Purchase Total and be diffed against it) — so this sums each lot's wt×rate, not the
+// raw rates themselves (summing rates across lots of different weight is meaningless).
+function itemAvgTotal(item){ return item.lots.reduce((s,l)=>s+lotGuessCost(l),0); }
 function itemWtTotal(item){ return item.lots.reduce((s,l)=>s+(Number(l.wt)||0),0); }
 function currentAvgTotal(){ return items.reduce((s,it)=>s+itemAvgTotal(it),0); }
 function currentWtTotal(){ return items.reduce((s,it)=>s+itemWtTotal(it),0); }
+// Combined/blended reference rates shown in the per-item table's Total row — sum of the
+// column across lots, divided by the item's total weight (not weighted per-lot).
+function colSum(item,key){ return item.lots.reduce((s,l)=>{ const v=l[key]; return s+(v!=='' && v!=null && !isNaN(v) ? Number(v) : 0); },0); }
+function itemColCombined(item,key){ const wt=itemWtTotal(item); return wt>0 ? colSum(item,key)/wt : 0; }
+function itemAvgCombined(item){ const wt=itemWtTotal(item); const sumAvg=item.lots.reduce((s,l)=>s+lotAvg(l),0); return wt>0 ? sumAvg/wt : 0; }
 
 function renderItems(){
   const container = document.getElementById('itemsContainer');
@@ -531,6 +544,7 @@ function renderItems(){
         <td data-label="${esc(g2n)}"><input type="number" value="${l.g2}" onchange="updateLot(${ii},${li},'g2',this.value)"></td>
         <td data-label="${esc(g3n)}"><input type="number" value="${l.g3}" onchange="updateLot(${ii},${li},'g3',this.value)"></td>
         <td class="num readonly" data-label="Guess Avg">${money(avg)}</td>
+        <td class="num costcell" data-label="Guess Cost">${money(wt*avg)}</td>
         <td class="num readonly" data-label="After Final" id="afterFinal_${ii}_${li}">${afterFinal!==null? money(afterFinal) : '—'}</td>
         <td class="num costcell" data-label="Final Cost" id="finalCost_${ii}_${li}">${finalCost!==null? money(finalCost) : '—'}</td>
         <td data-label="Remove">${item.lots.length>1 ? `<button class="btn small danger removeLotBtn" title="Remove lot" onclick="deleteLot(${ii},${li})">✕<span class="btnLabel"> Remove</span></button>` : ''}</td>
@@ -558,13 +572,16 @@ function renderItems(){
             <th><input type="text" value="${esc(g1n)}" onchange="updateLabel('g1',this.value)"></th>
             <th><input type="text" value="${esc(g2n)}" onchange="updateLabel('g2',this.value)"></th>
             <th><input type="text" value="${esc(g3n)}" onchange="updateLabel('g3',this.value)"></th>
-            <th>Guess Avg</th><th>After Final Price</th><th class="costHead">Final Cost</th><th></th>
+            <th>Guess Avg</th><th class="costHead">Guess Cost</th><th>After Final Price</th><th class="costHead">Final Cost</th><th></th>
           </tr></thead>
           <tbody>${rowsHtml}</tbody>
           <tfoot><tr>
             <td data-label="Total Weight"><span>Total: ${Math.round(wtTotal*100)/100} ct</span></td>
-            <td class="footSpacer"></td><td class="footSpacer"></td><td class="footSpacer"></td>
-            <td class="num readonly" data-label="Guess Avg Total">${money(itemAvg)}</td>
+            <td class="num readonly" data-label="${esc(g1n)} (Combined)">${moneyDec(itemColCombined(item,'g1'))}</td>
+            <td class="num readonly" data-label="${esc(g2n)} (Combined)">${moneyDec(itemColCombined(item,'g2'))}</td>
+            <td class="num readonly" data-label="${esc(g3n)} (Combined)">${moneyDec(itemColCombined(item,'g3'))}</td>
+            <td class="num readonly" data-label="Guess Avg (Combined)">${moneyDec(itemAvgCombined(item))}</td>
+            <td class="num costcell" data-label="Guess Cost Total">${money(itemAvg)}</td>
             <td class="num readonly" data-label="After Final">—</td>
             <td class="num costcell" data-label="Final Cost Total" id="finalCostTotal_${ii}">${diffPct!==null? money(finalCostTotal) : '—'}</td>
             <td class="footSpacer"></td>
