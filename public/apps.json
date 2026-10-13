@@ -30,12 +30,6 @@
     "enabled": false
   },
   {
-    "slug": "purchase-slip",
-    "name": "Purchase Slip",
-    "pushedAt": 0,
-    "enabled": false
-  },
-  {
     "slug": "purchase-price-estimator",
     "name": "Purchase Price Estimator",
     "pushedAt": 0,

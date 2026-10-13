@@ -110,7 +110,7 @@ tr.completedRow:hover{background:var(--mint)}
 
 table{width:100%;border-collapse:collapse}
 th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);font-weight:700;padding:10px 10px;border-bottom:1.5px solid var(--line);background:var(--surface-sunken);white-space:nowrap;font-family:var(--font-mono)}
-th input{width:70px;padding:5px 6px;border:1px solid var(--line-strong);border-radius:6px;font-size:10.5px;text-transform:uppercase;font-weight:700;text-align:center;background:var(--surface);color:var(--navy);font-family:var(--font-mono)}
+th input{width:100%;min-width:90px;padding:5px 6px;border:1px solid var(--line-strong);border-radius:6px;font-size:10.5px;font-weight:700;text-align:center;background:var(--surface);color:var(--navy);font-family:var(--font-mono)}
 td{padding:10px 10px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle}
 td input{width:84px;padding:8px 9px;border:1.5px solid var(--line-strong);border-radius:var(--radius-sm);font-size:13.5px;font-family:var(--font-mono);color:var(--ink)}
 .num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--font-mono)}
@@ -146,7 +146,7 @@ tfoot td{font-weight:700;background:var(--surface-sunken);border-top:2px solid v
 /* shrink the Wt/HD/ND/TK input columns so all 4 fit on one phone screen without horizontal scroll */
 @media(max-width:480px){
   .itemTable th{padding:6px 4px;font-size:9px}
-  .itemTable th input{width:44px;padding:3px 3px;font-size:9px}
+  .itemTable th input{width:100%;min-width:52px;padding:3px 3px;font-size:9px}
   .itemTable td{padding:6px 4px}
   .itemTable td input{width:50px;padding:6px 4px;font-size:12px}
   /* Guess Avg (5th column): let its header wrap to two lines (was forcing the column wide via nowrap) and shrink its own font/padding, so its value fits fully in the space left after Wt/HD/ND/TK instead of getting cut off */
@@ -352,11 +352,11 @@ const BROKER_NAME_SEED = ["A-SELF", "AFJAL BHAI", "AJAY JI AGARWAL", "ANIL JI KH
 let deals = JSON.parse(localStorage.getItem(LS_DEALS)||'[]');
 function newItem(name){ return {name: name||'', lots:[{wt:'', g1:'', g2:'', g3:''}]}; }
 let items = [newItem()]; // current in-progress deal's items: {name, lots:[{wt,g1,g2,g3}]}
-let g1Name='HD', g2Name='ND', g3Name='TK'; // broker guess labels, shared across every item's table
+let g1Name='Hitesh Dusad', g2Name='Nitesh Dusad', g3Name='Ankur Khandelwal'; // the 3 Directors who each give their own guess rate, shared across every item's table
 function updateLabel(which, val){
-  if(which==='g1') g1Name = val||'HD';
-  if(which==='g2') g2Name = val||'ND';
-  if(which==='g3') g3Name = val||'TK';
+  if(which==='g1') g1Name = val||'Hitesh Dusad';
+  if(which==='g2') g2Name = val||'Nitesh Dusad';
+  if(which==='g3') g3Name = val||'Ankur Khandelwal';
   renderItems();
 }
 let currentDealId = null; // id of the deal in `deals` currently being edited (null = fresh unsaved draft)
@@ -726,9 +726,9 @@ function openDeal(id){
   document.getElementById('hParty').value = d.party||'';
   document.getElementById('hBroker').value = d.broker||'';
   document.getElementById('hSlipNo').value = d.slipNo||'';
-  g1Name = d.g1Name||'HD';
-  g2Name = d.g2Name||'ND';
-  g3Name = d.g3Name||'TK';
+  g1Name = d.g1Name||'Hitesh Dusad';
+  g2Name = d.g2Name||'Nitesh Dusad';
+  g3Name = d.g3Name||'Ankur Khandelwal';
   document.getElementById('hFinalTotal').value = d.final||'';
   document.getElementById('hDueDate').value = d.dueDate||'';
   items = Array.isArray(d.items) ? JSON.parse(JSON.stringify(d.items))
