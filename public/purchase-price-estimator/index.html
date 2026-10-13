@@ -114,6 +114,7 @@ th input{width:100%;min-width:90px;padding:5px 6px;border:1px solid var(--line-s
 td{padding:10px 10px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle}
 td input{width:84px;padding:8px 9px;border:1.5px solid var(--line-strong);border-radius:var(--radius-sm);font-size:13.5px;font-family:var(--font-mono);color:var(--ink)}
 .num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--font-mono)}
+.combinedCell{text-align:center!important}
 .pos{color:var(--green-dark);font-weight:700}
 .neg{color:var(--red-dark);font-weight:700}
 .readonly{background:var(--mint);color:var(--green-dark);font-weight:700}
@@ -512,8 +513,8 @@ function currentWtTotal(){ return items.reduce((s,it)=>s+itemWtTotal(it),0); }
 // Combined/blended reference rates shown in the per-item table's Total row — sum of the
 // column across lots, divided by the item's total weight (not weighted per-lot).
 function colSum(item,key){ return item.lots.reduce((s,l)=>{ const v=l[key]; return s+(v!=='' && v!=null && !isNaN(v) ? Number(v) : 0); },0); }
-function itemColCombined(item,key){ const wt=itemWtTotal(item); return wt>0 ? colSum(item,key)/wt : 0; }
-function itemAvgCombined(item){ const wt=itemWtTotal(item); const sumAvg=item.lots.reduce((s,l)=>s+lotAvg(l),0); return wt>0 ? sumAvg/wt : 0; }
+function itemColCombined(item,key){ const wt=itemWtTotal(item); const s=colSum(item,key); return s>0 ? wt/s : 0; }
+function itemAvgCombined(item){ const wt=itemWtTotal(item); const sumAvg=item.lots.reduce((s,l)=>s+lotAvg(l),0); return sumAvg>0 ? wt/sumAvg : 0; }
 
 function renderItems(){
   const container = document.getElementById('itemsContainer');
@@ -577,10 +578,10 @@ function renderItems(){
           <tbody>${rowsHtml}</tbody>
           <tfoot><tr>
             <td data-label="Total Weight"><span>Total: ${Math.round(wtTotal*100)/100} ct</span></td>
-            <td class="num readonly" data-label="${esc(g1n)} (Combined)">${moneyDec(itemColCombined(item,'g1'))}</td>
-            <td class="num readonly" data-label="${esc(g2n)} (Combined)">${moneyDec(itemColCombined(item,'g2'))}</td>
-            <td class="num readonly" data-label="${esc(g3n)} (Combined)">${moneyDec(itemColCombined(item,'g3'))}</td>
-            <td class="num readonly" data-label="Guess Avg (Combined)">${moneyDec(itemAvgCombined(item))}</td>
+            <td class="num readonly combinedCell" data-label="${esc(g1n)} (Combined)">${moneyDec(itemColCombined(item,'g1'))}</td>
+            <td class="num readonly combinedCell" data-label="${esc(g2n)} (Combined)">${moneyDec(itemColCombined(item,'g2'))}</td>
+            <td class="num readonly combinedCell" data-label="${esc(g3n)} (Combined)">${moneyDec(itemColCombined(item,'g3'))}</td>
+            <td class="num readonly combinedCell" data-label="Guess Avg (Combined)">${moneyDec(itemAvgCombined(item))}</td>
             <td class="num costcell" data-label="Guess Cost Total">${money(itemAvg)}</td>
             <td class="num readonly" data-label="After Final">—</td>
             <td class="num costcell" data-label="Final Cost Total" id="finalCostTotal_${ii}">${diffPct!==null? money(finalCostTotal) : '—'}</td>
