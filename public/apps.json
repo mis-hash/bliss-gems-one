@@ -27,12 +27,12 @@
     "slug": "fuel-tracker",
     "name": "Vehicle Tracker",
     "pushedAt": 0,
-    "enabled": false
+    "enabled": true
   },
   {
     "slug": "purchase-price-estimator",
     "name": "Purchase Price Estimator",
     "pushedAt": 0,
-    "enabled": false
+    "enabled": true
   }
 ]
