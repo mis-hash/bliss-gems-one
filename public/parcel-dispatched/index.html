@@ -1068,7 +1068,7 @@ function personChanged(s){
         ?`📦 Parcel Packing Complete\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nPacked By: ${u.name}\nTime: ${now()}\n\n👉 View Details: ${parcelOpenLink(parcel)}`
         :`🚚 Parcel Dispatch Complete\n\nParcel ID: ${parcel}\nParty: ${party}\nBroker: ${$('broker')?.value||'-'}\nCourier: ${$('courierName')?.value||'-'}\nShip Through: ${$('shipThrough')?.value||'-'}\nAWB No: ${$('awbNo')?.value||'-'}${courierAmtLine}\nInsurance Amount: ${$('inshAmount')?.value||'-'}\nHandover By: ${u.name}\nTime: ${now()}\n\n👉 View Details: ${parcelOpenLink(parcel)}`;
       for(const r of recipients){
-        sendRawWA(r.phone,msg).catch(err=>console.error('Slip owner milestone WA failed:',err));
+        sendRawWA(r.phone,msg).catch(err=>{console.error('Slip owner milestone WA failed:',err);toast('⚠️ WhatsApp to '+r.name+' failed: '+err.message);});
       }
     }
   }
@@ -1166,7 +1166,7 @@ async function checkStuckParcelsAndAlertDelays(){
       if(!rec[alertKey]){
         const msg=`⏰ Delay Alert\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nStuck at: ${info.stage.name}${withLine}\nPending for: ${hrs}+ hours\n\n👉 ${parcelOpenLink(rec.parcelId)}`;
         for(const u of targets){
-          try{await sendRawWA(u.phone,msg)}catch(e){console.error('delay WA failed',e)}
+          try{await sendRawWA(u.phone,msg)}catch(e){console.error('delay WA failed',e);toast('⚠️ Delay alert WhatsApp to '+u.name+' failed: '+e.message);}
         }
         rec[alertKey]=true;changed=true;
         try{await pdDb.collection('pd_records_cloud').doc(String(rec.parcelId)).update({[alertKey]:true})}catch(e){console.error('delay flag save failed',e)}
@@ -1174,7 +1174,7 @@ async function checkStuckParcelsAndAlertDelays(){
       if(hours>=24&&!rec[criticalKey]&&targets.length){
         const critMsg=`🚨 Critically Delayed (1+ Day)\n\nParcel ID: ${rec.parcelId}\nParty: ${rec.shipTo||'-'}\nStuck at: ${info.stage.name}${withLine}\nPending for: ${hrs}+ hours\n\nKindly take action.\n\n👉 ${parcelOpenLink(rec.parcelId)}`;
         for(const u of targets){
-          try{await sendRawWA(u.phone,critMsg)}catch(e){console.error('critical delay WA failed',e)}
+          try{await sendRawWA(u.phone,critMsg)}catch(e){console.error('critical delay WA failed',e);toast('⚠️ Critical delay WhatsApp to '+u.name+' failed: '+e.message);}
         }
         rec[criticalKey]=true;changed=true;
         try{await pdDb.collection('pd_records_cloud').doc(String(rec.parcelId)).update({[criticalKey]:true})}catch(e){console.error('critical flag save failed',e)}
@@ -1257,7 +1257,7 @@ function notifyDlcIfNeeded(){
   localStorage.setItem(DLC_NOTIFIED_KEY,JSON.stringify(sent));
   const party=$('shipTo')?.value||'-';
   const msg=`📦 DLC / Delivery Challan Required\n\nParcel ID: ${pid}\nParty: ${party}\nShip Through: ${$('shipThrough').value}\n\nPlease complete the DLC section for this parcel.\n\n👉 Open DLC Section: ${parcelOpenLink(pid,'dlcItem')}`;
-  sendRawWA(recipient.phone,msg).catch(err=>console.error('DLC notify WA failed:',err));
+  sendRawWA(recipient.phone,msg).catch(err=>{console.error('DLC notify WA failed:',err);toast('⚠️ DLC WhatsApp to '+recipient.name+' failed: '+err.message);});
 }
 function priceChanged(){let yes=$('priceFill').value==='YES';$('priceWrap').classList.toggle('hidden',!yes);if(!yes)$('price').value=''}
 
@@ -2700,7 +2700,7 @@ function returnPersonSelected(s){
     const doneBy=users.find(x=>x.id===s.value);
     if(receivedBy&&receivedBy.phone&&doneBy&&receivedBy.id!==doneBy.id){
       const msg=`↩️ Return Process Complete\n\nReturn From: ${$('returnFrom')?.value||'-'}\nReturn Through: ${$('returnThrough')?.value||'-'}\nStock Boxed By: ${doneBy.name}\nTime: ${returnNow()}`;
-      sendRawWA(receivedBy.phone,msg).catch(err=>console.error('Return complete milestone WA failed:',err));
+      sendRawWA(receivedBy.phone,msg).catch(err=>{console.error('Return complete milestone WA failed:',err);toast('⚠️ WhatsApp to '+receivedBy.name+' failed: '+err.message);});
     }
   }
 }
@@ -4152,7 +4152,7 @@ function logWorkerSelection(field,selectedId,el){
        let q2=JSON.parse(localStorage.getItem(WA_QUEUE_KEY)||'[]');
        const it=q2.find(x=>x.createdAt===row.at&&x.toUserId===worker.id&&x.stage===fieldId&&x.status==='PENDING');
        if(it){it.lastSentAt=new Date().toISOString();localStorage.setItem(WA_QUEUE_KEY,JSON.stringify(q2))}
-     }).catch(err=>console.error('Immediate transfer WA failed:',err));
+     }).catch(err=>{console.error('Immediate transfer WA failed:',err);toast('⚠️ WhatsApp to '+worker.name+' failed: '+err.message);});
    }
  }
 }
