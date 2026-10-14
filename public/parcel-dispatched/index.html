@@ -4138,7 +4138,10 @@ function logWorkerSelection(field,selectedId,el){
  // own send was removed (see comment above) - this is now the only place that sends the
  // per-field assignment message, so it must honor the same on/off setting.
  if(el && el.dataset && el.dataset.event && notifySettings[el.dataset.event]===false)return;
- if(actor && actor.id!==worker.id){
+ // Still send even when the logged-in actor is assigning the task to themselves — the
+ // WhatsApp message is also how a Doer gets the direct task link/reminder on their own
+ // phone, not purely a "someone else notified you" ping.
+ if(actor){
    const everyMin=notifySettings.transferReminderMinutes||30;
    const intro=reason
      ? `${actor.name} has transferred '${field}' to you.\nReason: ${reason}`
