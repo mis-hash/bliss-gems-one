@@ -138,16 +138,58 @@ tbody tr:hover td{background:#f7faf8}
 
 <div class="shell">
 <nav>
-<div class="grouplabel">Inventory</div>
-<button class="on" data-page="dash" onclick="go('dash',this)">📊 Dashboard</button>
-<button data-page="in" onclick="go('in',this)">⬇ Stock In</button>
-<button data-page="out" onclick="go('out',this)">⬆ Stock Out / Issue</button>
+<div class="grouplabel">Requests</div>
+<button data-page="myrequests" onclick="go('myrequests',this)">🙋 My Requests</button>
+<button class="superAdminOnly hidden" data-page="requests" onclick="go('requests',this)" id="requestsNavBtn">📋 Requests</button>
+<div class="grouplabel superAdminOnly hidden">Inventory</div>
+<button class="superAdminOnly hidden" data-page="dash" onclick="go('dash',this)">📊 Dashboard</button>
+<button class="superAdminOnly hidden" data-page="in" onclick="go('in',this)">⬇ Stock In</button>
+<button class="superAdminOnly hidden" data-page="out" onclick="go('out',this)">⬆ Stock Out / Issue</button>
 <button class="superAdminOnly hidden" data-page="items" onclick="go('items',this)">🗂 Item Master</button>
-<button data-page="reports" onclick="go('reports',this)">📈 Reports</button>
+<button class="superAdminOnly hidden" data-page="reports" onclick="go('reports',this)">📈 Reports</button>
 </nav>
 
 <main>
-  <section class="page on" id="page-dash">
+  <section class="page on" id="page-myrequests">
+    <div class="hero">
+      <div><h1>My Stationery Requests</h1><p style="margin-top:4px;opacity:.9">Jo bhi stationery chahiye, yahan se request bhejein — Admin approve karke issue karega.</p></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span>New Request</span></div>
+      <div class="pb">
+        <div class="grid">
+          <div class="field"><label>Item <span style="color:var(--red)">*</span></label><input id="reqItemSearch" list="reqItemList" autocomplete="off" placeholder="Item select karein" oninput="syncItemIdFromSearch('reqItemSearch','reqItem')"><input type="hidden" id="reqItem"><datalist id="reqItemList"></datalist></div>
+          <div class="field"><label>Quantity <span style="color:var(--red)">*</span></label><input type="number" id="reqQty"></div>
+          <div class="field span2"><label>Purpose / Reason</label><input id="reqPurpose" placeholder="Optional"></div>
+        </div>
+        <div style="margin-top:14px;text-align:right"><button class="btn primary" id="reqSubmitBtn" onclick="submitStationeryRequest()">＋ Send Request</button></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span>My Request History</span></div>
+      <div class="pb" id="myRequestsList"></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-requests">
+    <div class="hero">
+      <div><h1>Stationery Requests</h1><p style="margin-top:4px;opacity:.9">Staff ki requests approve/issue ya reject karein.</p></div>
+    </div>
+    <div class="panel">
+      <div class="ph">
+        <span>All Requests</span>
+        <div class="tabs">
+          <button class="tab on" id="reqFilterBtn_PENDING" onclick="setRequestsFilter('PENDING')">Pending</button>
+          <button class="tab" id="reqFilterBtn_ISSUED" onclick="setRequestsFilter('ISSUED')">Issued</button>
+          <button class="tab" id="reqFilterBtn_REJECTED" onclick="setRequestsFilter('REJECTED')">Rejected</button>
+          <button class="tab" id="reqFilterBtn_ALL" onclick="setRequestsFilter('ALL')">All</button>
+        </div>
+      </div>
+      <div class="pb" id="adminRequestsList"></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-dash">
     <div class="hero">
       <div><h1>Stationery Inventory</h1></div>
       <div class="heroStat"><small>TOTAL ITEMS</small><strong id="heroTotalItems">0</strong></div>
@@ -262,11 +304,13 @@ tbody tr:hover td{background:#f7faf8}
 </div>
 
 <div class="bottomNav" id="bottomNav">
-<button class="on" data-page="dash" onclick="go('dash',this)"><span>📊</span>Dashboard</button>
-<button data-page="in" onclick="go('in',this)"><span>⬇</span>Stock In</button>
-<button data-page="out" onclick="go('out',this)"><span>⬆</span>Stock Out</button>
+<button class="on" data-page="myrequests" onclick="go('myrequests',this)"><span>🙋</span>Requests</button>
+<button class="superAdminOnly hidden" data-page="requests" onclick="go('requests',this)"><span>📋</span>All Req</button>
+<button class="superAdminOnly hidden" data-page="dash" onclick="go('dash',this)"><span>📊</span>Dashboard</button>
+<button class="superAdminOnly hidden" data-page="in" onclick="go('in',this)"><span>⬇</span>Stock In</button>
+<button class="superAdminOnly hidden" data-page="out" onclick="go('out',this)"><span>⬆</span>Stock Out</button>
 <button class="superAdminOnly hidden" data-page="items" onclick="go('items',this)"><span>🗂</span>Items</button>
-<button data-page="reports" onclick="go('reports',this)"><span>📈</span>Reports</button>
+<button class="superAdminOnly hidden" data-page="reports" onclick="go('reports',this)"><span>📈</span>Reports</button>
 </div>
 
 <!-- Login modal -->
@@ -336,7 +380,8 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const todayISO=()=>new Date().toISOString().slice(0,10);
 
-let users=[],items=[],inLog=[],outLog=[];
+let users=[],items=[],inLog=[],outLog=[],requests=[];
+let requestsFilter='PENDING';
 let masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{}};
 let api={};
 let currentUser=null,currentTab='category';
@@ -446,6 +491,12 @@ function startMastersSync(){
 }
 function saveMasters(){ if(db) db.collection('si_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
 
+let requestsStarted=false;
+function startRequestsSync(){
+  if(requestsStarted||!db)return;requestsStarted=true;
+  db.collection('si_requests').orderBy('requestedAt','desc').limit(300).onSnapshot(snap=>{requests=[];snap.forEach(d=>requests.push({id:d.id,...d.data()}));renderAll();},err=>console.error('requests sync error',err));
+}
+
 /* ===== WhatsApp (shared GREEN-API credentials) ===== */
 function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===10)p='91'+p;return p;}
 async function sendRawWA(phone,message){
@@ -462,7 +513,10 @@ async function sendRawWA(phone,message){
 // back to this default - so a fresh install always has a sensible message with no setup.
 const DEFAULT_SI_TEMPLATES={
   low_stock:{name:'Low Stock Alert',text:'⚠️ Low Stock Alert\n\nItem: {ItemName}\nIn Hand: {InHand} {Unit}\nMinimum Level: {MinLevel}\n\nPlease arrange for restocking at the earliest.'},
-  stock_issued:{name:'Stock Issued',text:'📦 Stock Issued\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nIssued To: {IssuedTo}\nIssued By: {IssuedBy}'}
+  stock_issued:{name:'Stock Issued',text:'📦 Stock Issued\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nIssued To: {IssuedTo}\nIssued By: {IssuedBy}'},
+  request_submitted:{name:'New Stationery Request (to Admin)',text:'🙋 New Stationery Request\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nRequested By: {RequestedBy}\nPurpose: {Purpose}\n\nPlease review and issue.'},
+  request_issued:{name:'Request Issued (to Requester)',text:'✅ Your Stationery Request Approved\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nIssued By: {IssuedBy}\n\nPlease collect it.'},
+  request_rejected:{name:'Request Rejected (to Requester)',text:'❌ Your Stationery Request Rejected\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nReason: {Reason}'}
 };
 function fillTemplate(text,vars){
   return text.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m);
@@ -483,6 +537,23 @@ function notifyIssue(item,qty,toUserId,byUserId){
   const msg=fillTemplate(templateText('stock_issued'),{ItemName:item.name,Qty:qty,Unit:item.unit||'',IssuedTo:nameOfUserId(toUserId),IssuedBy:nameOfUserId(byUserId)});
   admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('issue WA failed:',e)));
 }
+function notifyRequestSubmitted(item,qty,requesterId,purpose){
+  const admins=users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
+  const msg=fillTemplate(templateText('request_submitted'),{ItemName:item.name,Qty:qty,Unit:item.unit||'',RequestedBy:nameOfUserId(requesterId),Purpose:purpose||'-'});
+  admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('request-submitted WA failed:',e)));
+}
+function notifyRequestIssued(item,qty,requesterId,issuedByUserId){
+  const u=users.find(x=>x.id===requesterId);
+  if(!u||!u.phone)return;
+  const msg=fillTemplate(templateText('request_issued'),{ItemName:item.name,Qty:qty,Unit:item.unit||'',IssuedBy:nameOfUserId(issuedByUserId)});
+  sendRawWA(u.phone,msg).catch(e=>console.error('request-issued WA failed:',e));
+}
+function notifyRequestRejected(item,qty,requesterId,reason){
+  const u=users.find(x=>x.id===requesterId);
+  if(!u||!u.phone)return;
+  const msg=fillTemplate(templateText('request_rejected'),{ItemName:item.name,Qty:qty,Unit:item.unit||'',Reason:reason||'-'});
+  sendRawWA(u.phone,msg).catch(e=>console.error('request-rejected WA failed:',e));
+}
 
 /* ===== Nav / gate ===== */
 function go(id,btn){
@@ -502,9 +573,11 @@ function renderGate(){
       : `<h3>Login Required</h3><p class="note">Stationery Inventory dekhne ke liye login karein — wahi username/password jo baaki Bliss apps me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
     return;
   }
-  const role=myRole();
-  const hasAccess=superAdminUnlocked||role==='admin'||role==='director';
-  if(!hasAccess || (u.appAccess && u.appAccess[APP_SLUG]===false)){
+  // Every active Universal User can now open the app to send a Stationery Request — only
+  // the Inventory pages (Dashboard/Stock In/Out/Item Master/Reports) and the admin-side
+  // Requests queue stay restricted to Admin/Director, via applyFeatureVisibility() hiding
+  // their nav buttons (same .superAdminOnly pattern the other apps use).
+  if(u.appAccess && u.appAccess[APP_SLUG]===false){
     gateWrap.style.display='flex';appWrap.style.display='none';
     gateBox.innerHTML=`<h3>No Access</h3>`;
     return;
@@ -517,6 +590,7 @@ function refreshLoginBadge(){
   $('loginBadge').textContent=u?'👤 '+u.name:'Not Logged In';
   $('logoutBtn').classList.toggle('hidden',!u);
 }
+const ADMIN_ONLY_PAGES=['dash','in','out','items','reports','requests'];
 function applyFeatureVisibility(){
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.toggle('hidden',!isAdminRole()));
   // Message Templates / Low Stock Alerts need the actual Super Admin unlock, not just any
@@ -524,6 +598,15 @@ function applyFeatureVisibility(){
   // gates (via the "⚙ Manage" button itself being superAdminOnly).
   document.querySelectorAll('.superAdminStrict').forEach(el=>el.classList.toggle('hidden',!superAdminUnlocked));
   if(!superAdminUnlocked&&(currentTab==='notify'||currentTab==='templates')){currentTab='category';}
+  // A non-admin whose active page just became admin-only (e.g. an Admin's role being
+  // revoked mid-session) gets bounced back to My Requests, the one page every logged-in
+  // user keeps.
+  if(!isAdminRole()){
+    const activePage=document.querySelector('.page.on');
+    if(activePage && ADMIN_ONLY_PAGES.includes(activePage.id.replace('page-',''))){
+      go('myrequests');
+    }
+  }
 }
 
 /* ===== Dashboard / stock ===== */
@@ -555,6 +638,7 @@ function renderSelects(){
   const itemOpts=items.map(x=>`<option value="${esc(x.name)}"></option>`).join('');
   if($('inItemList'))$('inItemList').innerHTML=itemOpts;
   if($('outItemList'))$('outItemList').innerHTML=itemOpts;
+  if($('reqItemList'))$('reqItemList').innerHTML=itemOpts;
   const au=users.filter(u=>u.active!==false);
   if($('outTo'))$('outTo').innerHTML='<option value="">Select</option>'+au.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
   if($('vendorList'))$('vendorList').innerHTML=(masters.vendors||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
@@ -664,6 +748,98 @@ async function addStockOut(){
     if(btn)btn.disabled=false;
   }
 }
+/* ===== Stationery Requests (Staff submits -> Admin issues/rejects) ===== */
+let _reqSubmitting=false;
+async function submitStationeryRequest(){
+  if(_reqSubmitting)return;
+  const item=$('reqItem').value,qty=parseInt($('reqQty').value,10),purpose=$('reqPurpose').value.trim();
+  if(!item||!qty){alert('Item aur Quantity zaroori hai.');return}
+  const actor=loggedUser();
+  if(!actor)return;
+  const it=items.find(x=>x.id===item);
+  _reqSubmitting=true;
+  const btn=$('reqSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    await db.collection('si_requests').add({item,qty,purpose,status:'PENDING',requestedBy:actor.id,requestedAt:new Date().toISOString()});
+    $('reqItemSearch').value='';$('reqItem').value='';$('reqQty').value='';$('reqPurpose').value='';
+    toast('Request bhej diya gaya');
+    if(it)notifyRequestSubmitted(it,qty,actor.id,purpose);
+  }finally{
+    _reqSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
+}
+function requestStatusPill(status){
+  if(status==='ISSUED')return '<span class="pill ok">✓ Issued</span>';
+  if(status==='REJECTED')return '<span class="pill" style="background:var(--redbg);color:var(--red)">✕ Rejected</span>';
+  return '<span class="pill low">⏳ Pending</span>';
+}
+function renderMyRequests(){
+  const wrap=$('myRequestsList');if(!wrap)return;
+  const mine=requests.filter(r=>r.requestedBy===currentUser).sort((a,b)=>String(b.requestedAt||'').localeCompare(String(a.requestedAt||'')));
+  wrap.innerHTML=mine.length?mine.map(r=>{
+    const it=items.find(x=>x.id===r.item);
+    const name=it?it.name:(r.itemName||r.item);
+    const when=r.requestedAt?new Date(r.requestedAt).toLocaleString('en-IN'):'-';
+    let extra='';
+    if(r.status==='ISSUED')extra=`<small style="color:var(--muted)">Issued by ${esc(nameOfUserId(r.issuedBy))}</small>`;
+    if(r.status==='REJECTED')extra=`<small style="color:var(--muted)">Reason: ${esc(r.rejectReason||'-')}</small>`;
+    return `<div class="itemrow"><div><b>${esc(name)}</b><small>Qty ${r.qty}${r.purpose?' • '+esc(r.purpose):''} • ${esc(when)}</small>${extra?'<br>'+extra:''}</div>${requestStatusPill(r.status)}</div>`;
+  }).join(''):`<div class="emptystate">🙋<p>Abhi tak koi request nahi bheji.</p><small>Upar se naya request bhejein.</small></div>`;
+}
+function pendingRequestsCount(){ return requests.filter(r=>r.status==='PENDING').length; }
+function setRequestsFilter(f){
+  requestsFilter=f;
+  document.querySelectorAll('#page-requests .tab').forEach(b=>b.classList.toggle('on',b.id==='reqFilterBtn_'+f));
+  renderRequestsAdmin();
+}
+function renderRequestsAdmin(){
+  const wrap=$('adminRequestsList');if(!wrap)return;
+  const badge=$('requestsNavBtn');
+  const pend=pendingRequestsCount();
+  if(badge){
+    let dot=badge.querySelector('.reqCountBadge');
+    if(pend){ if(!dot){dot=document.createElement('span');dot.className='reqCountBadge';dot.style.cssText='margin-left:auto;background:var(--amber);color:#fff;border-radius:99px;padding:1px 7px;font-size:11px';badge.appendChild(dot);} dot.textContent=pend; }
+    else if(dot)dot.remove();
+  }
+  let list=requestsFilter==='ALL'?requests.slice():requests.filter(r=>r.status===requestsFilter);
+  list=list.sort((a,b)=>String(b.requestedAt||'').localeCompare(String(a.requestedAt||'')));
+  wrap.innerHTML=list.length?list.map(r=>{
+    const it=items.find(x=>x.id===r.item);
+    const name=it?it.name:(r.itemName||r.item);
+    const when=r.requestedAt?new Date(r.requestedAt).toLocaleString('en-IN'):'-';
+    const actions=r.status==='PENDING'
+      ?`<button class="btn small primary" onclick="issueRequest('${r.id}')">✓ Issue</button> <button class="btn small danger" onclick="rejectRequest('${r.id}')">✕ Reject</button>`
+      :(r.status==='ISSUED'?`<small style="color:var(--muted)">by ${esc(nameOfUserId(r.issuedBy))}</small>`:`<small style="color:var(--muted)">by ${esc(nameOfUserId(r.rejectedBy))}</small>`);
+    return `<div class="itemrow"><div><b>${esc(name)}</b><small>Qty ${r.qty}${r.purpose?' • '+esc(r.purpose):''} • By ${esc(nameOfUserId(r.requestedBy))} • ${esc(when)}</small></div><span style="display:flex;gap:8px;align-items:center">${requestStatusPill(r.status)}${actions}</span></div>`;
+  }).join(''):`<div class="emptystate">📋<p>Is filter mein koi request nahi hai.</p></div>`;
+}
+async function issueRequest(id){
+  if(!isAdminRole()){alert('Sirf Admin/Director requests issue kar sakte hain.');return}
+  const r=requests.find(x=>x.id===id);if(!r)return;
+  const it=items.find(x=>x.id===r.item);
+  if(it&&r.qty>(it.stock||0)){if(!confirm(`Sirf ${it.stock||0} ${it.unit||''} stock mein hai. Phir bhi issue karein?`))return}
+  const actor=loggedUser();
+  await db.collection('si_stock_out').add({item:r.item,qty:r.qty,to:r.requestedBy,purpose:r.purpose||'Stationery Request',date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString(),fromRequest:id});
+  await db.collection('si_items').doc(r.item).update({stock:firebase.firestore.FieldValue.increment(-r.qty)});
+  await db.collection('si_requests').doc(id).update({status:'ISSUED',issuedBy:actor?actor.id:'',issuedAt:new Date().toISOString()});
+  toast('Request issue ho gaya');
+  if(it){
+    notifyRequestIssued(it,r.qty,r.requestedBy,actor?actor.id:'');
+    if((it.stock||0)-r.qty<=(it.min||0))notifyLowStock({...it,stock:(it.stock||0)-r.qty});
+  }
+}
+async function rejectRequest(id){
+  if(!isAdminRole()){alert('Sirf Admin/Director requests reject kar sakte hain.');return}
+  const r=requests.find(x=>x.id===id);if(!r)return;
+  const reason=prompt('Reject karne ka reason (optional):')||'';
+  const actor=loggedUser();
+  await db.collection('si_requests').doc(id).update({status:'REJECTED',rejectedBy:actor?actor.id:'',rejectedAt:new Date().toISOString(),rejectReason:reason});
+  toast('Request reject ho gaya');
+  const it=items.find(x=>x.id===r.item);
+  if(it)notifyRequestRejected(it,r.qty,r.requestedBy,reason);
+}
+
 // Soft-delete only, same pattern as Parcel Dispatch/Trip Expense - a wrong entry moves to
 // "Deleted" (restorable) instead of being permanently destroyed. Reverses the entry's own
 // effect on the item's current stock count so a mistaken entry doesn't leave stock wrong
@@ -773,7 +949,7 @@ function renderManage(){
   else if(currentTab==='vendor'){c.innerHTML=masterListUI('vendors','Vendor');}
   else if(currentTab==='roles'){
     const au=users.filter(u=>u.active!==false);
-    c.innerHTML=`<p class="note">Ye poori app sirf Admin/Director role wale users ke liye hai — baaki sabko "No Access" dikhega.</p>`+au.map(u=>{
+    c.innerHTML=`<p class="note">Har active user "My Requests" page se stationery request bhej sakta hai. Sirf Admin/Director role wale hi Dashboard/Stock In/Out/Item Master/Reports/Requests (admin queue) dekh sakte hain.</p>`+au.map(u=>{
       const role=(u.appRoles&&u.appRoles[APP_SLUG])||'';
       return `<div class="item">
         <b style="font-size:13px">${esc(u.name)}</b>
@@ -967,6 +1143,8 @@ function renderAll(){
   renderLogs();
   renderItems();
   renderReports();
+  renderMyRequests();
+  renderRequestsAdmin();
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -979,6 +1157,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   startItemsSync();
   startLogsSync();
   startMastersSync();
+  startRequestsSync();
   renderAll();
 });
 window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
