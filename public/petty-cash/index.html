@@ -148,6 +148,8 @@ tbody tr:hover td{background:#f7faf8}
 
 <div class="shell">
   <nav id="pageNav">
+    <div class="grouplabel">Admin</div>
+    <button class="adminOnly hidden" data-page="admin" onclick="goPage('admin')">⚙ Admin</button>
     <div class="grouplabel">Operations</div>
     <button class="on" data-page="ledger" onclick="goPage('ledger')">📊 Ledger</button>
     <button data-page="my" id="myPageTabBtn" onclick="goPage('my')">👤 My Petty Cash</button>
@@ -156,6 +158,23 @@ tbody tr:hover td{background:#f7faf8}
     <button data-page="reports" onclick="goPage('reports')">📈 Reports</button>
   </nav>
   <main>
+
+  <div id="page-admin" class="pcPage">
+  <div class="hero">
+    <h1>Admin Panel</h1>
+    <p>Quick overview + fund actions — Admin/Director ke liye.</p>
+  </div>
+  <div class="cards" id="adminStatTiles"></div>
+  <div class="panel">
+    <div class="ph"><span>Quick Actions</span></div>
+    <div class="pb" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn primary" onclick="openEntryModal('in')">➕ Add Fund</button>
+      <button type="button" class="btn primary" onclick="openEntryModal('out')">➖ Issue / Cash Out</button>
+      <button type="button" class="btn primary" onclick="openEntryModal('loan')">🤝 Loan Given</button>
+    </div>
+  </div>
+  <div class="pendingRemindersWrap"></div>
+  </div>
 
   <div id="page-ledger" class="pcPage on">
   <div class="hero">
@@ -281,13 +300,14 @@ tbody tr:hover td{background:#f7faf8}
       </table></div></div>
     </div>
 
-    <div id="pendingRemindersWrap" class="no-print"></div>
+    <div class="pendingRemindersWrap no-print"></div>
   </div>
   </main>
 </div>
 </div>
 
 <div class="bottomNav" id="bottomNav">
+  <button class="adminOnly hidden" data-page="admin" onclick="goPage('admin')"><span>⚙</span>Admin</button>
   <button class="on" data-page="ledger" onclick="goPage('ledger')"><span>📊</span>Ledger</button>
   <button data-page="my" onclick="goPage('my')"><span>👤</span>My Cash</button>
   <button class="accountantOnly hidden" data-page="team" onclick="goPage('team')"><span>👥</span>Team</button>
@@ -587,7 +607,9 @@ function refreshLoginBadge(){
 function applyFeatureVisibility(){
   document.querySelectorAll('.superAdminStrict').forEach(el=>el.classList.toggle('hidden',!superAdminUnlocked));
   document.querySelectorAll('.accountantOnly').forEach(el=>el.classList.toggle('hidden',!canCloseLoan()));
+  document.querySelectorAll('.adminOnly').forEach(el=>el.classList.toggle('hidden',!canAddFund()));
   if(!canCloseLoan()&&document.getElementById('page-team')?.classList.contains('on'))goPage('ledger');
+  if(!canAddFund()&&document.getElementById('page-admin')?.classList.contains('on'))goPage('ledger');
   refreshAddFundVisibility();
 }
 
@@ -1132,13 +1154,13 @@ function maybeAutoSendReminders(due){
   });
 }
 function renderPendingReminders(){
-  const wrap=$('pendingRemindersWrap');
-  if(!wrap)return;
+  const wraps=document.querySelectorAll('.pendingRemindersWrap');
+  if(!wraps.length)return;
   const due=computePendingReminders();
   maybeAutoSendReminders(due);
   const toggleHtml=superAdminUnlocked?`<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer"><input type="checkbox" style="width:auto" ${masters.autoReminderEnabled?'checked':''} onchange="toggleAutoReminder()"> Auto-Send WhatsApp</label>`:'';
-  if(!due.length){wrap.innerHTML=`<div class="panel"><div class="ph"><span>⏰ Pending Hisaab Reminders</span>${toggleHtml}</div><div class="pb" style="display:flex;align-items:center;gap:8px;color:var(--g);font-size:13px;font-weight:600"><span style="font-size:17px">✓</span><span>Koi pending hisaab nahi hai.</span></div></div>`;return;}
-  wrap.innerHTML=`<div class="panel"><div class="ph"><span>⏰ Pending Hisaab Reminders</span>${toggleHtml}</div><div class="pb">
+  if(!due.length){wraps.forEach(wrap=>wrap.innerHTML=`<div class="panel"><div class="ph"><span>⏰ Pending Hisaab Reminders</span>${toggleHtml}</div><div class="pb" style="display:flex;align-items:center;gap:8px;color:var(--g);font-size:13px;font-weight:600"><span style="font-size:17px">✓</span><span>Koi pending hisaab nahi hai.</span></div></div>`);return;}
+  const html=`<div class="panel"><div class="ph"><span>⏰ Pending Hisaab Reminders</span>${toggleHtml}</div><div class="pb">
     <p class="note" style="margin:0 0 10px">Hisaab dene ke liye ${PENDING_REMINDER_GAP_DAYS} din milte hain, uske baad reminder due ho jata hai. ${ESCALATE_TO_ACCOUNTANT_DAYS}+ din se pending ho to Accountant ko bhi dikhega. ${masters.autoReminderEnabled?'Auto-Send ON hai — jab bhi koi app kholega, due reminders WhatsApp par khud chale jayenge.':'Auto-Send OFF hai — Super Admin isse upar diye "Auto-Send WhatsApp" toggle se on kar sakta hai, tab tak "Reminder Bhej Diya Mark Karein" button se manually mark karein.'} (Yeh check app khulne par hota hai — background mein khud-ba-khud nahi chalta, Spark free plan par ye possible nahi hai.)</p>
     ${due.map(r=>{
     const totalPending=r.issuedPending+r.loansOutstanding;
@@ -1156,6 +1178,7 @@ function renderPendingReminders(){
       </div>
     </div>`;
   }).join('')}</div></div>`;
+  wraps.forEach(wrap=>wrap.innerHTML=html);
 }
 function markReminderSent(pid){
   if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin reminder mark kar sakte hain.');return}
@@ -1471,12 +1494,26 @@ function goPage(id){
   document.querySelectorAll('.pcPage').forEach(p=>p.classList.toggle('on',p.id==='page-'+id));
   document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
 }
+function renderAdminPanel(){
+  const wrap=$('adminStatTiles');
+  if(!wrap)return;
+  const {totalIn,totalOut,outstandingLoans,outstandingCount}=computeBalance();
+  const pendingHisaab=computeAllPersonPendingTotals().reduce((s,r)=>s+r.issuedPending,0);
+  const tiles=[
+    {label:'TOTAL FUND ADDED',val:fmtAmt(totalIn)},
+    {label:'TOTAL ISSUED (OUT)',val:fmtAmt(totalOut)},
+    {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
+    {label:'OUTSTANDING LOANS',val:fmtAmt(outstandingLoans)+' ('+outstandingCount+')',warn:outstandingCount>0}
+  ];
+  wrap.innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+}
 function renderAll(){
   renderGate();
   refreshLoginBadge();
   applyFeatureVisibility();
   renderEntryPersonSelect();
   renderDash();
+  renderAdminPanel();
   renderHighAmountAlerts();
   renderMyPage();
   renderTeamOverview();
