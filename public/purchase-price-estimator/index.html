@@ -122,10 +122,12 @@ td input{width:84px;padding:8px 9px;border:1.5px solid var(--line-strong);border
 .itemTable td{text-align:center}
 .itemTable td input{text-align:center}
 .itemTable td.num{text-align:center}
-/* "Main hoon:" selector highlight - a distinct color from the amber Guess/Final Cost
-   columns so the selected director's own column is unmistakable at a glance. */
-.dirHighlight{background:#E3F2FD!important}
-.itemTable th.dirHighlight input{background:#E3F2FD}
+/* "Main hoon:" selector highlight - a distinct, gently pulsing color (not a harsh blink)
+   from the amber Guess/Final Cost columns, so the selected director's own column draws
+   the eye immediately instead of blending in as a flat static tint. */
+@keyframes dirPulse{0%,100%{background-color:#BBDEFB}50%{background-color:#E3F2FD}}
+.dirHighlight{animation:dirPulse 1.6s ease-in-out infinite}
+.itemTable th.dirHighlight input,.itemTable td.dirHighlight input{animation:dirPulse 1.6s ease-in-out infinite}
 .pos{color:var(--green-dark);font-weight:700}
 .neg{color:var(--red-dark);font-weight:700}
 .readonly{background:var(--mint);color:var(--green-dark);font-weight:700}
