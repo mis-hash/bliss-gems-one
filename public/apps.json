@@ -21,7 +21,7 @@
     "slug": "petty-cash",
     "name": "Petty Cash",
     "pushedAt": 0,
-    "enabled": false
+    "enabled": true
   },
   {
     "slug": "fuel-tracker",
