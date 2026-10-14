@@ -608,7 +608,7 @@ if(window.self!==window.top){
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script>
-const K={users:'pd_users_v2',shipto:'pd_shipto_v2',shipthrough:'pd_shipthrough_v2',api:'pd_greenapi_v2',records:'pd_records_v2',inshpresets:'pd_inshpresets_v1',couriernames:'pd_couriernames_v1',notifysettings:'pd_notify_settings_v1',featureaccess:'pd_feature_access_v1'};
+const K={users:'pd_users_v2',shipto:'pd_shipto_v2',shipthrough:'pd_shipthrough_v2',api:'pd_greenapi_v2',records:'pd_records_v2',inshpresets:'pd_inshpresets_v1',couriernames:'pd_couriernames_v1',notifysettings:'pd_notify_settings_v1',featureaccess:'pd_feature_access_v1',mutedrecipients:'pd_muted_recipients_v1'};
 const FEATURE_LIST=[
   {id:'dispatchSec1',name:'Dispatch — 1. Basic Dispatch & Preparation'},
   {id:'dispatchSec2',name:'Dispatch — 2. Weight & Checking'},
@@ -730,6 +730,41 @@ function pdStartClientMasterSync(){
 }
 function pdPushClientMasterToCloud(){
   try{pdDb.collection('pd_settings').doc('clientMaster').set({list:clientMaster}).catch(e=>console.error('pd client master cloud push failed',e));}catch(e){}
+}
+
+/* ===== Muted Recipients (Notification Control) - same cross-device sync pattern as
+   clientMaster above, since this must take effect no matter whose device sends the
+   WhatsApp, not just the admin's own browser that set the mute. ===== */
+let pdNotifyControlSyncStarted=false,pdNotifyControlSeedChecked=false;
+async function pdSeedCloudNotifyControlIfEmpty(){
+  if(pdNotifyControlSeedChecked)return;pdNotifyControlSeedChecked=true;
+  try{
+    const doc=await pdDb.collection('pd_settings').doc('notifyControl').get();
+    if(!doc.exists)await pdDb.collection('pd_settings').doc('notifyControl').set({mutedRecipients});
+  }catch(e){console.error('pd seed cloud notify control failed',e);}
+}
+function pdStartNotifyControlSync(){
+  if(pdNotifyControlSyncStarted)return;pdNotifyControlSyncStarted=true;
+  pdSeedCloudNotifyControlIfEmpty();
+  pdDb.collection('pd_settings').doc('notifyControl').onSnapshot(doc=>{
+    if(!doc.exists)return;
+    const list=doc.data().mutedRecipients;
+    if(!Array.isArray(list))return;
+    mutedRecipients=list;
+    localStorage.setItem(K.mutedrecipients,JSON.stringify(mutedRecipients));
+    try{if(typeof renderManage==='function'&&currentTab==='notifycontrol')renderManage();}catch(e){}
+  },err=>console.error('pd notify control sync error',err));
+}
+function pdPushNotifyControlToCloud(){
+  try{pdDb.collection('pd_settings').doc('notifyControl').set({mutedRecipients}).catch(e=>console.error('pd notify control cloud push failed',e));}catch(e){}
+}
+function toggleMutedRecipient(id){
+  id=String(id);
+  const i=mutedRecipients.indexOf(id);
+  if(i===-1)mutedRecipients.push(id);else mutedRecipients.splice(i,1);
+  localStorage.setItem(K.mutedrecipients,JSON.stringify(mutedRecipients));
+  pdPushNotifyControlToCloud();
+  renderManage();
 }
 
 /* ===== Admin-visible connection status (Firebase + GREEN-API) ===== */
@@ -894,7 +929,14 @@ if(!Array.isArray(waTemplates)||!waTemplates.length){
 }
 function saveWaTemplates(){localStorage.setItem(WA_TEMPLATE_KEY,JSON.stringify(waTemplates));}
 
-let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(localStorage.getItem(K.shipto)||'[]');let shipThrough=JSON.parse(localStorage.getItem(K.shipthrough)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let inshAmountPresets=JSON.parse(localStorage.getItem(K.inshpresets)||'null')||['0.10','0.20','0.50','0.60','0.70','1.00','2.00','3.00'];let courierNames=JSON.parse(localStorage.getItem(K.couriernames)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let api=JSON.parse(localStorage.getItem(K.api)||'{}');let notifySettings=JSON.parse(localStorage.getItem(K.notifysettings)||'{}');let featureAccess=JSON.parse(localStorage.getItem(K.featureaccess)||'{}');let editing=null,currentTab='users',waTarget=null;
+let users=JSON.parse(localStorage.getItem(K.users)||'[]');let shipTo=JSON.parse(localStorage.getItem(K.shipto)||'[]');let shipThrough=JSON.parse(localStorage.getItem(K.shipthrough)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let inshAmountPresets=JSON.parse(localStorage.getItem(K.inshpresets)||'null')||['0.10','0.20','0.50','0.60','0.70','1.00','2.00','3.00'];let courierNames=JSON.parse(localStorage.getItem(K.couriernames)||'null')||['SECURE','SEQUEL','BVC','DD','RJ','AIR','GREEN DART','By Hand'];let api=JSON.parse(localStorage.getItem(K.api)||'{}');let notifySettings=JSON.parse(localStorage.getItem(K.notifysettings)||'{}');let featureAccess=JSON.parse(localStorage.getItem(K.featureaccess)||'{}');
+// Muted Recipients - users who should NEVER get a WhatsApp from this app, regardless of
+// which field/event would otherwise target them (Issued To, Slip Owner, delay alerts,
+// DLC, New Task). Synced via pd_settings/notifyControl (not just localStorage) so the
+// mute applies no matter whose device actually triggers the send - see
+// pdStartNotifyControlSync() below, same cross-device pattern as clientMaster.
+let mutedRecipients=JSON.parse(localStorage.getItem(K.mutedrecipients)||'[]');
+let editing=null,currentTab='users',waTarget=null;
 // One-time additive merge: bring in courier names asked for, without touching anyone's
 // existing custom list (only appends names that aren't already there in some form).
 (function mergeDefaultCourierNames(){
@@ -978,6 +1020,7 @@ document.addEventListener('DOMContentLoaded',()=>{ensureDoerMaster();ensureUserP
   renderHistory();
   pdStartRecordsSync();
   pdStartClientMasterSync();
+  pdStartNotifyControlSync();
 });
 function openFromLink(parcelId){
   editRecord(parcelId);
@@ -1074,6 +1117,12 @@ function personChanged(s){
   }
 }
 async function sendRawWA(phone,message){
+  // Single enforcement point for Muted Recipients - matched by phone number (not user id)
+  // since every call site here only ever has a phone number in hand by this point, and a
+  // muted person could be targeted via any field (Issued To, Slip Owner, delay alert, DLC,
+  // New Task) without this function needing to know which one.
+  const mutedUser=users.find(u=>u.phone&&normalizePhone(u.phone)===normalizePhone(phone)&&mutedRecipients.includes(String(u.id)));
+  if(mutedUser){console.log('WhatsApp skipped - muted recipient:',mutedUser.name);return false}
   let id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
   if(!id||!token){console.warn('GREEN-API settings missing');return false}
   let p=normalizePhone(phone); if(p.length<11)return false;
@@ -2010,7 +2059,10 @@ else if(currentTab==='notifycontrol'){c.innerHTML=`<h3 style="margin-top:0">💬
 <div class="note">Jab tak transfer kiya hua task pending rehta hai, us Doer ko kitni der mein reminder WhatsApp message jaata rahega.</div>
 <select onchange="setTransferReminderMinutes(this.value)" style="width:auto">
 ${WA_REMINDER_FREQUENCIES.map(f=>`<option value="${f.minutes}"${(notifySettings.transferReminderMinutes||30)===f.minutes?' selected':''}>${esc(f.label)}</option>`).join('')}
-</select>`}
+</select>
+<h3>🔇 Muted Recipients</h3>
+<div class="note">Yahan select kiye gaye users ko is app se WhatsApp KABHI nahi jayega — chahe wo kisi bhi field (Issued To, Slip Owner, Delay Alert, DLC, New Task) mein select ho jayein.</div>
+${users.filter(u=>u.active!==false&&u.phone).map(u=>`<div class="item"><span>${esc(u.name)}</span><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" ${mutedRecipients.includes(String(u.id))?'checked':''} onchange="toggleMutedRecipient('${esc(u.id)}')"> Muted</label></div>`).join('')||'<div class="note">Koi active user ka phone number save nahi hai.</div>'}`}
 else if(currentTab==='messages'){
  let au=users.filter(u=>u.active!==false);
  c.innerHTML=`<h3 style="margin-top:0">DLC WhatsApp Rules</h3>
