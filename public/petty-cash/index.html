@@ -48,7 +48,14 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 .btn.secondary{background:#eef2f0;color:var(--txt)}
 .btn.danger{background:var(--redbg);color:var(--red)}
 .btn.small{padding:7px 11px;font-size:12px}
-.shell{max-width:1000px;margin:auto;padding:17px 18px 60px}
+.shell{max-width:1050px;margin:auto;display:grid;grid-template-columns:210px 1fr;gap:16px;padding:17px 18px 60px}
+nav{background:#fff;border:1px solid var(--line);border-radius:14px;padding:9px;height:max-content;position:sticky;top:85px}
+nav button{width:100%;border:0;background:transparent;text-align:left;padding:12px 11px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin:2px 0;display:flex;align-items:center;gap:8px;border-left:3px solid transparent;color:var(--txt);font-family:inherit}
+nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
+nav button.hidden{display:none}
+.grouplabel{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:14px 11px 6px}
+.grouplabel:first-child{padding-top:4px}
+.bottomNav{display:none}
 .hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px}
 .hero h1{font-size:24px;margin:0 0 5px}
 .hero p{font-size:13px;margin:0;opacity:.9}
@@ -93,7 +100,6 @@ tbody tr:hover td{background:#f7faf8}
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
 .tab{border:1px solid var(--line);background:#fff;color:var(--muted);padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
 .tab.on{background:var(--g);border-color:var(--g);color:#fff}
-#pageTabs .tab{padding:11px 16px;font-size:13.5px;position:relative}
 .tabBadgeDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin-left:5px}
 .pcPage{display:none}
 .pcPage.on{display:block}
@@ -102,13 +108,26 @@ tbody tr:hover td{background:#f7faf8}
 #entrySubmitBtn{padding:13px 22px;font-size:14px}
 @media(max-width:720px){
   header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:20px}.brand b{font-size:16px}.brand small{display:none}
-  .shell{padding:11px 10px 30px}
+  .shell{display:block;padding:11px 10px 76px}
+  nav{display:none}
   .hero{padding:17px}.hero h1{font-size:20px}
   .cards{grid-template-columns:1fr 1fr}
   .grid{grid-template-columns:1fr}
   .typeRow{flex-direction:column}
   .typeRow button{min-width:0;width:100%}
   #entrySubmitBtn{width:100%}
+  .bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}
+  .bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:1 0 auto;padding:6px 8px;white-space:nowrap;font-family:inherit;cursor:pointer}
+  .bottomNav button span{display:block;font-size:19px}
+  .bottomNav button.on{color:var(--g)}
+}
+.printOnly{display:none}
+@media print{
+  header,nav,.bottomNav,.no-print{display:none!important}
+  .shell{display:block;padding:0;max-width:100%}
+  .panel{box-shadow:none;border:1px solid #999}
+  .printOnly{display:block}
+  body{background:#fff}
 }
 </style>
 </head>
@@ -127,11 +146,15 @@ tbody tr:hover td{background:#f7faf8}
 </div></header>
 
 <div class="shell">
-  <div class="tabs" id="pageTabs" style="margin-bottom:14px">
-    <button class="tab on" data-page="ledger" onclick="goPage('ledger')">📊 Ledger</button>
-    <button class="tab" data-page="my" id="myPageTabBtn" onclick="goPage('my')">👤 My Petty Cash</button>
-    <button class="tab accountantOnly hidden" data-page="team" onclick="goPage('team')">👥 Team Overview</button>
-  </div>
+  <nav id="pageNav">
+    <div class="grouplabel">Operations</div>
+    <button class="on" data-page="ledger" onclick="goPage('ledger')">📊 Ledger</button>
+    <button data-page="my" id="myPageTabBtn" onclick="goPage('my')">👤 My Petty Cash</button>
+    <div class="grouplabel">Insights</div>
+    <button class="accountantOnly hidden" data-page="team" onclick="goPage('team')">👥 Team Overview</button>
+    <button data-page="reports" onclick="goPage('reports')">📈 Reports</button>
+  </nav>
+  <main>
 
   <div id="page-ledger" class="pcPage on">
   <div class="hero">
@@ -146,8 +169,8 @@ tbody tr:hover td{background:#f7faf8}
     <div class="ph"><span>New Entry</span></div>
     <div class="pb">
       <div class="typeRow">
-        <button type="button" class="tab on" id="typeBtn_in" onclick="selectEntryType('in')">➕ Cash In</button>
-        <button type="button" class="tab" id="typeBtn_out" onclick="selectEntryType('out')">➖ Cash Out</button>
+        <button type="button" class="tab" id="typeBtn_in" onclick="selectEntryType('in')">➕ Cash In</button>
+        <button type="button" class="tab on" id="typeBtn_out" onclick="selectEntryType('out')">➖ Cash Out</button>
         <button type="button" class="tab" id="typeBtn_loan" onclick="selectEntryType('loan')">🤝 Loan Given</button>
       </div>
       <div class="grid">
@@ -225,7 +248,58 @@ tbody tr:hover td{background:#f7faf8}
       </div>
     </div>
   </div>
+
+  <div id="page-reports" class="pcPage">
+    <div class="panel no-print">
+      <div class="ph"><span>📈 Reports</span></div>
+      <div class="pb">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px">
+          <button class="tab" id="reportRangeBtn_week" onclick="setReportRangeQuick('week')">This Week</button>
+          <button class="tab on" id="reportRangeBtn_month" onclick="setReportRangeQuick('month')">This Month</button>
+          <button class="tab" id="reportRangeBtn_all" onclick="setReportRangeQuick('all')">All Time</button>
+          <input type="date" id="reportRangeFrom" onchange="setReportRangeCustom()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+          <span class="note">to</span>
+          <input type="date" id="reportRangeTo" onchange="setReportRangeCustom()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+          <span style="flex:1"></span>
+          <button class="btn small secondary" onclick="printReports()">🖨 Print / PDF</button>
+          <button class="btn small secondary" onclick="shareReportsOnWhatsApp()">📤 Share on WhatsApp</button>
+        </div>
+        <div class="note" id="reportRangeLabel" style="margin-top:4px"></div>
+      </div>
+    </div>
+
+    <div class="printOnly" id="reportPrintHeader" style="margin-bottom:10px">
+      <h2 style="margin:0 0 2px">Petty Cash Report — Bliss Gems &amp; Minerals</h2>
+      <div class="note" id="reportPrintRangeLabel"></div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><span>👥 Staff-wise Report (Issued + Pending + Loan + Outstanding)</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Person</th><th class="num">Issued</th><th class="num">Pending (Issued)</th><th class="num">Loans Given</th><th class="num">Outstanding (Loan)</th></tr></thead>
+        <tbody id="staffReportTable"></tbody>
+      </table></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><span>🧾 Expense-wise Report</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Spent On</th><th class="num">Entries</th><th class="num">Total Amount</th></tr></thead>
+        <tbody id="expenseReportTable"></tbody>
+      </table></div></div>
+    </div>
+
+    <div id="pendingRemindersWrap" class="no-print"></div>
+  </div>
+  </main>
 </div>
+</div>
+
+<div class="bottomNav" id="bottomNav">
+  <button class="on" data-page="ledger" onclick="goPage('ledger')"><span>📊</span>Ledger</button>
+  <button data-page="my" onclick="goPage('my')"><span>👤</span>My Cash</button>
+  <button class="accountantOnly hidden" data-page="team" onclick="goPage('team')"><span>👥</span>Team</button>
+  <button data-page="reports" onclick="goPage('reports')"><span>📈</span>Reports</button>
 </div>
 
 <!-- Login modal -->
@@ -306,7 +380,7 @@ const todayISO=()=>new Date().toISOString().slice(0,10);
 const fmtAmt=n=>'₹'+Number(n||0).toLocaleString('en-IN');
 
 let users=[],ledger=[],issueSpends=[];
-let masters={alertRecipients:[]};
+let masters={alertRecipients:[],pendingReminders:{}};
 let api={};
 let currentUser=null,currentTab='records',entryType='in';
 let usersStarted=false,ledgerStarted=false,mastersStarted=false,issueSpendsStarted=false;
@@ -314,6 +388,13 @@ let usersStarted=false,ledgerStarted=false,mastersStarted=false,issueSpendsStart
 function loggedUser(){return users.find(x=>x.id===currentUser)||null}
 function myRole(){const u=loggedUser();return (u&&u.appRoles&&u.appRoles[APP_SLUG])||''}
 function canCloseLoan(){return superAdminUnlocked||['accountant','admin','director'].includes(myRole())}
+// Add Fund (Cash In) is restricted to Admin/Director — Accountant/staff only Issue (Cash
+// Out), Loan Given, and Receive/Verify/Mark Repaid (already gated by canCloseLoan above).
+function canAddFund(){return superAdminUnlocked||['admin','director'].includes(myRole())}
+function refreshAddFundVisibility(){
+  const btn=$('typeBtn_in');
+  if(btn)btn.classList.toggle('hidden',!canAddFund());
+}
 
 /* ===== Super Admin (same shared password as other Bliss apps) ===== */
 const SUPER_ADMIN_PASSWORD_HASH='0cb73e5ce7c7e7b2bc347bc16e73c2a16331fdedaec4c1c787815eab4daa6fad';
@@ -364,6 +445,9 @@ function doLogin(){
   localStorage.setItem(SESSION_KEY,u.id);
   currentUser=u.id;
   closeLogin();
+  // Reset the entry-type selector so a new login on the same page never inherits a stale
+  // "Cash In" state (and its gate) left over from whoever was logged in before.
+  if($('typeBtn_out'))selectEntryType('out');
   renderAll();
 }
 function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
@@ -397,7 +481,7 @@ function seedStarterMastersIfEmpty(){
 function startMastersSync(){
   if(mastersStarted||!db)return;mastersStarted=true;
   seedStarterMastersIfEmpty();
-  db.collection('pc_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={alertRecipients:[],...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  db.collection('pc_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={alertRecipients:[],pendingReminders:{},...doc.data()};renderAll();},err=>console.error('masters sync error',err));
   // Shared GREEN-API WhatsApp credentials - same doc the other Bliss apps already read from,
   // not a new config this app introduces.
   db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed',e));
@@ -480,10 +564,12 @@ function applyFeatureVisibility(){
   document.querySelectorAll('.superAdminStrict').forEach(el=>el.classList.toggle('hidden',!superAdminUnlocked));
   document.querySelectorAll('.accountantOnly').forEach(el=>el.classList.toggle('hidden',!canCloseLoan()));
   if(!canCloseLoan()&&document.getElementById('page-team')?.classList.contains('on'))goPage('ledger');
+  refreshAddFundVisibility();
 }
 
 /* ===== Entry form ===== */
 function selectEntryType(t){
+  if(t==='in'&&!canAddFund()){toast('Add Fund sirf Admin/Director kar sakte hain.');return}
   entryType=t;
   ['in','out','loan'].forEach(x=>$('typeBtn_'+x).classList.toggle('on',x===t));
   const textInp=$('entryPerson'),sel=$('entryPersonSelect');
@@ -521,6 +607,10 @@ function renderEntryPersonSelect(){
 let _entrySubmitting=false;
 async function addLedgerEntry(){
   if(_entrySubmitting)return;
+  // Authoritative check, not just the UI-level gate in selectEntryType() — entryType is a
+  // global that can carry over from a previous session/user on the same page load (e.g.
+  // switching logged-in users without a full reload), so this must stand on its own.
+  if(entryType==='in'&&!canAddFund()){alert('Add Fund sirf Admin/Director kar sakte hain.');return}
   const amount=parseFloat($('entryAmount').value);
   const date=$('entryDate').value||todayISO();
   const note=$('entryNote').value.trim();
@@ -732,12 +822,11 @@ function renderMyPage(){
   const loans=liveLedger().filter(x=>x.type==='loan'&&x.personId===currentUser);
   if($('myPageEmptyState'))$('myPageEmptyState').classList.toggle('hidden',issued.length>0||loans.length>0);
   const pending=issued.some(x=>(x.amount-issueSpentTotal(x.id))>0)||loans.some(x=>!x.repaid);
-  const tabBtn=$('myPageTabBtn');
-  if(tabBtn){
+  document.querySelectorAll('[data-page="my"]').forEach(tabBtn=>{
     let dot=tabBtn.querySelector('.tabBadgeDot');
     if(pending&&!dot){dot=document.createElement('span');dot.className='tabBadgeDot';tabBtn.appendChild(dot);}
     else if(!pending&&dot)dot.remove();
-  }
+  });
 }
 // Accountant/Admin/Director-only consolidated view: every person who's had cash issued or
 // a loan given to them, with their totals in one row instead of hunting through the
@@ -830,6 +919,185 @@ function exportTeamOverviewCSV(){
   computeTeamRows().forEach(r=>rows.push([r.name,r.issuedTotal,r.issuedPending,r.loansTotal,r.loansOutstanding,r.aging?'Yes ('+r.oldestAgeDays+'d)':'No']));
   downloadCSV('petty-cash-team-overview.csv',rows);
 }
+
+/* ============================================================================
+   Reports — Date Range filter (Daily/Weekly/Monthly/Custom), Staff-wise and
+   Expense-wise breakdowns, Print/PDF (browser print dialog) and WhatsApp share
+   of the current report, plus a Pending Hisaab reminder list (+2 days
+   follow-up) for whoever still owes an accounting of issued cash or a loan.
+   ============================================================================ */
+let reportRangeQuick='month';
+function weekAgoISO(){ const d=new Date(todayISO()); d.setDate(d.getDate()-7); return d.toISOString().slice(0,10); }
+function monthsAgoISO(n){ const d=new Date(todayISO()); d.setMonth(d.getMonth()-n); return d.toISOString().slice(0,10); }
+function resolveReportRange(){
+  const fromEl=$('reportRangeFrom'),toEl=$('reportRangeTo');
+  const customFrom=fromEl?fromEl.value:'',customTo=toEl?toEl.value:'';
+  if(customFrom||customTo)return {from:customFrom,to:customTo};
+  if(reportRangeQuick==='week')return {from:weekAgoISO(),to:''};
+  if(reportRangeQuick==='month')return {from:monthsAgoISO(1),to:''};
+  return {from:'',to:''};
+}
+function setReportRangeQuick(range){
+  reportRangeQuick=range;
+  if($('reportRangeFrom'))$('reportRangeFrom').value='';
+  if($('reportRangeTo'))$('reportRangeTo').value='';
+  ['week','month','all'].forEach(r=>{const b=$('reportRangeBtn_'+r);if(b)b.classList.toggle('on',r===range);});
+  renderReports();
+}
+function setReportRangeCustom(){
+  ['week','month','all'].forEach(r=>{const b=$('reportRangeBtn_'+r);if(b)b.classList.remove('on');});
+  renderReports();
+}
+function reportRangeLabelText(from,to){
+  if(!from&&!to)return 'All Time';
+  if(from&&to)return esc(from)+' se '+esc(to)+' tak';
+  if(from)return esc(from)+' se aaj tak';
+  return 'shuru se '+esc(to)+' tak';
+}
+function computeStaffReport(from,to){
+  const inRange=d=>{ if(!d)return true; if(from&&d<from)return false; if(to&&d>to)return false; return true; };
+  let live=liveLedger().filter(x=>inRange(x.date));
+  const personIds=new Set();
+  live.forEach(x=>{if((x.type==='out'||x.type==='loan')&&x.personId)personIds.add(x.personId);});
+  let rows=[...personIds].map(pid=>{
+    const issued=live.filter(x=>x.type==='out'&&x.personId===pid);
+    const loans=live.filter(x=>x.type==='loan'&&x.personId===pid);
+    const issuedTotal=issued.reduce((s,x)=>s+(x.amount||0),0);
+    const pendingIssues=issued.filter(x=>!x.verified);
+    const issuedPending=pendingIssues.reduce((s,x)=>s+(x.amount-issueSpentTotal(x.id)),0);
+    const loansTotal=loans.reduce((s,x)=>s+(x.amount||0),0);
+    const outstandingLoans=loans.filter(x=>!x.repaid);
+    const loansOutstanding=outstandingLoans.reduce((s,x)=>s+(x.amount||0),0);
+    return {pid,name:nameOfUserId(pid),issuedTotal,issuedPending,loansTotal,loansOutstanding};
+  });
+  rows.sort((a,b)=>(b.issuedTotal+b.loansTotal)-(a.issuedTotal+a.loansTotal));
+  return rows;
+}
+function computeExpenseReport(from,to){
+  const inRange=d=>{ if(!d)return true; if(from&&d<from)return false; if(to&&d>to)return false; return true; };
+  const live=issueSpends.filter(s=>!s.deletedAt&&inRange(s.date));
+  const byNote={};
+  live.forEach(s=>{
+    const key=(s.note||'').trim()||'(Reason nahi diya)';
+    if(!byNote[key])byNote[key]={note:key,total:0,count:0};
+    byNote[key].total+=(s.amount||0);
+    byNote[key].count++;
+  });
+  return Object.values(byNote).sort((a,b)=>b.total-a.total);
+}
+function renderReports(){
+  const {from,to}=resolveReportRange();
+  const label=reportRangeLabelText(from,to);
+  if($('reportRangeLabel'))$('reportRangeLabel').textContent='Dikha rahe hain: '+label;
+  if($('reportPrintRangeLabel'))$('reportPrintRangeLabel').textContent=label;
+
+  const staffRows=computeStaffReport(from,to);
+  if($('staffReportTable'))$('staffReportTable').innerHTML=staffRows.length?staffRows.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td class="num">${fmtAmt(r.issuedTotal)}</td><td class="num">${r.issuedPending>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.issuedPending)}</span>`:fmtAmt(0)}</td><td class="num">${fmtAmt(r.loansTotal)}</td><td class="num">${r.loansOutstanding>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.loansOutstanding)}</span>`:fmtAmt(0)}</td></tr>`).join(''):`<tr><td colspan="5"><div class="emptystate">📊<p>Is date range mein koi record nahi hai.</p></div></td></tr>`;
+
+  const expenseRows=computeExpenseReport(from,to);
+  if($('expenseReportTable'))$('expenseReportTable').innerHTML=expenseRows.length?expenseRows.map(r=>`<tr><td>${esc(r.note)}</td><td class="num">${r.count}</td><td class="num">${fmtAmt(r.total)}</td></tr>`).join(''):`<tr><td colspan="3"><div class="emptystate">🧾<p>Is date range mein koi spend entry nahi hai.</p></div></td></tr>`;
+
+  renderPendingReminders();
+}
+function printReports(){
+  goPage('reports');
+  setTimeout(()=>window.print(),50);
+}
+function buildReportsShareText(){
+  const {from,to}=resolveReportRange();
+  const label=reportRangeLabelText(from,to);
+  const staffRows=computeStaffReport(from,to);
+  const expenseRows=computeExpenseReport(from,to);
+  const lines=['*Petty Cash Report — Bliss Gems*','Range: '+label,''];
+  lines.push('*Staff-wise*');
+  staffRows.forEach(r=>lines.push(`${r.name}: Issued ${fmtAmt(r.issuedTotal)}, Pending ${fmtAmt(r.issuedPending)}, Loan ${fmtAmt(r.loansTotal)}, Outstanding ${fmtAmt(r.loansOutstanding)}`));
+  lines.push('');
+  lines.push('*Expense-wise*');
+  expenseRows.forEach(r=>lines.push(`${r.note}: ${fmtAmt(r.total)} (${r.count} entries)`));
+  return lines.join('\n');
+}
+function shareReportsOnWhatsApp(){
+  const text=buildReportsShareText();
+  window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+}
+/* ===== Pending Hisaab reminder — if someone still has pending issued cash or an
+   outstanding loan (regardless of any Team Overview date filter), flag it; once flagged
+   and marked "sent", wait PENDING_REMINDER_GAP_DAYS before flagging the same person again
+   (so it isn't re-sent every single day). ===== */
+const PENDING_REMINDER_GAP_DAYS=2;
+// After 3 days pending, the Accountant gets shown the same item too (not just the Doer
+// themselves) - escalation, not a separate automated channel: Spark (free) plan has no
+// background job, so this only fires the moment someone actually opens Reports.
+const ESCALATE_TO_ACCOUNTANT_DAYS=3;
+// Deliberately independent of computeTeamRows() (which respects the Team Overview page's
+// own From/To/search filters) - a pending reminder must always reflect every outstanding
+// item, not whatever date range someone last left Team Overview filtered to.
+function computeAllPersonPendingTotals(){
+  const live=liveLedger();
+  const personIds=new Set();
+  live.forEach(x=>{if((x.type==='out'||x.type==='loan')&&x.personId)personIds.add(x.personId);});
+  return [...personIds].map(pid=>{
+    const issued=live.filter(x=>x.type==='out'&&x.personId===pid);
+    const loans=live.filter(x=>x.type==='loan'&&x.personId===pid);
+    const pendingIssues=issued.filter(x=>!x.verified);
+    const issuedPending=pendingIssues.reduce((s,x)=>s+(x.amount-issueSpentTotal(x.id)),0);
+    const outstandingLoans=loans.filter(x=>!x.repaid);
+    const loansOutstanding=outstandingLoans.reduce((s,x)=>s+(x.amount||0),0);
+    return {pid,name:nameOfUserId(pid),issuedPending,loansOutstanding};
+  });
+}
+function oldestPendingDate(pid){
+  const live=liveLedger();
+  const pendingIssues=live.filter(x=>x.type==='out'&&x.personId===pid&&!x.verified);
+  const outstandingLoans=live.filter(x=>x.type==='loan'&&x.personId===pid&&!x.repaid);
+  const dates=[...pendingIssues,...outstandingLoans].map(x=>x.date).filter(Boolean).sort();
+  return dates[0]||null;
+}
+function computePendingReminders(){
+  const rows=computeAllPersonPendingTotals().filter(r=>r.issuedPending>0||r.loansOutstanding>0);
+  return rows.map(r=>{
+    const oldest=oldestPendingDate(r.pid);
+    const daysPending=oldest?daysSinceDate(oldest):0;
+    const lastReminder=(masters.pendingReminders||{})[r.pid]||null;
+    const daysSinceReminder=lastReminder?daysSinceDate(lastReminder.slice(0,10)):Infinity;
+    const due=daysPending>=PENDING_REMINDER_GAP_DAYS && daysSinceReminder>=PENDING_REMINDER_GAP_DAYS;
+    const escalated=daysPending>=ESCALATE_TO_ACCOUNTANT_DAYS;
+    return {...r,daysPending,due,escalated,lastReminder};
+  }).sort((a,b)=>b.daysPending-a.daysPending);
+}
+function renderPendingReminders(){
+  const wrap=$('pendingRemindersWrap');
+  if(!wrap)return;
+  const due=computePendingReminders();
+  if(!due.length){wrap.innerHTML=`<div class="panel"><div class="pb" style="display:flex;align-items:center;gap:8px;color:var(--g);font-size:13px;font-weight:600"><span style="font-size:17px">✓</span><span>Koi pending hisaab nahi hai.</span></div></div>`;return;}
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>⏰ Pending Hisaab Reminders</span></div><div class="pb">
+    <p class="note" style="margin:0 0 10px">Hisaab dene ke liye ${PENDING_REMINDER_GAP_DAYS} din milte hain, uske baad reminder due ho jata hai. ${ESCALATE_TO_ACCOUNTANT_DAYS}+ din se pending ho to Accountant ko bhi dikhega. (Yeh check app khulne par hota hai — background mein khud-ba-khud nahi chalta, Spark free plan par ye possible nahi hai.)</p>
+    ${due.map(r=>{
+    const totalPending=r.issuedPending+r.loansOutstanding;
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:6px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <span><b>${esc(r.name)}</b> — ${fmtAmt(totalPending)} pending, ${r.daysPending} din se</span>
+        <span style="display:flex;gap:6px;flex-wrap:wrap">
+          ${r.due?`<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ Reminder Due</span>`:`<span class="pill repaid">Reminder bheja ja chuka hai</span>`}
+          ${r.escalated?`<span class="pill" style="background:var(--redbg);color:var(--red)">🔺 Accountant ko bhi</span>`:''}
+        </span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <small class="note">📲 WhatsApp jayega: ${esc(r.name)}${r.escalated?', Accountant':''}</small>
+        ${(r.due&&canCloseLoan())?`<button class="btn small primary" onclick="markReminderSent('${esc(r.pid)}')">✓ Reminder Bhej Diya Mark Karein</button>`:''}
+      </div>
+    </div>`;
+  }).join('')}</div></div>`;
+}
+function markReminderSent(pid){
+  if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin reminder mark kar sakte hain.');return}
+  if(!masters.pendingReminders)masters.pendingReminders={};
+  masters.pendingReminders[pid]=new Date().toISOString();
+  saveMasters();
+  renderPendingReminders();
+  toast('Reminder sent mark ho gaya');
+}
+
 function openPersonDetailModal(personId){
   const name=nameOfUserId(personId);
   $('personDetailTitle').textContent=name;
@@ -1133,7 +1401,7 @@ function toast(msg){
 
 function goPage(id){
   document.querySelectorAll('.pcPage').forEach(p=>p.classList.toggle('on',p.id==='page-'+id));
-  document.querySelectorAll('#pageTabs .tab').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
+  document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
 }
 function renderAll(){
   renderGate();
@@ -1145,13 +1413,14 @@ function renderAll(){
   renderMyPage();
   renderTeamOverview();
   renderLedger();
+  renderReports();
   if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
   currentUser=localStorage.getItem(SESSION_KEY)||null;
   if($('entryDate'))$('entryDate').value=todayISO();
-  selectEntryType('in');
+  selectEntryType('out');
   startUsersSync();
   startLedgerSync();
   startMastersSync();
