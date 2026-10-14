@@ -168,19 +168,10 @@ tbody tr:hover td{background:#f7faf8}
 
   <div class="panel">
     <div class="ph"><span>New Entry</span></div>
-    <div class="pb">
-      <div class="typeRow">
-        <button type="button" class="tab" id="typeBtn_in" onclick="selectEntryType('in')">➕ Cash In</button>
-        <button type="button" class="tab on" id="typeBtn_out" onclick="selectEntryType('out')">➖ Cash Out</button>
-        <button type="button" class="tab" id="typeBtn_loan" onclick="selectEntryType('loan')">🤝 Loan Given</button>
-      </div>
-      <div class="grid">
-        <div class="field"><label>Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="entryAmount"></div>
-        <div class="field"><label>Date</label><input type="date" id="entryDate"></div>
-        <div class="field span2" id="entryPersonField"><label id="entryPersonLabel">Person Name</label><input id="entryPerson" placeholder="Optional"><select id="entryPersonSelect" class="hidden" onchange="toggleLoanPersonTextVisibility()"></select></div>
-        <div class="field span2"><label>Note / Reason</label><input id="entryNote" placeholder="Optional"></div>
-      </div>
-      <div style="margin-top:14px;text-align:right"><button class="btn primary" id="entrySubmitBtn" onclick="addLedgerEntry()">＋ Save Entry</button></div>
+    <div class="pb" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn primary" id="quickBtn_in" onclick="openEntryModal('in')">➕ Cash In</button>
+      <button type="button" class="btn primary" id="quickBtn_out" onclick="openEntryModal('out')">➖ Cash Out</button>
+      <button type="button" class="btn primary" id="quickBtn_loan" onclick="openEntryModal('loan')">🤝 Loan Given</button>
     </div>
   </div>
 
@@ -319,6 +310,23 @@ tbody tr:hover td{background:#f7faf8}
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeSuperAdminModal()">Cancel</button><button class="btn primary" onclick="unlockSuperAdmin()">Unlock</button></div>
 </div></div>
 
+<!-- New Entry modal (Cash In / Cash Out / Loan Given) -->
+<div class="modal" id="entryModal"><div class="box" style="width:min(480px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">New Entry</h3><button class="btn small" onclick="closeEntryModal()">✕</button></div>
+<div class="typeRow">
+  <button type="button" class="tab" id="typeBtn_in" onclick="selectEntryType('in')">➕ Cash In</button>
+  <button type="button" class="tab on" id="typeBtn_out" onclick="selectEntryType('out')">➖ Cash Out</button>
+  <button type="button" class="tab" id="typeBtn_loan" onclick="selectEntryType('loan')">🤝 Loan Given</button>
+</div>
+<div class="grid">
+  <div class="field"><label>Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="entryAmount"></div>
+  <div class="field"><label>Date</label><input type="date" id="entryDate"></div>
+  <div class="field span2" id="entryPersonField"><label id="entryPersonLabel">Person Name</label><input id="entryPerson" placeholder="Optional"><select id="entryPersonSelect" class="hidden" onchange="toggleLoanPersonTextVisibility()"></select></div>
+  <div class="field span2"><label>Note / Reason</label><input id="entryNote" placeholder="Optional"></div>
+</div>
+<div style="margin-top:14px;text-align:right"><button class="btn primary" id="entrySubmitBtn" onclick="addLedgerEntry()">＋ Save Entry</button></div>
+</div></div>
+
 <!-- Edit Entry modal -->
 <div class="modal" id="editLedgerModal"><div class="box" style="width:min(420px,100%)">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Edit Entry</h3><button class="btn small" onclick="closeEditLedgerModal()">✕</button></div>
@@ -381,7 +389,7 @@ const todayISO=()=>new Date().toISOString().slice(0,10);
 const fmtAmt=n=>'₹'+Number(n||0).toLocaleString('en-IN');
 
 let users=[],ledger=[],issueSpends=[];
-let masters={alertRecipients:[],pendingReminders:{}};
+let masters={alertRecipients:[],pendingReminders:{},autoReminderEnabled:false};
 let api={};
 let currentUser=null,currentTab='records',entryType='in';
 let usersStarted=false,ledgerStarted=false,mastersStarted=false,issueSpendsStarted=false;
@@ -393,8 +401,11 @@ function canCloseLoan(){return superAdminUnlocked||['accountant','admin','direct
 // Out), Loan Given, and Receive/Verify/Mark Repaid (already gated by canCloseLoan above).
 function canAddFund(){return superAdminUnlocked||['admin','director'].includes(myRole())}
 function refreshAddFundVisibility(){
+  const allowed=canAddFund();
   const btn=$('typeBtn_in');
-  if(btn)btn.classList.toggle('hidden',!canAddFund());
+  if(btn)btn.classList.toggle('hidden',!allowed);
+  const quickBtn=$('quickBtn_in');
+  if(quickBtn)quickBtn.classList.toggle('hidden',!allowed);
 }
 
 /* ===== Super Admin (same shared password as other Bliss apps) ===== */
@@ -494,7 +505,7 @@ function seedStarterMastersIfEmpty(){
 function startMastersSync(){
   if(mastersStarted||!db)return;mastersStarted=true;
   seedStarterMastersIfEmpty();
-  db.collection('pc_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={alertRecipients:[],pendingReminders:{},...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  db.collection('pc_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={alertRecipients:[],pendingReminders:{},autoReminderEnabled:false,...doc.data()};renderAll();},err=>console.error('masters sync error',err));
   // Shared GREEN-API WhatsApp credentials - same doc the other Bliss apps already read from,
   // not a new config this app introduces.
   db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed',e));
@@ -581,6 +592,12 @@ function applyFeatureVisibility(){
 }
 
 /* ===== Entry form ===== */
+function openEntryModal(t){
+  if(t==='in'&&!canAddFund()){toast('Add Fund sirf Admin/Director kar sakte hain.');return}
+  selectEntryType(t);
+  $('entryModal').classList.add('show');
+}
+function closeEntryModal(){$('entryModal')?.classList.remove('show')}
 function selectEntryType(t){
   if(t==='in'&&!canAddFund()){toast('Add Fund sirf Admin/Director kar sakte hain.');return}
   entryType=t;
@@ -657,6 +674,7 @@ async function addLedgerEntry(){
     await db.collection('pc_ledger').add(payload);
     $('entryAmount').value='';$('entryPerson').value='';$('entryNote').value='';
     if($('entryPersonSelect'))$('entryPersonSelect').value='';
+    closeEntryModal();
     toast('Entry saved');
   }finally{
     _entrySubmitting=false;
@@ -1078,13 +1096,50 @@ function computePendingReminders(){
     return {...r,daysPending,due,escalated,lastReminder};
   }).sort((a,b)=>b.daysPending-a.daysPending);
 }
+// Auto-send is opt-in (Super Admin toggle) and best-effort: it only fires the moment
+// someone has the app open (Spark free plan has no background job), and _autoReminderSent
+// below is an in-tab guard only, so it can't stop two people with the app open at the same
+// moment from both triggering a send for the same person - an accepted limitation here.
+let _autoReminderSent=new Set();
+function toggleAutoReminder(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin ye setting badal sakta hai.');return}
+  masters.autoReminderEnabled=!masters.autoReminderEnabled;
+  saveMasters();
+  renderPendingReminders();
+}
+async function sendPendingReminderWA(r){
+  const u=users.find(x=>x.id===r.pid);
+  const totalPending=r.issuedPending+r.loansOutstanding;
+  if(u&&u.phone){
+    const msg=`⏰ Petty Cash — Hisaab Reminder\n\nAapka ${fmtAmt(totalPending)} ka hisaab ${r.daysPending} din se pending hai. Kripya jald se jald hisaab/receipt submit karein.\n\nApp mein "👤 My Petty Cash" tab se dekh sakte hain.`;
+    await sendRawWA(u.phone,msg).catch(e=>console.error('pending reminder WA failed:',e));
+  }
+  if(r.escalated){
+    const accountants=users.filter(x=>x.active!==false&&x.phone&&x.appRoles&&x.appRoles[APP_SLUG]==='accountant');
+    const amsg=`🔺 Petty Cash — Pending Hisaab (Escalated)\n\n${esc(r.name)} ka ${fmtAmt(totalPending)} hisaab ${r.daysPending} din se pending hai. Follow-up karein.`;
+    accountants.forEach(x=>sendRawWA(x.phone,amsg).catch(e=>console.error('escalation WA failed:',e)));
+  }
+  if(!masters.pendingReminders)masters.pendingReminders={};
+  masters.pendingReminders[r.pid]=new Date().toISOString();
+  saveMasters();
+}
+function maybeAutoSendReminders(due){
+  if(!masters.autoReminderEnabled)return;
+  due.filter(r=>r.due).forEach(r=>{
+    if(_autoReminderSent.has(r.pid))return;
+    _autoReminderSent.add(r.pid);
+    sendPendingReminderWA(r);
+  });
+}
 function renderPendingReminders(){
   const wrap=$('pendingRemindersWrap');
   if(!wrap)return;
   const due=computePendingReminders();
-  if(!due.length){wrap.innerHTML=`<div class="panel"><div class="pb" style="display:flex;align-items:center;gap:8px;color:var(--g);font-size:13px;font-weight:600"><span style="font-size:17px">✓</span><span>Koi pending hisaab nahi hai.</span></div></div>`;return;}
-  wrap.innerHTML=`<div class="panel"><div class="ph"><span>⏰ Pending Hisaab Reminders</span></div><div class="pb">
-    <p class="note" style="margin:0 0 10px">Hisaab dene ke liye ${PENDING_REMINDER_GAP_DAYS} din milte hain, uske baad reminder due ho jata hai. ${ESCALATE_TO_ACCOUNTANT_DAYS}+ din se pending ho to Accountant ko bhi dikhega. (Yeh check app khulne par hota hai — background mein khud-ba-khud nahi chalta, Spark free plan par ye possible nahi hai.)</p>
+  maybeAutoSendReminders(due);
+  const toggleHtml=superAdminUnlocked?`<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer"><input type="checkbox" style="width:auto" ${masters.autoReminderEnabled?'checked':''} onchange="toggleAutoReminder()"> Auto-Send WhatsApp</label>`:'';
+  if(!due.length){wrap.innerHTML=`<div class="panel"><div class="ph"><span>⏰ Pending Hisaab Reminders</span>${toggleHtml}</div><div class="pb" style="display:flex;align-items:center;gap:8px;color:var(--g);font-size:13px;font-weight:600"><span style="font-size:17px">✓</span><span>Koi pending hisaab nahi hai.</span></div></div>`;return;}
+  wrap.innerHTML=`<div class="panel"><div class="ph"><span>⏰ Pending Hisaab Reminders</span>${toggleHtml}</div><div class="pb">
+    <p class="note" style="margin:0 0 10px">Hisaab dene ke liye ${PENDING_REMINDER_GAP_DAYS} din milte hain, uske baad reminder due ho jata hai. ${ESCALATE_TO_ACCOUNTANT_DAYS}+ din se pending ho to Accountant ko bhi dikhega. ${masters.autoReminderEnabled?'Auto-Send ON hai — jab bhi koi app kholega, due reminders WhatsApp par khud chale jayenge.':'Auto-Send OFF hai — Super Admin isse upar diye "Auto-Send WhatsApp" toggle se on kar sakta hai, tab tak "Reminder Bhej Diya Mark Karein" button se manually mark karein.'} (Yeh check app khulne par hota hai — background mein khud-ba-khud nahi chalta, Spark free plan par ye possible nahi hai.)</p>
     ${due.map(r=>{
     const totalPending=r.issuedPending+r.loansOutstanding;
     return `<div class="item" style="flex-direction:column;align-items:stretch;gap:6px">
