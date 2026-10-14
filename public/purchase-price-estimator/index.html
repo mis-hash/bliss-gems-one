@@ -122,6 +122,10 @@ td input{width:84px;padding:8px 9px;border:1.5px solid var(--line-strong);border
 .itemTable td{text-align:center}
 .itemTable td input{text-align:center}
 .itemTable td.num{text-align:center}
+/* "Main hoon:" selector highlight - a distinct color from the amber Guess/Final Cost
+   columns so the selected director's own column is unmistakable at a glance. */
+.dirHighlight{background:#E3F2FD!important}
+.itemTable th.dirHighlight input{background:#E3F2FD}
 .pos{color:var(--green-dark);font-weight:700}
 .neg{color:var(--red-dark);font-weight:700}
 .readonly{background:var(--mint);color:var(--green-dark);font-weight:700}
@@ -233,6 +237,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 <header><div class="head">
   <div class="logo">b</div>
   <div class="brand"><b>Purchase Price Estimator</b></div>
+  <select id="directorSelect" class="btn small" style="cursor:pointer" onchange="setSelectedDirector(this.value)"></select>
   <button class="btn small" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄 Refresh</button>
   <button class="btn small" id="mobilePreviewBtn" onclick="toggleMobilePreview()">📱 Mobile Preview</button>
   <div class="liveBadge"><span class="liveDot"></span><span class="lbl">Live Calculation</span></div>
@@ -366,7 +371,25 @@ function updateLabel(which, val){
   if(which==='g1') g1Name = val||'Hitesh Dusad';
   if(which==='g2') g2Name = val||'Nitesh Dusad';
   if(which==='g3') g3Name = val||'Ankur Khandelwal';
+  renderDirectorSelect();
   renderItems();
+}
+// "Main hoon:" selector - not a login, just a convenience toggle so whoever is physically
+// typing can highlight their own column across every item's table, instead of hunting for
+// the right box among three identical-looking columns.
+let selectedDirector=localStorage.getItem('ppe_selected_director')||'';
+function setSelectedDirector(val){
+  selectedDirector=val;
+  localStorage.setItem('ppe_selected_director',val);
+  renderItems();
+}
+function renderDirectorSelect(){
+  const sel=document.getElementById('directorSelect');
+  if(!sel)return;
+  sel.innerHTML=`<option value="">👤 Main hoon: — Select —</option>
+    <option value="g1"${selectedDirector==='g1'?' selected':''}>${esc(g1Name)}</option>
+    <option value="g2"${selectedDirector==='g2'?' selected':''}>${esc(g2Name)}</option>
+    <option value="g3"${selectedDirector==='g3'?' selected':''}>${esc(g3Name)}</option>`;
 }
 let currentDealId = null; // id of the deal in `deals` currently being edited (null = fresh unsaved draft)
 let finalTotalAuto = true; // while true, Final Purchase Total auto-fills with Guess Avg Total until the user types their own value
@@ -539,6 +562,7 @@ function renderItems(){
   const avgTotal = currentAvgTotal();
   const diffPct = (finalTotal>0 && avgTotal>0) ? ((finalTotal-avgTotal)/avgTotal*100) : null;
 
+  const hl=(key)=>selectedDirector===key?' dirHighlight':'';
   container.innerHTML = items.map((item, ii)=>{
     let finalCostTotal = 0;
     const rowsHtml = item.lots.map((l, li)=>{
@@ -549,9 +573,9 @@ function renderItems(){
       if(finalCost!==null) finalCostTotal += finalCost;
       return `<tr>
         <td data-label="Wt (ct)"><input type="number" value="${l.wt}" onchange="updateLot(${ii},${li},'wt',this.value)"></td>
-        <td data-label="${esc(g1n)}"><input type="number" value="${l.g1}" onchange="updateLot(${ii},${li},'g1',this.value)"></td>
-        <td data-label="${esc(g2n)}"><input type="number" value="${l.g2}" onchange="updateLot(${ii},${li},'g2',this.value)"></td>
-        <td data-label="${esc(g3n)}"><input type="number" value="${l.g3}" onchange="updateLot(${ii},${li},'g3',this.value)"></td>
+        <td class="${hl('g1')}" data-label="${esc(g1n)}"><input type="number" value="${l.g1}" onchange="updateLot(${ii},${li},'g1',this.value)"></td>
+        <td class="${hl('g2')}" data-label="${esc(g2n)}"><input type="number" value="${l.g2}" onchange="updateLot(${ii},${li},'g2',this.value)"></td>
+        <td class="${hl('g3')}" data-label="${esc(g3n)}"><input type="number" value="${l.g3}" onchange="updateLot(${ii},${li},'g3',this.value)"></td>
         <td class="num readonly" data-label="Guess Avg">${money(avg)}</td>
         <td class="num costcell" data-label="Guess Cost">${money(wt*avg)}</td>
         <td class="num readonly" data-label="After Final" id="afterFinal_${ii}_${li}">${afterFinal!==null? money(afterFinal) : '—'}</td>
@@ -578,17 +602,17 @@ function renderItems(){
         <table class="itemTable">
           <thead><tr>
             <th>Wt (ct)</th>
-            <th><input type="text" value="${esc(g1n)}" onchange="updateLabel('g1',this.value)"></th>
-            <th><input type="text" value="${esc(g2n)}" onchange="updateLabel('g2',this.value)"></th>
-            <th><input type="text" value="${esc(g3n)}" onchange="updateLabel('g3',this.value)"></th>
+            <th class="${hl('g1')}"><input type="text" value="${esc(g1n)}" onchange="updateLabel('g1',this.value)"></th>
+            <th class="${hl('g2')}"><input type="text" value="${esc(g2n)}" onchange="updateLabel('g2',this.value)"></th>
+            <th class="${hl('g3')}"><input type="text" value="${esc(g3n)}" onchange="updateLabel('g3',this.value)"></th>
             <th>Guess Avg</th><th class="costHead">Guess Cost</th><th>After Final Price</th><th class="costHead">Final Cost</th><th></th>
           </tr></thead>
           <tbody>${rowsHtml}</tbody>
           <tfoot><tr>
             <td data-label="Total Weight"><span>Total: ${Math.round(wtTotal*100)/100} ct</span></td>
-            <td class="num readonly combinedCell" data-label="${esc(g1n)} (Combined)">${moneyDec(itemColCombined(item,'g1'))}</td>
-            <td class="num readonly combinedCell" data-label="${esc(g2n)} (Combined)">${moneyDec(itemColCombined(item,'g2'))}</td>
-            <td class="num readonly combinedCell" data-label="${esc(g3n)} (Combined)">${moneyDec(itemColCombined(item,'g3'))}</td>
+            <td class="num readonly combinedCell${hl('g1')}" data-label="${esc(g1n)} (Combined)">${moneyDec(itemColCombined(item,'g1'))}</td>
+            <td class="num readonly combinedCell${hl('g2')}" data-label="${esc(g2n)} (Combined)">${moneyDec(itemColCombined(item,'g2'))}</td>
+            <td class="num readonly combinedCell${hl('g3')}" data-label="${esc(g3n)} (Combined)">${moneyDec(itemColCombined(item,'g3'))}</td>
             <td class="num readonly combinedCell" data-label="Guess Avg (Combined)">${moneyDec(itemAvgCombined(item))}</td>
             <td class="num costcell" data-label="Guess Cost Total">${money(itemAvg)}</td>
             <td class="num readonly" data-label="After Final">—</td>
@@ -760,6 +784,7 @@ function openDeal(id){
   items = Array.isArray(d.items) ? JSON.parse(JSON.stringify(d.items))
     : [{name: d.item||'', lots: Array.isArray(d.lots)?JSON.parse(JSON.stringify(d.lots)):[]}];
   if(!items.length) items = [newItem()];
+  renderDirectorSelect();
   renderItems();
   document.getElementById('dealFormTitle').textContent = '✏️ Editing '+(d.slipNo||'')+(d.note!=='Untitled Deal' && d.note ? ' — '+d.note : '');
   document.getElementById('draftStatusWrap').style.display = 'block';
@@ -965,6 +990,7 @@ const printDateEl = document.getElementById('printDate');
 if(printDateEl) printDateEl.textContent = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
 
 if(!document.getElementById('hSlipNo').value) document.getElementById('hSlipNo').value = nextSlipNo();
+renderDirectorSelect();
 renderItems();
 renderSummary();
 renderDealHistory();
