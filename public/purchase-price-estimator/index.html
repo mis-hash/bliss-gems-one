@@ -115,6 +115,12 @@ td{padding:10px 10px;border-bottom:1px solid var(--line);font-size:13.5px;vertic
 td input{width:84px;padding:8px 9px;border:1.5px solid var(--line-strong);border-radius:var(--radius-sm);font-size:13.5px;font-family:var(--font-mono);color:var(--ink)}
 .num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--font-mono)}
 .combinedCell{text-align:center!important}
+/* Lot-entry table (Wt/Guess rate inputs + Guess Avg/Cost/Final columns) — centered so every
+   column lines up in a straight vertical line, matching the already-centered header name
+   inputs and Combined footer cells. Scoped to .itemTable only, not the app-wide .num rule
+   used elsewhere (Deal History, print breakdown), to avoid changing unrelated tables. */
+.itemTable td input{text-align:center}
+.itemTable td.num{text-align:center}
 .pos{color:var(--green-dark);font-weight:700}
 .neg{color:var(--red-dark);font-weight:700}
 .readonly{background:var(--mint);color:var(--green-dark);font-weight:700}
