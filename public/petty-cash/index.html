@@ -139,6 +139,7 @@ tbody tr:hover td{background:#f7faf8}
 <header><div class="head">
   <div class="brand"><div class="logo">₹</div><div><b>Petty Cash</b><small>Bliss Gems &amp; Minerals</small></div></div>
   <div class="headRight">
+    <button class="btn" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄 Refresh</button>
     <span class="pillbadge" id="loginBadge">Not Logged In</span>
     <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
     <button class="btn superAdminStrict hidden" onclick="openManage()">⚙ Manage</button>
@@ -451,6 +452,18 @@ function doLogin(){
   renderAll();
 }
 function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
+function hardRefreshApp(){
+  var btn=document.getElementById('hardRefreshBtn');
+  if(btn)btn.textContent='⏳';
+  var done=function(){location.replace(location.pathname+'?_r='+Date.now()+location.hash)};
+  if('caches' in window){
+    caches.keys().then(function(names){
+      return Promise.all(names.map(function(n){return caches.delete(n)}));
+    }).then(done).catch(done);
+  } else {
+    done();
+  }
+}
 
 /* ===== Firestore sync ===== */
 function startUsersSync(){
