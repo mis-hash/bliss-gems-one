@@ -232,6 +232,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 <header><div class="head">
   <div class="logo">b</div>
   <div class="brand"><b>Purchase Price Estimator</b></div>
+  <button class="btn small" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄 Refresh</button>
   <button class="btn small" id="mobilePreviewBtn" onclick="toggleMobilePreview()">📱 Mobile Preview</button>
   <div class="liveBadge"><span class="liveDot"></span><span class="lbl">Live Calculation</span></div>
 </div></header>
@@ -885,6 +886,18 @@ function renderSummary(){
   document.getElementById('sDealsBar').style.width = Math.min(100, deals.length*10)+'%';
   document.getElementById('sMarkupBar').style.width = Math.min(100, Math.abs(pct)*3)+'%';
   document.getElementById('sDiffBar').style.width = sumAvg>0 ? Math.min(100, Math.abs(sumFinal-sumAvg)/sumAvg*100) + '%' : '0%';
+}
+function hardRefreshApp(){
+  var btn=document.getElementById('hardRefreshBtn');
+  if(btn)btn.textContent='⏳';
+  var done=function(){location.replace(location.pathname+'?_r='+Date.now()+location.hash)};
+  if('caches' in window){
+    caches.keys().then(function(names){
+      return Promise.all(names.map(function(n){return caches.delete(n)}));
+    }).then(done).catch(done);
+  } else {
+    done();
+  }
 }
 /* ===== Mobile Preview (desktop can preview the phone layout without resizing) ===== */
 function toggleMobilePreview(){
