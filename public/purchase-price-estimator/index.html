@@ -128,6 +128,16 @@ td input{width:84px;padding:8px 9px;border:1.5px solid var(--line-strong);border
    the eye immediately instead of blending in as a flat static tint. */
 .dirHighlight{background:#E3F2FD!important}
 .itemTable th.dirHighlight input{background:#E3F2FD}
+/* "Who are you" gate — replaces the always-visible "Main hoon" dropdown with a one-time
+   pick on load, so the main toolbar stays clean; re-opens via the header pill to switch. */
+.whoGate{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;z-index:999;padding:16px}
+.whoGate.hidden{display:none}
+.whoGateBox{background:var(--surface);border-radius:var(--radius-lg);padding:28px 24px;max-width:360px;width:100%;text-align:center;box-shadow:var(--shadow-md)}
+.whoGateTitle{font-size:18px;font-weight:800;margin-bottom:18px;color:var(--ink)}
+.whoGateBtns{display:flex;flex-direction:column;gap:10px}
+.whoGateBtns button{padding:14px;border-radius:var(--radius-md);border:1.5px solid var(--line-strong);background:var(--surface);color:var(--ink);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+.whoGateBtns button:hover{background:var(--mint);border-color:var(--green2)}
+#whoAmIPill{display:flex;align-items:center;gap:4px}
 .pos{color:var(--green-dark);font-weight:700}
 .neg{color:var(--red-dark);font-weight:700}
 .readonly{background:var(--mint);color:var(--green-dark);font-weight:700}
@@ -236,10 +246,17 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 </head>
 <body>
 
+<div id="whoAreYouGate" class="whoGate hidden">
+  <div class="whoGateBox">
+    <div class="whoGateTitle">👤 Aap kaun hain?</div>
+    <div class="whoGateBtns" id="whoGateBtns"></div>
+  </div>
+</div>
+
 <header><div class="head">
   <div class="logo">b</div>
   <div class="brand"><b>Purchase Price Estimator</b></div>
-  <select id="directorSelect" class="btn small" style="cursor:pointer" onchange="setSelectedDirector(this.value)"></select>
+  <button id="whoAmIPill" class="btn small" onclick="openWhoGate()"></button>
   <button class="btn small" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄 Refresh</button>
   <button class="btn small" id="mobilePreviewBtn" onclick="toggleMobilePreview()">📱 Mobile Preview</button>
   <div class="liveBadge"><span class="liveDot"></span><span class="lbl">Live Calculation</span></div>
@@ -383,6 +400,7 @@ let selectedDirector=localStorage.getItem('ppe_selected_director')||'';
 function setSelectedDirector(val){
   selectedDirector=val;
   localStorage.setItem('ppe_selected_director',val);
+  renderDirectorSelect();
   renderItems();
   focusFirstEmptyInSelectedColumn();
 }
@@ -394,12 +412,20 @@ function focusFirstEmptyInSelectedColumn(){
   for(const inp of inputs){ if(!inp.value){ inp.focus(); return; } }
 }
 function renderDirectorSelect(){
-  const sel=document.getElementById('directorSelect');
-  if(!sel)return;
-  sel.innerHTML=`<option value="">👤 Main hoon: — Select —</option>
-    <option value="g1"${selectedDirector==='g1'?' selected':''}>${esc(g1Name)}</option>
-    <option value="g2"${selectedDirector==='g2'?' selected':''}>${esc(g2Name)}</option>
-    <option value="g3"${selectedDirector==='g3'?' selected':''}>${esc(g3Name)}</option>`;
+  const pill=document.getElementById('whoAmIPill');
+  if(!pill)return;
+  const name=selectedDirector==='g1'?g1Name:selectedDirector==='g2'?g2Name:selectedDirector==='g3'?g3Name:'';
+  pill.innerHTML=name?('👤 '+esc(name)):'👤 Select';
+}
+function openWhoGate(){
+  const wrap=document.getElementById('whoGateBtns');
+  wrap.innerHTML=[['g1',g1Name],['g2',g2Name],['g3',g3Name]].map(([k,name])=>
+    `<button type="button" onclick="chooseDirector('${k}')">${esc(name)}</button>`).join('');
+  document.getElementById('whoAreYouGate').classList.remove('hidden');
+}
+function chooseDirector(val){
+  setSelectedDirector(val);
+  document.getElementById('whoAreYouGate').classList.add('hidden');
 }
 let currentDealId = null; // id of the deal in `deals` currently being edited (null = fresh unsaved draft)
 let finalTotalAuto = true; // while true, Final Purchase Total auto-fills with Guess Avg Total until the user types their own value
@@ -1004,6 +1030,7 @@ renderDirectorSelect();
 renderItems();
 renderSummary();
 renderDealHistory();
+if(!selectedDirector) openWhoGate();
 </script>
 </body>
 </html>
