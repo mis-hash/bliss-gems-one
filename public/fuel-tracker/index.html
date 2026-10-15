@@ -48,7 +48,11 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 .btn.secondary{background:#eef2f0;color:var(--txt)}
 .btn.danger{background:var(--redbg);color:var(--red)}
 .btn.small{padding:7px 11px;font-size:12px}
-.shell{max-width:1100px;margin:auto;padding:17px 18px 60px}
+.shell{max-width:1100px;margin:auto;display:grid;grid-template-columns:210px 1fr;gap:16px;padding:17px 18px 60px}
+nav{background:#fff;border:1px solid var(--line);border-radius:14px;padding:9px;height:max-content;position:sticky;top:85px}
+nav button{width:100%;border:0;background:transparent;text-align:left;padding:12px 11px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin:2px 0;display:flex;align-items:center;gap:8px;border-left:3px solid transparent;color:var(--txt);font-family:inherit}
+nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
+.bottomNav{display:none}
 .hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px}
 .hero h1{font-size:24px;margin:0 0 5px}
 .hero p{font-size:13px;margin:0;opacity:.9}
@@ -91,8 +95,6 @@ tbody tr:hover td{background:#f7faf8}
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
 .tab{border:1px solid var(--line);background:#fff;color:var(--muted);padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
 .tab.on{background:var(--g);border-color:var(--g);color:#fff}
-.pageTabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-.pageTabs .tab{padding:10px 15px;font-size:13px}
 .ftPage{display:none}
 .ftPage.on{display:block}
 .thumb{width:44px;height:44px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--line)}
@@ -105,13 +107,18 @@ tbody tr:hover td{background:#f7faf8}
 .docCard .dcMeta{font-size:12px;color:var(--muted)}
 @media(max-width:720px){
   header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:20px}.brand b{font-size:16px}.brand small{display:none}
-  .shell{padding:11px 10px 30px}
+  .shell{display:block;padding:11px 10px 76px}
+  nav{display:none}
   .hero{padding:17px}.hero h1{font-size:20px}
   .cards{grid-template-columns:1fr 1fr}
   .grid,.grid3{grid-template-columns:1fr}
   #fuelSubmitBtn{width:100%}
   .desktopTable{display:none}
   .mobileCards{display:block}
+  .bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}
+  .bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:1 0 auto;padding:6px 8px;white-space:nowrap;font-family:inherit;cursor:pointer}
+  .bottomNav button span{display:block;font-size:19px}
+  .bottomNav button.on{color:var(--g)}
 }
 </style>
 </head>
@@ -133,13 +140,14 @@ tbody tr:hover td{background:#f7faf8}
   <datalist id="vehicleList"></datalist>
   <datalist id="paymentModeList"></datalist>
 
-  <div class="pageTabs">
-    <button class="tab on" data-page="dashboard" onclick="goPage('dashboard')">📊 Dashboard</button>
-    <button class="tab" data-page="vehicles" onclick="goPage('vehicles')">🚗 Vehicles</button>
-    <button class="tab" data-page="documents" onclick="goPage('documents')">📄 Documents</button>
-    <button class="tab" data-page="fuel" onclick="goPage('fuel')">⛽ Fuel</button>
-    <button class="tab" data-page="service" onclick="goPage('service')">🔧 Service &amp; Repair</button>
-  </div>
+  <nav id="pageNav">
+    <button class="on" data-page="dashboard" onclick="goPage('dashboard')">📊 Dashboard</button>
+    <button data-page="vehicles" onclick="goPage('vehicles')">🚗 Vehicles</button>
+    <button data-page="documents" onclick="goPage('documents')">📄 Documents</button>
+    <button data-page="fuel" onclick="goPage('fuel')">⛽ Fuel</button>
+    <button data-page="service" onclick="goPage('service')">🔧 Service &amp; Repair</button>
+  </nav>
+  <main>
 
   <div id="page-dashboard" class="ftPage on">
     <div class="hero">
@@ -246,7 +254,16 @@ tbody tr:hover td{background:#f7faf8}
       </table></div></div>
     </div>
   </div>
+  </main>
 </div>
+</div>
+
+<div class="bottomNav" id="bottomNav">
+  <button class="on" data-page="dashboard" onclick="goPage('dashboard')"><span>📊</span>Dashboard</button>
+  <button data-page="vehicles" onclick="goPage('vehicles')"><span>🚗</span>Vehicles</button>
+  <button data-page="documents" onclick="goPage('documents')"><span>📄</span>Docs</button>
+  <button data-page="fuel" onclick="goPage('fuel')"><span>⛽</span>Fuel</button>
+  <button data-page="service" onclick="goPage('service')"><span>🔧</span>Service</button>
 </div>
 
 <!-- New Fuel Entry modal -->
@@ -507,7 +524,7 @@ function saveMasters(){ if(db) db.collection('fv_settings').doc('masters').set(m
 /* ===== Nav / gate ===== */
 function goPage(id){
   document.querySelectorAll('.ftPage').forEach(p=>p.classList.toggle('on',p.id==='page-'+id));
-  document.querySelectorAll('.pageTabs .tab').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
+  document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
 }
 function renderGate(){
   const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
