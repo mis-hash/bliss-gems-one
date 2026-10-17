@@ -146,6 +146,9 @@ tfoot td{font-weight:700;background:var(--surface-sunken);border-top:2px solid v
 @media(max-width:800px){
   .grid3,.headerGrid,.resultGrid{grid-template-columns:1fr}
 }
+@media(max-width:480px){
+  .finalDueGrid{grid-template-columns:1fr}
+}
 @media(max-width:700px){
   #mobilePreviewBtn{display:none}
   .shell{padding:14px 10px 110px}
@@ -214,7 +217,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 .printOnly{display:none}
 @media print{
   body{background:#fff}
-  header,.hero,.grid3,#mobilePreviewBtn,.mobileLiveBar,#dealResultGrid,.btnRow,.ph .countChip,#mobilePreviewWrap,#dealHistoryPanel,.no-print,#finalTotalBox,#dueDateBox{display:none !important}
+  header,.hero,.grid3,#mobilePreviewBtn,.mobileLiveBar,#dealResultGrid,.btnRow,.ph .countChip,#mobilePreviewWrap,#dealHistoryPanel,.no-print,#finalTotalBox{display:none !important}
   .shell{padding:0;max-width:100%}
   .panel{box-shadow:none;border:1px solid #999}
   .ph{background:#fff}
@@ -296,12 +299,11 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 
       <div id="finalTotalWrap">
         <div id="finalTotalBox" style="border:1.5px solid var(--mint-line);border-radius:var(--radius-md);background:var(--mint);padding:16px;margin-top:14px">
-          <label style="display:block;font-size:12px;font-weight:800;margin-bottom:6px;color:var(--green-dark);text-transform:uppercase;letter-spacing:.03em">Final Purchase Total (₹) — once deal is closed</label>
-          <input type="number" id="hFinalTotal" oninput="finalTotalAuto=false;onFinalTotalInput()" style="width:100%;padding:13px 14px;border:2px solid var(--green2);border-radius:var(--radius-md);font-size:18px;font-weight:800;color:var(--green-dark);background:var(--surface)">
-        </div>
-        <div id="dueDateBox" style="border:1.5px solid var(--warn-line);border-radius:var(--radius-md);background:var(--warn);padding:16px;margin-top:14px">
-          <label style="display:block;font-size:12px;font-weight:800;margin-bottom:6px;color:var(--warn-ink);text-transform:uppercase;letter-spacing:.03em">⏰ Due Date — fill once finalized</label>
-          <input type="date" id="hDueDate" oninput="onDueDateInput()" style="width:100%;padding:13px 14px;border:2px solid var(--warn-ink);border-radius:var(--radius-md);font-size:14px;color:var(--ink);background:var(--surface)">
+          <label style="display:block;font-size:12px;font-weight:800;margin-bottom:6px;color:var(--green-dark);text-transform:uppercase;letter-spacing:.03em">Final Purchase Total (₹) &amp; Due Date — deal close hone par</label>
+          <div class="finalDueGrid" style="display:grid;grid-template-columns:1.3fr 1fr;gap:12px">
+            <input type="number" id="hFinalTotal" oninput="finalTotalAuto=false;onFinalTotalInput()" style="width:100%;padding:13px 14px;border:2px solid var(--green2);border-radius:var(--radius-md);font-size:18px;font-weight:800;color:var(--green-dark);background:var(--surface)">
+            <input type="date" id="hDueDate" oninput="onDueDateInput()" style="width:100%;padding:13px 14px;border:2px solid var(--green2);border-radius:var(--radius-md);font-size:14px;color:var(--ink);background:var(--surface)">
+          </div>
         </div>
         <div class="printOnly printSummaryRow" id="printSummaryRow" style="border:1.5px solid var(--mint-line);border-radius:var(--radius-md);background:var(--mint);padding:14px 16px;margin-top:14px">
           <div><small>Guess Avg Total</small><b id="psAvgTotal">₹0</b></div>
