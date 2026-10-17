@@ -299,9 +299,9 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
           <label style="display:block;font-size:12px;font-weight:800;margin-bottom:6px;color:var(--green-dark);text-transform:uppercase;letter-spacing:.03em">Final Purchase Total (₹) — once deal is closed</label>
           <input type="number" id="hFinalTotal" oninput="finalTotalAuto=false;onFinalTotalInput()" style="width:100%;padding:13px 14px;border:2px solid var(--green2);border-radius:var(--radius-md);font-size:18px;font-weight:800;color:var(--green-dark);background:var(--surface)">
         </div>
-        <div id="dueDateBox" style="margin-top:14px">
-          <label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em">Due Date (optional — fill once finalized)</label>
-          <input type="date" id="hDueDate" oninput="onDueDateInput()" style="width:100%;padding:11px 14px;border:1.5px solid var(--line-strong);border-radius:var(--radius-md);font-size:14px;color:var(--ink);background:var(--surface)">
+        <div id="dueDateBox" style="border:1.5px solid var(--warn-line);border-radius:var(--radius-md);background:var(--warn);padding:16px;margin-top:14px">
+          <label style="display:block;font-size:12px;font-weight:800;margin-bottom:6px;color:var(--warn-ink);text-transform:uppercase;letter-spacing:.03em">⏰ Due Date — fill once finalized</label>
+          <input type="date" id="hDueDate" oninput="onDueDateInput()" style="width:100%;padding:13px 14px;border:2px solid var(--warn-ink);border-radius:var(--radius-md);font-size:14px;color:var(--ink);background:var(--surface)">
         </div>
         <div class="printOnly printSummaryRow" id="printSummaryRow" style="border:1.5px solid var(--mint-line);border-radius:var(--radius-md);background:var(--mint);padding:14px 16px;margin-top:14px">
           <div><small>Guess Avg Total</small><b id="psAvgTotal">₹0</b></div>
@@ -922,7 +922,15 @@ if(new URLSearchParams(location.search).get('embedded')==='1'){
   if(btn) btn.style.display = 'none';
 }
 
+// Soft reminder, not a hard block — every deal ends up needing a Due Date, but the person
+// printing/sharing isn't always the one who'll know it yet, so Cancel just lets them through.
+function dueDateOkToProceed(){
+  const due=document.getElementById('hDueDate');
+  if(due && !due.value) return confirm('Due Date nahi bhari hai — bina Due Date ke aage badhein?');
+  return true;
+}
 function printSlip(){
+  if(!dueDateOkToProceed())return;
   document.getElementById('printSlipNo').textContent = document.getElementById('hSlipNo').value || '—';
   window.print();
 }
@@ -963,6 +971,7 @@ function buildSlipShareText(){
   return lines.join('\n');
 }
 function shareSlipOnWhatsApp(){
+  if(!dueDateOkToProceed())return;
   const text = buildSlipShareText();
   window.open('https://wa.me/?text='+encodeURIComponent(text), '_blank');
 }
