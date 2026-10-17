@@ -518,7 +518,7 @@ async function sendRawWA(phone,message){
 const DEFAULT_SI_TEMPLATES={
   low_stock:{name:'Low Stock Alert',text:'⚠️ Low Stock Alert\n\nItem: {ItemName}\nIn Hand: {InHand} {Unit}\nMinimum Level: {MinLevel}\n\nPlease arrange for restocking at the earliest.'},
   stock_issued:{name:'Stock Issued',text:'📦 Stock Issued\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nIssued To: {IssuedTo}\nIssued By: {IssuedBy}'},
-  request_submitted:{name:'New Stationery Request (to Admin)',text:'🙋 New Stationery Request\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nRequested By: {RequestedBy}\nPurpose: {Purpose}\n\nPlease review and issue.'},
+  request_submitted:{name:'New Stationery Request (to Admin)',text:'🙋 New Stationery Request\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nRequested By: {RequestedBy}\nPurpose: {Purpose}\n\nPlease review and issue.\n{Link}'},
   request_issued:{name:'Request Issued (to Requester)',text:'✅ Your Stationery Request Approved\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nIssued By: {IssuedBy}\n\nPlease collect it.'},
   request_rejected:{name:'Request Rejected (to Requester)',text:'❌ Your Stationery Request Rejected\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nReason: {Reason}'}
 };
@@ -541,10 +541,13 @@ function notifyIssue(item,qty,toUserId,byUserId){
   const msg=fillTemplate(templateText('stock_issued'),{ItemName:item.name,Qty:qty,Unit:item.unit||'',IssuedTo:nameOfUserId(toUserId),IssuedBy:nameOfUserId(byUserId)});
   admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('issue WA failed:',e)));
 }
+// Sent only to Amit Sharma (not the general admin/director list) at the user's request,
+// with a direct link into the Requests review page.
 function notifyRequestSubmitted(item,qty,requesterId,purpose){
-  const admins=users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
-  const msg=fillTemplate(templateText('request_submitted'),{ItemName:item.name,Qty:qty,Unit:item.unit||'',RequestedBy:nameOfUserId(requesterId),Purpose:purpose||'-'});
-  admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('request-submitted WA failed:',e)));
+  const recipients=users.filter(u=>u.active!==false && u.phone && String(u.name||'').trim().toLowerCase()==='amit sharma');
+  const link='https://bliss-gems-one.web.app/stationery-inventory/?page=requests';
+  const msg=fillTemplate(templateText('request_submitted'),{ItemName:item.name,Qty:qty,Unit:item.unit||'',RequestedBy:nameOfUserId(requesterId),Purpose:purpose||'-',Link:link});
+  recipients.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('request-submitted WA failed:',e)));
 }
 function notifyRequestIssued(item,qty,requesterId,issuedByUserId){
   const u=users.find(x=>x.id===requesterId);
@@ -1163,6 +1166,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   startMastersSync();
   startRequestsSync();
   renderAll();
+  const deepPage=new URLSearchParams(location.search).get('page');
+  if(deepPage && currentUser && $('page-'+deepPage))go(deepPage);
 });
 window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
 </script>
