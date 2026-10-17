@@ -22,6 +22,9 @@
 })();
 </script>
 <title>Purchase Price Estimator — Bliss Gems</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -85,6 +88,11 @@ header{height:64px;background:var(--surface);border-bottom:1px solid var(--line)
 .field label{display:block;font-size:11px;font-weight:600;margin-bottom:6px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em}
 .field input{width:100%;padding:11px 12px;border:1.5px solid var(--line-strong);border-radius:var(--radius-md);font-size:14px;background:var(--surface);color:var(--ink);transition:border-color .15s, box-shadow .15s}
 .field input:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px rgba(38,143,118,.14)}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:999}
+.modal.show{display:flex}
+.modal .box{width:min(420px,100%);background:var(--surface);border-radius:var(--radius-lg);padding:20px;max-height:90vh;overflow:auto;box-shadow:var(--shadow-md)}
+/* lot-table cell(s) a deep link should land the viewer on, auto-focused + glowing */
+.ppeFocusGlow{box-shadow:0 0 0 2px var(--green2),0 0 10px rgba(63,175,147,.45)!important;border-color:var(--green2)!important}
 .comboBox{position:relative}
 .comboMenu{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:220px;overflow-y:auto;background:var(--surface);border:1.5px solid var(--line-strong);border-radius:var(--radius-md);box-shadow:var(--shadow-md);z-index:50}
 .comboMenu.show{display:block}
@@ -234,6 +242,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 <header><div class="head">
   <div class="logo">b</div>
   <div class="brand"><b>Purchase Price Estimator</b></div>
+  <button class="btn small" onclick="openSettingsModal()">⚙ Settings</button>
   <button class="btn small" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄 Refresh</button>
   <button class="btn small" id="mobilePreviewBtn" onclick="toggleMobilePreview()">📱 Mobile Preview</button>
   <div class="liveBadge"><span class="liveDot"></span><span class="lbl">Live Calculation</span></div>
@@ -316,6 +325,9 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
         <button class="btn primary" style="flex:1" onclick="printSlip()">🖨️ Print Slip</button>
         <button class="btn" style="flex:1;background:#E9FBF2;border-color:#B8E8CE;color:#128C4A" onclick="shareSlipOnWhatsApp()">📤 Share on WhatsApp</button>
       </div>
+      <div class="btnRow" style="margin-top:8px">
+        <button class="btn" style="flex:1;background:#DCF8C6;border-color:#B6E8A0;color:#1B7A2E" onclick="notifyOthersManual()">🔔 Notify Others (Reminder)</button>
+      </div>
     </div>
   </div>
 
@@ -350,6 +362,18 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 </div>
 </div>
 
+<!-- Settings: director phone numbers for WhatsApp notify (no login needed) -->
+<div class="modal" id="settingsModal">
+  <div class="box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3 style="margin:0">⚙ Settings — Director Phone Numbers</h3><button class="btn small" onclick="closeSettingsModal()">✕</button></div>
+    <p class="note" style="margin:0 0 14px">In numbers par "New Deal" aur "Notify Others" ke WhatsApp message jaate hain. Khaali rehne par us director ko kuch nahi jaayega.</p>
+    <div class="field" style="margin-bottom:10px"><label id="g1PhoneLabel">Hitesh Dusad</label><input id="g1Phone" placeholder="10-digit mobile number"></div>
+    <div class="field" style="margin-bottom:10px"><label id="g2PhoneLabel">Nitesh Dusad</label><input id="g2Phone" placeholder="10-digit mobile number"></div>
+    <div class="field" style="margin-bottom:10px"><label id="g3PhoneLabel">Ankur Khandelwal</label><input id="g3Phone" placeholder="10-digit mobile number"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeSettingsModal()">Cancel</button><button class="btn primary" onclick="saveSettings()">Save</button></div>
+  </div>
+</div>
+
 <div id="mobilePreviewWrap">
   <div class="phoneFrame"><iframe id="mobilePreviewFrame" title="Mobile preview"></iframe></div>
 </div>
@@ -357,9 +381,152 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 <script>
 const LS_DEALS='purchase_price_deals_v2';
 const LS_SLIP_SEQ='purchase_price_slip_seq_v1';
+/* ===== Firebase — cloud sync so a deal started on one phone can be filled in from another.
+   Anonymous auth only, no login screen: this app was deliberately kept gate-free. ===== */
+const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
+let db=null;
+try{
+  if(typeof firebase!=='undefined'){
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+  }else{console.error('firebase SDK not loaded — cloud sync unavailable this session');}
+}catch(e){console.error('firebase init failed:',e);}
+try{if(typeof firebase!=='undefined'&&firebase.auth)firebase.auth().signInAnonymously().catch(e=>console.error('anon auth failed:',e));}catch(e){console.error('anon auth failed:',e);}
 const ITEM_NAME_SEED = ["Amethyst", "AMETRINE PL TUMBLE", "AQUA", "AQUA ELON BEADS", "AQUA GF", "AQUA MELON BEADS", "Aquamarine", "AS PER DESCRIPTION", "AS PER SHEET", "Black Onyx", "BLACK ONYX SUGAR LOAF", "BLACK OPAL", "BLUE GF", "BLUE SAPP MELON", "BURMA RUBY", "Burma Tourmaline", "CATS EYE", "Citrine", "CITRINE CUT", "CORAL", "CORAL MELON BEADS", "CORAL WITH DIAMOND POLKI AND GOLD", "EM", "EM R", "EME", "EME PL MANI", "EME PL TUUMBLE", "EME R", "EME R CUT STONE", "EME R DROPS", "EME R MELON BEADS", "EME R PEAR CABS", "EME RUSSIAN", "EME ZAM", "EME ZAM CABS", "EME ZAM CARVING", "EME ZAM CUT STONE", "EME ZAM FACTED TABIZ", "EME ZAM FANCY CUT STONE", "EME ZAM OCT CUT", "EME ZAM OVAL CABS", "EME ZAM PL CAB", "EME.ZAM fancy cut", "EMERALD", "EMERALD & POLKI", "EMERALD CABS", "EMERALD CARVED WITH POLKI", "EMERALD CUT STONE", "EMERALD FLAT", "EMERALD OCTO CUT", "EMERALD R", "EMERALD R CUT STONE", "EMERALD R CUT STONE SD", "EMERALD R KUNDAN POLKI TUMBLE", "EMERALD R PL BEADS", "Emerald Russian", "Emerald ZAB CABS", "Emerald zam", "EMERALD ZAM OCT CUT", "EMERALD ZAM ROSE CUT", "EMERALD ZAMBIA", "EMERALD ZAMBIA HEART CUT", "EMERALD ZAMBIAN", "ETH OPAL", "ETH OPAL CABS", "ETH OPAL PEAR CABS", "ETH OPAL PL CABS", "ETHOPION OPAL", "GREEN AMETHYST", "GREEN SYNTHETIC", "GREEN TOUR", "GREEN TOURMALINE", "IOLITE", "Kunzite", "KUNZITE CUT STONE", "KUNZITE PEAR CUT", "LION BRACELET", "MIX STONE", "MIX STONES", "MORGANITE", "MORGANITE BEADS", "MORGANITE CABS", "MORGANITE CARVING", "MORGANITE PEAR CABS", "MORGANITE PINK", "MORGANITE QCTA", "MOTI", "MULTI STONE", "MULTI TOUR", "MULTI TOUR CABS", "Multi tourmaline", "NAVAGRAH", "NAVARATAN", "NAVGRAH", "NAVRATAN", "NR", "OPAL", "OPAL BLACK DYED", "OPAL BR", "PEACH MOONSTONE", "PEARLS", "PERIDOT", "PERIDOT FACT TABIZ", "PINK AMETHYST", "PINK OPAL", "PINK TOUR", "PINK TOUR BADAM", "PINK TOUR CAB", "PINK TOUR CABS", "PINK TOUR CARVING PAIR", "PINK TOUR CUT STONE", "PINK TOUR FACTED BADAM", "PINK TOUR OVAL ROSECUT", "PINK TOUR ROSE CUT", "PINK TOUR TUIPS", "PINK TOURMALINE", "PINK TOURMALINE CABS", "PINK TOURMALINE CARVING", "PINK TOURMALINE CUT STONE", "ROSE QUARTZ", "RUBY", "RUBY BURMA", "RUBY GF", "RUBY GF BADAM", "RUBY GF CABS", "RUBY GF CUT STONE", "RUBY GF FACT TYRE", "RUBY GF MOZ", "RUBY GF MOZ CUT STONE", "RUBY GF MOZ FUNCY CUT", "RUBY GF MOZ PL DROPS", "RUBY GF MOZ ROSE CUT", "RUBY GF RED", "RUBY MOZ", "RUBY MOZ GF", "RUBY MOZ GF CUT", "RUBY MOZ GF FACT ROSE CUT", "RUBY MOZ GF FACTED ROSECUT", "RUBY MOZ HEATED", "RUBY MOZAMBIQE", "RUBY PL DROPS", "RUBYLITE", "RUBYLITE CUT STONE", "RUSSIAN EMERALD", "SKY BT", "Tanzanite", "TANZANITE CAB", "Tanzanite CABS", "TANZANITE CUT", "TANZANITE PL DROP", "TANZANITE QCTA", "Tanzanite ROUGH", "TOUR", "TOUR CUT", "TOUR FLAT", "TOUR GREEN", "TOUR PINK", "TOUR TAPER", "Tourmaline", "TZ", "TZ & AQUA", "TZ CABS", "TZ FLAT", "Tz, Ruby", "YELLOW SAPP", "YELLOW SAPP CABS", "YELLOW SAPP OVAL CAB", "YELLOW SAPPHIRE", "YELLOW SAPPHIRE CABS"];
 const BROKER_NAME_SEED = ["A-SELF", "AFJAL BHAI", "AJAY JI AGARWAL", "ANIL JI KHANDELWAL", "ANKIT JI KALA", "ANURAG JI", "ASHISH JI SURANA", "B-SELF", "BCB JI", "CHINTU JI BEWAL", "DEEPAK JI HYD", "GC JI", "GCC JI", "GIRIRAJ PRASAD JI", "GYAN JI CHAJED", "LOKESH JI HYD", "MADHUSUDAN JI AGARWAL", "MAHESH JI GLG", "MS JI", "PD JI", "PRAKASH JI DUSAD", "PULKIT JI JAIN JPR", "RAHUL JI ROHIT JI", "RAJESH JI AGARWAL", "RAJNEESH JI PAREEK", "RAJU JI KACHAWA", "SACHIN JI HYD", "SELF", "SHUBHAM JI AGARWAL", "TASKIN BHAI", "UTTAM JI", "VIKAS JI PODDAR"];
-let deals = JSON.parse(localStorage.getItem(LS_DEALS)||'[]');
+let deals = JSON.parse(localStorage.getItem(LS_DEALS)||'[]'); // instant local load; cloud sync below reconciles once connected
+function startDealsSync(){
+  if(!db)return;
+  db.collection('ppe_deals').onSnapshot(snap=>{
+    const cloudDeals=[];
+    snap.forEach(d=>cloudDeals.push({id:d.id,...d.data()}));
+    deals=cloudDeals;
+    try{localStorage.setItem(LS_DEALS, JSON.stringify(deals));}catch(e){}
+    renderSummary();
+    renderDealHistory();
+    tryOpenDeepLinkDeal();
+  },err=>console.error('deals cloud sync failed:',err));
+}
+// The debounce keeps every keystroke feeling instant locally (renderItems runs right away)
+// while only the actual cloud write waits for a short pause in typing, so a fast typist
+// doesn't fire a Firestore write per character.
+let ppeSaveDebounceTimer=null;
+function pushDealToCloud(record){
+  if(!db)return;
+  clearTimeout(ppeSaveDebounceTimer);
+  ppeSaveDebounceTimer=setTimeout(()=>{
+    db.collection('ppe_deals').doc(record.id).set(record).catch(e=>console.error('deal cloud save failed:',e));
+  }, 1200);
+}
+/* ===== Director phone numbers + WhatsApp (shared GREEN-API credentials, same as the other
+   Bliss apps) — static per-slot config, no login needed. ===== */
+let directorPhones={g1:'',g2:'',g3:''};
+let api={};
+function startSettingsSync(){
+  if(!db)return;
+  db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed:',e));
+  db.collection('ppe_settings').doc('masters').onSnapshot(doc=>{
+    if(doc.exists){
+      const d=doc.data()||{};
+      directorPhones={g1:d.g1Phone||'',g2:d.g2Phone||'',g3:d.g3Phone||''};
+    }
+  },e=>console.error('settings sync failed:',e));
+}
+function openSettingsModal(){
+  document.getElementById('g1PhoneLabel').textContent=g1Name;
+  document.getElementById('g2PhoneLabel').textContent=g2Name;
+  document.getElementById('g3PhoneLabel').textContent=g3Name;
+  document.getElementById('g1Phone').value=directorPhones.g1;
+  document.getElementById('g2Phone').value=directorPhones.g2;
+  document.getElementById('g3Phone').value=directorPhones.g3;
+  document.getElementById('settingsModal').classList.add('show');
+}
+function closeSettingsModal(){ document.getElementById('settingsModal').classList.remove('show'); }
+function saveSettings(){
+  const patch={
+    g1Phone: document.getElementById('g1Phone').value.trim(),
+    g2Phone: document.getElementById('g2Phone').value.trim(),
+    g3Phone: document.getElementById('g3Phone').value.trim()
+  };
+  directorPhones={g1:patch.g1Phone,g2:patch.g2Phone,g3:patch.g3Phone};
+  if(db)db.collection('ppe_settings').doc('masters').set(patch,{merge:true}).catch(e=>console.error('settings save failed:',e));
+  closeSettingsModal();
+}
+function normalizePhone(p){ p=String(p||'').replace(/\D/g,''); if(p.length===10)p='91'+p; return p; }
+async function sendRawWA(phone,message){
+  const id=String(api.idInstance||'').trim(), token=String(api.apiToken||'').trim(), base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token){console.warn('GREEN-API settings missing');return false}
+  const p=normalizePhone(phone); if(p.length<11)return false;
+  try{
+    const r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
+    return r.ok;
+  }catch(e){console.error('WA send failed:',e);return false}
+}
+function fillTemplate(text,vars){ return text.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m); }
+const PPE_TEMPLATE_NEW_DEAL='💎 Purchase Slip {SlipNo}\n\n{StartedBy} has started a new deal — "{ItemName}".\nYour price is still pending.\n\n👉 Click the link to go straight to your column:\n{Link}';
+const PPE_TEMPLATE_REMINDER='⏰ Reminder: Price Pending\n\nThe deal {SlipNo} for {ItemName} is still waiting on your price.\n\n{Link}';
+function dealLink(dealId,who){ return 'https://bliss-gems-one.web.app/purchase-price-estimator/?deal='+encodeURIComponent(dealId)+'&who='+who; }
+// Across every item in the deal, does this director (g1/g2/g3) have at least one real value?
+function directorHasAnyValue(key){ return items.some(it=>it.lots.some(l=>l[key]!=='' && l[key]!=null && !isNaN(l[key]))); }
+function firstItemName(){ return (items.find(it=>it.name.trim())||{}).name || 'Deal'; }
+function sendDealNotice(record, targetKeys, template){
+  const names={g1:g1Name,g2:g2Name,g3:g3Name};
+  const startedBy = ['g1','g2','g3'].filter(k=>!targetKeys.includes(k)).map(k=>names[k]).join(' / ') || 'A director';
+  targetKeys.forEach(key=>{
+    const phone=directorPhones[key];
+    if(!phone){ console.warn(names[key]+' has no phone number set in Settings — skipped'); return; }
+    const msg=fillTemplate(template,{SlipNo:record.slipNo, ItemName:firstItemName(), StartedBy:startedBy, Link:dealLink(record.id,key)});
+    sendRawWA(phone,msg);
+  });
+}
+// Fires once per deal, automatically, the moment there's a real price to notify about —
+// whoever is still empty at that moment gets the "new deal" message together.
+function autoNotifyIfNeeded(record){
+  if(record.notifiedOnce) return record;
+  const avgTotal=currentAvgTotal();
+  if(avgTotal<=0) return record;
+  const emptyKeys=['g1','g2','g3'].filter(k=>!directorHasAnyValue(k));
+  if(!emptyKeys.length) return record;
+  sendDealNotice(record, emptyKeys, PPE_TEMPLATE_NEW_DEAL);
+  return {...record, notifiedOnce:true};
+}
+// Manual reminder — always targets whoever is still empty right now, ignores notifiedOnce.
+function notifyOthersManual(){
+  const emptyKeys=['g1','g2','g3'].filter(k=>!directorHasAnyValue(k));
+  if(!emptyKeys.length){ toast('Sabka price already bhar chuka hai.'); return; }
+  if(!currentDealId){ toast('Pehle kuch bhariye, deal save hone do.'); return; }
+  const record={id:currentDealId, slipNo:document.getElementById('hSlipNo').value||'—'};
+  sendDealNotice(record, emptyKeys, PPE_TEMPLATE_REMINDER);
+  toast('Reminder bhej diya: '+emptyKeys.map(k=>({g1:g1Name,g2:g2Name,g3:g3Name}[k])).join(', '));
+}
+function toast(msg){
+  let el=document.getElementById('ppeToast');
+  if(!el){ el=document.createElement('div'); el.id='ppeToast'; el.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;z-index:1000;box-shadow:0 4px 14px rgba(0,0,0,.2)'; document.body.appendChild(el); }
+  el.textContent=msg; el.style.display='block';
+  clearTimeout(el._t); el._t=setTimeout(()=>{el.style.display='none';},3000);
+}
+/* ===== Deep link: ?deal=<id>&who=<g1/g2/g3> opens that deal and focuses the right column ===== */
+let pendingDeepLinkDealId=new URLSearchParams(location.search).get('deal');
+let pendingDeepLinkWho=new URLSearchParams(location.search).get('who');
+function tryOpenDeepLinkDeal(){
+  if(!pendingDeepLinkDealId) return;
+  const d=deals.find(x=>x.id===pendingDeepLinkDealId);
+  if(!d) return; // not loaded yet (or doesn't exist) — next cloud sync tick will retry
+  openDeal(d.id);
+  if(pendingDeepLinkWho) setTimeout(()=>focusAndHighlightColumn(pendingDeepLinkWho), 150);
+  pendingDeepLinkDealId=null;
+}
+function focusAndHighlightColumn(key){
+  document.querySelectorAll('.ppeFocusGlow').forEach(el=>el.classList.remove('ppeFocusGlow'));
+  const inputs=document.querySelectorAll(`.itemTable td input[data-gkey="${key}"]`);
+  if(!inputs.length) return;
+  let target=null;
+  for(const inp of inputs){ if(!inp.value){ target=inp; break; } }
+  if(!target) target=inputs[0];
+  target.classList.add('ppeFocusGlow');
+  target.scrollIntoView({behavior:'smooth', block:'center'});
+  target.focus();
+}
 function newItem(name){ return {name: name||'', lots:[{wt:'', g1:'', g2:'', g3:''}]}; }
 let items = [newItem()]; // current in-progress deal's items: {name, lots:[{wt,g1,g2,g3}]}
 let g1Name='Hitesh Dusad', g2Name='Nitesh Dusad', g3Name='Ankur Khandelwal'; // the 3 Directors who each give their own guess rate, shared across every item's table
@@ -555,9 +722,9 @@ function renderItems(){
       if(finalCost!==null) finalCostTotal += finalCost;
       return `<tr>
         <td data-label="Wt (ct)"><input type="number" value="${l.wt}" onchange="updateLot(${ii},${li},'wt',this.value)"></td>
-        <td data-label="${esc(g1n)}"><input type="number" value="${l.g1}" onchange="updateLot(${ii},${li},'g1',this.value)"></td>
-        <td data-label="${esc(g2n)}"><input type="number" value="${l.g2}" onchange="updateLot(${ii},${li},'g2',this.value)"></td>
-        <td data-label="${esc(g3n)}"><input type="number" value="${l.g3}" onchange="updateLot(${ii},${li},'g3',this.value)"></td>
+        <td data-label="${esc(g1n)}"><input type="number" data-gkey="g1" value="${l.g1}" onchange="updateLot(${ii},${li},'g1',this.value)"></td>
+        <td data-label="${esc(g2n)}"><input type="number" data-gkey="g2" value="${l.g2}" onchange="updateLot(${ii},${li},'g2',this.value)"></td>
+        <td data-label="${esc(g3n)}"><input type="number" data-gkey="g3" value="${l.g3}" onchange="updateLot(${ii},${li},'g3',this.value)"></td>
         <td class="num readonly" data-label="Guess Avg">${money(avg)}</td>
         <td class="num costcell" data-label="Guess Cost">${money(wt*avg)}</td>
         <td class="num readonly" data-label="After Final" id="afterFinal_${ii}_${li}">${afterFinal!==null? money(afterFinal) : '—'}</td>
@@ -726,11 +893,15 @@ function autoSaveDraft(){
   // user saw on screen is exactly the one that gets saved.
   if(!currentDealId){ currentDealId = genId(); if(!document.getElementById('hSlipNo').value) document.getElementById('hSlipNo').value = nextSlipNo(); }
   const slipNo = document.getElementById('hSlipNo').value || nextSlipNo();
-  const record = { id: currentDealId, slipNo, note, party, broker, itemNames, g1Name, g2Name, g3Name,
-    avg: avgTotal, final: finalTotal, dueDate, items: JSON.parse(JSON.stringify(items)) };
+  const existing = deals.find(d=>d.id===currentDealId);
+  let record = { id: currentDealId, slipNo, note, party, broker, itemNames, g1Name, g2Name, g3Name,
+    avg: avgTotal, final: finalTotal, dueDate, items: JSON.parse(JSON.stringify(items)),
+    notifiedOnce: existing ? !!existing.notifiedOnce : false };
+  record = autoNotifyIfNeeded(record);
   const idx = deals.findIndex(d=>d.id===currentDealId);
   if(idx>=0) deals[idx] = record; else deals.push(record);
   saveDeals();
+  pushDealToCloud(record);
 
   statusWrap.style.display='block';
   statusEl.textContent = '✓ Auto-saved — Slip '+slipNo;
@@ -781,6 +952,7 @@ function deleteDeal(id){
   deals.splice(idx,1);
   if(currentDealId===id) startNewDeal();
   saveDeals();
+  if(db)db.collection('ppe_deals').doc(id).delete().catch(e=>console.error('deal cloud delete failed:',e));
 }
 function completedDeals(){ return deals.filter(d=>d.final>0); }
 function historicalMarkupPct(){
@@ -991,6 +1163,9 @@ if(!document.getElementById('hSlipNo').value) document.getElementById('hSlipNo')
 renderItems();
 renderSummary();
 renderDealHistory();
+startDealsSync();
+startSettingsSync();
+tryOpenDeepLinkDeal(); // in case localStorage's cached deals already has it, before the cloud sync even answers
 </script>
 </body>
 </html>
