@@ -935,6 +935,8 @@ function buildSlipShareText(){
   const broker = document.getElementById('hBroker').value.trim() || '—';
   const finalTotalInput = document.getElementById('hFinalTotal');
   const finalTotal = finalTotalInput ? Number(finalTotalInput.value)||0 : 0;
+  const avgTotal = currentAvgTotal();
+  const diffPct = (finalTotal>0 && avgTotal>0) ? ((finalTotal-avgTotal)/avgTotal*100) : null;
   const dateStr = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
   const lines = [
     '*Purchase Slip — Bliss Gems*',
@@ -945,10 +947,16 @@ function buildSlipShareText(){
   ];
   items.forEach(item=>{
     lines.push(`*${item.name.trim() || 'Item'}*`);
+    let itemFinalCostTotal = 0;
     item.lots.forEach(l=>{
+      const wt = Number(l.wt)||0;
       const avg = lotAvg(l);
-      lines.push(`  Wt ${l.wt||0}ct — ${g1Name}:${l.g1||0} ${g2Name}:${l.g2||0} ${g3Name}:${l.g3||0} → Avg ${money(avg)}`);
+      const afterFinal = diffPct!==null ? avg*(1+diffPct/100) : null;
+      const finalCost = afterFinal!==null ? wt*afterFinal : null;
+      if(finalCost!==null) itemFinalCostTotal += finalCost;
+      lines.push(`  Wt ${wt||0}ct → Final Cost ${finalCost!==null ? money(finalCost) : '—'}`);
     });
+    lines.push(`  Item Final Cost Total: ${diffPct!==null ? money(itemFinalCostTotal) : '—'}`);
   });
   lines.push('');
   lines.push(`Final Purchase Total: ${finalTotal>0 ? money(finalTotal) : '—'}`);
