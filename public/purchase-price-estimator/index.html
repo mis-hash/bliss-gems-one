@@ -368,6 +368,7 @@ function updateLabel(which, val){
   if(which==='g2') g2Name = val||'Nitesh Dusad';
   if(which==='g3') g3Name = val||'Ankur Khandelwal';
   renderItems();
+  autoSaveDraft();
 }
 let currentDealId = null; // id of the deal in `deals` currently being edited (null = fresh unsaved draft)
 let finalTotalAuto = true; // while true, Final Purchase Total auto-fills with Guess Avg Total until the user types their own value
@@ -485,25 +486,29 @@ function setFlash(el, text){
 }
 
 /* ===== Current Deal: multiple Items, each with multiple weight-lots ===== */
-function addItem(){ items.push(newItem()); renderItems(); }
+function addItem(){ items.push(newItem()); renderItems(); autoSaveDraft(); }
 function deleteItem(idx){
   items.splice(idx,1);
   if(!items.length) items.push(newItem());
   renderItems();
+  autoSaveDraft();
 }
 function updateItemName(idx, val){ items[idx].name = val; }
 function addLot(itemIdx){
   items[itemIdx].lots.push({wt:'', g1:'', g2:'', g3:''});
   renderItems();
+  autoSaveDraft();
 }
 function updateLot(itemIdx, lotIdx, field, val){
   items[itemIdx].lots[lotIdx][field] = val===''? '' : Number(val);
   renderItems();
+  autoSaveDraft();
 }
 function deleteLot(itemIdx, lotIdx){
   items[itemIdx].lots.splice(lotIdx,1);
   if(!items[itemIdx].lots.length) items[itemIdx].lots.push({wt:'', g1:'', g2:'', g3:''});
   renderItems();
+  autoSaveDraft();
 }
 
 function lotAvg(lot){
