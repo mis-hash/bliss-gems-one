@@ -644,7 +644,7 @@ async function deleteLedgerEntry(id,tripId){
   }catch(e){ console.error('delete ledger entry failed',e); alert('Delete fail ho gaya, dobara try karein.'); }
 }
 const NON_ADVANCE_LEDGER_TYPES=['expense','transfer_in','transfer_out','party_cash'];
-function isOverdue(t){return t.status!=='closed' && t.dueDate && t.dueDate<todayISO()}
+function isOverdue(t){return t.status!=='closed' && t.dueDate && t.dueDate<=todayISO()}
 
 /* ===== Issue / Extra / Expense / Hisaab / Close / Book ===== */
 function locationCheckboxHtml(l){return `<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;background:var(--mint);border-radius:6px;padding:4px 8px;cursor:pointer"><input type="checkbox" value="${esc(l)}" style="width:auto" onchange="updateIssueSuggestion()"> ${esc(l)}</label>`}
