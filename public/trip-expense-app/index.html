@@ -1507,12 +1507,12 @@ function renderExplorerPage(){
   const showAction=canDelete&&showDeleted;
   const wrap=$('explorerList');
   if(!list.length){wrap.innerHTML=`<small>${showDeleted?'Koi deleted trip nahi hai.':'Koi trip nahi mili.'}</small>`;return}
-  wrap.innerHTML=`<div style="overflow-x:auto"><table class="dtb"><thead><tr><th>Trip</th><th>Sales Person</th><th>Location</th><th>Purpose</th><th>Advance</th><th>Spent</th><th>Balance</th><th>Status</th>${showAction?'<th>Action</th>':''}</tr></thead><tbody>`+
+  wrap.innerHTML=`<div style="overflow-x:auto"><table class="dtb"><thead><tr><th>Trip</th><th>Sales Person</th><th>Location</th><th>Purpose</th><th>Advance</th><th>Spent</th><th>Received</th><th>Balance</th><th>Status</th>${showAction?'<th>Action</th>':''}</tr></thead><tbody>`+
   list.map(t=>{
     const issued=tripIssued(t.id),expense=tripExpense(t.id),balance=tripOutstanding(t.id);
     const statusLabel=t.status==='closed'?'Closed':(t.status==='hisaab_submitted'?'To Verify':(isOverdue(t)?'Overdue':'Active'));
     const action=`<button class="btn" onclick="event.stopPropagation();restoreTrip('${esc(t.id)}')">↩ Restore</button>`;
-    return `<tr onclick="openTripDetail('${esc(t.id)}')"><td>${esc(t.id)}</td><td><b style="font-size:13.5px">${esc(t.salesName)}</b></td><td>${esc(t.location)}</td><td>${esc(t.purpose||'-')}</td><td>${money(issued)}</td><td>${money(expense)}</td><td>${money(balance)}</td><td>${esc(statusLabel)}</td>${showAction?`<td>${action}</td>`:''}</tr>`;
+    return `<tr onclick="openTripDetail('${esc(t.id)}')"><td>${esc(t.id)}</td><td><b style="font-size:13.5px">${esc(t.salesName)}</b></td><td>${esc(t.location)}</td><td>${esc(t.purpose||'-')}</td><td>${money(issued)}</td><td>${money(expense)}</td><td>${t.status==='closed'?money(t.returnedAmount||0):'-'}</td><td>${money(balance)}</td><td>${esc(statusLabel)}</td>${showAction?`<td>${action}</td>`:''}</tr>`;
   }).join('')+`</tbody></table></div>`;
 }
 async function deleteTrip(tripId,skipConfirm){
