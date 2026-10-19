@@ -1008,11 +1008,18 @@ async function confirmCloseTrip(){
   await db.collection('te_trips').doc(tripId).update({status:'closed',closedAt:new Date().toISOString(),nocNumber,finalBalance:balance,returnedAmount:returned,returnedVia:mode});
   hide('closeTripModal');
   logActivity(`${(myUserObj()||{}).name||currentUser} closed ${tripId}`,`${nocNumber} generated · ${trip.salesName} · ${money(returned)} via ${mode}`);
+  toast(`Trip closed • Received ${money(returned)} via ${mode}`);
   if(notifySettings.closed){
     const sales=users.find(u=>u.id===trip.salesId);
     const msg=renderTemplate(messageTemplates.closed,{noc:nocNumber,name:trip.salesName,location:trip.location,tripId,balance:money(balance),returned:money(returned),mode});
     if(sales)sendWA(sales.phone,msg);
-    usersWithRole('admin').concat(usersWithRole('accounts')).forEach(u=>sendWA(u.phone,msg));
+    // Hitesh and Ankur get the overall Director insights/escalation notices already -
+    // don't also put every single NOC in their chat, only the actual closers (admin) and
+    // accounts (who book it) need the per-trip message.
+    const NOC_EXCLUDED_NAMES=['hitesh','ankur'];
+    usersWithRole('admin').concat(usersWithRole('accounts'))
+      .filter(u=>!NOC_EXCLUDED_NAMES.some(n=>String(u.name||'').trim().toLowerCase().startsWith(n)))
+      .forEach(u=>sendWA(u.phone,msg));
   }
 }
 async function markBooked(tripId){
