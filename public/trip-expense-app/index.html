@@ -1098,9 +1098,11 @@ function renderAdminPage(){
       overdue:{stripe:'var(--red)',avatarBg:'var(--redbg)',avatarColor:'var(--red)',badgeBg:'var(--redbg)',badgeColor:'var(--red)',label:'Overdue'},
       verify:{stripe:'var(--amber)',avatarBg:'var(--amberbg)',avatarColor:'var(--amber)',badgeBg:'var(--amberbg)',badgeColor:'var(--amber)',label:'To Verify'}
     }[state];
+    const advanceBtn=state==='active'?`<button class="btn" style="margin-left:8px" onclick="event.stopPropagation();openExtraModal('${esc(t.id)}')">+ Advance</button>`:'';
+    const closeBtn=`<button class="btn" style="margin-left:8px" onclick="event.stopPropagation();closeTrip('${esc(t.id)}')">⚑ Close Trip</button>`;
     const action=state==='verify'
       ?`<button class="btn primary" style="margin-left:8px" onclick="event.stopPropagation();closeTrip('${esc(t.id)}')">✓ Verify &amp; Close</button>`
-      :(state==='active'?`<button class="btn" style="margin-left:8px" onclick="event.stopPropagation();openExtraModal('${esc(t.id)}')">+ Advance</button>`:'');
+      :advanceBtn+closeBtn;
     return `<div class="trip-row" style="cursor:pointer" onclick="openTripDetail('${esc(t.id)}')">
     <div class="stripe" style="background:${colors.stripe}"></div>
     <div class="avatar" style="background:${colors.avatarBg};color:${colors.avatarColor}">${esc(initials)}</div>
