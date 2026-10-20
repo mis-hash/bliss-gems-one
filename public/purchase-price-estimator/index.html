@@ -313,7 +313,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
       <div id="finalTotalWrap">
         <div id="finalTotalBox" style="border:1.5px solid var(--mint-line);border-radius:var(--radius-md);background:var(--mint);padding:16px;margin-top:14px">
           <label style="display:block;font-size:12px;font-weight:800;margin-bottom:6px;color:var(--green-dark);text-transform:uppercase;letter-spacing:.03em">Final Rate (₹/ct) — once deal is closed</label>
-          <input type="number" id="hFinalTotal" oninput="finalTotalAuto=false;onFinalTotalInput()" style="width:100%;padding:13px 14px;border:2px solid var(--green2);border-radius:var(--radius-md);font-size:18px;font-weight:800;color:var(--green-dark);background:var(--surface)">
+          <input type="number" id="hFinalTotal" oninput="onFinalRateManualEdit()" style="width:100%;padding:13px 14px;border:2px solid var(--green2);border-radius:var(--radius-md);font-size:18px;font-weight:800;color:var(--green-dark);background:var(--surface)">
           <div id="finalRateHint" style="margin-top:8px;font-size:12px;color:var(--ink-soft)"></div>
         </div>
         <div id="dueDateBox" style="border:1.5px solid var(--warn-line);border-radius:var(--radius-md);background:var(--warn);padding:16px;margin-top:14px">
@@ -579,6 +579,12 @@ let finalTotalAuto = true; // while true, Final Purchase Total auto-fills with G
 // without this, a stale manually-typed rate from an earlier deal could keep sitting in the
 // box, silently driving the maths for lots that have nothing to do with it.
 let _prevWtTotalForAuto = 0;
+// The Guess Avg rate as of the moment the user last manually typed into Final Rate - if a
+// lot's numbers change afterwards, the avg this manual rate was set against no longer holds,
+// so it's stale and should go back to auto-tracking rather than keep sitting there looking
+// like the app invented a number on its own (overwriting an existing lot's g1/g2/g3 in place
+// never passes through zero weight, so the earlier 0->something reset alone can't catch this).
+let lastManualAvgRateContext = null;
 
 function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function ensureDealIds(){
@@ -873,6 +879,12 @@ function refreshFinalTotalDependents(){
   const avgTotal = currentAvgTotal();
   const wtTotal = currentWtTotal();
   const avgRate = wtTotal>0 ? avgTotal/wtTotal : 0;
+  if(!finalTotalAuto && lastManualAvgRateContext!==null && avgRate!==lastManualAvgRateContext){
+    // The lots changed since this rate was manually typed - it was set against a different
+    // avg and no longer means anything for the current numbers, so go back to auto-tracking.
+    finalTotalAuto = true;
+    lastManualAvgRateContext = null;
+  }
   if(_prevWtTotalForAuto<=0 && wtTotal>0) finalTotalAuto = true;
   _prevWtTotalForAuto = wtTotal;
   if(finalTotalAuto) finalTotalInput.value = avgRate>0 ? String(Math.round(avgRate)) : '';
@@ -974,12 +986,21 @@ function refreshFinalTotalDependents(){
 }
 function resetFinalRateToAvg(){
   finalTotalAuto = true;
+  lastManualAvgRateContext = null;
   refreshFinalTotalDependents();
   autoSaveDraft();
 }
 function onFinalTotalInput(){
   refreshFinalTotalDependents();
   autoSaveDraft();
+}
+// User is actively typing their own rate - remember the avg it was typed against, so a later
+// lot edit that changes that avg can tell this rate is now stale (see lastManualAvgRateContext).
+function onFinalRateManualEdit(){
+  finalTotalAuto = false;
+  const wt = currentWtTotal();
+  lastManualAvgRateContext = wt>0 ? currentAvgTotal()/wt : null;
+  onFinalTotalInput();
 }
 function onDueDateInput(){
   refreshFinalTotalDependents();
@@ -1024,6 +1045,7 @@ function startNewDeal(){
   currentDealId = null;
   finalTotalAuto = true;
   _prevWtTotalForAuto = 0;
+  lastManualAvgRateContext = null;
   items = [newItem()];
   ['hParty','hBroker','hFinalTotal','hDueDate'].forEach(id=>document.getElementById(id).value='');
   // Slip No. shows right away, like a physical purchase slip already has its number
@@ -1055,6 +1077,9 @@ function openDeal(id){
   const dealWt = items.reduce((s,it)=>s+it.lots.reduce((s2,l)=>s2+(Number(l.wt)||0),0),0);
   document.getElementById('hFinalTotal').value = (d.final && dealWt>0) ? String(Math.round(d.final/dealWt)) : '';
   _prevWtTotalForAuto = dealWt; // this deal already has weight - don't treat it as a fresh "0 -> something" start and silently re-enable auto-fill over its preserved rate
+  // `items` is already this deal's own data at this point, so this is its real avg - record
+  // it as the context the preserved rate matches, so it isn't immediately flagged stale.
+  lastManualAvgRateContext = dealWt>0 ? currentAvgTotal()/dealWt : null;
   renderItems();
   document.getElementById('dealFormTitle').textContent = '✏️ Editing '+(d.slipNo||'')+(d.note!=='Untitled Deal' && d.note ? ' — '+d.note : '');
   document.getElementById('draftStatusWrap').style.display = 'block';
