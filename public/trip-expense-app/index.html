@@ -322,6 +322,7 @@ if(window.self!==window.top){
 </div>
 <div class="field"><label>Start Date *</label><input type="date" id="editTripStart"></div>
 <div class="field"><label>Hisaab Due *</label><input type="date" id="editTripDue"></div>
+<div class="field span2 hidden" id="editTripReceivedByWrap"><label>Received By <small style="font-weight:400;color:var(--muted)">(trip close karte waqt cash/transfer kisne liya)</small></label><input type="text" id="editTripReceivedBy" placeholder="e.g. Amit Sharma"></div>
 </div><div class="actions"><button class="btn" onclick="hide('editTripModal')">Cancel</button><button class="btn primary" id="editTripSaveBtn" onclick="saveEditTrip()">Save</button></div><div class="msg" id="editTripMsg"></div></div></div>
 
 <script>
@@ -1463,18 +1464,23 @@ function openEditTripModal(tripId){
   renderEditTripLocationChecks(currentLocations);
   $('editTripStart').value=t.startDate||'';
   $('editTripDue').value=t.dueDate||'';
+  $('editTripReceivedByWrap').classList.toggle('hidden',t.status!=='closed');
+  $('editTripReceivedBy').value=t.closedBy||'';
   $('editTripMsg').textContent='';
   show('editTripModal');
 }
 async function saveEditTrip(){
   if(!_editTripId)return;
+  const t=trips.find(x=>x.id===_editTripId);
   const location=getSelectedEditTripLocations().join(' & '),start=$('editTripStart').value,due=$('editTripDue').value;
   const msg=$('editTripMsg');
   if(!location||!start||!due){msg.style.color='#b43a35';msg.textContent='Sabhi fields bharein, kam se kam 1 location select karein.';return}
   if(due<start){msg.style.color='#b43a35';msg.textContent='Due date, Start date se pehle nahi ho sakti.';return}
+  const patch={location,startDate:start,dueDate:due};
+  if(t&&t.status==='closed')patch.closedBy=$('editTripReceivedBy').value.trim();
   const btn=$('editTripSaveBtn');if(btn)btn.disabled=true;
   try{
-    await db.collection('te_trips').doc(_editTripId).update({location,startDate:start,dueDate:due});
+    await db.collection('te_trips').doc(_editTripId).update(patch);
   }catch(e){
     console.error('edit trip failed',e);
     msg.style.color='#b43a35';msg.textContent='Save fail ho gaya, dobara try karein.';
