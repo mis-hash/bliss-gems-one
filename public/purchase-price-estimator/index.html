@@ -675,8 +675,41 @@ function addLot(itemIdx){
 }
 function updateLot(itemIdx, lotIdx, field, val){
   items[itemIdx].lots[lotIdx][field] = val===''? '' : Number(val);
-  renderItems();
+  patchLotLive(itemIdx, lotIdx);
   autoSaveDraft();
+}
+// Fires on every keystroke (not just on blur), so the whole sheet feels truly live while
+// typing - patches just the read-only cells that depend on this lot/item by id, same as
+// refreshFinalTotalDependents() below, instead of calling renderItems()'s full innerHTML
+// rebuild, which would blow away the input the user is still typing into mid-keystroke.
+function patchLotLive(itemIdx, lotIdx){
+  const item = items[itemIdx];
+  if(!item) return;
+  const lot = item.lots[lotIdx];
+  if(lot){
+    const avg = lotAvg(lot);
+    const wt = Number(lot.wt)||0;
+    const avgEl = document.getElementById('guessAvg_'+itemIdx+'_'+lotIdx);
+    if(avgEl) avgEl.textContent = money(avg);
+    const costEl = document.getElementById('guessCost_'+itemIdx+'_'+lotIdx);
+    if(costEl) costEl.textContent = money(wt*avg);
+  }
+  const wtTotal = itemWtTotal(item);
+  const itemAvg = itemAvgTotal(item);
+  const wtLabelEl = document.getElementById('wtTotalLabel_'+itemIdx);
+  if(wtLabelEl) wtLabelEl.textContent = 'Total: '+(Math.round(wtTotal*100)/100)+' ct';
+  ['g1','g2','g3'].forEach(k=>{
+    const el = document.getElementById('combined_'+itemIdx+'_'+k);
+    if(el) el.textContent = moneyDec(itemColCombined(item,k));
+  });
+  const avgCombEl = document.getElementById('avgCombined_'+itemIdx);
+  if(avgCombEl) avgCombEl.textContent = moneyDec(itemAvgCombined(item));
+  const costTotalEl = document.getElementById('guessCostTotal_'+itemIdx);
+  if(costTotalEl) costTotalEl.textContent = money(itemAvg);
+  // Guess Avg changing can shift the overall diffPct (and, while finalTotalAuto, the Final
+  // Rate itself) for every item, not just this one - refreshFinalTotalDependents() already
+  // walks all items and patches their After Final / Final Cost cells plus the deal totals.
+  refreshFinalTotalDependents();
 }
 function deleteLot(itemIdx, lotIdx){
   items[itemIdx].lots.splice(lotIdx,1);
@@ -741,12 +774,12 @@ function renderItems(){
       const finalCost = afterFinal!==null ? wt*afterFinal : null;
       if(finalCost!==null) finalCostTotal += finalCost;
       return `<tr>
-        <td data-label="Wt (ct)"><input type="number" value="${l.wt}" onchange="updateLot(${ii},${li},'wt',this.value)"></td>
-        <td data-label="${esc(g1n)}"><input type="number" data-gkey="g1" value="${l.g1}" onchange="updateLot(${ii},${li},'g1',this.value)"></td>
-        <td data-label="${esc(g2n)}"><input type="number" data-gkey="g2" value="${l.g2}" onchange="updateLot(${ii},${li},'g2',this.value)"></td>
-        <td data-label="${esc(g3n)}"><input type="number" data-gkey="g3" value="${l.g3}" onchange="updateLot(${ii},${li},'g3',this.value)"></td>
-        <td class="num readonly" data-label="Guess Avg">${money(avg)}</td>
-        <td class="num costcell" data-label="Guess Cost">${money(wt*avg)}</td>
+        <td data-label="Wt (ct)"><input type="number" value="${l.wt}" oninput="updateLot(${ii},${li},'wt',this.value)"></td>
+        <td data-label="${esc(g1n)}"><input type="number" data-gkey="g1" value="${l.g1}" oninput="updateLot(${ii},${li},'g1',this.value)"></td>
+        <td data-label="${esc(g2n)}"><input type="number" data-gkey="g2" value="${l.g2}" oninput="updateLot(${ii},${li},'g2',this.value)"></td>
+        <td data-label="${esc(g3n)}"><input type="number" data-gkey="g3" value="${l.g3}" oninput="updateLot(${ii},${li},'g3',this.value)"></td>
+        <td class="num readonly" data-label="Guess Avg" id="guessAvg_${ii}_${li}">${money(avg)}</td>
+        <td class="num costcell" data-label="Guess Cost" id="guessCost_${ii}_${li}">${money(wt*avg)}</td>
         <td class="num readonly" data-label="After Final" id="afterFinal_${ii}_${li}">${afterFinal!==null? moneyDec(afterFinal) : '—'}</td>
         <td class="num costcell" data-label="Final Cost" id="finalCost_${ii}_${li}">${finalCost!==null? money(finalCost) : '—'}</td>
         <td data-label="Remove">${item.lots.length>1 ? `<button class="btn small danger removeLotBtn" title="Remove lot" onclick="deleteLot(${ii},${li})">✕<span class="btnLabel"> Remove</span></button>` : ''}</td>
@@ -778,12 +811,12 @@ function renderItems(){
           </tr></thead>
           <tbody>${rowsHtml}</tbody>
           <tfoot><tr>
-            <td data-label="Total Weight"><span>Total: ${Math.round(wtTotal*100)/100} ct</span></td>
-            <td class="num readonly combinedCell" data-label="${esc(g1n)} (Combined)">${moneyDec(itemColCombined(item,'g1'))}</td>
-            <td class="num readonly combinedCell" data-label="${esc(g2n)} (Combined)">${moneyDec(itemColCombined(item,'g2'))}</td>
-            <td class="num readonly combinedCell" data-label="${esc(g3n)} (Combined)">${moneyDec(itemColCombined(item,'g3'))}</td>
-            <td class="num readonly combinedCell" data-label="Guess Avg (Combined)">${moneyDec(itemAvgCombined(item))}</td>
-            <td class="num costcell" data-label="Guess Cost Total">${money(itemAvg)}</td>
+            <td data-label="Total Weight"><span id="wtTotalLabel_${ii}">Total: ${Math.round(wtTotal*100)/100} ct</span></td>
+            <td class="num readonly combinedCell" data-label="${esc(g1n)} (Combined)" id="combined_${ii}_g1">${moneyDec(itemColCombined(item,'g1'))}</td>
+            <td class="num readonly combinedCell" data-label="${esc(g2n)} (Combined)" id="combined_${ii}_g2">${moneyDec(itemColCombined(item,'g2'))}</td>
+            <td class="num readonly combinedCell" data-label="${esc(g3n)} (Combined)" id="combined_${ii}_g3">${moneyDec(itemColCombined(item,'g3'))}</td>
+            <td class="num readonly combinedCell" data-label="Guess Avg (Combined)" id="avgCombined_${ii}">${moneyDec(itemAvgCombined(item))}</td>
+            <td class="num costcell" data-label="Guess Cost Total" id="guessCostTotal_${ii}">${money(itemAvg)}</td>
             <td class="num readonly" data-label="After Final" id="afterFinalTotal_${ii}">${diffPct!==null && wtTotal>0? moneyDec(finalCostTotal/wtTotal) : '—'}</td>
             <td class="num costcell" data-label="Final Cost Total" id="finalCostTotal_${ii}">${diffPct!==null? money(finalCostTotal) : '—'}</td>
             <td class="footSpacer"></td>
