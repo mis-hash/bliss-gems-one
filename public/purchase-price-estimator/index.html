@@ -681,7 +681,10 @@ function deleteLot(itemIdx, lotIdx){
 function lotAvg(lot){
   const vals = [lot.g1, lot.g2, lot.g3].filter(v=>v!=='' && v!=null && !isNaN(v));
   if(!vals.length) return 0;
-  return vals.reduce((a,b)=>a+Number(b),0)/vals.length;
+  // Round to a whole rupee here, at the source, so every downstream number (Guess
+  // Cost, Combined Total, Final Purchase Total auto-fill) is actually wt * this same
+  // displayed rate - not a hidden fraction that only shows up once multiplied by weight.
+  return Math.round(vals.reduce((a,b)=>a+Number(b),0)/vals.length);
 }
 function lotGuessCost(lot){ return (Number(lot.wt)||0) * lotAvg(lot); }
 // Guess Avg Total must be a real guessed ₹ VALUE (so it can sensibly auto-fill Final
@@ -726,7 +729,7 @@ function renderItems(){
         <td data-label="${esc(g1n)}"><input type="number" data-gkey="g1" value="${l.g1}" onchange="updateLot(${ii},${li},'g1',this.value)"></td>
         <td data-label="${esc(g2n)}"><input type="number" data-gkey="g2" value="${l.g2}" onchange="updateLot(${ii},${li},'g2',this.value)"></td>
         <td data-label="${esc(g3n)}"><input type="number" data-gkey="g3" value="${l.g3}" onchange="updateLot(${ii},${li},'g3',this.value)"></td>
-        <td class="num readonly" data-label="Guess Avg">${moneyDec(avg)}</td>
+        <td class="num readonly" data-label="Guess Avg">${money(avg)}</td>
         <td class="num costcell" data-label="Guess Cost">${money(wt*avg)}</td>
         <td class="num readonly" data-label="After Final" id="afterFinal_${ii}_${li}">${afterFinal!==null? moneyDec(afterFinal) : '—'}</td>
         <td class="num costcell" data-label="Final Cost" id="finalCost_${ii}_${li}">${finalCost!==null? money(finalCost) : '—'}</td>
