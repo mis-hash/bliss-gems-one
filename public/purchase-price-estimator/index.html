@@ -777,7 +777,7 @@ function renderItems(){
             <td class="num readonly combinedCell" data-label="${esc(g3n)} (Combined)">${moneyDec(itemColCombined(item,'g3'))}</td>
             <td class="num readonly combinedCell" data-label="Guess Avg (Combined)">${moneyDec(itemAvgCombined(item))}</td>
             <td class="num costcell" data-label="Guess Cost Total">${money(itemAvg)}</td>
-            <td class="num readonly" data-label="After Final">${diffPct!==null && wtTotal>0? moneyDec(finalCostTotal/wtTotal) : '—'}</td>
+            <td class="num readonly" data-label="After Final" id="afterFinalTotal_${ii}">${diffPct!==null && wtTotal>0? moneyDec(finalCostTotal/wtTotal) : '—'}</td>
             <td class="num costcell" data-label="Final Cost Total" id="finalCostTotal_${ii}">${diffPct!==null? money(finalCostTotal) : '—'}</td>
             <td class="footSpacer"></td>
           </tr></tfoot>
@@ -823,6 +823,9 @@ function refreshFinalTotalDependents(){
     });
     const totalEl = document.getElementById('finalCostTotal_'+ii);
     if(totalEl) totalEl.textContent = diffPct!==null? money(finalCostTotal) : '—';
+    const itemWt = itemWtTotal(item);
+    const afterTotalEl = document.getElementById('afterFinalTotal_'+ii);
+    if(afterTotalEl) afterTotalEl.textContent = (diffPct!==null && itemWt>0)? moneyDec(finalCostTotal/itemWt) : '—';
   });
 
   const breakdownList = document.getElementById('lotBreakdownList');
