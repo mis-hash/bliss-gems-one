@@ -850,7 +850,7 @@ function renderItems(){
             <td class="num readonly combinedCell" data-label="${esc(g3n)} (Combined)" id="combined_${ii}_g3">${moneyDec(itemColCombined(item,'g3'))}</td>
             <td class="num readonly combinedCell" data-label="Guess Avg (Combined)" id="avgCombined_${ii}">${moneyDec(itemAvgCombined(item))}</td>
             <td class="num costcell" data-label="Guess Cost Total" id="guessCostTotal_${ii}">${money(itemAvg)}</td>
-            <td class="num readonly" data-label="After Final" id="afterFinalTotal_${ii}">${diffPct!==null && wtTotal>0? moneyDec(finalCostTotal/wtTotal) : '—'}</td>
+            <td class="num readonly" data-label="After Final" id="afterFinalTotal_${ii}" title="Har lot ka apna After Final Price alag hai (upar dekhein) — Total mein ek single rate nahi dikhaya jaata">—</td>
             <td class="num costcell" data-label="Final Cost Total" id="finalCostTotal_${ii}">${diffPct!==null? money(finalCostTotal) : '—'}</td>
             <td class="footSpacer"></td>
           </tr></tfoot>
@@ -910,9 +910,10 @@ function refreshFinalTotalDependents(){
     });
     const totalEl = document.getElementById('finalCostTotal_'+ii);
     if(totalEl) totalEl.textContent = diffPct!==null? money(finalCostTotal) : '—';
-    const itemWt = itemWtTotal(item);
-    const afterTotalEl = document.getElementById('afterFinalTotal_'+ii);
-    if(afterTotalEl) afterTotalEl.textContent = (diffPct!==null && itemWt>0)? moneyDec(finalCostTotal/itemWt) : '—';
+    // Total row never shows an "After Final Price" rate: it would always equal the typed
+    // Final Rate exactly (that's what a weighted average of proportionally-scaled lots does
+    // by construction), which looked like the box was mysteriously echoing itself back.
+    // Each lot's own After Final Price above is the real, meaningful number.
   });
 
   const breakdownList = document.getElementById('lotBreakdownList');
