@@ -305,7 +305,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 
       <div id="finalTotalWrap">
         <div id="finalTotalBox" style="border:1.5px solid var(--mint-line);border-radius:var(--radius-md);background:var(--mint);padding:16px;margin-top:14px">
-          <label style="display:block;font-size:12px;font-weight:800;margin-bottom:6px;color:var(--green-dark);text-transform:uppercase;letter-spacing:.03em">Final Purchase Total (₹) — once deal is closed</label>
+          <label style="display:block;font-size:12px;font-weight:800;margin-bottom:6px;color:var(--green-dark);text-transform:uppercase;letter-spacing:.03em">Final Rate (₹/ct) — once deal is closed</label>
           <input type="number" id="hFinalTotal" oninput="finalTotalAuto=false;onFinalTotalInput()" style="width:100%;padding:13px 14px;border:2px solid var(--green2);border-radius:var(--radius-md);font-size:18px;font-weight:800;color:var(--green-dark);background:var(--surface)">
         </div>
         <div id="dueDateBox" style="border:1.5px solid var(--warn-line);border-radius:var(--radius-md);background:var(--warn);padding:16px;margin-top:14px">
@@ -694,6 +694,11 @@ function itemAvgTotal(item){ return item.lots.reduce((s,l)=>s+lotGuessCost(l),0)
 function itemWtTotal(item){ return item.lots.reduce((s,l)=>s+(Number(l.wt)||0),0); }
 function currentAvgTotal(){ return items.reduce((s,it)=>s+itemAvgTotal(it),0); }
 function currentWtTotal(){ return items.reduce((s,it)=>s+itemWtTotal(it),0); }
+// #hFinalTotal holds the FLAT FINAL RATE (₹/ct) the deal closed at, not a lump ₹ total -
+// every lot's Final Cost is this same rate × that lot's own weight, and the ₹ total shown
+// everywhere else (result tiles, Print Slip, WhatsApp, saved deal) is this rate × total weight.
+function currentFinalRate(){ const el=document.getElementById('hFinalTotal'); return el ? (Number(el.value)||0) : 0; }
+function currentFinalTotalComputed(){ return currentFinalRate() * currentWtTotal(); }
 // Combined/blended reference rate shown in the per-item table's Total row — a true
 // weight-weighted average rate across lots: sum(wt_i * rate_i) / sum(wt_i), not a plain
 // sum/average of the per-lot rates (which is meaningless across lots of different weight).
@@ -711,16 +716,14 @@ function renderItems(){
   // in them is never interrupted. refreshFinalTotalDependents() below patches everything
   // that depends on their value (After Final/Final Cost cells, breakdown list, result
   // tiles, print summary) without recreating any input.
-  const finalTotalInput = document.getElementById('hFinalTotal');
-  const finalTotal = finalTotalInput ? (Number(finalTotalInput.value)||0) : 0;
+  const finalRate = currentFinalRate();
   const avgTotal = currentAvgTotal();
-  const diffPct = (finalTotal>0 && avgTotal>0) ? ((finalTotal-avgTotal)/avgTotal*100) : null;
 
   container.innerHTML = items.map((item, ii)=>{
     let finalCostTotal = 0;
     const rowsHtml = item.lots.map((l, li)=>{
       const avg = lotAvg(l);
-      const afterFinal = diffPct!==null ? avg*(1+diffPct/100) : null;
+      const afterFinal = finalRate>0 ? finalRate : null;
       const wt = Number(l.wt)||0;
       const finalCost = afterFinal!==null ? wt*afterFinal : null;
       if(finalCost!==null) finalCostTotal += finalCost;
@@ -768,8 +771,8 @@ function renderItems(){
             <td class="num readonly combinedCell" data-label="${esc(g3n)} (Combined)">${moneyDec(itemColCombined(item,'g3'))}</td>
             <td class="num readonly combinedCell" data-label="Guess Avg (Combined)">${moneyDec(itemAvgCombined(item))}</td>
             <td class="num costcell" data-label="Guess Cost Total">${money(itemAvg)}</td>
-            <td class="num readonly" data-label="After Final">—</td>
-            <td class="num costcell" data-label="Final Cost Total" id="finalCostTotal_${ii}">${diffPct!==null? money(finalCostTotal) : '—'}</td>
+            <td class="num readonly" data-label="After Final">${finalRate>0? money(finalRate) : '—'}</td>
+            <td class="num costcell" data-label="Final Cost Total" id="finalCostTotal_${ii}">${finalRate>0? money(finalCostTotal) : '—'}</td>
             <td class="footSpacer"></td>
           </tr></tfoot>
         </table>
@@ -789,8 +792,11 @@ function renderItems(){
 function refreshFinalTotalDependents(){
   const finalTotalInput = document.getElementById('hFinalTotal');
   const avgTotal = currentAvgTotal();
-  if(finalTotalAuto) finalTotalInput.value = avgTotal>0 ? String(Math.round(avgTotal)) : '';
-  const finalTotal = Number(finalTotalInput.value)||0;
+  const wtTotal = currentWtTotal();
+  const avgRate = wtTotal>0 ? avgTotal/wtTotal : 0;
+  if(finalTotalAuto) finalTotalInput.value = avgRate>0 ? String(Math.round(avgRate)) : '';
+  const finalRate = Number(finalTotalInput.value)||0;
+  const finalTotal = finalRate * wtTotal; // the real ₹ total, derived from the flat rate
   const diffPct = (finalTotal>0 && avgTotal>0) ? ((finalTotal-avgTotal)/avgTotal*100) : null;
   const dueDateValueStr = document.getElementById('hDueDate').value;
 
@@ -799,7 +805,7 @@ function refreshFinalTotalDependents(){
     let finalCostTotal = 0;
     item.lots.forEach((l,li)=>{
       const avg = lotAvg(l);
-      const afterFinal = diffPct!==null ? avg*(1+diffPct/100) : null;
+      const afterFinal = finalRate>0 ? finalRate : null;
       const wt = Number(l.wt)||0;
       const finalCost = afterFinal!==null ? wt*afterFinal : null;
       if(finalCost!==null) finalCostTotal += finalCost;
@@ -810,7 +816,7 @@ function refreshFinalTotalDependents(){
       if(costEl) costEl.textContent = finalCost!==null? money(finalCost) : '—';
     });
     const totalEl = document.getElementById('finalCostTotal_'+ii);
-    if(totalEl) totalEl.textContent = diffPct!==null? money(finalCostTotal) : '—';
+    if(totalEl) totalEl.textContent = finalRate>0? money(finalCostTotal) : '—';
   });
 
   const breakdownList = document.getElementById('lotBreakdownList');
@@ -883,7 +889,7 @@ function autoSaveDraft(){
   const party = document.getElementById('hParty').value.trim();
   const broker = document.getElementById('hBroker').value.trim();
   const avgTotal = currentAvgTotal();
-  const finalTotal = Number(document.getElementById('hFinalTotal').value)||0;
+  const finalTotal = currentFinalTotalComputed();
   const dueDate = document.getElementById('hDueDate').value;
   const hasLots = items.some(it=>it.lots.length);
   const statusWrap = document.getElementById('draftStatusWrap');
@@ -936,11 +942,15 @@ function openDeal(id){
   g1Name = d.g1Name||'Hitesh Dusad';
   g2Name = d.g2Name||'Nitesh Dusad';
   g3Name = d.g3Name||'Ankur Khandelwal';
-  document.getElementById('hFinalTotal').value = d.final||'';
   document.getElementById('hDueDate').value = d.dueDate||'';
   items = Array.isArray(d.items) ? JSON.parse(JSON.stringify(d.items))
     : [{name: d.item||'', lots: Array.isArray(d.lots)?JSON.parse(JSON.stringify(d.lots)):[]}];
   if(!items.length) items = [newItem()];
+  // d.final was saved as a ₹ total (old deals) or rate×weight (new ones) - either way,
+  // hFinalTotal now holds the flat RATE, so convert back by dividing out this deal's own
+  // total weight. A deal saved before this change just gets its implied average rate.
+  const dealWt = items.reduce((s,it)=>s+it.lots.reduce((s2,l)=>s2+(Number(l.wt)||0),0),0);
+  document.getElementById('hFinalTotal').value = (d.final && dealWt>0) ? String(Math.round(d.final/dealWt)) : '';
   renderItems();
   document.getElementById('dealFormTitle').textContent = '✏️ Editing '+(d.slipNo||'')+(d.note!=='Untitled Deal' && d.note ? ' — '+d.note : '');
   document.getElementById('draftStatusWrap').style.display = 'block';
@@ -1122,10 +1132,8 @@ function buildSlipShareText(){
   const slipNo = document.getElementById('hSlipNo').value || '—';
   const party = document.getElementById('hParty').value.trim() || '—';
   const broker = document.getElementById('hBroker').value.trim() || '—';
-  const finalTotalInput = document.getElementById('hFinalTotal');
-  const finalTotal = finalTotalInput ? Number(finalTotalInput.value)||0 : 0;
-  const avgTotal = currentAvgTotal();
-  const diffPct = (finalTotal>0 && avgTotal>0) ? ((finalTotal-avgTotal)/avgTotal*100) : null;
+  const finalRate = currentFinalRate();
+  const finalTotal = currentFinalTotalComputed();
   const dateStr = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
   const lines = [
     '*Purchase Slip — Bliss Gems*',
@@ -1139,15 +1147,14 @@ function buildSlipShareText(){
     let itemFinalCostTotal = 0;
     item.lots.forEach(l=>{
       const wt = Number(l.wt)||0;
-      const avg = lotAvg(l);
-      const afterFinal = diffPct!==null ? avg*(1+diffPct/100) : null;
-      const finalCost = afterFinal!==null ? wt*afterFinal : null;
+      const finalCost = finalRate>0 ? wt*finalRate : null;
       if(finalCost!==null) itemFinalCostTotal += finalCost;
       lines.push(`  Wt ${wt||0}ct → Final Cost ${finalCost!==null ? money(finalCost) : '—'}`);
     });
-    lines.push(`  Item Final Cost Total: ${diffPct!==null ? money(itemFinalCostTotal) : '—'}`);
+    lines.push(`  Item Final Cost Total: ${finalRate>0 ? money(itemFinalCostTotal) : '—'}`);
   });
   lines.push('');
+  lines.push(`Final Rate: ${finalRate>0 ? money(finalRate)+'/ct' : '—'}`);
   lines.push(`Final Purchase Total: ${finalTotal>0 ? money(finalTotal) : '—'}`);
   return lines.join('\n');
 }
