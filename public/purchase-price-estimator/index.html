@@ -239,6 +239,13 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 </head>
 <body>
 
+<div id="deepLinkOverlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:14px">
+  <div style="width:34px;height:34px;border:3px solid var(--mint-line);border-top-color:var(--green);border-radius:50%;animation:dlSpin .8s linear infinite"></div>
+  <div style="font-size:14px;font-weight:700;color:var(--green-dark)">Aapka deal khul raha hai…</div>
+</div>
+<style>@keyframes dlSpin{to{transform:rotate(360deg)}}</style>
+<script>if(new URLSearchParams(location.search).get('deal')) document.getElementById('deepLinkOverlay').style.display='flex';</script>
+
 <header><div class="head">
   <div class="logo">b</div>
   <div class="brand"><b>Purchase Price Estimator</b></div>
@@ -464,8 +471,8 @@ async function sendRawWA(phone,message){
   }catch(e){console.error('WA send failed:',e);return false}
 }
 function fillTemplate(text,vars){ return text.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m); }
-const PPE_TEMPLATE_NEW_DEAL='💎 Purchase Slip {SlipNo}\n\n{StartedBy} has started a new deal — "{ItemName}".\nYour price is still pending.\n\n👉 Click the link to go straight to your column:\n{Link}';
-const PPE_TEMPLATE_REMINDER='⏰ Reminder: Price Pending\n\nThe deal {SlipNo} for {ItemName} is still waiting on your price.\n\n{Link}';
+const PPE_TEMPLATE_NEW_DEAL='💎 *Purchase Slip {SlipNo}*\n*{ItemName}*\n\nStarted by {StartedBy} — your price is still pending.\n\n👉 Tap to open your column:\n{Link}';
+const PPE_TEMPLATE_REMINDER='⏰ *Reminder — Price Pending*\n*Slip {SlipNo}* · *{ItemName}*\n\n👉 Tap to open your column:\n{Link}';
 function dealLink(dealId,who){ return 'https://bliss-gems-one.web.app/purchase-price-estimator/?deal='+encodeURIComponent(dealId)+'&who='+who; }
 // Across every item in the deal, does this director (g1/g2/g3) have at least one real value?
 function directorHasAnyValue(key){ return items.some(it=>it.lots.some(l=>l[key]!=='' && l[key]!=null && !isNaN(l[key]))); }
@@ -480,16 +487,29 @@ function sendDealNotice(record, targetKeys, template){
     sendRawWA(phone,msg);
   });
 }
-// Fires once per deal, automatically, the moment there's a real price to notify about —
-// whoever is still empty at that moment gets the "new deal" message together.
-function autoNotifyIfNeeded(record){
-  if(record.notifiedOnce) return record;
-  const avgTotal=currentAvgTotal();
-  if(avgTotal<=0) return record;
-  const emptyKeys=['g1','g2','g3'].filter(k=>!directorHasAnyValue(k));
-  if(!emptyKeys.length) return record;
-  sendDealNotice(record, emptyKeys, PPE_TEMPLATE_NEW_DEAL);
-  return {...record, notifiedOnce:true};
+// Fires once per deal, automatically — but only after the user has paused typing for a bit,
+// not the instant there's a real price. With lot entry now live on every keystroke, firing
+// immediately meant the "new deal" WhatsApp went out after just the first lot, while the
+// user was still in the middle of adding more lots to the same deal.
+let ppeNotifyDebounceTimer=null;
+function scheduleAutoNotify(){
+  clearTimeout(ppeNotifyDebounceTimer);
+  const dealIdAtSchedule=currentDealId;
+  ppeNotifyDebounceTimer=setTimeout(()=>{
+    if(!dealIdAtSchedule || dealIdAtSchedule!==currentDealId) return; // switched to a different deal meanwhile
+    const idx=deals.findIndex(d=>d.id===dealIdAtSchedule);
+    if(idx<0) return;
+    const record=deals[idx];
+    if(record.notifiedOnce) return;
+    const avgTotal=currentAvgTotal();
+    if(avgTotal<=0) return;
+    const emptyKeys=['g1','g2','g3'].filter(k=>!directorHasAnyValue(k));
+    if(!emptyKeys.length) return;
+    sendDealNotice(record, emptyKeys, PPE_TEMPLATE_NEW_DEAL);
+    deals[idx]={...record, notifiedOnce:true};
+    saveDeals();
+    pushDealToCloud(deals[idx]);
+  }, 11000); // ~11s pause in editing before the other directors get pinged
 }
 // Manual reminder — always targets whoever is still empty right now, ignores notifiedOnce.
 function notifyOthersManual(){
@@ -514,8 +534,21 @@ function tryOpenDeepLinkDeal(){
   const d=deals.find(x=>x.id===pendingDeepLinkDealId);
   if(!d) return; // not loaded yet (or doesn't exist) — next cloud sync tick will retry
   openDeal(d.id);
+  const overlay=document.getElementById('deepLinkOverlay');
+  if(overlay) overlay.style.display='none';
   if(pendingDeepLinkWho) setTimeout(()=>focusAndHighlightColumn(pendingDeepLinkWho), 150);
   pendingDeepLinkDealId=null;
+}
+// Covers a deal link opened on a fresh device/browser where localStorage has nothing yet and
+// the cloud sync is slow to connect - don't leave the loading overlay up forever.
+if(pendingDeepLinkDealId){
+  setTimeout(()=>{
+    const overlay=document.getElementById('deepLinkOverlay');
+    if(overlay && overlay.style.display!=='none'){
+      overlay.style.display='none';
+      toast('Deal load nahi ho paaya — dobara link se try karein.');
+    }
+  }, 8000);
 }
 function focusAndHighlightColumn(key){
   document.querySelectorAll('.ppeFocusGlow').forEach(el=>el.classList.remove('ppeFocusGlow'));
@@ -975,11 +1008,11 @@ function autoSaveDraft(){
   let record = { id: currentDealId, slipNo, note, party, broker, itemNames, g1Name, g2Name, g3Name,
     avg: avgTotal, final: finalTotal, dueDate, items: JSON.parse(JSON.stringify(items)),
     notifiedOnce: existing ? !!existing.notifiedOnce : false };
-  record = autoNotifyIfNeeded(record);
   const idx = deals.findIndex(d=>d.id===currentDealId);
   if(idx>=0) deals[idx] = record; else deals.push(record);
   saveDeals();
   pushDealToCloud(record);
+  scheduleAutoNotify();
 
   statusWrap.style.display='block';
   statusEl.textContent = '✓ Auto-saved — Slip '+slipNo;
