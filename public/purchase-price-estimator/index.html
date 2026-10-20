@@ -691,11 +691,12 @@ function itemAvgTotal(item){ return item.lots.reduce((s,l)=>s+lotGuessCost(l),0)
 function itemWtTotal(item){ return item.lots.reduce((s,l)=>s+(Number(l.wt)||0),0); }
 function currentAvgTotal(){ return items.reduce((s,it)=>s+itemAvgTotal(it),0); }
 function currentWtTotal(){ return items.reduce((s,it)=>s+itemWtTotal(it),0); }
-// Combined/blended reference rates shown in the per-item table's Total row — sum of the
-// column across lots, divided by the item's total weight (not weighted per-lot).
-function colSum(item,key){ return item.lots.reduce((s,l)=>{ const v=l[key]; return s+(v!=='' && v!=null && !isNaN(v) ? Number(v) : 0); },0); }
-function itemColCombined(item,key){ const wt=itemWtTotal(item); const s=colSum(item,key); return s>0 ? wt/s : 0; }
-function itemAvgCombined(item){ const wt=itemWtTotal(item); const sumAvg=item.lots.reduce((s,l)=>s+lotAvg(l),0); return sumAvg>0 ? wt/sumAvg : 0; }
+// Combined/blended reference rate shown in the per-item table's Total row — a true
+// weight-weighted average rate across lots: sum(wt_i * rate_i) / sum(wt_i), not a plain
+// sum/average of the per-lot rates (which is meaningless across lots of different weight).
+function colWeightedSum(item,key){ return item.lots.reduce((s,l)=>{ const v=l[key]; const wt=Number(l.wt)||0; return s+(v!=='' && v!=null && !isNaN(v) ? wt*Number(v) : 0); },0); }
+function itemColCombined(item,key){ const wt=itemWtTotal(item); return wt>0 ? colWeightedSum(item,key)/wt : 0; }
+function itemAvgCombined(item){ const wt=itemWtTotal(item); return wt>0 ? itemAvgTotal(item)/wt : 0; }
 
 function renderItems(){
   const container = document.getElementById('itemsContainer');
