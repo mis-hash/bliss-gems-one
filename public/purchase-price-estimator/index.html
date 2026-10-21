@@ -270,7 +270,10 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
   <div class="panel" id="dealFormPanel">
     <div class="ph no-print">
       <span id="dealFormTitle">➕ New Deal</span>
-      <button class="btn small" onclick="startNewDeal()">🆕 Start New</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn small" id="backToHistoryBtn" onclick="scrollToHistory()" style="display:none">⬅️ Back to Deals</button>
+        <button class="btn small" onclick="startNewDeal()">🆕 Start New</button>
+      </div>
     </div>
     <div class="pb">
       <div class="no-print" id="draftStatusWrap" style="display:none;margin-bottom:12px">
@@ -1052,7 +1055,11 @@ function startNewDeal(){
   document.getElementById('hSlipNo').value = nextSlipNo();
   document.getElementById('draftStatusWrap').style.display = 'none';
   document.getElementById('dealFormTitle').textContent = '➕ New Deal';
+  document.getElementById('backToHistoryBtn').style.display = 'none';
   renderItems();
+}
+function scrollToHistory(){
+  document.getElementById('dealHistoryPanel').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function openDeal(id){
@@ -1083,6 +1090,7 @@ function openDeal(id){
   document.getElementById('dealFormTitle').textContent = '✏️ Editing '+(d.slipNo||'')+(d.note!=='Untitled Deal' && d.note ? ' — '+d.note : '');
   document.getElementById('draftStatusWrap').style.display = 'block';
   document.getElementById('draftStatus').textContent = '✓ Auto-saved — Slip '+(d.slipNo||'');
+  document.getElementById('backToHistoryBtn').style.display = 'inline-block';
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
