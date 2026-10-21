@@ -1407,7 +1407,12 @@ function sendFileWA(phone, blob, fileName){
 function buildPdfExportClone(){
   const original = document.getElementById('dealFormPanel');
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:fixed;left:-10000px;top:0;width:1100px;background:#fff;z-index:-1';
+  // html2canvas clones the whole document into a same-size offscreen iframe to capture this
+  // element, sized to span from the element's position out to its far edge. At -10000px that
+  // iframe/canvas has to cover >11000px width (22000+ at scale:2) - past the canvas size cap
+  // on many mobile browsers/WebViews, which can silently rasterize nothing instead of erroring.
+  // -1500px is still well clear of any real viewport but stays inside normal canvas limits.
+  wrap.style.cssText = 'position:fixed;left:-1500px;top:0;width:1100px;background:#fff;z-index:-1';
   wrap.className = 'pdfExportMode';
   const clone = original.cloneNode(true);
   clone.removeAttribute('id');
@@ -1438,6 +1443,14 @@ async function generateSlipPdfBlob(){
   if(typeof html2pdf==='undefined'){ console.warn('html2pdf not loaded'); return null; }
   const wrap = buildPdfExportClone();
   try{
+    // Let the freshly-inserted offscreen clone actually finish layout/paint before handing
+    // it to html2canvas - on a slower device the element can still measure 0-height if
+    // captured on the very next tick, which rasterizes to a blank page.
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    if(wrap.getBoundingClientRect().height<10){
+      console.error('PDF export clone has no height - aborting instead of sending a blank PDF');
+      return null;
+    }
     return await html2pdf().from(wrap).set({
       margin:10,
       filename:'slip.pdf',
