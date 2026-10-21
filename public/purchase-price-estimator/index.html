@@ -222,7 +222,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 .printOnly{display:none}
 @media print{
   body{background:#fff}
-  header,.hero,.grid3,#mobilePreviewBtn,.mobileLiveBar,#dealResultGrid,.btnRow,.ph .countChip,#mobilePreviewWrap,#dealHistoryPanel,.no-print,#finalTotalBox,#dueDateBox{display:none !important}
+  header,.hero,.grid3,#mobilePreviewBtn,.mobileLiveBar,#dealResultGrid,.btnRow,.ph .countChip,#mobilePreviewWrap,#dealHistoryPanel,#newDealEntryPanel,.no-print,#finalTotalBox,#dueDateBox{display:none !important}
   .shell{padding:0;max-width:100%}
   .panel{box-shadow:none;border:1px solid #999}
   .ph{background:#fff}
@@ -267,11 +267,15 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
     <div class="stat"><span class="ic">₹</span><small>Total Diff (₹)</small><b id="sDiff">₹0</b><div class="bar"><i id="sDiffBar" style="width:0%"></i></div></div>
   </div>
 
-  <div class="panel" id="dealFormPanel">
+  <div class="panel" id="newDealEntryPanel" style="padding:22px;text-align:center">
+    <button class="btn primary" onclick="startNewDeal()">➕ Start a New Deal</button>
+  </div>
+
+  <div class="panel" id="dealFormPanel" style="display:none">
     <div class="ph no-print">
       <span id="dealFormTitle">➕ New Deal</span>
       <div style="display:flex;gap:8px">
-        <button class="btn small" id="backToHistoryBtn" onclick="scrollToHistory()" style="display:none">⬅️ Back to Deals</button>
+        <button class="btn small" id="backToHistoryBtn" onclick="closeDealForm()">⬅️ Back to Deals</button>
         <button class="btn small" onclick="startNewDeal()">🆕 Start New</button>
       </div>
     </div>
@@ -1055,10 +1059,17 @@ function startNewDeal(){
   document.getElementById('hSlipNo').value = nextSlipNo();
   document.getElementById('draftStatusWrap').style.display = 'none';
   document.getElementById('dealFormTitle').textContent = '➕ New Deal';
-  document.getElementById('backToHistoryBtn').style.display = 'none';
+  document.getElementById('newDealEntryPanel').style.display = 'none';
+  document.getElementById('dealFormPanel').style.display = '';
   renderItems();
+  document.getElementById('dealFormPanel').scrollIntoView({behavior:'smooth', block:'start'});
 }
-function scrollToHistory(){
+// Nothing is lost by closing the form - autoSaveDraft() already persisted everything as the
+// user typed, so this just goes back to a plain deals list instead of leaving a half-filled
+// (or someone else's already-saved) form sitting open the moment the app loads.
+function closeDealForm(){
+  document.getElementById('dealFormPanel').style.display = 'none';
+  document.getElementById('newDealEntryPanel').style.display = '';
   document.getElementById('dealHistoryPanel').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
@@ -1090,7 +1101,8 @@ function openDeal(id){
   document.getElementById('dealFormTitle').textContent = '✏️ Editing '+(d.slipNo||'')+(d.note!=='Untitled Deal' && d.note ? ' — '+d.note : '');
   document.getElementById('draftStatusWrap').style.display = 'block';
   document.getElementById('draftStatus').textContent = '✓ Auto-saved — Slip '+(d.slipNo||'');
-  document.getElementById('backToHistoryBtn').style.display = 'inline-block';
+  document.getElementById('newDealEntryPanel').style.display = 'none';
+  document.getElementById('dealFormPanel').style.display = '';
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
@@ -1312,7 +1324,6 @@ function shareDealFromHistory(id){ openDeal(id); shareSlipOnWhatsApp(); }
 const printDateEl = document.getElementById('printDate');
 if(printDateEl) printDateEl.textContent = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
 
-if(!document.getElementById('hSlipNo').value) document.getElementById('hSlipNo').value = nextSlipNo();
 renderItems();
 renderSummary();
 renderDealHistory();
