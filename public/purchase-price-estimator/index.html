@@ -279,6 +279,14 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 .pdfExportMode .itemTable th input{width:100%;padding:2px 0;font-size:9px}
 .pdfExportMode .itemTable td{padding:9px 5px}
 .pdfExportMode .itemTable td input{width:100%;padding:2px 0;font-size:10.5px}
+/* Per-lot vertical cards (see buildTransposedItemsHtml()) replacing the wide lot table in the
+   WhatsApp PDF only, so a narrow/tall page fills a phone screen instead of a wide/short one. */
+.pdfExportMode .pdfLotCard{border:1.5px solid var(--line-strong);border-radius:10px;margin-bottom:10px;overflow:hidden}
+.pdfExportMode .pdfLotCard .lotHead{background:var(--surface-sunken);padding:6px 10px;font-size:11px;font-weight:700;color:var(--green-dark)}
+.pdfExportMode .pdfLotCard .lotRow{display:flex;justify-content:space-between;gap:10px;padding:6px 10px;border-top:1px solid var(--line);font-size:12.5px}
+.pdfExportMode .pdfLotCard .lotRow .lbl{color:var(--ink-soft);font-weight:600}
+.pdfExportMode .pdfLotCard .lotRow .val{font-weight:700}
+.pdfExportMode .pdfLotCard .lotRow.final{background:var(--warn);color:var(--warn-ink)}
 </style>
 </head>
 <body>
@@ -1408,9 +1416,44 @@ function sendFileWA(phone, blob, fileName){
   return fetch(`${base}/waInstance${encodeURIComponent(id)}/sendFileByUpload/${encodeURIComponent(token)}`,{method:'POST',body:form})
     .then(r=>r.ok).catch(e=>{console.error('WA file send failed:',e);return false});
 }
-// Builds an off-screen copy of the slip panel with print-mode CSS and director initials
-// applied (see .pdfExportMode above), so html2canvas rasterizes it exactly like Print Slip
-// does - without ever showing that condensed layout on the page the user is looking at.
+// Per-lot vertical card markup for the WhatsApp PDF (see buildPdfExportClone()) - full
+// director names as row labels (not the Print Slip's abbreviated initials), one card per
+// lot, so the page stays narrow/tall instead of the wide 8-column table's short/wide shape.
+function buildTransposedItemsHtml(){
+  const g1n = g1Name||'G1', g2n = g2Name||'G2', g3n = g3Name||'G3';
+  const finalRate = currentFinalRate();
+  const avgTotal = currentAvgTotal();
+  const wtTotalForDiff = currentWtTotal();
+  const avgRate = wtTotalForDiff>0 ? avgTotal/wtTotalForDiff : 0;
+  const diffPct = (finalRate>0 && avgRate>0) ? ((finalRate-avgRate)/avgRate*100) : null;
+  return items.map(item=>{
+    const lotCards = item.lots.map(l=>{
+      const avg = lotAvg(l);
+      const wt = Number(l.wt)||0;
+      const guessCost = wt*avg;
+      const afterFinal = diffPct!==null ? avg*(1+diffPct/100) : null;
+      const finalCost = afterFinal!==null ? wt*afterFinal : null;
+      return `<div class="pdfLotCard">
+        <div class="lotHead">Lot — Wt: ${wt} ct</div>
+        <div class="lotRow"><span class="lbl">${esc(g1n)}</span><span class="val">${esc(l.g1??'')}</span></div>
+        <div class="lotRow"><span class="lbl">${esc(g2n)}</span><span class="val">${esc(l.g2??'')}</span></div>
+        <div class="lotRow"><span class="lbl">${esc(g3n)}</span><span class="val">${esc(l.g3??'')}</span></div>
+        <div class="lotRow"><span class="lbl">Guess Avg</span><span class="val">${money(avg)}</span></div>
+        <div class="lotRow"><span class="lbl">Guess Cost</span><span class="val">${money(guessCost)}</span></div>
+        <div class="lotRow"><span class="lbl">After Final Price</span><span class="val">${afterFinal!==null?moneyDec(afterFinal):'—'}</span></div>
+        <div class="lotRow final"><span class="lbl">Final Cost</span><span class="val">${finalCost!==null?money(finalCost):'—'}</span></div>
+      </div>`;
+    }).join('');
+    return `<div class="panel" style="margin-bottom:14px">
+      <div class="ph"><span style="font-weight:800">${esc(item.name||'Item')}</span></div>
+      <div class="pb">${lotCards}</div>
+    </div>`;
+  }).join('');
+}
+// Builds an off-screen copy of the slip panel with print-mode CSS applied (see .pdfExportMode
+// above) and the lot table swapped for per-lot cards (see buildTransposedItemsHtml()), so
+// html2canvas rasterizes a narrow/tall page - without ever showing that layout on the page
+// the user is looking at.
 function buildPdfExportClone(){
   const original = document.getElementById('dealFormPanel');
   const wrap = document.createElement('div');
@@ -1421,7 +1464,9 @@ function buildPdfExportClone(){
   // all (confirmed: the real exported PDF measured a correct non-zero size but had zero draw
   // operations - a real element html2canvas looked for in the wrong place, not a sizing issue).
   // position:absolute is anchored in normal document flow, which html2canvas handles correctly.
-  wrap.style.cssText = 'position:absolute;left:-1500px;top:0;width:1100px;background:#fff;z-index:-1';
+  // Narrow (phone-width-ish) instead of the old 1100px wide table layout, since the content
+  // is now per-lot cards, not a wide table - matches the imgW used in generateSlipPdfBlob().
+  wrap.style.cssText = 'position:absolute;left:-1500px;top:0;width:420px;background:#fff;z-index:-1';
   wrap.className = 'pdfExportMode';
   const clone = original.cloneNode(true);
   clone.removeAttribute('id');
@@ -1440,12 +1485,12 @@ function buildPdfExportClone(){
   const livePrintDate = document.getElementById('printDate');
   if(dateEl && livePrintDate) dateEl.textContent = livePrintDate.textContent;
 
-  const hd = initialsFor(g1Name), nd = initialsFor(g2Name), ak = initialsFor(g3Name);
-  clone.querySelectorAll('.itemTable thead th input[type="text"]').forEach((inp,i)=>{
-    inp.value = [hd,nd,ak][i%3];
-  });
-  const legendEl = clone.querySelector('#printLegend');
-  if(legendEl) legendEl.textContent = `${hd} = ${g1Name}   ·   ${nd} = ${g2Name}   ·   ${ak} = ${g3Name}`;
+  // The wide lot table (8 columns) barely filled a phone screen even after sizing the PDF
+  // page to its content, since a wide table forces a wide/short page on a tall screen. Swap
+  // it for a per-lot vertical card (each director's rate as its own row) here, in the clone
+  // only - the live on-screen table/editing experience is untouched.
+  const itemsEl = clone.querySelector('#itemsContainer');
+  if(itemsEl) itemsEl.innerHTML = buildTransposedItemsHtml();
   return wrap;
 }
 // Returns true once a visible sample of the canvas has real (non-white) pixels - catches a
@@ -1481,7 +1526,7 @@ async function generateSlipPdfBlob(){
     // chain) so the canvas can be verified to actually have content before it's ever handed
     // to jsPDF - three real-device tests through the html2pdf.js chain all came back a
     // correctly-sized but completely content-free PDF, with no error anywhere to catch.
-    const canvas = await html2canvas(wrap, {scale:2, backgroundColor:'#ffffff', windowWidth:1100, scrollX:0, scrollY:0});
+    const canvas = await html2canvas(wrap, {scale:2, backgroundColor:'#ffffff', windowWidth:420, scrollX:0, scrollY:0});
     if(!canvasHasContent(canvas)){
       console.error('Captured canvas has no visible content - aborting instead of sending a blank PDF');
       return null;
@@ -1493,7 +1538,7 @@ async function generateSlipPdfBlob(){
     // viewer apps fill that blank space with ads). Size the page to the content itself
     // instead, so the PDF is exactly as tall as the slip and fills the screen on a phone.
     const margin = 10;
-    const imgW = 277; // same printable width a 297mm-wide A4 landscape page gave after margins
+    const imgW = 100; // narrow/phone-width-ish, matching the per-lot card layout
     const imgH = canvas.height * (imgW/canvas.width);
     const pdf = new jsPDF({unit:'mm', format:[imgW+margin*2, imgH+margin*2]});
     pdf.addImage(imgData, 'JPEG', margin, margin, imgW, imgH);
