@@ -689,6 +689,19 @@ function formatDueDate(isoStr){
   return isNaN(d) ? isoStr : d.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
 }
 function esc(s){ return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+// Party/Broker/Slip No./Final Total/Due Date live in static (never-recreated) inputs, set
+// via the .value PROPERTY (typing, or JS like openDeal()/autoSaveDraft()). That property
+// change never updates the HTML value ATTRIBUTE. Some phones' "Print"/"Share as PDF" paths
+// snapshot the page's serialized HTML rather than the live render tree, so those fields
+// printed as blank even though they were visibly filled in on screen — keep the attribute
+// mirrored to the property everywhere these fields are set, so a static-HTML snapshot still
+// shows the real value.
+function setFieldValue(id, val){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.value = val;
+  el.setAttribute('value', val);
+}
 
 /* ===== Party/Broker/Item Name searchable dropdown (same pattern as Bliss One / Parcel Dispatch combos) ===== */
 function comboInputId(which, idx){ return which==='party' ? 'hParty' : which==='broker' ? 'hBroker' : `itemNameInput${idx}`; }
@@ -717,6 +730,7 @@ function renderComboMenu(which, idx){
 }
 function onComboInput(which, idx){
   if(which==='item') updateItemName(idx, document.getElementById(comboInputId('item', idx)).value);
+  else document.getElementById(comboInputId(which)).setAttribute('value', document.getElementById(comboInputId(which)).value);
   renderComboMenu(which, idx);
   autoSaveDraft();
 }
@@ -735,6 +749,7 @@ function handleComboMouseDown(e, which, idx){
     return;
   }
   inputEl.value = val;
+  inputEl.setAttribute('value', val);
   document.getElementById(comboMenuId(which, idx)).classList.remove('show');
   if(which==='item') updateItemName(idx, val);
   if(which==='party') autoFillBrokerForParty(val);
@@ -754,7 +769,7 @@ function autoFillBrokerForParty(partyName){
   const brokerInput = document.getElementById('hBroker');
   if(!brokerInput || brokerInput.value.trim()) return;
   const broker = latestBrokerForParty(partyName);
-  if(broker) brokerInput.value = broker;
+  if(broker) setFieldValue('hBroker', broker);
 }
 document.addEventListener('click', (e)=>{
   document.querySelectorAll('.comboBox').forEach(box=>{
@@ -965,7 +980,7 @@ function refreshFinalTotalDependents(){
   }
   if(_prevWtTotalForAuto<=0 && wtTotal>0) finalTotalAuto = true;
   _prevWtTotalForAuto = wtTotal;
-  if(finalTotalAuto) finalTotalInput.value = avgRate>0 ? String(Math.round(avgRate)) : '';
+  if(finalTotalAuto) setFieldValue('hFinalTotal', avgRate>0 ? String(Math.round(avgRate)) : '');
   const finalRate = Number(finalTotalInput.value)||0;
   const diffPct = (finalRate>0 && avgRate>0) ? ((finalRate-avgRate)/avgRate*100) : null;
   const finalTotal = finalRate * wtTotal; // reference ₹ total shown on result tiles etc.
@@ -1068,6 +1083,8 @@ function resetFinalRateToAvg(){
   autoSaveDraft();
 }
 function onFinalTotalInput(){
+  const el = document.getElementById('hFinalTotal');
+  el.setAttribute('value', el.value);
   refreshFinalTotalDependents();
   autoSaveDraft();
 }
@@ -1080,6 +1097,8 @@ function onFinalRateManualEdit(){
   onFinalTotalInput();
 }
 function onDueDateInput(){
+  const el = document.getElementById('hDueDate');
+  el.setAttribute('value', el.value);
   refreshFinalTotalDependents();
   autoSaveDraft();
   scheduleAutoSendPdf();
@@ -1102,7 +1121,7 @@ function autoSaveDraft(){
   // Slip No. is already generated the moment the New Deal screen opens (see startNewDeal()/
   // page load below) — reuse it here instead of generating a second one, so the number the
   // user saw on screen is exactly the one that gets saved.
-  if(!currentDealId){ currentDealId = genId(); if(!document.getElementById('hSlipNo').value) document.getElementById('hSlipNo').value = nextSlipNo(); }
+  if(!currentDealId){ currentDealId = genId(); if(!document.getElementById('hSlipNo').value) setFieldValue('hSlipNo', nextSlipNo()); }
   const slipNo = document.getElementById('hSlipNo').value || nextSlipNo();
   const existing = deals.find(d=>d.id===currentDealId);
   let record = { id: currentDealId, slipNo, note, party, broker, itemNames, g1Name, g2Name, g3Name,
@@ -1126,10 +1145,10 @@ function startNewDeal(){
   _prevWtTotalForAuto = 0;
   lastManualAvgRateContext = null;
   items = [newItem()];
-  ['hParty','hBroker','hFinalTotal','hDueDate'].forEach(id=>document.getElementById(id).value='');
+  ['hParty','hBroker','hFinalTotal','hDueDate'].forEach(id=>setFieldValue(id,''));
   // Slip No. shows right away, like a physical purchase slip already has its number
   // printed before anyone fills it in — not just after the first lot is entered.
-  document.getElementById('hSlipNo').value = nextSlipNo();
+  setFieldValue('hSlipNo', nextSlipNo());
   document.getElementById('draftStatusWrap').style.display = 'none';
   document.getElementById('dealFormTitle').textContent = '➕ New Deal';
   document.getElementById('newDealEntryPanel').style.display = 'none';
@@ -1151,13 +1170,13 @@ function openDeal(id){
   if(!d) return;
   currentDealId = d.id;
   finalTotalAuto = false; // preserve this saved deal's own Final Total, don't silently auto-overwrite it
-  document.getElementById('hParty').value = d.party||'';
-  document.getElementById('hBroker').value = d.broker||'';
-  document.getElementById('hSlipNo').value = d.slipNo||'';
+  setFieldValue('hParty', d.party||'');
+  setFieldValue('hBroker', d.broker||'');
+  setFieldValue('hSlipNo', d.slipNo||'');
   g1Name = d.g1Name||'Hitesh Dusad';
   g2Name = d.g2Name||'Nitesh Dusad';
   g3Name = d.g3Name||'Ankur Khandelwal';
-  document.getElementById('hDueDate').value = d.dueDate||'';
+  setFieldValue('hDueDate', d.dueDate||'');
   items = Array.isArray(d.items) ? JSON.parse(JSON.stringify(d.items))
     : [{name: d.item||'', lots: Array.isArray(d.lots)?JSON.parse(JSON.stringify(d.lots)):[]}];
   if(!items.length) items = [newItem()];
@@ -1165,7 +1184,7 @@ function openDeal(id){
   // hFinalTotal now holds the flat RATE, so convert back by dividing out this deal's own
   // total weight. A deal saved before this change just gets its implied average rate.
   const dealWt = items.reduce((s,it)=>s+it.lots.reduce((s2,l)=>s2+(Number(l.wt)||0),0),0);
-  document.getElementById('hFinalTotal').value = (d.final && dealWt>0) ? String(Math.round(d.final/dealWt)) : '';
+  setFieldValue('hFinalTotal', (d.final && dealWt>0) ? String(Math.round(d.final/dealWt)) : '');
   _prevWtTotalForAuto = dealWt; // this deal already has weight - don't treat it as a fresh "0 -> something" start and silently re-enable auto-fill over its preserved rate
   // `items` is already this deal's own data at this point, so this is its real avg - record
   // it as the context the preserved rate matches, so it isn't immediately flagged stale.
@@ -1392,6 +1411,12 @@ function buildPdfExportClone(){
   wrap.className = 'pdfExportMode';
   const clone = original.cloneNode(true);
   clone.removeAttribute('id');
+  // The auto-send-on-Due-Date flow fires 5s after Due Date is picked - if the user has
+  // already tapped "Back to Deals" (closeDealForm) in that window, the live panel being
+  // cloned is sitting at display:none, and cloneNode copies that inline style too. html2canvas
+  // then rasterizes a zero-content element, producing a blank PDF. Force the clone visible
+  // regardless of the live panel's current state.
+  clone.style.display = '';
   wrap.appendChild(clone);
   document.body.appendChild(wrap);
 
