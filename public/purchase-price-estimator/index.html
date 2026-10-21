@@ -25,6 +25,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -247,6 +248,28 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
   .itemTable td{padding:4px 2px}
   .itemTable td input{width:100%;padding:1px 0;font-size:9px}
 }
+/* Same ruleset as @media print above, but selector-scoped instead of media-gated - html2pdf
+   screenshots the live DOM under normal "screen" media, so @media print never applies to it.
+   This runs on an off-screen clone (see buildPdfExportClone()), never on the page the user sees. */
+.pdfExportMode{background:#fff}
+.pdfExportMode header,.pdfExportMode .hero,.pdfExportMode .grid3,.pdfExportMode #mobilePreviewBtn,.pdfExportMode .mobileLiveBar,.pdfExportMode #dealResultGrid,.pdfExportMode .btnRow,.pdfExportMode .ph .countChip,.pdfExportMode #mobilePreviewWrap,.pdfExportMode #dealHistoryPanel,.pdfExportMode #newDealEntryPanel,.pdfExportMode .no-print,.pdfExportMode #finalTotalBox,.pdfExportMode #dueDateBox{display:none !important}
+.pdfExportMode.shell,.pdfExportMode .shell{padding:0;max-width:100%}
+.pdfExportMode .panel{box-shadow:none;border:1px solid #999}
+.pdfExportMode .ph{background:#fff}
+.pdfExportMode .printOnly{display:block}
+.pdfExportMode .printOnly.printSummaryRow{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.pdfExportMode .printSummaryRow small{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.03em;color:#4a5a52;font-weight:700;margin-bottom:3px}
+.pdfExportMode .printSummaryRow b{display:block;font-size:17px;color:#000}
+.pdfExportMode .itemTable th:last-child,.pdfExportMode .itemTable td:last-child{display:none}
+.pdfExportMode input{border:none !important;background:transparent !important;padding:2px 0 !important;box-shadow:none !important;color:#000 !important}
+.pdfExportMode .readonly,.pdfExportMode .costcell{background:#F2F2F2 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pdfExportMode th,.pdfExportMode td{border-color:#999}
+.pdfExportMode .tableWrap{overflow:visible}
+.pdfExportMode table.itemTable{table-layout:fixed;width:100%;font-size:9px}
+.pdfExportMode .itemTable th{padding:4px 2px;font-size:7.5px;white-space:normal;line-height:1.2}
+.pdfExportMode .itemTable th input{width:100%;padding:1px 0;font-size:7.5px}
+.pdfExportMode .itemTable td{padding:4px 2px}
+.pdfExportMode .itemTable td input{width:100%;padding:1px 0;font-size:9px}
 </style>
 </head>
 <body>
@@ -328,6 +351,10 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
         </div>
       </div>
 
+      <div class="no-print" style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-bottom:8px">
+        <small style="color:var(--ink-soft);font-size:11px">Doosre director ka price bhi yahin live aa jaata hai</small>
+        <button class="btn small" title="Latest price check karein" onclick="manualRefreshOpenDeal()">🔄 Refresh</button>
+      </div>
       <div id="itemsContainer"></div>
 
       <div id="finalTotalWrap">
@@ -433,7 +460,36 @@ function startDealsSync(){
     renderSummary();
     renderDealHistory();
     tryOpenDeepLinkDeal();
+    liveMergeOpenDealIfSafe();
   },err=>console.error('deals cloud sync failed:',err));
+}
+// If the deal currently open on screen was just updated elsewhere (another director filling
+// in their own price column on a different device), pull that straight into the open table -
+// without touching Final Rate's own auto/manual state, Party/Broker/Due Date, or anything
+// else the user is mid-typing in. Skipped while a local edit is still mid-flight to the cloud
+// (ppeSaveDebounceTimer set), so a fast typist's own keystroke never gets overwritten by a
+// snapshot that's a moment behind it - the next snapshot after they pause will still catch up.
+function liveMergeOpenDealIfSafe(){
+  if(!currentDealId || ppeSaveDebounceTimer) return;
+  const remote = deals.find(d=>d.id===currentDealId);
+  if(!remote || !Array.isArray(remote.items)) return;
+  const remoteStr = JSON.stringify(remote.items);
+  if(remoteStr === JSON.stringify(items)) return;
+  items = JSON.parse(remoteStr);
+  renderItems();
+  toast('Kisi aur ne price bhara — turant update ho gaya.');
+}
+// Manual version of the same pull, for the small Refresh button above the table - ignores
+// the debounce guard since this is an explicit user action, not a background snapshot.
+function manualRefreshOpenDeal(){
+  if(!currentDealId){ toast('Koi slip khula nahi hai.'); return; }
+  const remote = deals.find(d=>d.id===currentDealId);
+  if(!remote || !Array.isArray(remote.items)){ toast('Data nahi mila.'); return; }
+  const remoteStr = JSON.stringify(remote.items);
+  if(remoteStr === JSON.stringify(items)){ toast('Pehle se latest hai.'); return; }
+  items = JSON.parse(remoteStr);
+  renderItems();
+  toast('Latest data aa gaya.');
 }
 // The debounce keeps every keystroke feeling instant locally (renderItems runs right away)
 // while only the actual cloud write waits for a short pause in typing, so a fast typist
@@ -1024,6 +1080,7 @@ function onFinalRateManualEdit(){
 function onDueDateInput(){
   refreshFinalTotalDependents();
   autoSaveDraft();
+  scheduleAutoSendPdf();
 }
 
 /* ===== Live auto-save: the open deal saves itself continuously, no manual "Save" step ===== */
@@ -1048,7 +1105,8 @@ function autoSaveDraft(){
   const existing = deals.find(d=>d.id===currentDealId);
   let record = { id: currentDealId, slipNo, note, party, broker, itemNames, g1Name, g2Name, g3Name,
     avg: avgTotal, final: finalTotal, dueDate, items: JSON.parse(JSON.stringify(items)),
-    notifiedOnce: existing ? !!existing.notifiedOnce : false };
+    notifiedOnce: existing ? !!existing.notifiedOnce : false,
+    pdfSentOnce: existing ? !!existing.pdfSentOnce : false };
   const idx = deals.findIndex(d=>d.id===currentDealId);
   if(idx>=0) deals[idx] = record; else deals.push(record);
   saveDeals();
@@ -1307,6 +1365,85 @@ window.addEventListener('afterprint', ()=>{
   });
   autoSaveDraft();
 });
+
+/* ===== Auto-PDF on Due Date: once the deal is closed (Due Date filled), send the same
+   Purchase Slip PDF straight to all three directors on WhatsApp - no Print/Share click
+   needed. Renders off-screen (never flashes on the live page) and fires once per deal. ===== */
+function sendFileWA(phone, blob, fileName){
+  const id=String(api.idInstance||'').trim(), token=String(api.apiToken||'').trim(), base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token){console.warn('GREEN-API settings missing');return Promise.resolve(false)}
+  const p=normalizePhone(phone); if(p.length<11)return Promise.resolve(false);
+  const form=new FormData();
+  form.append('chatId', p+'@c.us');
+  form.append('file', blob, fileName);
+  form.append('fileName', fileName);
+  return fetch(`${base}/waInstance${encodeURIComponent(id)}/sendFileByUpload/${encodeURIComponent(token)}`,{method:'POST',body:form})
+    .then(r=>r.ok).catch(e=>{console.error('WA file send failed:',e);return false});
+}
+// Builds an off-screen copy of the slip panel with print-mode CSS and director initials
+// applied (see .pdfExportMode above), so html2canvas rasterizes it exactly like Print Slip
+// does - without ever showing that condensed layout on the page the user is looking at.
+function buildPdfExportClone(){
+  const original = document.getElementById('dealFormPanel');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;left:-10000px;top:0;width:780px;background:#fff;z-index:-1';
+  wrap.className = 'pdfExportMode';
+  const clone = original.cloneNode(true);
+  clone.removeAttribute('id');
+  wrap.appendChild(clone);
+  document.body.appendChild(wrap);
+
+  const slipNoEl = clone.querySelector('#printSlipNo');
+  if(slipNoEl) slipNoEl.textContent = document.getElementById('hSlipNo').value || '—';
+  const dateEl = clone.querySelector('#printDate');
+  const livePrintDate = document.getElementById('printDate');
+  if(dateEl && livePrintDate) dateEl.textContent = livePrintDate.textContent;
+
+  const hd = initialsFor(g1Name), nd = initialsFor(g2Name), ak = initialsFor(g3Name);
+  clone.querySelectorAll('.itemTable thead th input[type="text"]').forEach((inp,i)=>{
+    inp.value = [hd,nd,ak][i%3];
+  });
+  const legendEl = clone.querySelector('#printLegend');
+  if(legendEl) legendEl.textContent = `${hd} = ${g1Name}   ·   ${nd} = ${g2Name}   ·   ${ak} = ${g3Name}`;
+  return wrap;
+}
+async function generateSlipPdfBlob(){
+  if(typeof html2pdf==='undefined'){ console.warn('html2pdf not loaded'); return null; }
+  const wrap = buildPdfExportClone();
+  try{
+    return await html2pdf().from(wrap).set({
+      margin:10,
+      filename:'slip.pdf',
+      html2canvas:{scale:2,backgroundColor:'#ffffff',windowWidth:780},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+    }).outputPdf('blob');
+  }catch(e){ console.error('PDF generation failed:',e); return null; }
+  finally{ wrap.remove(); }
+}
+let ppeAutoPdfDebounceTimer=null;
+function scheduleAutoSendPdf(){
+  clearTimeout(ppeAutoPdfDebounceTimer);
+  const dealIdAtSchedule = currentDealId;
+  ppeAutoPdfDebounceTimer = setTimeout(async ()=>{
+    if(!dealIdAtSchedule || dealIdAtSchedule!==currentDealId) return;
+    if(!document.getElementById('hDueDate').value) return;
+    const idx = deals.findIndex(d=>d.id===dealIdAtSchedule);
+    if(idx<0) return;
+    const record = deals[idx];
+    if(record.pdfSentOnce) return;
+    const blob = await generateSlipPdfBlob();
+    if(!blob) return;
+    const fileName = (record.slipNo||'slip')+'.pdf';
+    const targets = [directorPhones.g1, directorPhones.g2, directorPhones.g3];
+    const results = await Promise.all(targets.map(phone => phone ? sendFileWA(phone, blob, fileName) : Promise.resolve(false)));
+    if(results.some(ok=>ok)){
+      deals[idx] = {...deals[idx], pdfSentOnce:true};
+      saveDeals();
+      pushDealToCloud(deals[idx]);
+      toast('Purchase Slip PDF WhatsApp pe bhej diya.');
+    }
+  }, 5000); // ~5s after Due Date is picked, per the director's own request
+}
 
 /* ===== WhatsApp Share: same deal data as the Print Slip, as a plain-text message ===== */
 function buildSlipShareText(){
