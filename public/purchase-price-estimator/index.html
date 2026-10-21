@@ -295,6 +295,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
       <div class="printOnly" id="printHeader" style="margin-bottom:14px">
         <h2 style="margin:0 0 4px;font-family:var(--font-display)">🧾 Purchase Slip — Bliss Gems</h2>
         <div style="font-size:12px;color:#444">Slip No. <span id="printSlipNo"></span> · <span id="printDate"></span></div>
+        <div class="printOnly" id="printLegend" style="font-size:10px;color:#666;margin-top:4px"></div>
       </div>
 
       <div class="resultGrid" id="dealResultGrid" style="display:none;margin-bottom:18px">
@@ -1277,12 +1278,31 @@ function dueDateOkToProceed(){
   if(due && !due.value) return confirm('Due Date nahi bhari hai — bina Due Date ke aage badhein?');
   return true;
 }
+// First-letter-of-each-word initials ("Hitesh Dusad" -> "HD") - used only for print, where
+// the full director names were crowding the lot table and running into the next column.
+function initialsFor(name){
+  const parts = String(name||'').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '';
+  return parts.map(w=>w[0].toUpperCase()).join('').slice(0,3);
+}
 function printSlip(){
   if(!dueDateOkToProceed())return;
   document.getElementById('printSlipNo').textContent = document.getElementById('hSlipNo').value || '—';
+  const hd = initialsFor(g1Name), nd = initialsFor(g2Name), ak = initialsFor(g3Name);
+  document.querySelectorAll('.itemTable thead th input[type="text"]').forEach((inp,i)=>{
+    inp.dataset.fullName = inp.value;
+    inp.value = [hd,nd,ak][i%3];
+  });
+  const legend = document.getElementById('printLegend');
+  if(legend) legend.textContent = `${hd} = ${g1Name}   ·   ${nd} = ${g2Name}   ·   ${ak} = ${g3Name}`;
   window.print();
 }
-window.addEventListener('afterprint', ()=>{ autoSaveDraft(); });
+window.addEventListener('afterprint', ()=>{
+  document.querySelectorAll('.itemTable thead th input[type="text"]').forEach(inp=>{
+    if(inp.dataset.fullName!==undefined){ inp.value = inp.dataset.fullName; delete inp.dataset.fullName; }
+  });
+  autoSaveDraft();
+});
 
 /* ===== WhatsApp Share: same deal data as the Print Slip, as a plain-text message ===== */
 function buildSlipShareText(){
