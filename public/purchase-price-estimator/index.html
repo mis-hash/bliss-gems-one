@@ -25,7 +25,12 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<!-- Loaded as two separate libraries (not the html2pdf.js bundle) so generateSlipPdfBlob()
+     can drive html2canvas and jsPDF directly and verify the canvas actually has content
+     before building the PDF, instead of trusting html2pdf.js's own internal worker chain,
+     which kept producing a correctly-sized but completely content-free PDF. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -1441,8 +1446,25 @@ function buildPdfExportClone(){
   if(legendEl) legendEl.textContent = `${hd} = ${g1Name}   ·   ${nd} = ${g2Name}   ·   ${ak} = ${g3Name}`;
   return wrap;
 }
+// Returns true once a visible sample of the canvas has real (non-white) pixels - catches a
+// canvas that rendered at the right size but with nothing actually drawn onto it, which is
+// exactly what repeated real-world tests of the html2pdf.js one-call chain kept producing.
+function canvasHasContent(canvas){
+  try{
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    const sample = ctx.getImageData(0, 0, w, Math.min(h, 400));
+    const data = sample.data;
+    for(let i=0;i<data.length;i+=4*37){ // sparse sample, every ~37th pixel, is enough to catch real content
+      if(data[i]<250 || data[i+1]<250 || data[i+2]<250) return true;
+    }
+    return false;
+  }catch(e){ console.error('Canvas content check failed (likely tainted canvas):', e); return false; }
+}
 async function generateSlipPdfBlob(){
-  if(typeof html2pdf==='undefined'){ console.warn('html2pdf not loaded'); return null; }
+  if(typeof html2canvas==='undefined' || !(window.jspdf && window.jspdf.jsPDF)){
+    console.warn('PDF libraries not loaded'); return null;
+  }
   const wrap = buildPdfExportClone();
   try{
     // Let the freshly-inserted offscreen clone actually finish layout/paint before handing
@@ -1453,12 +1475,25 @@ async function generateSlipPdfBlob(){
       console.error('PDF export clone has no height - aborting instead of sending a blank PDF');
       return null;
     }
-    return await html2pdf().from(wrap).set({
-      margin:10,
-      filename:'slip.pdf',
-      html2canvas:{scale:2,backgroundColor:'#ffffff',windowWidth:1100,scrollX:0,scrollY:0},
-      jsPDF:{unit:'mm',format:'a4',orientation:'landscape'}
-    }).outputPdf('blob');
+    // Driving html2canvas and jsPDF directly (rather than html2pdf.js's from().outputPdf()
+    // chain) so the canvas can be verified to actually have content before it's ever handed
+    // to jsPDF - three real-device tests through the html2pdf.js chain all came back a
+    // correctly-sized but completely content-free PDF, with no error anywhere to catch.
+    const canvas = await html2canvas(wrap, {scale:2, backgroundColor:'#ffffff', windowWidth:1100, scrollX:0, scrollY:0});
+    if(!canvasHasContent(canvas)){
+      console.error('Captured canvas has no visible content - aborting instead of sending a blank PDF');
+      return null;
+    }
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({unit:'mm', format:'a4', orientation:'landscape'});
+    const margin = 10;
+    const usableW = pdf.internal.pageSize.getWidth() - margin*2;
+    const usableH = pdf.internal.pageSize.getHeight() - margin*2;
+    const imgW = usableW;
+    const imgH = Math.min(canvas.height * (imgW/canvas.width), usableH);
+    pdf.addImage(imgData, 'JPEG', margin, margin, imgW, imgH);
+    return pdf.output('blob');
   }catch(e){ console.error('PDF generation failed:',e); return null; }
   finally{ wrap.remove(); }
 }
