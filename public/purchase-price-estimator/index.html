@@ -1488,12 +1488,14 @@ async function generateSlipPdfBlob(){
     }
     const imgData = canvas.toDataURL('image/jpeg', 0.92);
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({unit:'mm', format:'a4', orientation:'landscape'});
+    // Fixed A4 landscape left a lot of blank page below a short slip - mobile PDF viewers
+    // then show the content as a small strip in the middle of a mostly-empty page (and some
+    // viewer apps fill that blank space with ads). Size the page to the content itself
+    // instead, so the PDF is exactly as tall as the slip and fills the screen on a phone.
     const margin = 10;
-    const usableW = pdf.internal.pageSize.getWidth() - margin*2;
-    const usableH = pdf.internal.pageSize.getHeight() - margin*2;
-    const imgW = usableW;
-    const imgH = Math.min(canvas.height * (imgW/canvas.width), usableH);
+    const imgW = 277; // same printable width a 297mm-wide A4 landscape page gave after margins
+    const imgH = canvas.height * (imgW/canvas.width);
+    const pdf = new jsPDF({unit:'mm', format:[imgW+margin*2, imgH+margin*2]});
     pdf.addImage(imgData, 'JPEG', margin, margin, imgW, imgH);
     return pdf.output('blob');
   }catch(e){ console.error('PDF generation failed:',e); return null; }
