@@ -225,6 +225,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 
 /* ===== Print: clean physical slip ===== */
 .printOnly{display:none}
+@page{size:A4 landscape;margin:10mm}
 @media print{
   body{background:#fff}
   header,.hero,.grid3,#mobilePreviewBtn,.mobileLiveBar,#dealResultGrid,.btnRow,.ph .countChip,#mobilePreviewWrap,#dealHistoryPanel,#newDealEntryPanel,.no-print,#finalTotalBox,#dueDateBox{display:none !important}
@@ -1387,7 +1388,7 @@ function sendFileWA(phone, blob, fileName){
 function buildPdfExportClone(){
   const original = document.getElementById('dealFormPanel');
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:fixed;left:-10000px;top:0;width:780px;background:#fff;z-index:-1';
+  wrap.style.cssText = 'position:fixed;left:-10000px;top:0;width:1100px;background:#fff;z-index:-1';
   wrap.className = 'pdfExportMode';
   const clone = original.cloneNode(true);
   clone.removeAttribute('id');
@@ -1415,8 +1416,8 @@ async function generateSlipPdfBlob(){
     return await html2pdf().from(wrap).set({
       margin:10,
       filename:'slip.pdf',
-      html2canvas:{scale:2,backgroundColor:'#ffffff',windowWidth:780},
-      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+      html2canvas:{scale:2,backgroundColor:'#ffffff',windowWidth:1100},
+      jsPDF:{unit:'mm',format:'a4',orientation:'landscape'}
     }).outputPdf('blob');
   }catch(e){ console.error('PDF generation failed:',e); return null; }
   finally{ wrap.remove(); }
