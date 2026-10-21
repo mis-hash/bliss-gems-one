@@ -240,9 +240,10 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
   .printOnly{display:block}
   .printOnly.printSummaryRow{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   .printSummaryRow small{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.03em;color:#4a5a52;font-weight:700;margin-bottom:3px}
-  .printSummaryRow b{display:block;font-size:17px;color:#000}
+  .printSummaryRow b{display:block;font-size:17px;color:#000;font-weight:500}
   .itemTable th:last-child,.itemTable td:last-child{display:none}
   input{border:none !important;background:transparent !important;padding:2px 0 !important;box-shadow:none !important;color:#000 !important}
+  .itemTable tbody td input{font-weight:700}
   .readonly,.costcell{background:#F2F2F2 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   th,td{border-color:#999}
   /* The lot table's normal screen sizing (comfortable padding/font for a wide monitor) runs
@@ -266,9 +267,10 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 .pdfExportMode .printOnly{display:block}
 .pdfExportMode .printOnly.printSummaryRow{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .pdfExportMode .printSummaryRow small{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.03em;color:#4a5a52;font-weight:700;margin-bottom:3px}
-.pdfExportMode .printSummaryRow b{display:block;font-size:17px;color:#000}
+.pdfExportMode .printSummaryRow b{display:block;font-size:17px;color:#000;font-weight:500}
 .pdfExportMode .itemTable th:last-child,.pdfExportMode .itemTable td:last-child{display:none}
 .pdfExportMode input{border:none !important;background:transparent !important;padding:2px 0 !important;box-shadow:none !important;color:#000 !important}
+.pdfExportMode .itemTable tbody td input{font-weight:700}
 .pdfExportMode .readonly,.pdfExportMode .costcell{background:#F2F2F2 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .pdfExportMode th,.pdfExportMode td{border-color:#999}
 .pdfExportMode .tableWrap{overflow:visible}
@@ -1486,12 +1488,14 @@ async function generateSlipPdfBlob(){
     }
     const imgData = canvas.toDataURL('image/jpeg', 0.92);
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({unit:'mm', format:'a4', orientation:'landscape'});
+    // Fixed A4 landscape left a lot of blank page below a short slip - mobile PDF viewers
+    // then show the content as a small strip in the middle of a mostly-empty page (and some
+    // viewer apps fill that blank space with ads). Size the page to the content itself
+    // instead, so the PDF is exactly as tall as the slip and fills the screen on a phone.
     const margin = 10;
-    const usableW = pdf.internal.pageSize.getWidth() - margin*2;
-    const usableH = pdf.internal.pageSize.getHeight() - margin*2;
-    const imgW = usableW;
-    const imgH = Math.min(canvas.height * (imgW/canvas.width), usableH);
+    const imgW = 277; // same printable width a 297mm-wide A4 landscape page gave after margins
+    const imgH = canvas.height * (imgW/canvas.width);
+    const pdf = new jsPDF({unit:'mm', format:[imgW+margin*2, imgH+margin*2]});
     pdf.addImage(imgData, 'JPEG', margin, margin, imgW, imgH);
     return pdf.output('blob');
   }catch(e){ console.error('PDF generation failed:',e); return null; }
