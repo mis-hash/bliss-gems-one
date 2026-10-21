@@ -243,11 +243,11 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
      well past A4's printable width and was getting clipped on the right - force it to fit
      the page instead of overflowing, same idea as the narrow-phone shrink above. */
   .tableWrap{overflow:visible}
-  table.itemTable{table-layout:fixed;width:100%;font-size:9px}
-  .itemTable th{padding:4px 2px;font-size:7.5px;white-space:normal;line-height:1.2}
-  .itemTable th input{width:100%;padding:1px 0;font-size:7.5px}
-  .itemTable td{padding:4px 2px}
-  .itemTable td input{width:100%;padding:1px 0;font-size:9px}
+  table.itemTable{table-layout:fixed;width:100%;font-size:10.5px;border-spacing:0}
+  .itemTable th{padding:8px 4px;font-size:9px;white-space:normal;line-height:1.3}
+  .itemTable th input{width:100%;padding:2px 0;font-size:9px}
+  .itemTable td{padding:9px 5px}
+  .itemTable td input{width:100%;padding:2px 0;font-size:10.5px}
 }
 /* Same ruleset as @media print above, but selector-scoped instead of media-gated - html2pdf
    screenshots the live DOM under normal "screen" media, so @media print never applies to it.
@@ -266,11 +266,11 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 .pdfExportMode .readonly,.pdfExportMode .costcell{background:#F2F2F2 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .pdfExportMode th,.pdfExportMode td{border-color:#999}
 .pdfExportMode .tableWrap{overflow:visible}
-.pdfExportMode table.itemTable{table-layout:fixed;width:100%;font-size:9px}
-.pdfExportMode .itemTable th{padding:4px 2px;font-size:7.5px;white-space:normal;line-height:1.2}
-.pdfExportMode .itemTable th input{width:100%;padding:1px 0;font-size:7.5px}
-.pdfExportMode .itemTable td{padding:4px 2px}
-.pdfExportMode .itemTable td input{width:100%;padding:1px 0;font-size:9px}
+.pdfExportMode table.itemTable{table-layout:fixed;width:100%;font-size:10.5px;border-spacing:0}
+.pdfExportMode .itemTable th{padding:8px 4px;font-size:9px;white-space:normal;line-height:1.3}
+.pdfExportMode .itemTable th input{width:100%;padding:2px 0;font-size:9px}
+.pdfExportMode .itemTable td{padding:9px 5px}
+.pdfExportMode .itemTable td input{width:100%;padding:2px 0;font-size:10.5px}
 </style>
 </head>
 <body>
