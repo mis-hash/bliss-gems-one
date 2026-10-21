@@ -369,7 +369,6 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
       </div>
 
       <div class="no-print" style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-bottom:8px">
-        <small style="color:var(--ink-soft);font-size:11px">Doosre director ka price bhi yahin live aa jaata hai</small>
         <button class="btn small" title="Latest price check karein" onclick="manualRefreshOpenDeal()">🔄 Refresh</button>
       </div>
       <div id="itemsContainer"></div>
@@ -1002,10 +1001,8 @@ function refreshFinalTotalDependents(){
 
   const hintEl = document.getElementById('finalRateHint');
   if(hintEl){
-    if(avgRate<=0){
+    if(avgRate<=0 || finalTotalAuto){
       hintEl.innerHTML = '';
-    } else if(finalTotalAuto){
-      hintEl.innerHTML = 'Guess Avg se auto-fill hua hai — yahan badlo to final price usi hisaab se ghategi/badhegi.';
     } else {
       const pctStr = diffPct!==null ? ' ('+(diffPct>=0?'+':'')+diffPct.toFixed(1)+'%)' : '';
       hintEl.innerHTML = 'Guess Avg: <b>'+money(Math.round(avgRate))+'/ct</b>'+esc(pctStr)+' &nbsp;·&nbsp; <a href="javascript:void(0)" onclick="resetFinalRateToAvg()" style="color:var(--green-dark);font-weight:700;text-decoration:underline">↻ Guess Avg par reset karein</a>';
