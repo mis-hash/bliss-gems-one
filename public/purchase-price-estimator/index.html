@@ -1538,7 +1538,13 @@ async function generateSlipPdfBlob(){
     // viewer apps fill that blank space with ads). Size the page to the content itself
     // instead, so the PDF is exactly as tall as the slip and fills the screen on a phone.
     const margin = 10;
-    const imgW = 100; // narrow/phone-width-ish, matching the per-lot card layout
+    // A 100mm-wide page looked great on mobile but most desktop PDF viewers default to
+    // "fit page width to window" - against a wide desktop window, that narrow a page gets
+    // blown up to a huge zoom level (confirmed: a real desktop screenshot showed the title
+    // alone filling the whole window). 150mm is still much narrower than the original
+    // 277mm table-width page (so it stays portrait-ish and reads fine on a phone), but
+    // isn't narrow enough to make a typical desktop window zoom it in so aggressively.
+    const imgW = 150;
     const imgH = canvas.height * (imgW/canvas.width);
     const pdf = new jsPDF({unit:'mm', format:[imgW+margin*2, imgH+margin*2]});
     pdf.addImage(imgData, 'JPEG', margin, margin, imgW, imgH);
