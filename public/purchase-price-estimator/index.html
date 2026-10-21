@@ -114,6 +114,9 @@ header{height:64px;background:var(--surface);border-bottom:1px solid var(--line)
 .dealFilterBtn.active{background:var(--green);color:#fff;border-color:var(--green)}
 tr.completedRow{background:var(--mint)}
 tr.completedRow:hover{background:var(--mint)}
+/* While one deal's lot-wise breakdown is open, blur every other row so the open one reads
+   as the single thing in focus instead of competing with a full list underneath it. */
+tr.dealRowBlurred{filter:blur(2.5px);opacity:.55;pointer-events:none;transition:filter .15s ease, opacity .15s ease}
 .btnRow{margin-top:14px;display:flex;gap:9px;flex-wrap:wrap}
 
 table{width:100%;border-collapse:collapse}
@@ -1174,6 +1177,7 @@ function renderDealHistory(){
   if(!visible.length){ table.style.display='none'; empty.textContent='No matching deals.'; empty.style.display='block'; return; }
   table.style.display='table'; empty.style.display='none';
 
+  const anyExpanded = visible.some(x=>expandedDeals[x.d.id]);
   body.innerHTML = visible.map(({d})=>{
     const id = d.id;
     const isCompleted = d.final>0;
@@ -1190,7 +1194,7 @@ function renderDealHistory(){
     const statusTag = isCompleted
       ? `<span style="color:var(--green-dark);font-weight:700">✓ Completed</span>`
       : `<span style="color:var(--ink-soft);font-weight:700">● Pending</span>`;
-    const row = `<tr class="${isCompleted?'completedRow':''}"><td style="font-family:var(--font-mono);color:var(--ink-soft)">${esc(d.slipNo||'—')}</td><td>${esc(titleLine)} <small style="color:var(--ink-soft)">(${lotCount} lots)</small><br><small>${statusTag}</small></td><td class="num">${money(d.avg)}</td><td class="num">${d.final>0?money(d.final):'—'}</td><td class="num ${cls}">${d.final>0?(diff>=0?'+':'')+money(diff):'—'}</td><td class="num ${cls}">${d.final>0?(diff>=0?'+':'')+pct.toFixed(1)+'%':'—'}</td><td class="dealRowActions"><button class="btn small dealActionBtn" title="View lot-wise breakdown" onclick="toggleDealExpand('${id}')">${isOpen?'🔽':'👁'}<span class="btnLabel"> View</span></button> <button class="btn small dealActionBtn" title="Open" onclick="openDeal('${id}')">✏️<span class="btnLabel"> Open</span></button> <button class="btn small dealActionBtn" title="Print / PDF" onclick="printDealFromHistory('${id}')">🖨️<span class="btnLabel"> Print</span></button> <button class="btn small dealActionBtn" title="Share on WhatsApp" onclick="shareDealFromHistory('${id}')">📤<span class="btnLabel"> Share</span></button> <button class="btn small danger dealActionBtn" title="Delete" onclick="deleteDeal('${id}')">✕<span class="btnLabel"> Delete</span></button></td></tr>`;
+    const row = `<tr class="${isCompleted?'completedRow':''}${anyExpanded && !isOpen ? ' dealRowBlurred' : ''}"><td style="font-family:var(--font-mono);color:var(--ink-soft)">${esc(d.slipNo||'—')}</td><td>${esc(titleLine)} <small style="color:var(--ink-soft)">(${lotCount} lots)</small><br><small>${statusTag}</small></td><td class="num">${money(d.avg)}</td><td class="num">${d.final>0?money(d.final):'—'}</td><td class="num ${cls}">${d.final>0?(diff>=0?'+':'')+money(diff):'—'}</td><td class="num ${cls}">${d.final>0?(diff>=0?'+':'')+pct.toFixed(1)+'%':'—'}</td><td class="dealRowActions"><button class="btn small dealActionBtn" title="View lot-wise breakdown" onclick="toggleDealExpand('${id}')">${isOpen?'🔽':'👁'}<span class="btnLabel"> View</span></button> <button class="btn small dealActionBtn" title="Open" onclick="openDeal('${id}')">✏️<span class="btnLabel"> Open</span></button> <button class="btn small dealActionBtn" title="Print / PDF" onclick="printDealFromHistory('${id}')">🖨️<span class="btnLabel"> Print</span></button> <button class="btn small dealActionBtn" title="Share on WhatsApp" onclick="shareDealFromHistory('${id}')">📤<span class="btnLabel"> Share</span></button> <button class="btn small danger dealActionBtn" title="Delete" onclick="deleteDeal('${id}')">✕<span class="btnLabel"> Delete</span></button></td></tr>`;
     if(!isOpen || !lotCount) return row;
     const dp = d.avg>0 ? ((d.final-d.avg)/d.avg*100) : 0;
     const itemBlocks = itemList.map(it=>{
