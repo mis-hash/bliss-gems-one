@@ -22,6 +22,10 @@
 })();
 </script>
 <title>Purchase Price Estimator — Bliss Gems</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -85,6 +89,11 @@ header{height:64px;background:var(--surface);border-bottom:1px solid var(--line)
 .field label{display:block;font-size:11px;font-weight:600;margin-bottom:6px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em}
 .field input{width:100%;padding:11px 12px;border:1.5px solid var(--line-strong);border-radius:var(--radius-md);font-size:14px;background:var(--surface);color:var(--ink);transition:border-color .15s, box-shadow .15s}
 .field input:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px rgba(38,143,118,.14)}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:999}
+.modal.show{display:flex}
+.modal .box{width:min(420px,100%);background:var(--surface);border-radius:var(--radius-lg);padding:20px;max-height:90vh;overflow:auto;box-shadow:var(--shadow-md)}
+/* lot-table cell(s) a deep link should land the viewer on, auto-focused + glowing */
+.ppeFocusGlow{box-shadow:0 0 0 2px var(--green2),0 0 10px rgba(63,175,147,.45)!important;border-color:var(--green2)!important}
 .comboBox{position:relative}
 .comboMenu{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:220px;overflow-y:auto;background:var(--surface);border:1.5px solid var(--line-strong);border-radius:var(--radius-md);box-shadow:var(--shadow-md);z-index:50}
 .comboMenu.show{display:block}
@@ -106,14 +115,18 @@ header{height:64px;background:var(--surface);border-bottom:1px solid var(--line)
 .dealFilterBtn.active{background:var(--green);color:#fff;border-color:var(--green)}
 tr.completedRow{background:var(--mint)}
 tr.completedRow:hover{background:var(--mint)}
+/* While one deal's lot-wise breakdown is open, blur every other row so the open one reads
+   as the single thing in focus instead of competing with a full list underneath it. */
+tr.dealRowBlurred{filter:blur(2.5px);opacity:.55;pointer-events:none;transition:filter .15s ease, opacity .15s ease}
 .btnRow{margin-top:14px;display:flex;gap:9px;flex-wrap:wrap}
 
 table{width:100%;border-collapse:collapse}
 th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);font-weight:700;padding:10px 10px;border-bottom:1.5px solid var(--line);background:var(--surface-sunken);white-space:nowrap;font-family:var(--font-mono)}
 th input{width:100%;min-width:90px;padding:5px 6px;border:1px solid var(--line-strong);border-radius:6px;font-size:10.5px;font-weight:700;text-align:center;background:var(--surface);color:var(--navy);font-family:var(--font-mono)}
 td{padding:10px 10px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle}
+.dealRowActions{display:flex;flex-wrap:wrap;gap:6px}
 td input{width:84px;padding:8px 9px;border:1.5px solid var(--line-strong);border-radius:var(--radius-sm);font-size:13.5px;font-family:var(--font-mono);color:var(--ink)}
-.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--font-mono)}
+.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--font-mono);white-space:nowrap}
 .combinedCell{text-align:center!important}
 /* Lot-entry table (Wt/Guess rate inputs + Guess Avg/Cost/Final columns) — centered so every
    column lines up in a straight vertical line, matching the already-centered header name
@@ -123,11 +136,6 @@ td input{width:84px;padding:8px 9px;border:1.5px solid var(--line-strong);border
 .itemTable .removeLotBtn{padding:4px 9px}
 .itemTable td input{text-align:center}
 .itemTable td.num{text-align:center}
-/* "Main hoon:" selector highlight - a distinct, gently pulsing color (not a harsh blink)
-   from the amber Guess/Final Cost columns, so the selected director's own column draws
-   the eye immediately instead of blending in as a flat static tint. */
-.dirHighlight{background:#E3F2FD!important}
-.itemTable th.dirHighlight input{background:#E3F2FD}
 .pos{color:var(--green-dark);font-weight:700}
 .neg{color:var(--red-dark);font-weight:700}
 .readonly{background:var(--mint);color:var(--green-dark);font-weight:700}
@@ -217,9 +225,10 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 
 /* ===== Print: clean physical slip ===== */
 .printOnly{display:none}
+@page{size:A4 landscape;margin:10mm}
 @media print{
   body{background:#fff}
-  header,.hero,.grid3,#mobilePreviewBtn,.mobileLiveBar,#dealResultGrid,.btnRow,.ph .countChip,#mobilePreviewWrap,#dealHistoryPanel,.no-print,#finalTotalBox,#dueDateBox{display:none !important}
+  header,.hero,.grid3,#mobilePreviewBtn,.mobileLiveBar,#dealResultGrid,.btnRow,.ph .countChip,#mobilePreviewWrap,#dealHistoryPanel,#newDealEntryPanel,.no-print,#finalTotalBox,#dueDateBox{display:none !important}
   .shell{padding:0;max-width:100%}
   .panel{box-shadow:none;border:1px solid #999}
   .ph{background:#fff}
@@ -231,15 +240,53 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
   input{border:none !important;background:transparent !important;padding:2px 0 !important;box-shadow:none !important;color:#000 !important}
   .readonly,.costcell{background:#F2F2F2 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   th,td{border-color:#999}
+  /* The lot table's normal screen sizing (comfortable padding/font for a wide monitor) runs
+     well past A4's printable width and was getting clipped on the right - force it to fit
+     the page instead of overflowing, same idea as the narrow-phone shrink above. */
+  .tableWrap{overflow:visible}
+  table.itemTable{table-layout:fixed;width:100%;font-size:10.5px;border-spacing:0}
+  .itemTable th{padding:8px 4px;font-size:9px;white-space:normal;line-height:1.3}
+  .itemTable th input{width:100%;padding:2px 0;font-size:9px}
+  .itemTable td{padding:9px 5px}
+  .itemTable td input{width:100%;padding:2px 0;font-size:10.5px}
 }
+/* Same ruleset as @media print above, but selector-scoped instead of media-gated - html2pdf
+   screenshots the live DOM under normal "screen" media, so @media print never applies to it.
+   This runs on an off-screen clone (see buildPdfExportClone()), never on the page the user sees. */
+.pdfExportMode{background:#fff}
+.pdfExportMode header,.pdfExportMode .hero,.pdfExportMode .grid3,.pdfExportMode #mobilePreviewBtn,.pdfExportMode .mobileLiveBar,.pdfExportMode #dealResultGrid,.pdfExportMode .btnRow,.pdfExportMode .ph .countChip,.pdfExportMode #mobilePreviewWrap,.pdfExportMode #dealHistoryPanel,.pdfExportMode #newDealEntryPanel,.pdfExportMode .no-print,.pdfExportMode #finalTotalBox,.pdfExportMode #dueDateBox{display:none !important}
+.pdfExportMode.shell,.pdfExportMode .shell{padding:0;max-width:100%}
+.pdfExportMode .panel{box-shadow:none;border:1px solid #999}
+.pdfExportMode .ph{background:#fff}
+.pdfExportMode .printOnly{display:block}
+.pdfExportMode .printOnly.printSummaryRow{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.pdfExportMode .printSummaryRow small{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.03em;color:#4a5a52;font-weight:700;margin-bottom:3px}
+.pdfExportMode .printSummaryRow b{display:block;font-size:17px;color:#000}
+.pdfExportMode .itemTable th:last-child,.pdfExportMode .itemTable td:last-child{display:none}
+.pdfExportMode input{border:none !important;background:transparent !important;padding:2px 0 !important;box-shadow:none !important;color:#000 !important}
+.pdfExportMode .readonly,.pdfExportMode .costcell{background:#F2F2F2 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pdfExportMode th,.pdfExportMode td{border-color:#999}
+.pdfExportMode .tableWrap{overflow:visible}
+.pdfExportMode table.itemTable{table-layout:fixed;width:100%;font-size:10.5px;border-spacing:0}
+.pdfExportMode .itemTable th{padding:8px 4px;font-size:9px;white-space:normal;line-height:1.3}
+.pdfExportMode .itemTable th input{width:100%;padding:2px 0;font-size:9px}
+.pdfExportMode .itemTable td{padding:9px 5px}
+.pdfExportMode .itemTable td input{width:100%;padding:2px 0;font-size:10.5px}
 </style>
 </head>
 <body>
 
+<div id="deepLinkOverlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:14px">
+  <div style="width:34px;height:34px;border:3px solid var(--mint-line);border-top-color:var(--green);border-radius:50%;animation:dlSpin .8s linear infinite"></div>
+  <div style="font-size:14px;font-weight:700;color:var(--green-dark)">Aapka deal khul raha hai…</div>
+</div>
+<style>@keyframes dlSpin{to{transform:rotate(360deg)}}</style>
+<script>if(new URLSearchParams(location.search).get('deal')) document.getElementById('deepLinkOverlay').style.display='flex';</script>
+
 <header><div class="head">
   <div class="logo">b</div>
   <div class="brand"><b>Purchase Price Estimator</b></div>
-  <select id="directorSelect" class="btn small" style="cursor:pointer" onchange="setSelectedDirector(this.value)"></select>
+  <button class="btn small" onclick="openSettingsModal()">⚙ Settings</button>
   <button class="btn small" id="hardRefreshBtn" onclick="hardRefreshApp()" title="Force reload the latest version">🔄 Refresh</button>
   <button class="btn small" id="mobilePreviewBtn" onclick="toggleMobilePreview()">📱 Mobile Preview</button>
   <div class="liveBadge"><span class="liveDot"></span><span class="lbl">Live Calculation</span></div>
@@ -257,10 +304,17 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
     <div class="stat"><span class="ic">₹</span><small>Total Diff (₹)</small><b id="sDiff">₹0</b><div class="bar"><i id="sDiffBar" style="width:0%"></i></div></div>
   </div>
 
-  <div class="panel" id="dealFormPanel">
+  <div class="panel" id="newDealEntryPanel" style="padding:22px;text-align:center">
+    <button class="btn primary" onclick="startNewDeal()">➕ Start a New Deal</button>
+  </div>
+
+  <div class="panel" id="dealFormPanel" style="display:none">
     <div class="ph no-print">
       <span id="dealFormTitle">➕ New Deal</span>
-      <button class="btn small" onclick="startNewDeal()">🆕 Start New</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn small" id="backToHistoryBtn" onclick="closeDealForm()">⬅️ Back to Deals</button>
+        <button class="btn small" onclick="startNewDeal()">🆕 Start New</button>
+      </div>
     </div>
     <div class="pb">
       <div class="no-print" id="draftStatusWrap" style="display:none;margin-bottom:12px">
@@ -269,6 +323,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
       <div class="printOnly" id="printHeader" style="margin-bottom:14px">
         <h2 style="margin:0 0 4px;font-family:var(--font-display)">🧾 Purchase Slip — Bliss Gems</h2>
         <div style="font-size:12px;color:#444">Slip No. <span id="printSlipNo"></span> · <span id="printDate"></span></div>
+        <div class="printOnly" id="printLegend" style="font-size:10px;color:#666;margin-top:4px"></div>
       </div>
 
       <div class="resultGrid" id="dealResultGrid" style="display:none;margin-bottom:18px">
@@ -298,16 +353,21 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
         </div>
       </div>
 
+      <div class="no-print" style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-bottom:8px">
+        <small style="color:var(--ink-soft);font-size:11px">Doosre director ka price bhi yahin live aa jaata hai</small>
+        <button class="btn small" title="Latest price check karein" onclick="manualRefreshOpenDeal()">🔄 Refresh</button>
+      </div>
       <div id="itemsContainer"></div>
 
       <div id="finalTotalWrap">
         <div id="finalTotalBox" style="border:1.5px solid var(--mint-line);border-radius:var(--radius-md);background:var(--mint);padding:16px;margin-top:14px">
-          <label style="display:block;font-size:12px;font-weight:800;margin-bottom:6px;color:var(--green-dark);text-transform:uppercase;letter-spacing:.03em">Final Purchase Total (₹) — once deal is closed</label>
-          <input type="number" id="hFinalTotal" oninput="finalTotalAuto=false;onFinalTotalInput()" style="width:100%;padding:13px 14px;border:2px solid var(--green2);border-radius:var(--radius-md);font-size:18px;font-weight:800;color:var(--green-dark);background:var(--surface)">
+          <label style="display:block;font-size:12px;font-weight:800;margin-bottom:6px;color:var(--green-dark);text-transform:uppercase;letter-spacing:.03em">Final Rate (₹/ct) — once deal is closed</label>
+          <input type="number" id="hFinalTotal" oninput="onFinalRateManualEdit()" style="width:100%;padding:13px 14px;border:2px solid var(--green2);border-radius:var(--radius-md);font-size:18px;font-weight:800;color:var(--green-dark);background:var(--surface)">
+          <div id="finalRateHint" style="margin-top:8px;font-size:12px;color:var(--ink-soft)"></div>
         </div>
-        <div id="dueDateBox" style="margin-top:14px">
-          <label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em">Due Date (optional — fill once finalized)</label>
-          <input type="date" id="hDueDate" oninput="onDueDateInput()" style="width:100%;padding:11px 14px;border:1.5px solid var(--line-strong);border-radius:var(--radius-md);font-size:14px;color:var(--ink);background:var(--surface)">
+        <div id="dueDateBox" style="border:1.5px solid var(--warn-line);border-radius:var(--radius-md);background:var(--warn);padding:16px;margin-top:14px">
+          <label style="display:block;font-size:12px;font-weight:800;margin-bottom:6px;color:var(--warn-ink);text-transform:uppercase;letter-spacing:.03em">⏰ Due Date — fill once finalized</label>
+          <input type="date" id="hDueDate" oninput="onDueDateInput()" style="width:100%;padding:13px 14px;border:2px solid var(--warn-ink);border-radius:var(--radius-md);font-size:14px;color:var(--ink);background:var(--surface)">
         </div>
         <div class="printOnly printSummaryRow" id="printSummaryRow" style="border:1.5px solid var(--mint-line);border-radius:var(--radius-md);background:var(--mint);padding:14px 16px;margin-top:14px">
           <div><small>Guess Avg Total</small><b id="psAvgTotal">₹0</b></div>
@@ -321,6 +381,9 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
       <div class="btnRow" style="margin-top:14px">
         <button class="btn primary" style="flex:1" onclick="printSlip()">🖨️ Print Slip</button>
         <button class="btn" style="flex:1;background:#E9FBF2;border-color:#B8E8CE;color:#128C4A" onclick="shareSlipOnWhatsApp()">📤 Share on WhatsApp</button>
+      </div>
+      <div class="btnRow" style="margin-top:8px">
+        <button class="btn" style="flex:1;background:#DCF8C6;border-color:#B6E8A0;color:#1B7A2E" onclick="notifyOthersManual()">🔔 Notify Others (Reminder)</button>
       </div>
     </div>
   </div>
@@ -356,6 +419,18 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 </div>
 </div>
 
+<!-- Settings: director phone numbers for WhatsApp notify (no login needed) -->
+<div class="modal" id="settingsModal">
+  <div class="box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3 style="margin:0">⚙ Settings — Director Phone Numbers</h3><button class="btn small" onclick="closeSettingsModal()">✕</button></div>
+    <p class="note" style="margin:0 0 14px">In numbers par "New Deal" aur "Notify Others" ke WhatsApp message jaate hain. Khaali rehne par us director ko kuch nahi jaayega.</p>
+    <div class="field" style="margin-bottom:10px"><label id="g1PhoneLabel">Hitesh Dusad</label><input id="g1Phone" placeholder="10-digit mobile number"></div>
+    <div class="field" style="margin-bottom:10px"><label id="g2PhoneLabel">Nitesh Dusad</label><input id="g2Phone" placeholder="10-digit mobile number"></div>
+    <div class="field" style="margin-bottom:10px"><label id="g3PhoneLabel">Ankur Khandelwal</label><input id="g3Phone" placeholder="10-digit mobile number"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeSettingsModal()">Cancel</button><button class="btn primary" onclick="saveSettings()">Save</button></div>
+  </div>
+</div>
+
 <div id="mobilePreviewWrap">
   <div class="phoneFrame"><iframe id="mobilePreviewFrame" title="Mobile preview"></iframe></div>
 </div>
@@ -363,9 +438,207 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 <script>
 const LS_DEALS='purchase_price_deals_v2';
 const LS_SLIP_SEQ='purchase_price_slip_seq_v1';
+/* ===== Firebase — cloud sync so a deal started on one phone can be filled in from another.
+   Anonymous auth only, no login screen: this app was deliberately kept gate-free. ===== */
+const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
+let db=null;
+try{
+  if(typeof firebase!=='undefined'){
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+  }else{console.error('firebase SDK not loaded — cloud sync unavailable this session');}
+}catch(e){console.error('firebase init failed:',e);}
+try{if(typeof firebase!=='undefined'&&firebase.auth)firebase.auth().signInAnonymously().catch(e=>console.error('anon auth failed:',e));}catch(e){console.error('anon auth failed:',e);}
 const ITEM_NAME_SEED = ["Amethyst", "AMETRINE PL TUMBLE", "AQUA", "AQUA ELON BEADS", "AQUA GF", "AQUA MELON BEADS", "Aquamarine", "AS PER DESCRIPTION", "AS PER SHEET", "Black Onyx", "BLACK ONYX SUGAR LOAF", "BLACK OPAL", "BLUE GF", "BLUE SAPP MELON", "BURMA RUBY", "Burma Tourmaline", "CATS EYE", "Citrine", "CITRINE CUT", "CORAL", "CORAL MELON BEADS", "CORAL WITH DIAMOND POLKI AND GOLD", "EM", "EM R", "EME", "EME PL MANI", "EME PL TUUMBLE", "EME R", "EME R CUT STONE", "EME R DROPS", "EME R MELON BEADS", "EME R PEAR CABS", "EME RUSSIAN", "EME ZAM", "EME ZAM CABS", "EME ZAM CARVING", "EME ZAM CUT STONE", "EME ZAM FACTED TABIZ", "EME ZAM FANCY CUT STONE", "EME ZAM OCT CUT", "EME ZAM OVAL CABS", "EME ZAM PL CAB", "EME.ZAM fancy cut", "EMERALD", "EMERALD & POLKI", "EMERALD CABS", "EMERALD CARVED WITH POLKI", "EMERALD CUT STONE", "EMERALD FLAT", "EMERALD OCTO CUT", "EMERALD R", "EMERALD R CUT STONE", "EMERALD R CUT STONE SD", "EMERALD R KUNDAN POLKI TUMBLE", "EMERALD R PL BEADS", "Emerald Russian", "Emerald ZAB CABS", "Emerald zam", "EMERALD ZAM OCT CUT", "EMERALD ZAM ROSE CUT", "EMERALD ZAMBIA", "EMERALD ZAMBIA HEART CUT", "EMERALD ZAMBIAN", "ETH OPAL", "ETH OPAL CABS", "ETH OPAL PEAR CABS", "ETH OPAL PL CABS", "ETHOPION OPAL", "GREEN AMETHYST", "GREEN SYNTHETIC", "GREEN TOUR", "GREEN TOURMALINE", "IOLITE", "Kunzite", "KUNZITE CUT STONE", "KUNZITE PEAR CUT", "LION BRACELET", "MIX STONE", "MIX STONES", "MORGANITE", "MORGANITE BEADS", "MORGANITE CABS", "MORGANITE CARVING", "MORGANITE PEAR CABS", "MORGANITE PINK", "MORGANITE QCTA", "MOTI", "MULTI STONE", "MULTI TOUR", "MULTI TOUR CABS", "Multi tourmaline", "NAVAGRAH", "NAVARATAN", "NAVGRAH", "NAVRATAN", "NR", "OPAL", "OPAL BLACK DYED", "OPAL BR", "PEACH MOONSTONE", "PEARLS", "PERIDOT", "PERIDOT FACT TABIZ", "PINK AMETHYST", "PINK OPAL", "PINK TOUR", "PINK TOUR BADAM", "PINK TOUR CAB", "PINK TOUR CABS", "PINK TOUR CARVING PAIR", "PINK TOUR CUT STONE", "PINK TOUR FACTED BADAM", "PINK TOUR OVAL ROSECUT", "PINK TOUR ROSE CUT", "PINK TOUR TUIPS", "PINK TOURMALINE", "PINK TOURMALINE CABS", "PINK TOURMALINE CARVING", "PINK TOURMALINE CUT STONE", "ROSE QUARTZ", "RUBY", "RUBY BURMA", "RUBY GF", "RUBY GF BADAM", "RUBY GF CABS", "RUBY GF CUT STONE", "RUBY GF FACT TYRE", "RUBY GF MOZ", "RUBY GF MOZ CUT STONE", "RUBY GF MOZ FUNCY CUT", "RUBY GF MOZ PL DROPS", "RUBY GF MOZ ROSE CUT", "RUBY GF RED", "RUBY MOZ", "RUBY MOZ GF", "RUBY MOZ GF CUT", "RUBY MOZ GF FACT ROSE CUT", "RUBY MOZ GF FACTED ROSECUT", "RUBY MOZ HEATED", "RUBY MOZAMBIQE", "RUBY PL DROPS", "RUBYLITE", "RUBYLITE CUT STONE", "RUSSIAN EMERALD", "SKY BT", "Tanzanite", "TANZANITE CAB", "Tanzanite CABS", "TANZANITE CUT", "TANZANITE PL DROP", "TANZANITE QCTA", "Tanzanite ROUGH", "TOUR", "TOUR CUT", "TOUR FLAT", "TOUR GREEN", "TOUR PINK", "TOUR TAPER", "Tourmaline", "TZ", "TZ & AQUA", "TZ CABS", "TZ FLAT", "Tz, Ruby", "YELLOW SAPP", "YELLOW SAPP CABS", "YELLOW SAPP OVAL CAB", "YELLOW SAPPHIRE", "YELLOW SAPPHIRE CABS"];
 const BROKER_NAME_SEED = ["A-SELF", "AFJAL BHAI", "AJAY JI AGARWAL", "ANIL JI KHANDELWAL", "ANKIT JI KALA", "ANURAG JI", "ASHISH JI SURANA", "B-SELF", "BCB JI", "CHINTU JI BEWAL", "DEEPAK JI HYD", "GC JI", "GCC JI", "GIRIRAJ PRASAD JI", "GYAN JI CHAJED", "LOKESH JI HYD", "MADHUSUDAN JI AGARWAL", "MAHESH JI GLG", "MS JI", "PD JI", "PRAKASH JI DUSAD", "PULKIT JI JAIN JPR", "RAHUL JI ROHIT JI", "RAJESH JI AGARWAL", "RAJNEESH JI PAREEK", "RAJU JI KACHAWA", "SACHIN JI HYD", "SELF", "SHUBHAM JI AGARWAL", "TASKIN BHAI", "UTTAM JI", "VIKAS JI PODDAR"];
-let deals = JSON.parse(localStorage.getItem(LS_DEALS)||'[]');
+let deals = JSON.parse(localStorage.getItem(LS_DEALS)||'[]'); // instant local load; cloud sync below reconciles once connected
+function startDealsSync(){
+  if(!db)return;
+  db.collection('ppe_deals').onSnapshot(snap=>{
+    const cloudDeals=[];
+    snap.forEach(d=>cloudDeals.push({id:d.id,...d.data()}));
+    deals=cloudDeals;
+    try{localStorage.setItem(LS_DEALS, JSON.stringify(deals));}catch(e){}
+    renderSummary();
+    renderDealHistory();
+    tryOpenDeepLinkDeal();
+    liveMergeOpenDealIfSafe();
+  },err=>console.error('deals cloud sync failed:',err));
+}
+// If the deal currently open on screen was just updated elsewhere (another director filling
+// in their own price column on a different device), pull that straight into the open table -
+// without touching Final Rate's own auto/manual state, Party/Broker/Due Date, or anything
+// else the user is mid-typing in. Skipped while a local edit is still mid-flight to the cloud
+// (ppeSaveDebounceTimer set), so a fast typist's own keystroke never gets overwritten by a
+// snapshot that's a moment behind it - the next snapshot after they pause will still catch up.
+function liveMergeOpenDealIfSafe(){
+  if(!currentDealId || ppeSaveDebounceTimer) return;
+  const remote = deals.find(d=>d.id===currentDealId);
+  if(!remote || !Array.isArray(remote.items)) return;
+  const remoteStr = JSON.stringify(remote.items);
+  if(remoteStr === JSON.stringify(items)) return;
+  items = JSON.parse(remoteStr);
+  renderItems();
+  toast('Kisi aur ne price bhara — turant update ho gaya.');
+}
+// Manual version of the same pull, for the small Refresh button above the table - ignores
+// the debounce guard since this is an explicit user action, not a background snapshot.
+function manualRefreshOpenDeal(){
+  if(!currentDealId){ toast('Koi slip khula nahi hai.'); return; }
+  const remote = deals.find(d=>d.id===currentDealId);
+  if(!remote || !Array.isArray(remote.items)){ toast('Data nahi mila.'); return; }
+  const remoteStr = JSON.stringify(remote.items);
+  if(remoteStr === JSON.stringify(items)){ toast('Pehle se latest hai.'); return; }
+  items = JSON.parse(remoteStr);
+  renderItems();
+  toast('Latest data aa gaya.');
+}
+// The debounce keeps every keystroke feeling instant locally (renderItems runs right away)
+// while only the actual cloud write waits for a short pause in typing, so a fast typist
+// doesn't fire a Firestore write per character.
+let ppeSaveDebounceTimer=null;
+function pushDealToCloud(record){
+  if(!db)return;
+  clearTimeout(ppeSaveDebounceTimer);
+  ppeSaveDebounceTimer=setTimeout(()=>{
+    db.collection('ppe_deals').doc(record.id).set(record).catch(e=>console.error('deal cloud save failed:',e));
+  }, 1200);
+}
+/* ===== Director phone numbers + WhatsApp (shared GREEN-API credentials, same as the other
+   Bliss apps) — static per-slot config, no login needed. ===== */
+let directorPhones={g1:'',g2:'',g3:''};
+let api={};
+function startSettingsSync(){
+  if(!db)return;
+  db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed:',e));
+  db.collection('ppe_settings').doc('masters').onSnapshot(doc=>{
+    if(doc.exists){
+      const d=doc.data()||{};
+      directorPhones={g1:d.g1Phone||'',g2:d.g2Phone||'',g3:d.g3Phone||''};
+    }
+  },e=>console.error('settings sync failed:',e));
+}
+function openSettingsModal(){
+  document.getElementById('g1PhoneLabel').textContent=g1Name;
+  document.getElementById('g2PhoneLabel').textContent=g2Name;
+  document.getElementById('g3PhoneLabel').textContent=g3Name;
+  document.getElementById('g1Phone').value=directorPhones.g1;
+  document.getElementById('g2Phone').value=directorPhones.g2;
+  document.getElementById('g3Phone').value=directorPhones.g3;
+  document.getElementById('settingsModal').classList.add('show');
+}
+function closeSettingsModal(){ document.getElementById('settingsModal').classList.remove('show'); }
+function saveSettings(){
+  const patch={
+    g1Phone: document.getElementById('g1Phone').value.trim(),
+    g2Phone: document.getElementById('g2Phone').value.trim(),
+    g3Phone: document.getElementById('g3Phone').value.trim()
+  };
+  directorPhones={g1:patch.g1Phone,g2:patch.g2Phone,g3:patch.g3Phone};
+  if(db)db.collection('ppe_settings').doc('masters').set(patch,{merge:true}).catch(e=>console.error('settings save failed:',e));
+  closeSettingsModal();
+}
+function normalizePhone(p){ p=String(p||'').replace(/\D/g,''); if(p.length===10)p='91'+p; return p; }
+async function sendRawWA(phone,message){
+  const id=String(api.idInstance||'').trim(), token=String(api.apiToken||'').trim(), base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token){console.warn('GREEN-API settings missing');return false}
+  const p=normalizePhone(phone); if(p.length<11)return false;
+  try{
+    const r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
+    return r.ok;
+  }catch(e){console.error('WA send failed:',e);return false}
+}
+function fillTemplate(text,vars){ return text.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m); }
+const PPE_TEMPLATE_NEW_DEAL='💎 *Purchase Slip {SlipNo}*\n*{ItemName}*\n\nStarted by {StartedBy} — your price is still pending.\n\n👉 Tap to open your column:\n{Link}';
+const PPE_TEMPLATE_REMINDER='⏰ *Reminder — Price Pending*\n*Slip {SlipNo}* · *{ItemName}*\n\n👉 Tap to open your column:\n{Link}';
+function dealLink(dealId,who){ return 'https://bliss-gems-one.web.app/purchase-price-estimator/?deal='+encodeURIComponent(dealId)+'&who='+who; }
+// Across every item in the deal, does this director (g1/g2/g3) have at least one real value?
+function directorHasAnyValue(key){ return items.some(it=>it.lots.some(l=>l[key]!=='' && l[key]!=null && !isNaN(l[key]))); }
+function firstItemName(){ return (items.find(it=>it.name.trim())||{}).name || 'Deal'; }
+function sendDealNotice(record, targetKeys, template){
+  const names={g1:g1Name,g2:g2Name,g3:g3Name};
+  const startedBy = ['g1','g2','g3'].filter(k=>!targetKeys.includes(k)).map(k=>names[k]).join(' / ') || 'A director';
+  targetKeys.forEach(key=>{
+    const phone=directorPhones[key];
+    if(!phone){ console.warn(names[key]+' has no phone number set in Settings — skipped'); return; }
+    const msg=fillTemplate(template,{SlipNo:record.slipNo, ItemName:firstItemName(), StartedBy:startedBy, Link:dealLink(record.id,key)});
+    sendRawWA(phone,msg);
+  });
+}
+// Fires once per deal, automatically — but only after the user has paused typing for a bit,
+// not the instant there's a real price. With lot entry now live on every keystroke, firing
+// immediately meant the "new deal" WhatsApp went out after just the first lot, while the
+// user was still in the middle of adding more lots to the same deal.
+let ppeNotifyDebounceTimer=null;
+function scheduleAutoNotify(){
+  clearTimeout(ppeNotifyDebounceTimer);
+  const dealIdAtSchedule=currentDealId;
+  ppeNotifyDebounceTimer=setTimeout(()=>{
+    if(!dealIdAtSchedule || dealIdAtSchedule!==currentDealId) return; // switched to a different deal meanwhile
+    const idx=deals.findIndex(d=>d.id===dealIdAtSchedule);
+    if(idx<0) return;
+    const record=deals[idx];
+    if(record.notifiedOnce) return;
+    const avgTotal=currentAvgTotal();
+    if(avgTotal<=0) return;
+    const emptyKeys=['g1','g2','g3'].filter(k=>!directorHasAnyValue(k));
+    if(!emptyKeys.length) return;
+    sendDealNotice(record, emptyKeys, PPE_TEMPLATE_NEW_DEAL);
+    deals[idx]={...record, notifiedOnce:true};
+    saveDeals();
+    pushDealToCloud(deals[idx]);
+  }, 11000); // ~11s pause in editing before the other directors get pinged
+}
+// Manual reminder — always targets whoever is still empty right now, ignores notifiedOnce.
+function notifyOthersManual(){
+  const emptyKeys=['g1','g2','g3'].filter(k=>!directorHasAnyValue(k));
+  if(!emptyKeys.length){ toast('Sabka price already bhar chuka hai.'); return; }
+  if(!currentDealId){ toast('Pehle kuch bhariye, deal save hone do.'); return; }
+  const record={id:currentDealId, slipNo:document.getElementById('hSlipNo').value||'—'};
+  sendDealNotice(record, emptyKeys, PPE_TEMPLATE_REMINDER);
+  toast('Reminder bhej diya: '+emptyKeys.map(k=>({g1:g1Name,g2:g2Name,g3:g3Name}[k])).join(', '));
+}
+function toast(msg){
+  let el=document.getElementById('ppeToast');
+  if(!el){ el=document.createElement('div'); el.id='ppeToast'; el.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;z-index:1000;box-shadow:0 4px 14px rgba(0,0,0,.2)'; document.body.appendChild(el); }
+  el.textContent=msg; el.style.display='block';
+  clearTimeout(el._t); el._t=setTimeout(()=>{el.style.display='none';},3000);
+}
+/* ===== Deep link: ?deal=<id>&who=<g1/g2/g3> opens that deal and focuses the right column ===== */
+let pendingDeepLinkDealId=new URLSearchParams(location.search).get('deal');
+let pendingDeepLinkWho=new URLSearchParams(location.search).get('who');
+function tryOpenDeepLinkDeal(){
+  if(!pendingDeepLinkDealId) return;
+  const d=deals.find(x=>x.id===pendingDeepLinkDealId);
+  if(!d) return; // not loaded yet (or doesn't exist) — next cloud sync tick will retry
+  openDeal(d.id);
+  const overlay=document.getElementById('deepLinkOverlay');
+  if(overlay) overlay.style.display='none';
+  if(pendingDeepLinkWho) setTimeout(()=>focusAndHighlightColumn(pendingDeepLinkWho), 150);
+  pendingDeepLinkDealId=null;
+}
+// Covers a deal link opened on a fresh device/browser where localStorage has nothing yet and
+// the cloud sync is slow to connect - don't leave the loading overlay up forever.
+if(pendingDeepLinkDealId){
+  setTimeout(()=>{
+    const overlay=document.getElementById('deepLinkOverlay');
+    if(overlay && overlay.style.display!=='none'){
+      overlay.style.display='none';
+      toast('Deal load nahi ho paaya — dobara link se try karein.');
+    }
+  }, 8000);
+}
+function focusAndHighlightColumn(key){
+  document.querySelectorAll('.ppeFocusGlow').forEach(el=>el.classList.remove('ppeFocusGlow'));
+  const inputs=document.querySelectorAll(`.itemTable td input[data-gkey="${key}"]`);
+  if(!inputs.length) return;
+  let target=null;
+  for(const inp of inputs){ if(!inp.value){ target=inp; break; } }
+  if(!target) target=inputs[0];
+  target.classList.add('ppeFocusGlow');
+  target.scrollIntoView({behavior:'smooth', block:'center'});
+  target.focus();
+}
 function newItem(name){ return {name: name||'', lots:[{wt:'', g1:'', g2:'', g3:''}]}; }
 let items = [newItem()]; // current in-progress deal's items: {name, lots:[{wt,g1,g2,g3}]}
 let g1Name='Hitesh Dusad', g2Name='Nitesh Dusad', g3Name='Ankur Khandelwal'; // the 3 Directors who each give their own guess rate, shared across every item's table
@@ -373,36 +646,23 @@ function updateLabel(which, val){
   if(which==='g1') g1Name = val||'Hitesh Dusad';
   if(which==='g2') g2Name = val||'Nitesh Dusad';
   if(which==='g3') g3Name = val||'Ankur Khandelwal';
-  renderDirectorSelect();
   renderItems();
-}
-// "Main hoon:" selector - not a login, just a convenience toggle so whoever is physically
-// typing can highlight their own column across every item's table, instead of hunting for
-// the right box among three identical-looking columns.
-let selectedDirector=localStorage.getItem('ppe_selected_director')||'';
-function setSelectedDirector(val){
-  selectedDirector=val;
-  localStorage.setItem('ppe_selected_director',val);
-  renderItems();
-  focusFirstEmptyInSelectedColumn();
-}
-// Puts a real blinking text cursor in the first still-empty box of the selected director's
-// column - a native, unmistakable "type here" cue that doesn't need a flashing background.
-function focusFirstEmptyInSelectedColumn(){
-  if(!selectedDirector)return;
-  const inputs=document.querySelectorAll(`.itemTable td input[data-gkey="${selectedDirector}"]`);
-  for(const inp of inputs){ if(!inp.value){ inp.focus(); return; } }
-}
-function renderDirectorSelect(){
-  const sel=document.getElementById('directorSelect');
-  if(!sel)return;
-  sel.innerHTML=`<option value="">👤 Main hoon: — Select —</option>
-    <option value="g1"${selectedDirector==='g1'?' selected':''}>${esc(g1Name)}</option>
-    <option value="g2"${selectedDirector==='g2'?' selected':''}>${esc(g2Name)}</option>
-    <option value="g3"${selectedDirector==='g3'?' selected':''}>${esc(g3Name)}</option>`;
+  autoSaveDraft();
 }
 let currentDealId = null; // id of the deal in `deals` currently being edited (null = fresh unsaved draft)
 let finalTotalAuto = true; // while true, Final Purchase Total auto-fills with Guess Avg Total until the user types their own value
+// Tracks total weight as of the last refresh, so a 0 -> something transition (lots just
+// started being filled in on an otherwise-blank deal) can re-enable auto-fill even if
+// finalTotalAuto had earlier been switched off by some unrelated typing in this same tab -
+// without this, a stale manually-typed rate from an earlier deal could keep sitting in the
+// box, silently driving the maths for lots that have nothing to do with it.
+let _prevWtTotalForAuto = 0;
+// The Guess Avg rate as of the moment the user last manually typed into Final Rate - if a
+// lot's numbers change afterwards, the avg this manual rate was set against no longer holds,
+// so it's stale and should go back to auto-tracking rather than keep sitting there looking
+// like the app invented a number on its own (overwriting an existing lot's g1/g2/g3 in place
+// never passes through zero weight, so the earlier 0->something reset alone can't catch this).
+let lastManualAvgRateContext = null;
 
 function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function ensureDealIds(){
@@ -532,31 +792,71 @@ function setFlash(el, text){
 }
 
 /* ===== Current Deal: multiple Items, each with multiple weight-lots ===== */
-function addItem(){ items.push(newItem()); renderItems(); }
+function addItem(){ items.push(newItem()); renderItems(); autoSaveDraft(); }
 function deleteItem(idx){
   items.splice(idx,1);
   if(!items.length) items.push(newItem());
   renderItems();
+  autoSaveDraft();
 }
 function updateItemName(idx, val){ items[idx].name = val; }
 function addLot(itemIdx){
   items[itemIdx].lots.push({wt:'', g1:'', g2:'', g3:''});
   renderItems();
+  autoSaveDraft();
 }
 function updateLot(itemIdx, lotIdx, field, val){
   items[itemIdx].lots[lotIdx][field] = val===''? '' : Number(val);
-  renderItems();
+  patchLotLive(itemIdx, lotIdx);
+  autoSaveDraft();
+}
+// Fires on every keystroke (not just on blur), so the whole sheet feels truly live while
+// typing - patches just the read-only cells that depend on this lot/item by id, same as
+// refreshFinalTotalDependents() below, instead of calling renderItems()'s full innerHTML
+// rebuild, which would blow away the input the user is still typing into mid-keystroke.
+function patchLotLive(itemIdx, lotIdx){
+  const item = items[itemIdx];
+  if(!item) return;
+  const lot = item.lots[lotIdx];
+  if(lot){
+    const avg = lotAvg(lot);
+    const wt = Number(lot.wt)||0;
+    const avgEl = document.getElementById('guessAvg_'+itemIdx+'_'+lotIdx);
+    if(avgEl) avgEl.textContent = money(avg);
+    const costEl = document.getElementById('guessCost_'+itemIdx+'_'+lotIdx);
+    if(costEl) costEl.textContent = money(wt*avg);
+  }
+  const wtTotal = itemWtTotal(item);
+  const itemAvg = itemAvgTotal(item);
+  const wtLabelEl = document.getElementById('wtTotalLabel_'+itemIdx);
+  if(wtLabelEl) wtLabelEl.textContent = 'Total: '+(Math.round(wtTotal*100)/100)+' ct';
+  ['g1','g2','g3'].forEach(k=>{
+    const el = document.getElementById('combined_'+itemIdx+'_'+k);
+    if(el) el.textContent = moneyDec(itemColCombined(item,k));
+  });
+  const avgCombEl = document.getElementById('avgCombined_'+itemIdx);
+  if(avgCombEl) avgCombEl.textContent = moneyDec(itemAvgCombined(item));
+  const costTotalEl = document.getElementById('guessCostTotal_'+itemIdx);
+  if(costTotalEl) costTotalEl.textContent = money(itemAvg);
+  // Guess Avg changing can shift the overall diffPct (and, while finalTotalAuto, the Final
+  // Rate itself) for every item, not just this one - refreshFinalTotalDependents() already
+  // walks all items and patches their After Final / Final Cost cells plus the deal totals.
+  refreshFinalTotalDependents();
 }
 function deleteLot(itemIdx, lotIdx){
   items[itemIdx].lots.splice(lotIdx,1);
   if(!items[itemIdx].lots.length) items[itemIdx].lots.push({wt:'', g1:'', g2:'', g3:''});
   renderItems();
+  autoSaveDraft();
 }
 
 function lotAvg(lot){
   const vals = [lot.g1, lot.g2, lot.g3].filter(v=>v!=='' && v!=null && !isNaN(v));
   if(!vals.length) return 0;
-  return vals.reduce((a,b)=>a+Number(b),0)/vals.length;
+  // Round to a whole rupee here, at the source, so every downstream number (Guess
+  // Cost, Combined Total, Final Purchase Total auto-fill) is actually wt * this same
+  // displayed rate - not a hidden fraction that only shows up once multiplied by weight.
+  return Math.round(vals.reduce((a,b)=>a+Number(b),0)/vals.length);
 }
 function lotGuessCost(lot){ return (Number(lot.wt)||0) * lotAvg(lot); }
 // Guess Avg Total must be a real guessed ₹ VALUE (so it can sensibly auto-fill Final
@@ -566,11 +866,17 @@ function itemAvgTotal(item){ return item.lots.reduce((s,l)=>s+lotGuessCost(l),0)
 function itemWtTotal(item){ return item.lots.reduce((s,l)=>s+(Number(l.wt)||0),0); }
 function currentAvgTotal(){ return items.reduce((s,it)=>s+itemAvgTotal(it),0); }
 function currentWtTotal(){ return items.reduce((s,it)=>s+itemWtTotal(it),0); }
-// Combined/blended reference rates shown in the per-item table's Total row — sum of the
-// column across lots, divided by the item's total weight (not weighted per-lot).
-function colSum(item,key){ return item.lots.reduce((s,l)=>{ const v=l[key]; return s+(v!=='' && v!=null && !isNaN(v) ? Number(v) : 0); },0); }
-function itemColCombined(item,key){ const wt=itemWtTotal(item); const s=colSum(item,key); return s>0 ? wt/s : 0; }
-function itemAvgCombined(item){ const wt=itemWtTotal(item); const sumAvg=item.lots.reduce((s,l)=>s+lotAvg(l),0); return sumAvg>0 ? wt/sumAvg : 0; }
+// #hFinalTotal holds the FLAT FINAL RATE (₹/ct) the deal closed at, not a lump ₹ total -
+// every lot's Final Cost is this same rate × that lot's own weight, and the ₹ total shown
+// everywhere else (result tiles, Print Slip, WhatsApp, saved deal) is this rate × total weight.
+function currentFinalRate(){ const el=document.getElementById('hFinalTotal'); return el ? (Number(el.value)||0) : 0; }
+function currentFinalTotalComputed(){ return currentFinalRate() * currentWtTotal(); }
+// Combined/blended reference rate shown in the per-item table's Total row — a true
+// weight-weighted average rate across lots: sum(wt_i * rate_i) / sum(wt_i), not a plain
+// sum/average of the per-lot rates (which is meaningless across lots of different weight).
+function colWeightedSum(item,key){ return item.lots.reduce((s,l)=>{ const v=l[key]; const wt=Number(l.wt)||0; return s+(v!=='' && v!=null && !isNaN(v) ? wt*Number(v) : 0); },0); }
+function itemColCombined(item,key){ const wt=itemWtTotal(item); return wt>0 ? colWeightedSum(item,key)/wt : 0; }
+function itemAvgCombined(item){ const wt=itemWtTotal(item); return wt>0 ? itemAvgTotal(item)/wt : 0; }
 
 function renderItems(){
   const container = document.getElementById('itemsContainer');
@@ -582,12 +888,15 @@ function renderItems(){
   // in them is never interrupted. refreshFinalTotalDependents() below patches everything
   // that depends on their value (After Final/Final Cost cells, breakdown list, result
   // tiles, print summary) without recreating any input.
-  const finalTotalInput = document.getElementById('hFinalTotal');
-  const finalTotal = finalTotalInput ? (Number(finalTotalInput.value)||0) : 0;
+  const finalRate = currentFinalRate();
   const avgTotal = currentAvgTotal();
-  const diffPct = (finalTotal>0 && avgTotal>0) ? ((finalTotal-avgTotal)/avgTotal*100) : null;
+  const wtTotalForDiff = currentWtTotal();
+  const avgRate = wtTotalForDiff>0 ? avgTotal/wtTotalForDiff : 0;
+  // finalRate is one flat number entered against the overall weighted avg rate - scale
+  // each lot's OWN guess avg by that same %, don't just overwrite every lot with finalRate
+  // itself (that would flatten away the real quality/price spread between lots).
+  const diffPct = (finalRate>0 && avgRate>0) ? ((finalRate-avgRate)/avgRate*100) : null;
 
-  const hl=(key)=>selectedDirector===key?' dirHighlight':'';
   container.innerHTML = items.map((item, ii)=>{
     let finalCostTotal = 0;
     const rowsHtml = item.lots.map((l, li)=>{
@@ -597,13 +906,13 @@ function renderItems(){
       const finalCost = afterFinal!==null ? wt*afterFinal : null;
       if(finalCost!==null) finalCostTotal += finalCost;
       return `<tr>
-        <td data-label="Wt (ct)"><input type="number" value="${l.wt}" onchange="updateLot(${ii},${li},'wt',this.value)"></td>
-        <td class="${hl('g1')}" data-label="${esc(g1n)}"><input type="number" data-gkey="g1" value="${l.g1}" onchange="updateLot(${ii},${li},'g1',this.value)"></td>
-        <td class="${hl('g2')}" data-label="${esc(g2n)}"><input type="number" data-gkey="g2" value="${l.g2}" onchange="updateLot(${ii},${li},'g2',this.value)"></td>
-        <td class="${hl('g3')}" data-label="${esc(g3n)}"><input type="number" data-gkey="g3" value="${l.g3}" onchange="updateLot(${ii},${li},'g3',this.value)"></td>
-        <td class="num readonly" data-label="Guess Avg">${money(avg)}</td>
-        <td class="num costcell" data-label="Guess Cost">${money(wt*avg)}</td>
-        <td class="num readonly" data-label="After Final" id="afterFinal_${ii}_${li}">${afterFinal!==null? money(afterFinal) : '—'}</td>
+        <td data-label="Wt (ct)"><input type="number" value="${l.wt}" oninput="updateLot(${ii},${li},'wt',this.value)"></td>
+        <td data-label="${esc(g1n)}"><input type="number" data-gkey="g1" value="${l.g1}" oninput="updateLot(${ii},${li},'g1',this.value)"></td>
+        <td data-label="${esc(g2n)}"><input type="number" data-gkey="g2" value="${l.g2}" oninput="updateLot(${ii},${li},'g2',this.value)"></td>
+        <td data-label="${esc(g3n)}"><input type="number" data-gkey="g3" value="${l.g3}" oninput="updateLot(${ii},${li},'g3',this.value)"></td>
+        <td class="num readonly" data-label="Guess Avg" id="guessAvg_${ii}_${li}">${money(avg)}</td>
+        <td class="num costcell" data-label="Guess Cost" id="guessCost_${ii}_${li}">${money(wt*avg)}</td>
+        <td class="num readonly" data-label="After Final" id="afterFinal_${ii}_${li}">${afterFinal!==null? moneyDec(afterFinal) : '—'}</td>
         <td class="num costcell" data-label="Final Cost" id="finalCost_${ii}_${li}">${finalCost!==null? money(finalCost) : '—'}</td>
         <td data-label="Remove">${item.lots.length>1 ? `<button class="btn small danger removeLotBtn" title="Remove lot" onclick="deleteLot(${ii},${li})">✕<span class="btnLabel"> Remove</span></button>` : ''}</td>
       </tr>`;
@@ -627,20 +936,20 @@ function renderItems(){
         <table class="itemTable">
           <thead><tr>
             <th>Wt (ct)</th>
-            <th class="${hl('g1')}"><input type="text" value="${esc(g1n)}" onchange="updateLabel('g1',this.value)"></th>
-            <th class="${hl('g2')}"><input type="text" value="${esc(g2n)}" onchange="updateLabel('g2',this.value)"></th>
-            <th class="${hl('g3')}"><input type="text" value="${esc(g3n)}" onchange="updateLabel('g3',this.value)"></th>
+            <th><input type="text" value="${esc(g1n)}" onchange="updateLabel('g1',this.value)"></th>
+            <th><input type="text" value="${esc(g2n)}" onchange="updateLabel('g2',this.value)"></th>
+            <th><input type="text" value="${esc(g3n)}" onchange="updateLabel('g3',this.value)"></th>
             <th>Guess Avg</th><th class="costHead">Guess Cost</th><th>After Final Price</th><th class="costHead">Final Cost</th><th></th>
           </tr></thead>
           <tbody>${rowsHtml}</tbody>
           <tfoot><tr>
-            <td data-label="Total Weight"><span>Total: ${Math.round(wtTotal*100)/100} ct</span></td>
-            <td class="num readonly combinedCell${hl('g1')}" data-label="${esc(g1n)} (Combined)">${moneyDec(itemColCombined(item,'g1'))}</td>
-            <td class="num readonly combinedCell${hl('g2')}" data-label="${esc(g2n)} (Combined)">${moneyDec(itemColCombined(item,'g2'))}</td>
-            <td class="num readonly combinedCell${hl('g3')}" data-label="${esc(g3n)} (Combined)">${moneyDec(itemColCombined(item,'g3'))}</td>
-            <td class="num readonly combinedCell" data-label="Guess Avg (Combined)">${moneyDec(itemAvgCombined(item))}</td>
-            <td class="num costcell" data-label="Guess Cost Total">${money(itemAvg)}</td>
-            <td class="num readonly" data-label="After Final">—</td>
+            <td data-label="Total Weight"><span id="wtTotalLabel_${ii}">Total: ${Math.round(wtTotal*100)/100} ct</span></td>
+            <td class="num readonly combinedCell" data-label="${esc(g1n)} (Combined)" id="combined_${ii}_g1">${moneyDec(itemColCombined(item,'g1'))}</td>
+            <td class="num readonly combinedCell" data-label="${esc(g2n)} (Combined)" id="combined_${ii}_g2">${moneyDec(itemColCombined(item,'g2'))}</td>
+            <td class="num readonly combinedCell" data-label="${esc(g3n)} (Combined)" id="combined_${ii}_g3">${moneyDec(itemColCombined(item,'g3'))}</td>
+            <td class="num readonly combinedCell" data-label="Guess Avg (Combined)" id="avgCombined_${ii}">${moneyDec(itemAvgCombined(item))}</td>
+            <td class="num costcell" data-label="Guess Cost Total" id="guessCostTotal_${ii}">${money(itemAvg)}</td>
+            <td class="num readonly" data-label="After Final" id="afterFinalTotal_${ii}">${diffPct!==null && wtTotal>0? moneyDec(finalCostTotal/wtTotal) : '—'}</td>
             <td class="num costcell" data-label="Final Cost Total" id="finalCostTotal_${ii}">${diffPct!==null? money(finalCostTotal) : '—'}</td>
             <td class="footSpacer"></td>
           </tr></tfoot>
@@ -661,9 +970,32 @@ function renderItems(){
 function refreshFinalTotalDependents(){
   const finalTotalInput = document.getElementById('hFinalTotal');
   const avgTotal = currentAvgTotal();
-  if(finalTotalAuto) setFieldValue('hFinalTotal', avgTotal>0 ? String(Math.round(avgTotal)) : '');
-  const finalTotal = Number(finalTotalInput.value)||0;
-  const diffPct = (finalTotal>0 && avgTotal>0) ? ((finalTotal-avgTotal)/avgTotal*100) : null;
+  const wtTotal = currentWtTotal();
+  const avgRate = wtTotal>0 ? avgTotal/wtTotal : 0;
+  if(!finalTotalAuto && lastManualAvgRateContext!==null && avgRate!==lastManualAvgRateContext){
+    // The lots changed since this rate was manually typed - it was set against a different
+    // avg and no longer means anything for the current numbers, so go back to auto-tracking.
+    finalTotalAuto = true;
+    lastManualAvgRateContext = null;
+  }
+  if(_prevWtTotalForAuto<=0 && wtTotal>0) finalTotalAuto = true;
+  _prevWtTotalForAuto = wtTotal;
+  if(finalTotalAuto) setFieldValue('hFinalTotal', avgRate>0 ? String(Math.round(avgRate)) : '');
+  const finalRate = Number(finalTotalInput.value)||0;
+  const diffPct = (finalRate>0 && avgRate>0) ? ((finalRate-avgRate)/avgRate*100) : null;
+  const finalTotal = finalRate * wtTotal; // reference ₹ total shown on result tiles etc.
+
+  const hintEl = document.getElementById('finalRateHint');
+  if(hintEl){
+    if(avgRate<=0){
+      hintEl.innerHTML = '';
+    } else if(finalTotalAuto){
+      hintEl.innerHTML = 'Guess Avg se auto-fill hua hai — yahan badlo to final price usi hisaab se ghategi/badhegi.';
+    } else {
+      const pctStr = diffPct!==null ? ' ('+(diffPct>=0?'+':'')+diffPct.toFixed(1)+'%)' : '';
+      hintEl.innerHTML = 'Guess Avg: <b>'+money(Math.round(avgRate))+'/ct</b>'+esc(pctStr)+' &nbsp;·&nbsp; <a href="javascript:void(0)" onclick="resetFinalRateToAvg()" style="color:var(--green-dark);font-weight:700;text-decoration:underline">↻ Guess Avg par reset karein</a>';
+    }
+  }
   const dueDateValueStr = document.getElementById('hDueDate').value;
 
   const lotBreakdownRows = [];
@@ -677,12 +1009,15 @@ function refreshFinalTotalDependents(){
       if(finalCost!==null) finalCostTotal += finalCost;
       if(avg>0) lotBreakdownRows.push({ itemName: item.name.trim()||'Item', wt, avg, finalCost, diffPct });
       const afterEl = document.getElementById('afterFinal_'+ii+'_'+li);
-      if(afterEl) afterEl.textContent = afterFinal!==null? money(afterFinal) : '—';
+      if(afterEl) afterEl.textContent = afterFinal!==null? moneyDec(afterFinal) : '—';
       const costEl = document.getElementById('finalCost_'+ii+'_'+li);
       if(costEl) costEl.textContent = finalCost!==null? money(finalCost) : '—';
     });
     const totalEl = document.getElementById('finalCostTotal_'+ii);
     if(totalEl) totalEl.textContent = diffPct!==null? money(finalCostTotal) : '—';
+    const itemWt = itemWtTotal(item);
+    const afterTotalEl = document.getElementById('afterFinalTotal_'+ii);
+    if(afterTotalEl) afterTotalEl.textContent = (diffPct!==null && itemWt>0)? moneyDec(finalCostTotal/itemWt) : '—';
   });
 
   const breakdownList = document.getElementById('lotBreakdownList');
@@ -741,17 +1076,32 @@ function refreshFinalTotalDependents(){
   if(dueDateValueStr){ dueWrap.style.display='block'; document.getElementById('psDueDate').textContent = formatDueDate(dueDateValueStr); }
   else dueWrap.style.display='none';
 }
+function resetFinalRateToAvg(){
+  finalTotalAuto = true;
+  lastManualAvgRateContext = null;
+  refreshFinalTotalDependents();
+  autoSaveDraft();
+}
 function onFinalTotalInput(){
   const el = document.getElementById('hFinalTotal');
   el.setAttribute('value', el.value);
   refreshFinalTotalDependents();
   autoSaveDraft();
 }
+// User is actively typing their own rate - remember the avg it was typed against, so a later
+// lot edit that changes that avg can tell this rate is now stale (see lastManualAvgRateContext).
+function onFinalRateManualEdit(){
+  finalTotalAuto = false;
+  const wt = currentWtTotal();
+  lastManualAvgRateContext = wt>0 ? currentAvgTotal()/wt : null;
+  onFinalTotalInput();
+}
 function onDueDateInput(){
   const el = document.getElementById('hDueDate');
   el.setAttribute('value', el.value);
   refreshFinalTotalDependents();
   autoSaveDraft();
+  scheduleAutoSendPdf();
 }
 
 /* ===== Live auto-save: the open deal saves itself continuously, no manual "Save" step ===== */
@@ -759,7 +1109,7 @@ function autoSaveDraft(){
   const party = document.getElementById('hParty').value.trim();
   const broker = document.getElementById('hBroker').value.trim();
   const avgTotal = currentAvgTotal();
-  const finalTotal = Number(document.getElementById('hFinalTotal').value)||0;
+  const finalTotal = currentFinalTotalComputed();
   const dueDate = document.getElementById('hDueDate').value;
   const hasLots = items.some(it=>it.lots.length);
   const statusWrap = document.getElementById('draftStatusWrap');
@@ -773,11 +1123,16 @@ function autoSaveDraft(){
   // user saw on screen is exactly the one that gets saved.
   if(!currentDealId){ currentDealId = genId(); if(!document.getElementById('hSlipNo').value) setFieldValue('hSlipNo', nextSlipNo()); }
   const slipNo = document.getElementById('hSlipNo').value || nextSlipNo();
-  const record = { id: currentDealId, slipNo, note, party, broker, itemNames, g1Name, g2Name, g3Name,
-    avg: avgTotal, final: finalTotal, dueDate, items: JSON.parse(JSON.stringify(items)) };
+  const existing = deals.find(d=>d.id===currentDealId);
+  let record = { id: currentDealId, slipNo, note, party, broker, itemNames, g1Name, g2Name, g3Name,
+    avg: avgTotal, final: finalTotal, dueDate, items: JSON.parse(JSON.stringify(items)),
+    notifiedOnce: existing ? !!existing.notifiedOnce : false,
+    pdfSentOnce: existing ? !!existing.pdfSentOnce : false };
   const idx = deals.findIndex(d=>d.id===currentDealId);
   if(idx>=0) deals[idx] = record; else deals.push(record);
   saveDeals();
+  pushDealToCloud(record);
+  scheduleAutoNotify();
 
   statusWrap.style.display='block';
   statusEl.textContent = '✓ Auto-saved — Slip '+slipNo;
@@ -787,6 +1142,8 @@ function autoSaveDraft(){
 function startNewDeal(){
   currentDealId = null;
   finalTotalAuto = true;
+  _prevWtTotalForAuto = 0;
+  lastManualAvgRateContext = null;
   items = [newItem()];
   ['hParty','hBroker','hFinalTotal','hDueDate'].forEach(id=>setFieldValue(id,''));
   // Slip No. shows right away, like a physical purchase slip already has its number
@@ -794,7 +1151,18 @@ function startNewDeal(){
   setFieldValue('hSlipNo', nextSlipNo());
   document.getElementById('draftStatusWrap').style.display = 'none';
   document.getElementById('dealFormTitle').textContent = '➕ New Deal';
+  document.getElementById('newDealEntryPanel').style.display = 'none';
+  document.getElementById('dealFormPanel').style.display = '';
   renderItems();
+  document.getElementById('dealFormPanel').scrollIntoView({behavior:'smooth', block:'start'});
+}
+// Nothing is lost by closing the form - autoSaveDraft() already persisted everything as the
+// user typed, so this just goes back to a plain deals list instead of leaving a half-filled
+// (or someone else's already-saved) form sitting open the moment the app loads.
+function closeDealForm(){
+  document.getElementById('dealFormPanel').style.display = 'none';
+  document.getElementById('newDealEntryPanel').style.display = '';
+  document.getElementById('dealHistoryPanel').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function openDeal(id){
@@ -808,16 +1176,25 @@ function openDeal(id){
   g1Name = d.g1Name||'Hitesh Dusad';
   g2Name = d.g2Name||'Nitesh Dusad';
   g3Name = d.g3Name||'Ankur Khandelwal';
-  setFieldValue('hFinalTotal', d.final||'');
   setFieldValue('hDueDate', d.dueDate||'');
   items = Array.isArray(d.items) ? JSON.parse(JSON.stringify(d.items))
     : [{name: d.item||'', lots: Array.isArray(d.lots)?JSON.parse(JSON.stringify(d.lots)):[]}];
   if(!items.length) items = [newItem()];
-  renderDirectorSelect();
+  // d.final was saved as a ₹ total (old deals) or rate×weight (new ones) - either way,
+  // hFinalTotal now holds the flat RATE, so convert back by dividing out this deal's own
+  // total weight. A deal saved before this change just gets its implied average rate.
+  const dealWt = items.reduce((s,it)=>s+it.lots.reduce((s2,l)=>s2+(Number(l.wt)||0),0),0);
+  setFieldValue('hFinalTotal', (d.final && dealWt>0) ? String(Math.round(d.final/dealWt)) : '');
+  _prevWtTotalForAuto = dealWt; // this deal already has weight - don't treat it as a fresh "0 -> something" start and silently re-enable auto-fill over its preserved rate
+  // `items` is already this deal's own data at this point, so this is its real avg - record
+  // it as the context the preserved rate matches, so it isn't immediately flagged stale.
+  lastManualAvgRateContext = dealWt>0 ? currentAvgTotal()/dealWt : null;
   renderItems();
   document.getElementById('dealFormTitle').textContent = '✏️ Editing '+(d.slipNo||'')+(d.note!=='Untitled Deal' && d.note ? ' — '+d.note : '');
   document.getElementById('draftStatusWrap').style.display = 'block';
   document.getElementById('draftStatus').textContent = '✓ Auto-saved — Slip '+(d.slipNo||'');
+  document.getElementById('newDealEntryPanel').style.display = 'none';
+  document.getElementById('dealFormPanel').style.display = '';
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
@@ -829,6 +1206,7 @@ function deleteDeal(id){
   deals.splice(idx,1);
   if(currentDealId===id) startNewDeal();
   saveDeals();
+  if(db)db.collection('ppe_deals').doc(id).delete().catch(e=>console.error('deal cloud delete failed:',e));
 }
 function completedDeals(){ return deals.filter(d=>d.final>0); }
 function historicalMarkupPct(){
@@ -878,6 +1256,7 @@ function renderDealHistory(){
   if(!visible.length){ table.style.display='none'; empty.textContent='No matching deals.'; empty.style.display='block'; return; }
   table.style.display='table'; empty.style.display='none';
 
+  const anyExpanded = visible.some(x=>expandedDeals[x.d.id]);
   body.innerHTML = visible.map(({d})=>{
     const id = d.id;
     const isCompleted = d.final>0;
@@ -894,7 +1273,7 @@ function renderDealHistory(){
     const statusTag = isCompleted
       ? `<span style="color:var(--green-dark);font-weight:700">✓ Completed</span>`
       : `<span style="color:var(--ink-soft);font-weight:700">● Pending</span>`;
-    const row = `<tr class="${isCompleted?'completedRow':''}"><td style="font-family:var(--font-mono);color:var(--ink-soft)">${esc(d.slipNo||'—')}</td><td>${esc(titleLine)} <small style="color:var(--ink-soft)">(${lotCount} lots)</small><br><small>${statusTag}</small></td><td class="num">${money(d.avg)}</td><td class="num">${d.final>0?money(d.final):'—'}</td><td class="num ${cls}">${d.final>0?(diff>=0?'+':'')+money(diff):'—'}</td><td class="num ${cls}">${d.final>0?(diff>=0?'+':'')+pct.toFixed(1)+'%':'—'}</td><td class="dealRowActions"><button class="btn small dealActionBtn" title="View lot-wise breakdown" onclick="toggleDealExpand('${id}')">${isOpen?'🔽':'👁'}<span class="btnLabel"> View</span></button> <button class="btn small dealActionBtn" title="Open" onclick="openDeal('${id}')">✏️<span class="btnLabel"> Open</span></button> <button class="btn small dealActionBtn" title="Print / PDF" onclick="printDealFromHistory('${id}')">🖨️<span class="btnLabel"> Print</span></button> <button class="btn small dealActionBtn" title="Share on WhatsApp" onclick="shareDealFromHistory('${id}')">📤<span class="btnLabel"> Share</span></button> <button class="btn small danger dealActionBtn" title="Delete" onclick="deleteDeal('${id}')">✕<span class="btnLabel"> Delete</span></button></td></tr>`;
+    const row = `<tr class="${isCompleted?'completedRow':''}${anyExpanded && !isOpen ? ' dealRowBlurred' : ''}"><td style="font-family:var(--font-mono);color:var(--ink-soft)">${esc(d.slipNo||'—')}</td><td>${esc(titleLine)} <small style="color:var(--ink-soft)">(${lotCount} lots)</small><br><small>${statusTag}</small></td><td class="num">${money(d.avg)}</td><td class="num">${d.final>0?money(d.final):'—'}</td><td class="num ${cls}">${d.final>0?(diff>=0?'+':'')+money(diff):'—'}</td><td class="num ${cls}">${d.final>0?(diff>=0?'+':'')+pct.toFixed(1)+'%':'—'}</td><td class="dealRowActions"><button class="btn small dealActionBtn" title="View lot-wise breakdown" onclick="toggleDealExpand('${id}')">${isOpen?'🔽':'👁'}<span class="btnLabel"> View</span></button> <button class="btn small dealActionBtn" title="Open" onclick="openDeal('${id}')">✏️<span class="btnLabel"> Open</span></button> <button class="btn small dealActionBtn" title="Print / PDF" onclick="printDealFromHistory('${id}')">🖨️<span class="btnLabel"> Print</span></button> <button class="btn small dealActionBtn" title="Share on WhatsApp" onclick="shareDealFromHistory('${id}')">📤<span class="btnLabel"> Share</span></button> <button class="btn small danger dealActionBtn" title="Delete" onclick="deleteDeal('${id}')">✕<span class="btnLabel"> Delete</span></button></td></tr>`;
     if(!isOpen || !lotCount) return row;
     const dp = d.avg>0 ? ((d.final-d.avg)/d.avg*100) : 0;
     const itemBlocks = itemList.map(it=>{
@@ -975,19 +1354,135 @@ if(new URLSearchParams(location.search).get('embedded')==='1'){
   if(btn) btn.style.display = 'none';
 }
 
+// Soft reminder, not a hard block — every deal ends up needing a Due Date, but the person
+// printing/sharing isn't always the one who'll know it yet, so Cancel just lets them through.
+function dueDateOkToProceed(){
+  const due=document.getElementById('hDueDate');
+  if(due && !due.value) return confirm('Due Date nahi bhari hai — bina Due Date ke aage badhein?');
+  return true;
+}
+// First-letter-of-each-word initials ("Hitesh Dusad" -> "HD") - used only for print, where
+// the full director names were crowding the lot table and running into the next column.
+function initialsFor(name){
+  const parts = String(name||'').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '';
+  return parts.map(w=>w[0].toUpperCase()).join('').slice(0,3);
+}
 function printSlip(){
+  if(!dueDateOkToProceed())return;
   document.getElementById('printSlipNo').textContent = document.getElementById('hSlipNo').value || '—';
+  const hd = initialsFor(g1Name), nd = initialsFor(g2Name), ak = initialsFor(g3Name);
+  document.querySelectorAll('.itemTable thead th input[type="text"]').forEach((inp,i)=>{
+    inp.dataset.fullName = inp.value;
+    inp.value = [hd,nd,ak][i%3];
+  });
+  const legend = document.getElementById('printLegend');
+  if(legend) legend.textContent = `${hd} = ${g1Name}   ·   ${nd} = ${g2Name}   ·   ${ak} = ${g3Name}`;
   window.print();
 }
-window.addEventListener('afterprint', ()=>{ autoSaveDraft(); });
+window.addEventListener('afterprint', ()=>{
+  document.querySelectorAll('.itemTable thead th input[type="text"]').forEach(inp=>{
+    if(inp.dataset.fullName!==undefined){ inp.value = inp.dataset.fullName; delete inp.dataset.fullName; }
+  });
+  autoSaveDraft();
+});
+
+/* ===== Auto-PDF on Due Date: once the deal is closed (Due Date filled), send the same
+   Purchase Slip PDF straight to all three directors on WhatsApp - no Print/Share click
+   needed. Renders off-screen (never flashes on the live page) and fires once per deal. ===== */
+function sendFileWA(phone, blob, fileName){
+  const id=String(api.idInstance||'').trim(), token=String(api.apiToken||'').trim(), base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token){console.warn('GREEN-API settings missing');return Promise.resolve(false)}
+  const p=normalizePhone(phone); if(p.length<11)return Promise.resolve(false);
+  const form=new FormData();
+  form.append('chatId', p+'@c.us');
+  form.append('file', blob, fileName);
+  form.append('fileName', fileName);
+  return fetch(`${base}/waInstance${encodeURIComponent(id)}/sendFileByUpload/${encodeURIComponent(token)}`,{method:'POST',body:form})
+    .then(r=>r.ok).catch(e=>{console.error('WA file send failed:',e);return false});
+}
+// Builds an off-screen copy of the slip panel with print-mode CSS and director initials
+// applied (see .pdfExportMode above), so html2canvas rasterizes it exactly like Print Slip
+// does - without ever showing that condensed layout on the page the user is looking at.
+function buildPdfExportClone(){
+  const original = document.getElementById('dealFormPanel');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;left:-10000px;top:0;width:1100px;background:#fff;z-index:-1';
+  wrap.className = 'pdfExportMode';
+  const clone = original.cloneNode(true);
+  clone.removeAttribute('id');
+  // The auto-send-on-Due-Date flow fires 5s after Due Date is picked - if the user has
+  // already tapped "Back to Deals" (closeDealForm) in that window, the live panel being
+  // cloned is sitting at display:none, and cloneNode copies that inline style too. html2canvas
+  // then rasterizes a zero-content element, producing a blank PDF. Force the clone visible
+  // regardless of the live panel's current state.
+  clone.style.display = '';
+  wrap.appendChild(clone);
+  document.body.appendChild(wrap);
+
+  const slipNoEl = clone.querySelector('#printSlipNo');
+  if(slipNoEl) slipNoEl.textContent = document.getElementById('hSlipNo').value || '—';
+  const dateEl = clone.querySelector('#printDate');
+  const livePrintDate = document.getElementById('printDate');
+  if(dateEl && livePrintDate) dateEl.textContent = livePrintDate.textContent;
+
+  const hd = initialsFor(g1Name), nd = initialsFor(g2Name), ak = initialsFor(g3Name);
+  clone.querySelectorAll('.itemTable thead th input[type="text"]').forEach((inp,i)=>{
+    inp.value = [hd,nd,ak][i%3];
+  });
+  const legendEl = clone.querySelector('#printLegend');
+  if(legendEl) legendEl.textContent = `${hd} = ${g1Name}   ·   ${nd} = ${g2Name}   ·   ${ak} = ${g3Name}`;
+  return wrap;
+}
+async function generateSlipPdfBlob(){
+  if(typeof html2pdf==='undefined'){ console.warn('html2pdf not loaded'); return null; }
+  const wrap = buildPdfExportClone();
+  try{
+    return await html2pdf().from(wrap).set({
+      margin:10,
+      filename:'slip.pdf',
+      html2canvas:{scale:2,backgroundColor:'#ffffff',windowWidth:1100},
+      jsPDF:{unit:'mm',format:'a4',orientation:'landscape'}
+    }).outputPdf('blob');
+  }catch(e){ console.error('PDF generation failed:',e); return null; }
+  finally{ wrap.remove(); }
+}
+let ppeAutoPdfDebounceTimer=null;
+function scheduleAutoSendPdf(){
+  clearTimeout(ppeAutoPdfDebounceTimer);
+  const dealIdAtSchedule = currentDealId;
+  ppeAutoPdfDebounceTimer = setTimeout(async ()=>{
+    if(!dealIdAtSchedule || dealIdAtSchedule!==currentDealId) return;
+    if(!document.getElementById('hDueDate').value) return;
+    const idx = deals.findIndex(d=>d.id===dealIdAtSchedule);
+    if(idx<0) return;
+    const record = deals[idx];
+    if(record.pdfSentOnce) return;
+    const blob = await generateSlipPdfBlob();
+    if(!blob) return;
+    const fileName = (record.slipNo||'slip')+'.pdf';
+    const targets = [directorPhones.g1, directorPhones.g2, directorPhones.g3];
+    const results = await Promise.all(targets.map(phone => phone ? sendFileWA(phone, blob, fileName) : Promise.resolve(false)));
+    if(results.some(ok=>ok)){
+      deals[idx] = {...deals[idx], pdfSentOnce:true};
+      saveDeals();
+      pushDealToCloud(deals[idx]);
+      toast('Purchase Slip PDF WhatsApp pe bhej diya.');
+    }
+  }, 5000); // ~5s after Due Date is picked, per the director's own request
+}
 
 /* ===== WhatsApp Share: same deal data as the Print Slip, as a plain-text message ===== */
 function buildSlipShareText(){
   const slipNo = document.getElementById('hSlipNo').value || '—';
   const party = document.getElementById('hParty').value.trim() || '—';
   const broker = document.getElementById('hBroker').value.trim() || '—';
-  const finalTotalInput = document.getElementById('hFinalTotal');
-  const finalTotal = finalTotalInput ? Number(finalTotalInput.value)||0 : 0;
+  const finalRate = currentFinalRate();
+  const avgTotal = currentAvgTotal();
+  const wtTotal = currentWtTotal();
+  const avgRate = wtTotal>0 ? avgTotal/wtTotal : 0;
+  const diffPct = (finalRate>0 && avgRate>0) ? ((finalRate-avgRate)/avgRate*100) : null;
+  const finalTotal = finalRate * wtTotal;
   const dateStr = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
   const lines = [
     '*Purchase Slip — Bliss Gems*',
@@ -998,16 +1493,24 @@ function buildSlipShareText(){
   ];
   items.forEach(item=>{
     lines.push(`*${item.name.trim() || 'Item'}*`);
+    let itemFinalCostTotal = 0;
     item.lots.forEach(l=>{
+      const wt = Number(l.wt)||0;
       const avg = lotAvg(l);
-      lines.push(`  Wt ${l.wt||0}ct — ${g1Name}:${l.g1||0} ${g2Name}:${l.g2||0} ${g3Name}:${l.g3||0} → Avg ${money(avg)}`);
+      const afterFinal = diffPct!==null ? avg*(1+diffPct/100) : null;
+      const finalCost = afterFinal!==null ? wt*afterFinal : null;
+      if(finalCost!==null) itemFinalCostTotal += finalCost;
+      lines.push(`  Wt ${wt||0}ct → Final Cost ${finalCost!==null ? money(finalCost) : '—'}`);
     });
+    lines.push(`  Item Final Cost Total: ${diffPct!==null ? money(itemFinalCostTotal) : '—'}`);
   });
   lines.push('');
+  lines.push(`Final Rate: ${finalRate>0 ? money(finalRate)+'/ct' : '—'}`);
   lines.push(`Final Purchase Total: ${finalTotal>0 ? money(finalTotal) : '—'}`);
   return lines.join('\n');
 }
 function shareSlipOnWhatsApp(){
+  if(!dueDateOkToProceed())return;
   const text = buildSlipShareText();
   window.open('https://wa.me/?text='+encodeURIComponent(text), '_blank');
 }
@@ -1018,11 +1521,12 @@ function shareDealFromHistory(id){ openDeal(id); shareSlipOnWhatsApp(); }
 const printDateEl = document.getElementById('printDate');
 if(printDateEl) printDateEl.textContent = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
 
-if(!document.getElementById('hSlipNo').value) setFieldValue('hSlipNo', nextSlipNo());
-renderDirectorSelect();
 renderItems();
 renderSummary();
 renderDealHistory();
+startDealsSync();
+startSettingsSync();
+tryOpenDeepLinkDeal(); // in case localStorage's cached deals already has it, before the cloud sync even answers
 </script>
 </body>
 </html>

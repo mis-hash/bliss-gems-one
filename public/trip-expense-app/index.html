@@ -322,6 +322,7 @@ if(window.self!==window.top){
 </div>
 <div class="field"><label>Start Date *</label><input type="date" id="editTripStart"></div>
 <div class="field"><label>Hisaab Due *</label><input type="date" id="editTripDue"></div>
+<div class="field span2 hidden" id="editTripReceivedByWrap"><label>Received By <small style="font-weight:400;color:var(--muted)">(trip close karte waqt cash/transfer kisne liya)</small></label><input type="text" id="editTripReceivedBy" placeholder="e.g. Amit Sharma"></div>
 </div><div class="actions"><button class="btn" onclick="hide('editTripModal')">Cancel</button><button class="btn primary" id="editTripSaveBtn" onclick="saveEditTrip()">Save</button></div><div class="msg" id="editTripMsg"></div></div></div>
 
 <script>
@@ -372,6 +373,10 @@ let EXPENSE_CATEGORIES=['Hotel','Breakfast','Lunch','Dinner','Food','Tea / Snack
 let ledgerHeads={cash:'Cash-in-Hand',advance:'Staff Advance A/c',categories:{Hotel:'Travelling Expenses',Breakfast:'Business Promotion Exp.',Lunch:'Business Promotion Exp.',Dinner:'Business Promotion Exp.',Food:'Business Promotion Exp.','Tea / Snacks':'Business Promotion Exp.','Taxi / Cab':'Travelling Expenses','Local Conveyance':'Travelling Expenses',Bus:'Travelling Expenses',Train:'Travelling Expenses',Flight:'Travelling Expenses',Fuel:'Travelling Expenses','Toll / Parking':'Travelling Expenses','Party Entertainment':'Business Promotion Exp.','Sample / Gift to Party':'Business Promotion Exp.','Courier / Parcel':'Miscellaneous Expenses','Mobile / Internet':'Miscellaneous Expenses','Stationery / Printing':'Miscellaneous Expenses','Porter / Coolie':'Travelling Expenses','Labour Charges':'Travelling Expenses','Godown / Warehouse':'Miscellaneous Expenses','Vehicle Repair':'Travelling Expenses',Medical:'Miscellaneous Expenses',Laundry:'Travelling Expenses','Bank / ATM Charges':'Miscellaneous Expenses',Misc:'Miscellaneous Expenses',Other:'Miscellaneous Expenses'}};
 let activity=[];
 let closeTripId=null,closeTripExpected=0;
+// Which of the doer's own (possibly several concurrent) active trips the Add
+// Expense/Transfer/Party Cash modals are currently acting on - set by the card's
+// own button before the modal opens, read by that modal's submit handler.
+let _activeSalesTripId=null;
 
 /* ===== Users (shared Universal Users list) ===== */
 function startUsersSync(){
@@ -617,6 +622,15 @@ function tripLedger(tripId){return ledger.filter(l=>l.tripId===tripId)}
 function tripIssued(tripId){return tripLedger(tripId).filter(l=>l.type==='advance'||l.type==='additional_advance'||l.type==='transfer_in'||l.type==='party_cash').reduce((s,l)=>s+Number(l.amount||0),0)}
 function tripExpense(tripId){return tripLedger(tripId).filter(l=>l.type==='expense'||l.type==='transfer_out').reduce((s,l)=>s+Number(l.amount||0),0)}
 function tripBalance(tripId){return tripIssued(tripId)-tripExpense(tripId)}
+// Closing a trip (confirmCloseTrip) records what was actually paid back separately, as
+// returnedAmount on the trip doc - it doesn't touch the ledger. So the raw advance-minus-
+// expense balance alone still shows the pre-settlement figure forever after a trip closes.
+// Anywhere a human-facing "Balance" is shown, net that settlement out too.
+function tripOutstanding(tripId){
+  const t=trips.find(x=>x.id===tripId);
+  const raw=tripBalance(tripId);
+  return (t&&t.status==='closed')?raw-(t.returnedAmount||0):raw;
+}
 // Shared row renderer for transfer_in/transfer_out/party_cash entries - used anywhere an
 // expense list is shown (My Trip's Recent Expenses, Admin's per-trip detail, the Ledger
 // timeline) so these self-service money movements are visible everywhere, not just on
@@ -644,7 +658,7 @@ async function deleteLedgerEntry(id,tripId){
   }catch(e){ console.error('delete ledger entry failed',e); alert('Delete fail ho gaya, dobara try karein.'); }
 }
 const NON_ADVANCE_LEDGER_TYPES=['expense','transfer_in','transfer_out','party_cash'];
-function isOverdue(t){return t.status!=='closed' && t.dueDate && t.dueDate<todayISO()}
+function isOverdue(t){return t.status!=='closed' && t.dueDate && t.dueDate<=todayISO()}
 
 /* ===== Issue / Extra / Expense / Hisaab / Close / Book ===== */
 function locationCheckboxHtml(l){return `<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;background:var(--mint);border-radius:6px;padding:4px 8px;cursor:pointer"><input type="checkbox" value="${esc(l)}" style="width:auto" onchange="updateIssueSuggestion()"> ${esc(l)}</label>`}
@@ -790,9 +804,10 @@ async function submitExtra(){
 // Two Sales people in the field sometimes hand cash to each other when one runs short -
 // self-service so neither has to route it through Admin, but recorded on both trips so it's
 // never just untracked cash changing hands.
-function openTransferModal(){
-  const myTrip=mySalesTrip();
+function openTransferModal(tripId){
+  const myTrip=trips.find(t=>t.id===tripId)||mySalesTrip();
   if(!myTrip){alert('Koi active trip nahi hai.');return}
+  _activeSalesTripId=myTrip.id;
   const others=trips.filter(t=>t.status!=='closed' && t.salesId!==currentUser);
   $('transferToTrip').innerHTML='<option value="">Select Sales Person</option>'+others.map(t=>`<option value="${esc(t.id)}">${esc(t.salesName)} (${esc(t.location)})</option>`).join('');
   $('transferAmount').value='';$('transferRemark').value='';$('transferMsg').textContent='';
@@ -801,7 +816,7 @@ function openTransferModal(){
 let _transferSubmitting=false;
 async function submitTransfer(){
   if(_transferSubmitting)return;
-  const myTrip=mySalesTrip();
+  const myTrip=trips.find(t=>t.id===_activeSalesTripId)||mySalesTrip();
   const toTripId=$('transferToTrip').value;
   const amount=Number($('transferAmount').value);
   const remark=$('transferRemark').value.trim();
@@ -831,16 +846,17 @@ async function submitTransfer(){
 // Sales sometimes uses cash collected directly from a party to cover trip expenses -
 // self-service entry, but Admin/Director get notified immediately since it's the company's
 // money from that party's account being spent, not a company-issued advance.
-function openPartyCashModal(){
-  const myTrip=mySalesTrip();
+function openPartyCashModal(tripId){
+  const myTrip=trips.find(t=>t.id===tripId)||mySalesTrip();
   if(!myTrip){alert('Koi active trip nahi hai.');return}
+  _activeSalesTripId=myTrip.id;
   $('partyCashName').value='';$('partyCashAmount').value='';$('partyCashRemark').value='';$('partyCashMsg').textContent='';
   show('partyCashModal');
 }
 let _partyCashSubmitting=false;
 async function submitPartyCash(){
   if(_partyCashSubmitting)return;
-  const myTrip=mySalesTrip();
+  const myTrip=trips.find(t=>t.id===_activeSalesTripId)||mySalesTrip();
   const partyName=$('partyCashName').value.trim();
   const amount=Number($('partyCashAmount').value);
   const remark=$('partyCashRemark').value.trim();
@@ -888,16 +904,17 @@ function mySalesTrip(){
 function mySalesTrips(){
   return trips.filter(t=>t.salesId===currentUser).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
 }
-function openExpenseModal(){
-  const trip=mySalesTrip();
+function openExpenseModal(tripId){
+  const trip=trips.find(t=>t.id===tripId)||mySalesTrip();
   if(!trip){alert('Koi active trip nahi hai.');return}
+  _activeSalesTripId=trip.id;
   $('expCategory').value='Hotel';$('expAmount').value='';$('expPaidTo').value='';$('expProof').value='';$('expRemark').value='';$('expMsg').textContent='';
   show('expense');
 }
 let _expenseSubmitting=false;
 async function submitExpense(){
   if(_expenseSubmitting)return;
-  const trip=mySalesTrip();
+  const trip=trips.find(t=>t.id===_activeSalesTripId)||mySalesTrip();
   const msg=$('expMsg');
   if(!trip){msg.style.color='#b43a35';msg.textContent='Koi active trip nahi hai.';return}
   const category=$('expCategory').value.trim(),amount=Number($('expAmount').value),paidTo=$('expPaidTo').value.trim(),remark=$('expRemark').value.trim();
@@ -937,8 +954,8 @@ function hisaabSummaryLines(tripId){
   lines.push(balance>0?`💵 Company ko lena hai: ${money(balance)}`:balance<0?`💸 Company ko dena hai: ${money(-balance)}`:`✅ Hisaab barabar hai`);
   return lines.join('\n');
 }
-async function submitHisaab(){
-  const trip=mySalesTrip();
+async function submitHisaab(tripId){
+  const trip=trips.find(t=>t.id===tripId)||mySalesTrip();
   if(!trip){alert('Koi active trip nahi hai.');return}
   if(!confirm('Hisaab submit karein? Iske baad Admin verify karega.'))return;
   await db.collection('te_trips').doc(trip.id).update({status:'hisaab_submitted'});
@@ -989,14 +1006,22 @@ async function confirmCloseTrip(){
   const mode=$('closeReturnMode').value;
   const balance=closeTripExpected;
   const nocNumber='NOC-'+tripId;
-  await db.collection('te_trips').doc(tripId).update({status:'closed',closedAt:new Date().toISOString(),nocNumber,finalBalance:balance,returnedAmount:returned,returnedVia:mode});
+  const closerName=(myUserObj()||{}).name||currentUser;
+  await db.collection('te_trips').doc(tripId).update({status:'closed',closedAt:new Date().toISOString(),nocNumber,finalBalance:balance,returnedAmount:returned,returnedVia:mode,closedBy:closerName});
   hide('closeTripModal');
   logActivity(`${(myUserObj()||{}).name||currentUser} closed ${tripId}`,`${nocNumber} generated · ${trip.salesName} · ${money(returned)} via ${mode}`);
+  toast(`Trip closed • Received ${money(returned)} via ${mode}`);
   if(notifySettings.closed){
     const sales=users.find(u=>u.id===trip.salesId);
     const msg=renderTemplate(messageTemplates.closed,{noc:nocNumber,name:trip.salesName,location:trip.location,tripId,balance:money(balance),returned:money(returned),mode});
     if(sales)sendWA(sales.phone,msg);
-    usersWithRole('admin').concat(usersWithRole('accounts')).forEach(u=>sendWA(u.phone,msg));
+    // Hitesh and Ankur get the overall Director insights/escalation notices already -
+    // don't also put every single NOC in their chat, only the actual closers (admin) and
+    // accounts (who book it) need the per-trip message.
+    const NOC_EXCLUDED_NAMES=['hitesh','ankur'];
+    usersWithRole('admin').concat(usersWithRole('accounts'))
+      .filter(u=>!NOC_EXCLUDED_NAMES.some(n=>String(u.name||'').trim().toLowerCase().startsWith(n)))
+      .forEach(u=>sendWA(u.phone,msg));
   }
 }
 async function markBooked(tripId){
@@ -1098,9 +1123,11 @@ function renderAdminPage(){
       overdue:{stripe:'var(--red)',avatarBg:'var(--redbg)',avatarColor:'var(--red)',badgeBg:'var(--redbg)',badgeColor:'var(--red)',label:'Overdue'},
       verify:{stripe:'var(--amber)',avatarBg:'var(--amberbg)',avatarColor:'var(--amber)',badgeBg:'var(--amberbg)',badgeColor:'var(--amber)',label:'To Verify'}
     }[state];
+    const advanceBtn=state==='active'?`<button class="btn" style="margin-left:8px" onclick="event.stopPropagation();openExtraModal('${esc(t.id)}')">+ Advance</button>`:'';
+    const closeBtn=`<button class="btn" style="margin-left:8px" onclick="event.stopPropagation();closeTrip('${esc(t.id)}')">⚑ Close Trip</button>`;
     const action=state==='verify'
       ?`<button class="btn primary" style="margin-left:8px" onclick="event.stopPropagation();closeTrip('${esc(t.id)}')">✓ Verify &amp; Close</button>`
-      :(state==='active'?`<button class="btn" style="margin-left:8px" onclick="event.stopPropagation();openExtraModal('${esc(t.id)}')">+ Advance</button>`:'');
+      :advanceBtn+closeBtn;
     return `<div class="trip-row" style="cursor:pointer" onclick="openTripDetail('${esc(t.id)}')">
     <div class="stripe" style="background:${colors.stripe}"></div>
     <div class="avatar" style="background:${colors.avatarBg};color:${colors.avatarColor}">${esc(initials)}</div>
@@ -1142,10 +1169,7 @@ function viewMyTripLedger(tripId){
   p.dataset.filled='';renderLedgerPage();
   p.value=tripId;renderLedgerPage();
 }
-function renderSalesPage(){
-  const wrap=$('salesWrap');
-  const trip=mySalesTrip();
-  if(!trip){wrap.innerHTML='<div class="panel"><div class="pb"><small>Abhi koi active trip nahi hai. Admin se advance issue karwayein.</small></div></div>'+myPastTripsPanel();return}
+function salesTripCardHtml(trip){
   const issued=tripIssued(trip.id),expense=tripExpense(trip.id),balance=issued-expense;
   const companyAdvance=tripLedger(trip.id).filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0);
   const partyCash=tripLedger(trip.id).filter(l=>l.type==='party_cash').reduce((s,l)=>s+Number(l.amount||0),0);
@@ -1153,13 +1177,23 @@ function renderSalesPage(){
   const transferSent=tripLedger(trip.id).filter(l=>l.type==='transfer_out').reduce((s,l)=>s+Number(l.amount||0),0);
   const rows=tripLedger(trip.id).filter(l=>NON_ADVANCE_LEDGER_TYPES.includes(l.type)).sort((a,b)=>b.at.localeCompare(a.at)).map(l=>ledgerEntryRow(l)).join('')||'<div class="row"><small>Koi expense abhi tak nahi.</small></div>';
   const submitted=trip.status==='hisaab_submitted';
+  const dueReached=!submitted&&trip.dueDate&&trip.dueDate<=todayISO();
+  const tid=esc(trip.id);
   const submitBtn=submitted
     ?`<div class="big" style="background:var(--mint);color:var(--g);cursor:default;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.3"><span>✅ Hisaab Submitted<br><small style="font-weight:500">Admin verify karega</small></span></div>`
-    :`<button class="big primary" onclick="submitHisaab()"><span>✓</span>Submit Hisaab</button>`;
-  wrap.innerHTML=`<div class="trip"><h1>My ${esc(trip.location)} Trip</h1><p>${esc(trip.id)} • ${esc(trip.salesName)} • Hisaab Due ${esc(trip.dueDate)}</p>
+    :`<button class="big primary" style="${dueReached?'background:var(--amber)':''}" onclick="submitHisaab('${tid}')"><span>✓</span>Submit Hisaab${dueReached?' ⏰':''}</button>`;
+  const dueBanner=dueReached?`<div class="row" style="background:var(--amberbg);border:1px solid var(--amber);border-radius:10px;margin:10px 0 0;color:var(--amber);font-weight:700"><small>⏰ Hisaab ki due date (${esc(trip.dueDate)}) aa gayi hai — Submit Hisaab zaroor karein.</small></div>`:'';
+  return `<div class="trip"><h1>My ${esc(trip.location)} Trip</h1><p>${esc(trip.id)} • ${esc(trip.salesName)} • Hisaab Due ${esc(trip.dueDate)}</p>${dueBanner}
   <div class="tripMoney"><div class="tm"><small>COMPANY ADVANCE</small><b>+ ${money(companyAdvance)}</b></div><div class="tm"><small>PARTY CASH</small><b>+ ${money(partyCash)}</b></div><div class="tm"><small>TRANSFER RECEIVED</small><b>+ ${money(transferReceived)}</b></div><div class="tm"><small>TRANSFER SENT</small><b>- ${money(transferSent)}</b></div><div class="tm"><small>MY EXPENSE</small><b>- ${money(expense)}</b></div><div class="tm"><small>BALANCE</small><b>${money(balance)}</b></div></div></div>
-  <div class="salesActions"><button class="big" onclick="openExpenseModal()"><span>＋</span>Add Expense</button><button class="big" onclick="go('ledger')"><span>📋</span>My Expenses</button><button class="big" onclick="openTransferModal()"><span>🔄</span>Transfer to Sales</button><button class="big" onclick="openPartyCashModal()"><span>＋</span>Add Fund From Party Cash</button>${submitBtn}</div>
-  <div class="panel"><div class="ph">Recent Activity</div><div class="pb">${rows}</div></div>`+myPastTripsPanel();
+  <div class="salesActions"><button class="big" onclick="openExpenseModal('${tid}')"><span>＋</span>Add Expense</button><button class="big" onclick="viewMyTripLedger('${tid}')"><span>📋</span>My Expenses</button><button class="big" onclick="openTransferModal('${tid}')"><span>🔄</span>Transfer to Sales</button><button class="big" onclick="openPartyCashModal('${tid}')"><span>＋</span>Add Fund From Party Cash</button>${submitBtn}</div>
+  <div class="panel"><div class="ph">Recent Activity</div><div class="pb">${rows}</div></div>`;
+}
+function renderSalesPage(){
+  const wrap=$('salesWrap');
+  const myTrips=mySalesTrips().filter(t=>t.status!=='closed');
+  if(!myTrips.length){wrap.innerHTML='<div class="panel"><div class="pb"><small>Abhi koi active trip nahi hai. Admin se advance issue karwayein.</small></div></div>'+myPastTripsPanel();return}
+  const heading=myTrips.length>1?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin:0 2px 8px">${myTrips.length} Active Trips</div>`:'';
+  wrap.innerHTML=heading+myTrips.map((t,i)=>salesTripCardHtml(t)).join('<div style="height:16px"></div>')+myPastTripsPanel();
 }
 function renderLedgerPage(){
   const picker=$('ledgerTripPicker');
@@ -1242,7 +1276,7 @@ function renderAccountsPage(){
     const issued=tripIssued(t.id),expense=tripExpense(t.id);
     const tag=t.bookedByAccounts?'<span class="tag">BOOKED</span>':'<span class="tag amber">READY TO BOOK</span>';
     return `<div class="person" style="cursor:pointer" onclick="openTripDetail('${esc(t.id)}')"><div class="pt"><div><h3>${esc(t.salesName)} • ${esc(t.location)} • ${esc(t.id)}</h3><p>${esc(t.purpose||'')} • ${esc(t.startDate)} → ${esc(t.dueDate)}</p></div>${tag}</div>
-    <div class="money"><div class="m"><small>ISSUED</small><b>${money(issued)}</b></div><div class="m"><small>EXPENSE</small><b>${money(expense)}</b></div><div class="m"><small>STATUS</small><b>${esc(t.status)}</b></div><div class="m"><small>NOC</small><b>${esc(t.nocNumber||'-')}</b></div>
+    <div class="money"><div class="m"><small>ISSUED</small><b>${money(issued)}</b></div><div class="m"><small>EXPENSE</small><b>${money(expense)}</b></div><div class="m"><small>RECEIVED</small><b>${money(t.returnedAmount||0)}</b></div><div class="m"><small>RECEIVED BY</small><b>${esc(t.closedBy||'-')}</b></div><div class="m"><small>STATUS</small><b>${esc(t.status)}</b></div><div class="m"><small>NOC</small><b>${esc(t.nocNumber||'-')}</b></div>
     <div class="m"><small>ACTION</small>${!t.bookedByAccounts?`<button class="btn primary" onclick="event.stopPropagation();markBooked('${esc(t.id)}')">Mark Booked</button>`:''}</div></div></div>`;
   }).join('');
 }
@@ -1382,16 +1416,18 @@ function exportBusy(){
 /* ===== Trip Detail modal (reused by Explorer/Bookkeeping/Search) ===== */
 function openTripDetail(tripId){
   const t=trips.find(x=>x.id===tripId);if(!t)return;
-  const issued=tripIssued(tripId),expense=tripExpense(tripId),balance=issued-expense;
+  const issued=tripIssued(tripId),expense=tripExpense(tripId),balance=tripOutstanding(tripId);
   const companyAdvance=tripLedger(tripId).filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0);
   const partyCash=tripLedger(tripId).filter(l=>l.type==='party_cash').reduce((s,l)=>s+Number(l.amount||0),0);
   const transferReceived=tripLedger(tripId).filter(l=>l.type==='transfer_in').reduce((s,l)=>s+Number(l.amount||0),0);
   const transferSent=tripLedger(tripId).filter(l=>l.type==='transfer_out').reduce((s,l)=>s+Number(l.amount||0),0);
   const entries=tripLedger(tripId).filter(l=>NON_ADVANCE_LEDGER_TYPES.includes(l.type)).sort((a,b)=>b.at.localeCompare(a.at));
   const rows=entries.map(l=>ledgerEntryRow(l,canEditTripDates())).join('')||'<div class="row"><small>Koi expense nahi hai.</small></div>';
+  const settledNote=t.status==='closed'?`<div style="background:var(--mint);border:1.5px solid var(--g);border-radius:10px;padding:12px 14px;margin-top:10px;font-size:14px;font-weight:700;color:var(--g)">✓ Received ${money(t.returnedAmount||0)} <span style="background:#fff;border:1.5px solid var(--g);border-radius:99px;padding:3px 11px;font-size:12px;font-weight:800;letter-spacing:.02em;white-space:nowrap">${esc(t.returnedVia||'')}</span>${t.closedBy?`<br><span style="font-size:12px;font-weight:600">by ${esc(t.closedBy)}</span>`:''}</div>`:'';
   $('tripDetailBody').innerHTML=`<h3>${esc(t.id)} • ${esc(t.location)}</h3>
   <p style="font-size:13px;color:var(--muted);margin:-8px 0 12px">${esc(t.salesName)} • ${esc(t.purpose||'')} • Due ${esc(t.dueDate)} ${t.nocNumber?`• NOC ${esc(t.nocNumber)}`:''} ${canEditTripDates()?`<button class="btn" style="padding:2px 8px;font-size:11px;margin-left:6px" onclick="openEditTripModal('${esc(t.id)}')">✎ Edit Trip</button>`:''}</p>
   <div class="money" style="grid-template-columns:repeat(3,1fr)"><div class="m"><small>COMPANY ADVANCE</small><b>+ ${money(companyAdvance)}</b></div><div class="m"><small>PARTY CASH</small><b>+ ${money(partyCash)}</b></div><div class="m"><small>TRANSFER RECEIVED</small><b>+ ${money(transferReceived)}</b></div><div class="m"><small>TRANSFER SENT</small><b>- ${money(transferSent)}</b></div><div class="m"><small>SPENT</small><b>- ${money(expense)}</b></div><div class="m"><small>BALANCE</small><b>${money(balance)}</b></div></div>
+  ${settledNote}
   <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin:14px 0 6px">Activity</div>${rows}`;
   show('tripDetailModal');
 }
@@ -1428,18 +1464,23 @@ function openEditTripModal(tripId){
   renderEditTripLocationChecks(currentLocations);
   $('editTripStart').value=t.startDate||'';
   $('editTripDue').value=t.dueDate||'';
+  $('editTripReceivedByWrap').classList.toggle('hidden',t.status!=='closed');
+  $('editTripReceivedBy').value=t.closedBy||'';
   $('editTripMsg').textContent='';
   show('editTripModal');
 }
 async function saveEditTrip(){
   if(!_editTripId)return;
+  const t=trips.find(x=>x.id===_editTripId);
   const location=getSelectedEditTripLocations().join(' & '),start=$('editTripStart').value,due=$('editTripDue').value;
   const msg=$('editTripMsg');
   if(!location||!start||!due){msg.style.color='#b43a35';msg.textContent='Sabhi fields bharein, kam se kam 1 location select karein.';return}
   if(due<start){msg.style.color='#b43a35';msg.textContent='Due date, Start date se pehle nahi ho sakti.';return}
+  const patch={location,startDate:start,dueDate:due};
+  if(t&&t.status==='closed')patch.closedBy=$('editTripReceivedBy').value.trim();
   const btn=$('editTripSaveBtn');if(btn)btn.disabled=true;
   try{
-    await db.collection('te_trips').doc(_editTripId).update({location,startDate:start,dueDate:due});
+    await db.collection('te_trips').doc(_editTripId).update(patch);
   }catch(e){
     console.error('edit trip failed',e);
     msg.style.color='#b43a35';msg.textContent='Save fail ho gaya, dobara try karein.';
@@ -1473,12 +1514,12 @@ function renderExplorerPage(){
   const showAction=canDelete&&showDeleted;
   const wrap=$('explorerList');
   if(!list.length){wrap.innerHTML=`<small>${showDeleted?'Koi deleted trip nahi hai.':'Koi trip nahi mili.'}</small>`;return}
-  wrap.innerHTML=`<div style="overflow-x:auto"><table class="dtb"><thead><tr><th>Trip</th><th>Sales Person</th><th>Location</th><th>Purpose</th><th>Advance</th><th>Spent</th><th>Balance</th><th>Status</th>${showAction?'<th>Action</th>':''}</tr></thead><tbody>`+
+  wrap.innerHTML=`<div style="overflow-x:auto"><table class="dtb"><thead><tr><th>Trip</th><th>Sales Person</th><th>Location</th><th>Purpose</th><th>Advance</th><th>Spent</th><th>Received</th><th>Balance</th><th>Status</th>${showAction?'<th>Action</th>':''}</tr></thead><tbody>`+
   list.map(t=>{
-    const issued=tripIssued(t.id),expense=tripExpense(t.id),balance=issued-expense;
+    const issued=tripIssued(t.id),expense=tripExpense(t.id),balance=tripOutstanding(t.id);
     const statusLabel=t.status==='closed'?'Closed':(t.status==='hisaab_submitted'?'To Verify':(isOverdue(t)?'Overdue':'Active'));
     const action=`<button class="btn" onclick="event.stopPropagation();restoreTrip('${esc(t.id)}')">↩ Restore</button>`;
-    return `<tr onclick="openTripDetail('${esc(t.id)}')"><td>${esc(t.id)}</td><td>${esc(t.salesName)}</td><td>${esc(t.location)}</td><td>${esc(t.purpose||'-')}</td><td>${money(issued)}</td><td>${money(expense)}</td><td>${money(balance)}</td><td>${esc(statusLabel)}</td>${showAction?`<td>${action}</td>`:''}</tr>`;
+    return `<tr onclick="openTripDetail('${esc(t.id)}')"><td>${esc(t.id)}</td><td><b style="font-size:13.5px">${esc(t.salesName)}</b></td><td>${esc(t.location)}</td><td>${esc(t.purpose||'-')}</td><td>${money(issued)}</td><td>${money(expense)}</td><td>${t.status==='closed'?money(t.returnedAmount||0):'-'}</td><td>${money(balance)}</td><td>${esc(statusLabel)}</td>${showAction?`<td>${action}</td>`:''}</tr>`;
   }).join('')+`</tbody></table></div>`;
 }
 async function deleteTrip(tripId,skipConfirm){
