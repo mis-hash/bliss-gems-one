@@ -429,6 +429,19 @@ function formatDueDate(isoStr){
   return isNaN(d) ? isoStr : d.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
 }
 function esc(s){ return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+// Party/Broker/Slip No./Final Total/Due Date live in static (never-recreated) inputs, set
+// via the .value PROPERTY (typing, or JS like openDeal()/autoSaveDraft()). That property
+// change never updates the HTML value ATTRIBUTE. Some phones' "Print"/"Share as PDF" paths
+// snapshot the page's serialized HTML rather than the live render tree, so those fields
+// printed as blank even though they were visibly filled in on screen — keep the attribute
+// mirrored to the property everywhere these fields are set, so a static-HTML snapshot still
+// shows the real value.
+function setFieldValue(id, val){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.value = val;
+  el.setAttribute('value', val);
+}
 
 /* ===== Party/Broker/Item Name searchable dropdown (same pattern as Bliss One / Parcel Dispatch combos) ===== */
 function comboInputId(which, idx){ return which==='party' ? 'hParty' : which==='broker' ? 'hBroker' : `itemNameInput${idx}`; }
@@ -457,6 +470,7 @@ function renderComboMenu(which, idx){
 }
 function onComboInput(which, idx){
   if(which==='item') updateItemName(idx, document.getElementById(comboInputId('item', idx)).value);
+  else document.getElementById(comboInputId(which)).setAttribute('value', document.getElementById(comboInputId(which)).value);
   renderComboMenu(which, idx);
   autoSaveDraft();
 }
@@ -475,6 +489,7 @@ function handleComboMouseDown(e, which, idx){
     return;
   }
   inputEl.value = val;
+  inputEl.setAttribute('value', val);
   document.getElementById(comboMenuId(which, idx)).classList.remove('show');
   if(which==='item') updateItemName(idx, val);
   if(which==='party') autoFillBrokerForParty(val);
@@ -494,7 +509,7 @@ function autoFillBrokerForParty(partyName){
   const brokerInput = document.getElementById('hBroker');
   if(!brokerInput || brokerInput.value.trim()) return;
   const broker = latestBrokerForParty(partyName);
-  if(broker) brokerInput.value = broker;
+  if(broker) setFieldValue('hBroker', broker);
 }
 document.addEventListener('click', (e)=>{
   document.querySelectorAll('.comboBox').forEach(box=>{
@@ -646,7 +661,7 @@ function renderItems(){
 function refreshFinalTotalDependents(){
   const finalTotalInput = document.getElementById('hFinalTotal');
   const avgTotal = currentAvgTotal();
-  if(finalTotalAuto) finalTotalInput.value = avgTotal>0 ? String(Math.round(avgTotal)) : '';
+  if(finalTotalAuto) setFieldValue('hFinalTotal', avgTotal>0 ? String(Math.round(avgTotal)) : '');
   const finalTotal = Number(finalTotalInput.value)||0;
   const diffPct = (finalTotal>0 && avgTotal>0) ? ((finalTotal-avgTotal)/avgTotal*100) : null;
   const dueDateValueStr = document.getElementById('hDueDate').value;
@@ -727,10 +742,14 @@ function refreshFinalTotalDependents(){
   else dueWrap.style.display='none';
 }
 function onFinalTotalInput(){
+  const el = document.getElementById('hFinalTotal');
+  el.setAttribute('value', el.value);
   refreshFinalTotalDependents();
   autoSaveDraft();
 }
 function onDueDateInput(){
+  const el = document.getElementById('hDueDate');
+  el.setAttribute('value', el.value);
   refreshFinalTotalDependents();
   autoSaveDraft();
 }
@@ -752,7 +771,7 @@ function autoSaveDraft(){
   // Slip No. is already generated the moment the New Deal screen opens (see startNewDeal()/
   // page load below) — reuse it here instead of generating a second one, so the number the
   // user saw on screen is exactly the one that gets saved.
-  if(!currentDealId){ currentDealId = genId(); if(!document.getElementById('hSlipNo').value) document.getElementById('hSlipNo').value = nextSlipNo(); }
+  if(!currentDealId){ currentDealId = genId(); if(!document.getElementById('hSlipNo').value) setFieldValue('hSlipNo', nextSlipNo()); }
   const slipNo = document.getElementById('hSlipNo').value || nextSlipNo();
   const record = { id: currentDealId, slipNo, note, party, broker, itemNames, g1Name, g2Name, g3Name,
     avg: avgTotal, final: finalTotal, dueDate, items: JSON.parse(JSON.stringify(items)) };
@@ -769,10 +788,10 @@ function startNewDeal(){
   currentDealId = null;
   finalTotalAuto = true;
   items = [newItem()];
-  ['hParty','hBroker','hFinalTotal','hDueDate'].forEach(id=>document.getElementById(id).value='');
+  ['hParty','hBroker','hFinalTotal','hDueDate'].forEach(id=>setFieldValue(id,''));
   // Slip No. shows right away, like a physical purchase slip already has its number
   // printed before anyone fills it in — not just after the first lot is entered.
-  document.getElementById('hSlipNo').value = nextSlipNo();
+  setFieldValue('hSlipNo', nextSlipNo());
   document.getElementById('draftStatusWrap').style.display = 'none';
   document.getElementById('dealFormTitle').textContent = '➕ New Deal';
   renderItems();
@@ -783,14 +802,14 @@ function openDeal(id){
   if(!d) return;
   currentDealId = d.id;
   finalTotalAuto = false; // preserve this saved deal's own Final Total, don't silently auto-overwrite it
-  document.getElementById('hParty').value = d.party||'';
-  document.getElementById('hBroker').value = d.broker||'';
-  document.getElementById('hSlipNo').value = d.slipNo||'';
+  setFieldValue('hParty', d.party||'');
+  setFieldValue('hBroker', d.broker||'');
+  setFieldValue('hSlipNo', d.slipNo||'');
   g1Name = d.g1Name||'Hitesh Dusad';
   g2Name = d.g2Name||'Nitesh Dusad';
   g3Name = d.g3Name||'Ankur Khandelwal';
-  document.getElementById('hFinalTotal').value = d.final||'';
-  document.getElementById('hDueDate').value = d.dueDate||'';
+  setFieldValue('hFinalTotal', d.final||'');
+  setFieldValue('hDueDate', d.dueDate||'');
   items = Array.isArray(d.items) ? JSON.parse(JSON.stringify(d.items))
     : [{name: d.item||'', lots: Array.isArray(d.lots)?JSON.parse(JSON.stringify(d.lots)):[]}];
   if(!items.length) items = [newItem()];
@@ -999,7 +1018,7 @@ function shareDealFromHistory(id){ openDeal(id); shareSlipOnWhatsApp(); }
 const printDateEl = document.getElementById('printDate');
 if(printDateEl) printDateEl.textContent = new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
 
-if(!document.getElementById('hSlipNo').value) document.getElementById('hSlipNo').value = nextSlipNo();
+if(!document.getElementById('hSlipNo').value) setFieldValue('hSlipNo', nextSlipNo());
 renderDirectorSelect();
 renderItems();
 renderSummary();
