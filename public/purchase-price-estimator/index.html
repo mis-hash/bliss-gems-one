@@ -234,6 +234,15 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
   input{border:none !important;background:transparent !important;padding:2px 0 !important;box-shadow:none !important;color:#000 !important}
   .readonly,.costcell{background:#F2F2F2 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   th,td{border-color:#999}
+  /* The lot table's normal screen sizing (comfortable padding/font for a wide monitor) runs
+     well past A4's printable width and was getting clipped on the right - force it to fit
+     the page instead of overflowing, same idea as the narrow-phone shrink above. */
+  .tableWrap{overflow:visible}
+  table.itemTable{table-layout:fixed;width:100%;font-size:9px}
+  .itemTable th{padding:4px 2px;font-size:7.5px;white-space:normal;line-height:1.2}
+  .itemTable th input{width:100%;padding:1px 0;font-size:7.5px}
+  .itemTable td{padding:4px 2px}
+  .itemTable td input{width:100%;padding:1px 0;font-size:9px}
 }
 </style>
 </head>
