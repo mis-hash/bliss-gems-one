@@ -37,7 +37,7 @@ if(localStorage.getItem('bliss_force_desktop')==='1')document.getElementById('vi
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<!-- Trip Summary PDF (auto-sent to Nitesh Dusad on Close Trip) - html2canvas + jsPDF loaded
+<!-- Trip Summary PDF (auto-sent to Hitesh and Nitesh Dusad on Close Trip) - html2canvas + jsPDF loaded
      as separate libraries and driven directly, not via the html2pdf.js convenience chain
      (see Purchase Price Estimator's generateSlipPdfBlob for why: that chain repeatedly
      produced a correctly-sized but completely content-free PDF with no error to catch). -->
@@ -81,7 +81,7 @@ table.dtb td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px}tab
    lets "📱 Mobile View" preview mobile layout on a real desktop browser, where the viewport
    meta tag hack has no visible effect at all. */
 body.te-force-mobile header{height:60px}body.te-force-mobile .head{padding:0 11px}body.te-force-mobile .logo{width:38px;height:38px;font-size:22px}body.te-force-mobile .brand b{font-size:16px}body.te-force-mobile .brand small,body.te-force-mobile .live{display:none}body.te-force-mobile .shell{display:block;padding:11px 10px 76px}body.te-force-mobile nav{display:none}body.te-force-mobile .hero{padding:17px}body.te-force-mobile .hero h1{font-size:20px}body.te-force-mobile .hero strong{font-size:23px}body.te-force-mobile .cards{grid-template-columns:1fr 1fr}body.te-force-mobile .money{grid-template-columns:1fr 1fr}body.te-force-mobile .money .m:last-child:nth-child(odd){grid-column:1/-1}body.te-force-mobile .analytics{grid-template-columns:1fr}body.te-force-mobile .tripMoney{grid-template-columns:1fr 1fr}body.te-force-mobile .tripMoney .tm:last-child:nth-child(odd){grid-column:1/-1}body.te-force-mobile .salesActions{grid-template-columns:1fr}body.te-force-mobile .big{min-height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;text-align:left}body.te-force-mobile .big span{margin:0}body.te-force-mobile .fields{grid-template-columns:1fr}body.te-force-mobile .span2{grid-column:auto}body.te-force-mobile .bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}body.te-force-mobile .bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:0 0 auto;padding:2px 12px;white-space:nowrap}body.te-force-mobile .bottomNav button.hidden{display:none}body.te-force-mobile .bottomNav span{display:block;font-size:19px}body.te-force-mobile .bottomNav button.on{color:var(--g)}
-/* Trip Summary PDF (sent to Nitesh Dusad on Close Trip) - built as its own standalone
+/* Trip Summary PDF (sent to Hitesh and Nitesh Dusad on Close Trip) - built as its own standalone
    markup (not a clone of any on-screen panel, unlike Purchase Price Estimator's PDF, since
    this app has no equivalent single panel to clone) and rendered off-screen for capture. */
 .tripPdfWrap{font-family:Arial,sans-serif;background:#fff;color:var(--txt)}
@@ -1068,9 +1068,9 @@ async function confirmCloseTrip(){
       .filter(u=>!NOC_EXCLUDED_NAMES.some(n=>String(u.name||'').trim().toLowerCase().startsWith(n)))
       .forEach(u=>sendWA(u.phone,msg));
   }
-  sendTripSummaryToNitesh(tripId,{returned,mode,nocNumber,closerName});
+  sendTripSummaryToDirectors(tripId,{returned,mode,nocNumber,closerName});
 }
-/* ===== Trip Summary PDF, auto-sent to Nitesh Dusad on Close Trip ===== */
+/* ===== Trip Summary PDF, auto-sent to Hitesh and Nitesh Dusad on Close Trip ===== */
 function fmtDateShort(isoStr){
   if(!isoStr)return '—';
   const d=new Date(isoStr.length<=10?isoStr+'T00:00:00':isoStr);
@@ -1157,6 +1157,7 @@ function buildTripSummaryHtml(tripId,extra){
     <div class="tripPdfNocCard">
       <div class="row2"><span class="lbl">NOC Number</span><span class="val">${esc(extra.nocNumber)}</span></div>
       ${nocRows}
+      <div class="row2"><span class="lbl">Received By</span><span class="val">${esc(extra.closerName)}</span></div>
     </div>
     <div class="tripPdfFooter">Bliss Gems &amp; Minerals — Trip Expense App</div>
   </div>`;
@@ -1203,15 +1204,16 @@ async function generateTripSummaryPdfBlob(tripId,extra){
   }catch(e){console.error('Trip Summary PDF generation failed:',e);return null;}
   finally{wrap.remove();}
 }
-async function sendTripSummaryToNitesh(tripId,extra){
-  const nitesh=findUserByName('nitesh dusad')||findUserByName('nitesh');
-  if(!nitesh||!nitesh.phone){console.warn('Nitesh Dusad not found or has no phone - Trip Summary PDF not sent');return;}
+async function sendTripSummaryToDirectors(tripId,extra){
+  const recipients=[findUserByName('hitesh dusad')||findUserByName('hitesh'),findUserByName('nitesh dusad')||findUserByName('nitesh')]
+    .filter(u=>u&&u.phone);
+  if(!recipients.length){console.warn('Hitesh/Nitesh Dusad not found or have no phone - Trip Summary PDF not sent');return;}
   const blob=await generateTripSummaryPdfBlob(tripId,extra);
   if(!blob)return;
   const trip=trips.find(t=>t.id===tripId);
   const locationPart=(trip&&trip.location?trip.location:'Trip').replace(/[\\/:*?"<>|]/g,'').trim();
   const fileName=`Trip Summary - ${locationPart} - ${tripId}.pdf`;
-  await sendTripFileWA(nitesh.phone,blob,fileName);
+  recipients.forEach(u=>sendTripFileWA(u.phone,blob,fileName));
 }
 async function markBooked(tripId){
   await db.collection('te_trips').doc(tripId).update({bookedByAccounts:true});
