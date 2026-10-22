@@ -410,8 +410,8 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
       <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
         <input type="text" id="dealSearch" placeholder="🔍 Search party, broker, item or slip no..." oninput="renderDealHistory()" style="flex:1;min-width:220px;padding:10px 13px;border:1.5px solid var(--line-strong);border-radius:var(--radius-md);font-size:13.5px;background:var(--surface);color:var(--ink)">
         <div style="display:flex;gap:6px">
-          <button class="btn small dealFilterBtn active" data-filter="all" onclick="setDealFilter('all')">All</button>
-          <button class="btn small dealFilterBtn" data-filter="pending" onclick="setDealFilter('pending')">Pending</button>
+          <button class="btn small dealFilterBtn" data-filter="all" onclick="setDealFilter('all')">All</button>
+          <button class="btn small dealFilterBtn active" data-filter="pending" onclick="setDealFilter('pending')">Pending</button>
           <button class="btn small dealFilterBtn" data-filter="completed" onclick="setDealFilter('completed')">Completed</button>
         </div>
       </div>
@@ -1232,7 +1232,7 @@ function historicalMarkupPct(){
   return ((sumFinal-sumAvg)/sumAvg)*100;
 }
 let expandedDeals = {}; // index -> true/false
-let dealFilter = 'all'; // 'all' | 'pending' | 'completed'
+let dealFilter = 'pending'; // 'all' | 'pending' | 'completed'
 function setDealFilter(f){
   dealFilter = f;
   document.querySelectorAll('.dealFilterBtn').forEach(b=>b.classList.toggle('active', b.dataset.filter===f));
