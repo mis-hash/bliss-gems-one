@@ -1523,12 +1523,15 @@ async function generateSlipPdfBlob(){
     // chain) so the canvas can be verified to actually have content before it's ever handed
     // to jsPDF - three real-device tests through the html2pdf.js chain all came back a
     // correctly-sized but completely content-free PDF, with no error anywhere to catch.
-    const canvas = await html2canvas(wrap, {scale:2, backgroundColor:'#ffffff', windowWidth:420, scrollX:0, scrollY:0});
+    // scale:2 on a 420px-wide capture worked out to ~142 DPI on the printed page - soft/blurry
+    // once a reader pinch-zooms in on the hero title, per real device feedback. scale:3 roughly
+    // doubles the effective DPI for a real sharpness gain at a still-small file size increase.
+    const canvas = await html2canvas(wrap, {scale:3, backgroundColor:'#ffffff', windowWidth:420, scrollX:0, scrollY:0});
     if(!canvasHasContent(canvas)){
       console.error('Captured canvas has no visible content - aborting instead of sending a blank PDF');
       return null;
     }
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
     const { jsPDF } = window.jspdf;
     // Fixed A4 landscape left a lot of blank page below a short slip - mobile PDF viewers
     // then show the content as a small strip in the middle of a mostly-empty page (and some
