@@ -1208,7 +1208,10 @@ async function sendTripSummaryToNitesh(tripId,extra){
   if(!nitesh||!nitesh.phone){console.warn('Nitesh Dusad not found or has no phone - Trip Summary PDF not sent');return;}
   const blob=await generateTripSummaryPdfBlob(tripId,extra);
   if(!blob)return;
-  await sendTripFileWA(nitesh.phone,blob,tripId+'-summary.pdf');
+  const trip=trips.find(t=>t.id===tripId);
+  const locationPart=(trip&&trip.location?trip.location:'Trip').replace(/[\\/:*?"<>|]/g,'').trim();
+  const fileName=`Trip Summary - ${locationPart} - ${tripId}.pdf`;
+  await sendTripFileWA(nitesh.phone,blob,fileName);
 }
 async function markBooked(tripId){
   await db.collection('te_trips').doc(tripId).update({bookedByAccounts:true});
