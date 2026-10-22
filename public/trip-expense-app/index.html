@@ -85,10 +85,11 @@ body.te-force-mobile header{height:60px}body.te-force-mobile .head{padding:0 11p
    markup (not a clone of any on-screen panel, unlike Purchase Price Estimator's PDF, since
    this app has no equivalent single panel to clone) and rendered off-screen for capture. */
 .tripPdfWrap{font-family:Arial,sans-serif;background:#fff;color:var(--txt)}
-.tripPdfHero{background:linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:14px;padding:16px;margin-bottom:12px}
+.tripPdfHero{background:linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:14px;padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:12px}
 .tripPdfHero .eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.05em;opacity:.85;font-weight:700}
 .tripPdfHero h1{font-size:19px;margin:4px 0 2px;font-weight:800;font-family:inherit}
 .tripPdfHero p{margin:0;font-size:12px;opacity:.9}
+.tripPdfHeroBadge{flex:none;width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:#fff}
 .tripPdfTop{background:#F8FAF9;border-radius:12px;padding:10px 12px;margin-bottom:12px}
 .tripPdfTop .row2{display:flex;justify-content:space-between;padding:4px 0;font-size:12.5px}
 .tripPdfTop .row2 span.lbl{color:var(--muted);font-weight:600}
@@ -1137,9 +1138,12 @@ function buildTripSummaryHtml(tripId,extra){
       <div class="row2"><span class="lbl">Paid Via</span><span class="val">${esc(extra.mode)}</span></div>`;
   return `<div class="tripPdfWrap">
     <div class="tripPdfHero">
-      <div class="eyebrow">Trip Summary — Bliss Gems</div>
-      <h1>${esc(trip.location||'Trip')}</h1>
-      <p>${esc(tripId)} · Closed ${fmtDateShort(new Date().toISOString())}</p>
+      <div class="tripPdfHeroBadge">B</div>
+      <div>
+        <div class="eyebrow">Bliss Gems &amp; Minerals</div>
+        <h1>${esc(trip.location||'Trip')}</h1>
+        <p>${esc(tripId)} · Closed ${fmtDateShort(new Date().toISOString())}</p>
+      </div>
     </div>
     <div class="tripPdfTop">
       <div class="row2"><span class="lbl">Sales Person</span><span class="val">${esc(trip.salesName)}</span></div>
