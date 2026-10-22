@@ -288,9 +288,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(46%) sepia(25%
 .pdfExportMode .pdfLotCard .lotRow .val{font-weight:700}
 .pdfExportMode .pdfLotCard .lotRow.final{background:var(--warn);color:var(--warn-ink)}
 .pdfExportMode #printHeader{background:linear-gradient(135deg,#3A4550,#717E8C);color:#fff;border-radius:14px;padding:16px;margin-bottom:12px}
-.pdfExportMode #printHeader h2{color:#fff;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;opacity:.85;font-weight:700}
-.pdfExportMode #printHeader>div:first-of-type{color:#fff !important;font-size:19px !important;font-weight:800}
-.pdfExportMode #printHeader #printLegend{color:#fff !important;opacity:.85}
+.pdfExportMode .pdfHeroBadge{flex:none;width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:#fff}
 </style>
 </head>
 <body>
@@ -1480,11 +1478,22 @@ function buildPdfExportClone(){
   wrap.appendChild(clone);
   document.body.appendChild(wrap);
 
-  const slipNoEl = clone.querySelector('#printSlipNo');
-  if(slipNoEl) slipNoEl.textContent = document.getElementById('hSlipNo').value || '—';
-  const dateEl = clone.querySelector('#printDate');
+  // Replace the clone's header with a badge + full company name - only here, so the physical
+  // Print Slip (which shares this same #printHeader markup) keeps its plain original look.
+  const slipNoVal = document.getElementById('hSlipNo').value || '—';
   const livePrintDate = document.getElementById('printDate');
-  if(dateEl && livePrintDate) dateEl.textContent = livePrintDate.textContent;
+  const dateVal = livePrintDate ? livePrintDate.textContent : '';
+  const headerEl = clone.querySelector('#printHeader');
+  if(headerEl){
+    headerEl.innerHTML = `<div style="display:flex;align-items:center;gap:12px">
+      <div class="pdfHeroBadge">B</div>
+      <div>
+        <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;opacity:.85;font-weight:700">Bliss Gems &amp; Minerals</div>
+        <div style="font-size:18px;font-weight:800;margin-top:2px">Purchase Slip &middot; ${esc(slipNoVal)}</div>
+        <div style="font-size:11.5px;opacity:.9;margin-top:1px">${esc(dateVal)}</div>
+      </div>
+    </div>`;
+  }
 
   // The wide lot table (8 columns) barely filled a phone screen even after sizing the PDF
   // page to its content, since a wide table forces a wide/short page on a tall screen. Swap
