@@ -37,6 +37,12 @@ if(localStorage.getItem('bliss_force_desktop')==='1')document.getElementById('vi
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<!-- Trip Summary PDF (auto-sent to Nitesh Dusad on Close Trip) - html2canvas + jsPDF loaded
+     as separate libraries and driven directly, not via the html2pdf.js convenience chain
+     (see Purchase Price Estimator's generateSlipPdfBlob for why: that chain repeatedly
+     produced a correctly-sized but completely content-free PDF with no error to catch). -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--pink:#F2A8C0;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
 *{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}button,input,select,textarea{font:inherit}
@@ -75,6 +81,45 @@ table.dtb td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px}tab
    lets "📱 Mobile View" preview mobile layout on a real desktop browser, where the viewport
    meta tag hack has no visible effect at all. */
 body.te-force-mobile header{height:60px}body.te-force-mobile .head{padding:0 11px}body.te-force-mobile .logo{width:38px;height:38px;font-size:22px}body.te-force-mobile .brand b{font-size:16px}body.te-force-mobile .brand small,body.te-force-mobile .live{display:none}body.te-force-mobile .shell{display:block;padding:11px 10px 76px}body.te-force-mobile nav{display:none}body.te-force-mobile .hero{padding:17px}body.te-force-mobile .hero h1{font-size:20px}body.te-force-mobile .hero strong{font-size:23px}body.te-force-mobile .cards{grid-template-columns:1fr 1fr}body.te-force-mobile .money{grid-template-columns:1fr 1fr}body.te-force-mobile .money .m:last-child:nth-child(odd){grid-column:1/-1}body.te-force-mobile .analytics{grid-template-columns:1fr}body.te-force-mobile .tripMoney{grid-template-columns:1fr 1fr}body.te-force-mobile .tripMoney .tm:last-child:nth-child(odd){grid-column:1/-1}body.te-force-mobile .salesActions{grid-template-columns:1fr}body.te-force-mobile .big{min-height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;text-align:left}body.te-force-mobile .big span{margin:0}body.te-force-mobile .fields{grid-template-columns:1fr}body.te-force-mobile .span2{grid-column:auto}body.te-force-mobile .bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}body.te-force-mobile .bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:0 0 auto;padding:2px 12px;white-space:nowrap}body.te-force-mobile .bottomNav button.hidden{display:none}body.te-force-mobile .bottomNav span{display:block;font-size:19px}body.te-force-mobile .bottomNav button.on{color:var(--g)}
+/* Trip Summary PDF (sent to Nitesh Dusad on Close Trip) - built as its own standalone
+   markup (not a clone of any on-screen panel, unlike Purchase Price Estimator's PDF, since
+   this app has no equivalent single panel to clone) and rendered off-screen for capture. */
+.tripPdfWrap{font-family:Arial,sans-serif;background:#fff;color:var(--txt)}
+.tripPdfHero{background:linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:14px;padding:16px;margin-bottom:12px}
+.tripPdfHero .eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.05em;opacity:.85;font-weight:700}
+.tripPdfHero h1{font-size:19px;margin:4px 0 2px;font-weight:800;font-family:inherit}
+.tripPdfHero p{margin:0;font-size:12px;opacity:.9}
+.tripPdfTop{background:#F8FAF9;border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.tripPdfTop .row2{display:flex;justify-content:space-between;padding:4px 0;font-size:12.5px}
+.tripPdfTop .row2 span.lbl{color:var(--muted);font-weight:600}
+.tripPdfTop .row2 span.val{font-weight:700}
+.tripPdfSectionTitle{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700;margin:14px 0 6px}
+.tripPdfGlanceRow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tripPdfGlanceTile{border:1.5px solid var(--line);border-radius:10px;padding:9px 10px;text-align:center}
+.tripPdfGlanceTile small{display:block;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700}
+.tripPdfGlanceTile b{display:block;font-size:14px;margin-top:3px}
+.tripPdfGlanceTile.warn{background:var(--redbg);border-color:#efcbc8}
+.tripPdfGlanceTile.warn b{color:var(--red)}
+.tripPdfMoneyCard{border:1.5px solid var(--line);border-radius:10px;overflow:hidden}
+.tripPdfMrow{display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);font-size:13px}
+.tripPdfMrow:first-child{border-top:0}
+.tripPdfMrow .lbl{color:var(--muted);font-weight:600}
+.tripPdfMrow .val{font-weight:700}
+.tripPdfMrow.receivable{background:var(--mint)}
+.tripPdfMrow.receivable .val{color:var(--g)}
+.tripPdfMrow.payable{background:var(--redbg)}
+.tripPdfMrow.payable .val{color:var(--red)}
+.tripPdfHeadCard{margin-bottom:9px}
+.tripPdfHeadRow{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px}
+.tripPdfHeadRow .cat{font-weight:600}
+.tripPdfHeadRow .amt{font-weight:700}
+.tripPdfBarTrack{height:6px;background:#eef3f0;border-radius:4px;overflow:hidden}
+.tripPdfBarFill{height:100%;background:var(--g2);border-radius:4px}
+.tripPdfNocCard{background:var(--amberbg);border:1px solid #efd99a;border-radius:10px;padding:10px 12px;margin-top:12px}
+.tripPdfNocCard .row2{display:flex;justify-content:space-between;padding:3px 0;font-size:12.5px}
+.tripPdfNocCard .row2 span.lbl{color:var(--amber);font-weight:600}
+.tripPdfNocCard .row2 span.val{font-weight:700;color:var(--amber)}
+.tripPdfFooter{margin-top:14px;font-size:10.5px;color:var(--muted);text-align:center}
 </style></head>
 <body>
 <header><div class="head"><div class="brand"><div class="logo" id="secretLogo">b</div><div><b>Bliss Gems & Minerals</b><small>Employee Advance & Trip Settlement</small></div></div>
@@ -1023,6 +1068,147 @@ async function confirmCloseTrip(){
       .filter(u=>!NOC_EXCLUDED_NAMES.some(n=>String(u.name||'').trim().toLowerCase().startsWith(n)))
       .forEach(u=>sendWA(u.phone,msg));
   }
+  sendTripSummaryToNitesh(tripId,{returned,mode,nocNumber,closerName});
+}
+/* ===== Trip Summary PDF, auto-sent to Nitesh Dusad on Close Trip ===== */
+function fmtDateShort(isoStr){
+  if(!isoStr)return '—';
+  const d=new Date(isoStr.length<=10?isoStr+'T00:00:00':isoStr);
+  return isNaN(d)?isoStr:d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+}
+function tripExpenseCategoryBreakdown(tripId){
+  const byCategory={};
+  tripLedger(tripId).filter(l=>l.type==='expense').forEach(l=>{
+    byCategory[l.category||'Other']=(byCategory[l.category||'Other']||0)+Number(l.amount||0);
+  });
+  return Object.entries(byCategory).sort((a,b)=>b[1]-a[1]);
+}
+function findUserByName(partialName){
+  const q=String(partialName||'').trim().toLowerCase();
+  if(!q)return null;
+  return users.find(u=>String(u.name||'').trim().toLowerCase().startsWith(q))||null;
+}
+async function sendTripFileWA(phone,blob,fileName){
+  if(!phone)return false;
+  const creds=await getGreenApiCreds();
+  if(!creds)return false;
+  const id=String(creds.idInstance||'').trim(),token=String(creds.apiToken||'').trim(),base=String(creds.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token)return false;
+  let chatId=String(phone).replace(/\D/g,'');if(chatId.length===10)chatId='91'+chatId;chatId+='@c.us';
+  const form=new FormData();
+  form.append('chatId',chatId);
+  form.append('file',blob,fileName);
+  form.append('fileName',fileName);
+  try{
+    const res=await fetch(`${base}/waInstance${id}/sendFileByUpload/${token}`,{method:'POST',body:form});
+    return res.ok;
+  }catch(e){console.error('Trip Summary PDF send failed',e);return false;}
+}
+function buildTripSummaryHtml(tripId,extra){
+  const trip=trips.find(t=>t.id===tripId);
+  if(!trip)return '';
+  const advance=tripLedger(tripId).filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0);
+  const expense=tripLedger(tripId).filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0);
+  const partyCash=tripLedger(tripId).filter(l=>l.type==='party_cash').reduce((s,l)=>s+Number(l.amount||0),0);
+  const transferIn=tripLedger(tripId).filter(l=>l.type==='transfer_in').reduce((s,l)=>s+Number(l.amount||0),0);
+  const transferOut=tripLedger(tripId).filter(l=>l.type==='transfer_out').reduce((s,l)=>s+Number(l.amount||0),0);
+  const balance=tripIssued(tripId)-tripExpense(tripId);
+  const expenseEntries=tripLedger(tripId).filter(l=>l.type==='expense');
+  const withProof=expenseEntries.filter(l=>l.proofDataUri).length;
+  const proofPct=expenseEntries.length?Math.round(withProof/expenseEntries.length*100):0;
+  const categories=tripExpenseCategoryBreakdown(tripId);
+  const maxCat=categories.length?categories[0][1]:1;
+  const moneyRows=[`<div class="tripPdfMrow"><span class="lbl">Advance Given</span><span class="val">${money(advance)}</span></div>`,
+    `<div class="tripPdfMrow"><span class="lbl">Total Expense</span><span class="val">${money(expense)}</span></div>`];
+  if(partyCash>0)moneyRows.push(`<div class="tripPdfMrow"><span class="lbl">Party Cash</span><span class="val">${money(partyCash)}</span></div>`);
+  if(transferIn>0)moneyRows.push(`<div class="tripPdfMrow"><span class="lbl">Transfer Received</span><span class="val">${money(transferIn)}</span></div>`);
+  if(transferOut>0)moneyRows.push(`<div class="tripPdfMrow"><span class="lbl">Transfer Sent</span><span class="val">${money(transferOut)}</span></div>`);
+  moneyRows.push(balance>=0
+    ?`<div class="tripPdfMrow receivable"><span class="lbl">Balance Receivable</span><span class="val">${money(balance)}</span></div>`
+    :`<div class="tripPdfMrow payable"><span class="lbl">Balance Payable</span><span class="val">${money(-balance)}</span></div>`);
+  const headCards=categories.map(([cat,amt])=>`<div class="tripPdfHeadCard">
+    <div class="tripPdfHeadRow"><span class="cat">${esc(cat)}</span><span class="amt">${money(amt)}</span></div>
+    <div class="tripPdfBarTrack"><div class="tripPdfBarFill" style="width:${Math.round(amt/maxCat*100)}%"></div></div>
+  </div>`).join('');
+  const nocRows=balance>=0
+    ?`<div class="row2"><span class="lbl">Returned Amount</span><span class="val">${money(extra.returned)}</span></div>
+      <div class="row2"><span class="lbl">Returned Via</span><span class="val">${esc(extra.mode)}</span></div>`
+    :`<div class="row2"><span class="lbl">Payable to ${esc((trip.salesName||'').split(' ')[0])}</span><span class="val">${money(extra.returned)}</span></div>
+      <div class="row2"><span class="lbl">Paid Via</span><span class="val">${esc(extra.mode)}</span></div>`;
+  return `<div class="tripPdfWrap">
+    <div class="tripPdfHero">
+      <div class="eyebrow">Trip Summary — Bliss Gems</div>
+      <h1>${esc(trip.location||'Trip')}</h1>
+      <p>${esc(tripId)} · Closed ${fmtDateShort(new Date().toISOString())}</p>
+    </div>
+    <div class="tripPdfTop">
+      <div class="row2"><span class="lbl">Sales Person</span><span class="val">${esc(trip.salesName)}</span></div>
+      <div class="row2"><span class="lbl">Location</span><span class="val">${esc(trip.location)}</span></div>
+      <div class="row2"><span class="lbl">Trip Duration</span><span class="val">${fmtDateShort(trip.startDate)} – ${fmtDateShort(new Date().toISOString())}</span></div>
+      <div class="row2"><span class="lbl">Closed By</span><span class="val">${esc(extra.closerName)}</span></div>
+    </div>
+    <div class="tripPdfGlanceRow">
+      <div class="tripPdfGlanceTile"><small>Expense Entries</small><b>${expenseEntries.length}</b></div>
+      <div class="tripPdfGlanceTile${proofPct<100?' warn':''}"><small>Proof Rate</small><b>${withProof}/${expenseEntries.length} (${proofPct}%)</b></div>
+    </div>
+    <div class="tripPdfSectionTitle">Money Breakdown</div>
+    <div class="tripPdfMoneyCard">${moneyRows.join('')}</div>
+    ${categories.length?`<div class="tripPdfSectionTitle">💰 Expense Heads</div>${headCards}`:''}
+    <div class="tripPdfNocCard">
+      <div class="row2"><span class="lbl">NOC Number</span><span class="val">${esc(extra.nocNumber)}</span></div>
+      ${nocRows}
+    </div>
+    <div class="tripPdfFooter">Bliss Gems &amp; Minerals — Trip Expense App</div>
+  </div>`;
+}
+function tripPdfCanvasHasContent(canvas){
+  try{
+    const ctx=canvas.getContext('2d');
+    const w=canvas.width,h=canvas.height;
+    const sample=ctx.getImageData(0,0,w,Math.min(h,400));
+    const data=sample.data;
+    for(let i=0;i<data.length;i+=4*37){
+      if(data[i]<250||data[i+1]<250||data[i+2]<250)return true;
+    }
+    return false;
+  }catch(e){console.error('Trip Summary canvas content check failed:',e);return false;}
+}
+async function generateTripSummaryPdfBlob(tripId,extra){
+  if(typeof html2canvas==='undefined'||!(window.jspdf&&window.jspdf.jsPDF)){console.warn('PDF libraries not loaded');return null;}
+  const html=buildTripSummaryHtml(tripId,extra);
+  if(!html)return null;
+  const wrap=document.createElement('div');
+  wrap.style.cssText='position:absolute;left:-1500px;top:0;width:420px;background:#fff;z-index:-1;padding:16px;box-sizing:border-box';
+  wrap.innerHTML=html;
+  document.body.appendChild(wrap);
+  try{
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    if(wrap.getBoundingClientRect().height<10){
+      console.error('Trip Summary PDF export has no height - aborting instead of sending a blank PDF');
+      return null;
+    }
+    const canvas=await html2canvas(wrap,{scale:2,backgroundColor:'#ffffff',windowWidth:420,scrollX:0,scrollY:0});
+    if(!tripPdfCanvasHasContent(canvas)){
+      console.error('Trip Summary PDF canvas has no visible content - aborting instead of sending a blank PDF');
+      return null;
+    }
+    const imgData=canvas.toDataURL('image/jpeg',0.92);
+    const {jsPDF}=window.jspdf;
+    const margin=10;
+    const imgW=150; // narrow for mobile but wide enough that desktop PDF viewers don't zoom in excessively
+    const imgH=canvas.height*(imgW/canvas.width);
+    const pdf=new jsPDF({unit:'mm',format:[imgW+margin*2,imgH+margin*2]});
+    pdf.addImage(imgData,'JPEG',margin,margin,imgW,imgH);
+    return pdf.output('blob');
+  }catch(e){console.error('Trip Summary PDF generation failed:',e);return null;}
+  finally{wrap.remove();}
+}
+async function sendTripSummaryToNitesh(tripId,extra){
+  const nitesh=findUserByName('nitesh dusad')||findUserByName('nitesh');
+  if(!nitesh||!nitesh.phone){console.warn('Nitesh Dusad not found or has no phone - Trip Summary PDF not sent');return;}
+  const blob=await generateTripSummaryPdfBlob(tripId,extra);
+  if(!blob)return;
+  await sendTripFileWA(nitesh.phone,blob,tripId+'-summary.pdf');
 }
 async function markBooked(tripId){
   await db.collection('te_trips').doc(tripId).update({bookedByAccounts:true});
