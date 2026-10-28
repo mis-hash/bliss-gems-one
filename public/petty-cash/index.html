@@ -1363,8 +1363,11 @@ function renderDash(){
   const {fundAdded,verifyReceiveTotal,totalOut,balance}=computeBalance();
   // Total actually spent by recipients against issued cash (from their own "Cash Issued to
   // Me" spend entries) - a different number from Total Issue, which is just what was handed
-  // out, not what's been accounted for yet.
-  const totalSpent=issueSpends.filter(s=>!s.deletedAt).reduce((s,x)=>s+(x.amount||0),0);
+  // out, not what's been accounted for yet. Also excludes any spend entry whose parent Issue
+  // was itself deleted/disabled - without this, deleting a test Cash Out entry leaves its
+  // spend entries orphaned in pc_issue_spends, still inflating this total forever.
+  const liveIssueIds=new Set(liveLedger().filter(x=>x.type==='out').map(x=>x.id));
+  const totalSpent=issueSpends.filter(s=>!s.deletedAt&&liveIssueIds.has(s.issueId)).reduce((s,x)=>s+(x.amount||0),0);
   const pendingHisaab=computeAllPersonPendingTotals().reduce((s,r)=>s+r.issuedPending,0);
   const pendingAccept=pendingAcceptSummary();
   // Loan Given is retired (see addLedgerEntry()/openEntryModal()) - no Loan tile here anymore,
