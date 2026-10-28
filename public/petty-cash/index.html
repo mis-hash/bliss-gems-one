@@ -1196,15 +1196,18 @@ function pcStaffDetailRowHtml(row){
   </td></tr>`;
 }
 function pcExpenseDetailRowHtml(group){
-  const itemsHtml=group.items.map(s=>{
+  const rows=group.items.map(s=>{
     const issue=ledger.find(x=>x.id===s.issueId);
-    const delBtn=superAdminUnlocked?`<button class="btn small danger" style="padding:2px 7px;font-size:10px" onclick="permanentlyDeleteIssueSpend('${esc(s.id)}')">✕ Delete</button>`:'';
-    return `<div class="item"><span><b>${fmtAmt(s.amount)}</b> on ${esc(s.date)}${issue?' — issue se: '+esc(issue.person||'-')+' ('+fmtAmt(issue.amount||0)+')':''}<br><small style="color:var(--muted)">by ${esc(nameOfUserId(s.by))}</small></span>${delBtn}</div>`;
+    const delBtn=superAdminUnlocked?`<button class="btn small danger" style="padding:2px 7px;font-size:10px;white-space:nowrap" onclick="permanentlyDeleteIssueSpend('${esc(s.id)}')">✕ Delete</button>`:'';
+    return `<tr><td>${esc(s.date)}</td><td class="num">${fmtAmt(s.amount)}</td><td>${issue?esc(issue.person||'-'):'<span style="color:var(--red)">Issue mil nahi raha</span>'}</td><td>${esc(nameOfUserId(s.by))}</td><td>${delBtn}</td></tr>`;
   }).join('');
   return `<tr><td colspan="3" style="padding:0;border:0">
     <div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:#f7faf8">
-      <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:6px">🔽 "${esc(group.note)}" KI ENTRIES <span style="font-weight:400">(belongs to the row above ↑)</span></div>
-      ${itemsHtml}
+      <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:8px">🔽 "${esc(group.note)}" KI ENTRIES <span style="font-weight:400">(belongs to the row above ↑)</span></div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+        <thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase"><th style="padding:0 6px 6px 0">Date</th><th style="padding:0 6px 6px 0">Amount</th><th style="padding:0 6px 6px 0">Issued To</th><th style="padding:0 6px 6px 0">Entry By</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
     </div>
   </td></tr>`;
 }
