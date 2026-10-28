@@ -1061,10 +1061,10 @@ async function confirmCloseTrip(){
     const sales=users.find(u=>u.id===trip.salesId);
     const msg=renderTemplate(messageTemplates.closed,{noc:nocNumber,name:trip.salesName,location:trip.location,tripId,balance:money(balance),returned:money(returned),mode});
     if(sales)sendWA(sales.phone,msg);
-    // Hitesh and Ankur get the overall Director insights/escalation notices already -
-    // don't also put every single NOC in their chat, only the actual closers (admin) and
-    // accounts (who book it) need the per-trip message.
-    const NOC_EXCLUDED_NAMES=['hitesh','ankur'];
+    // Hitesh, Nitesh and Ankur get the overall Director insights/escalation notices
+    // already - don't also put every single NOC in their chat, only the actual closers
+    // (admin) and accounts (who book it) need the per-trip message.
+    const NOC_EXCLUDED_NAMES=['hitesh','nitesh','ankur'];
     usersWithRole('admin').concat(usersWithRole('accounts'))
       .filter(u=>!NOC_EXCLUDED_NAMES.some(n=>String(u.name||'').trim().toLowerCase().startsWith(n)))
       .forEach(u=>sendWA(u.phone,msg));
