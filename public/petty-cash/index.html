@@ -183,6 +183,8 @@ tbody tr:hover td{background:#f7faf8}
   </div>
   <div class="cards" id="statTiles"></div>
 
+  <div id="pcSpendAuditWrap"></div>
+
   <div id="highAmountAlerts"></div>
 
   <div class="panel">
@@ -1392,6 +1394,44 @@ function renderDash(){
     {label:'CURRENT BALANCE',val:fmtAmt(balance)}
   ];
   $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+  renderSpendAudit();
+}
+// Diagnostic breakdown behind the Total Spent tile - shows exactly which live Issues the
+// number is made of, plus any orphaned pc_issue_spends (spend entries whose parent Issue
+// was deleted) so a surprising Total Spent can be traced to its source instead of guessed at.
+let pcSpendAuditOpen=false;
+function togglePcSpendAudit(){pcSpendAuditOpen=!pcSpendAuditOpen;renderSpendAudit();}
+function renderSpendAudit(){
+  const wrap=$('pcSpendAuditWrap');
+  if(!wrap)return;
+  if(!canAddFund()){wrap.innerHTML='';return}
+  const liveIssues=liveLedger().filter(x=>x.type==='out');
+  const liveIssueIds=new Set(liveIssues.map(x=>x.id));
+  const byIssue=liveIssues.map(iss=>({
+    iss,
+    spent: issueSpends.filter(s=>!s.deletedAt&&s.issueId===iss.id).reduce((s,x)=>s+(x.amount||0),0)
+  })).filter(r=>r.spent>0).sort((a,b)=>b.spent-a.spent);
+  const orphanSpends=issueSpends.filter(s=>!s.deletedAt&&!liveIssueIds.has(s.issueId));
+  const orphanTotal=orphanSpends.reduce((s,x)=>s+(x.amount||0),0);
+  if(!byIssue.length&&!orphanTotal){wrap.innerHTML='';return}
+  if(!pcSpendAuditOpen){
+    wrap.innerHTML=`<div style="margin:-4px 0 8px"><button type="button" class="btn small secondary" onclick="togglePcSpendAudit()">🔍 Total Spent breakdown dekhein</button></div>`;
+    return;
+  }
+  const rows=byIssue.map(r=>{
+    const over=r.spent>(r.iss.amount||0);
+    return `<tr${over?' style="color:#b91c1c"':''}><td>${esc(r.iss.date||'-')}</td><td>${esc(r.iss.person||nameOfUserId(r.iss.personId)||'-')}</td><td>${fmtAmt(r.iss.amount||0)}</td><td>${fmtAmt(r.spent)}${over?' ⚠':''}</td></tr>`;
+  }).join('');
+  wrap.innerHTML=`<div class="panel">
+    <div class="ph"><span>Total Spent Breakdown</span><button type="button" class="btn small secondary" onclick="togglePcSpendAudit()">Band karein</button></div>
+    <div class="pb">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="text-align:left;color:var(--muted)"><th>Issue Date</th><th>Person</th><th>Issued</th><th>Spent</th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="4">Koi live issue ke against spend nahi mila.</td></tr>'}</tbody>
+      </table>
+      ${orphanTotal?`<div style="margin-top:10px;padding:8px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-size:13px">⚠ ${orphanSpends.length} orphaned spend entr${orphanSpends.length===1?'y':'ies'} mile (jinka parent Issue delete ho chuka hai) totaling ${fmtAmt(orphanTotal)} — yeh Total Spent mein COUNT NAHI ho rahe, already excluded hain.</div>`:''}
+    </div>
+  </div>`;
 }
 // A single Out/Loan entry costing much more than that type's own recent history is worth a
 // second look (same pattern as Fuel Tracker's Mileage Alert) - compares the latest live
