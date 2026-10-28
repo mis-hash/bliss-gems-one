@@ -1358,12 +1358,12 @@ function renderDash(){
   // Loan Given is retired (see addLedgerEntry()/openEntryModal()) - no Loan tile here anymore,
   // even though existing loan entries still count toward balance via computeBalance().
   const tiles=[
-    {label:'CURRENT BALANCE',val:fmtAmt(balance)},
-    {label:'FUND ADDED',val:fmtAmt(fundAdded)},
-    {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
+    {label:'FUND RECEIVED (FROM ADMIN)',val:fmtAmt(fundAdded)},
     {label:'TOTAL ISSUE',val:fmtAmt(totalOut)},
     {label:'TOTAL SPENT',val:fmtAmt(totalSpent)},
-    {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0}
+    {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
+    {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
+    {label:'CURRENT BALANCE',val:fmtAmt(balance)}
   ];
   $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
 }
