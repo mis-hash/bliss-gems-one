@@ -1605,14 +1605,14 @@ function goPage(id){
 function renderAdminPanel(){
   const wrap=$('adminStatTiles');
   if(!wrap)return;
-  const {fundAdded,verifyReceiveTotal,totalOut,outstandingLoans,outstandingCount}=computeBalance();
+  const {fundAdded,verifyReceiveTotal,totalOut}=computeBalance();
   const pendingHisaab=computeAllPersonPendingTotals().reduce((s,r)=>s+r.issuedPending,0);
+  // Loan Given is retired - no Outstanding Loans tile here anymore (matches the Ledger page).
   const tiles=[
     {label:'TOTAL FUND ADDED',val:fmtAmt(fundAdded)},
     {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
     {label:'TOTAL ISSUED (OUT)',val:fmtAmt(totalOut)},
-    {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
-    {label:'OUTSTANDING LOANS',val:fmtAmt(outstandingLoans)+' ('+outstandingCount+')',warn:outstandingCount>0}
+    {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0}
   ];
   wrap.innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
 }
