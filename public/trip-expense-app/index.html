@@ -1194,8 +1194,11 @@ function renderPettyCashPage(){
   const actions=$('pcQuickActions');
   if(actions){
     let btns='';
-    if(role==='admin')btns+=`<button class="btn primary" style="margin-right:8px;margin-bottom:8px" onclick="openPcAddFundModal()">➕ Release Fund</button>`;
-    if(pcAccountsLikeRole())btns+=`<button class="btn primary" style="margin-right:8px;margin-bottom:8px" onclick="openPcIssueModal()">📤 Issue to Doer</button>`;
+    // Admin only ever sees Release Fund, Accounts only ever sees Issue - Director (oversight
+    // role across this whole app) keeps both, matching the access pattern every other page here
+    // already gives Director over Admin/Accounts-specific actions.
+    if(role==='admin'||role==='director')btns+=`<button class="btn primary" style="margin-right:8px;margin-bottom:8px" onclick="openPcAddFundModal()">➕ Release Fund</button>`;
+    if(role==='accounts'||role==='director')btns+=`<button class="btn primary" style="margin-right:8px;margin-bottom:8px" onclick="openPcIssueModal()">📤 Issue to Doer</button>`;
     if(pcMyOpenIssues().length)btns+=`<button class="btn" style="margin-bottom:8px" onclick="openPcReturnModal()">↩ Return My Balance</button>`;
     actions.innerHTML=btns||'<div class="row"><small>Koi action available nahi hai.</small></div>';
   }
