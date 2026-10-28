@@ -19,6 +19,24 @@ lost) can pick up exactly where the previous session left off. Read this first.
 - After every push: verify the GitHub Actions deploy (`firebase-hosting-merge.yml`
   workflow, via `list_workflow_runs`) reaches `status: completed` /
   `conclusion: success` before telling the user it's live. Report the live URL.
+- **GCP project gotcha (real incident, Oct 2026, cost ~6 days to resolve) — read this
+  before touching ANY Google Cloud / Firebase Console settings for this project:**
+  The Google Cloud organization `teambgmjaipur.com` has **multiple projects with
+  confusingly similar names** — `bliss-one`, `bliss-gems-one`, `app-bliss-gems`,
+  `blissgems-ex`, etc. **The ONLY correct project for this site is `bliss-gems-one`**
+  (Firebase Hosting site `bliss-gems-one.web.app` — the real live URL). `bliss-one` is
+  a different, unrelated project that happens to have a similarly-named GCP *display
+  name* ("BLISS ONE") — it is easy to click into by mistake when searching "bliss" in
+  the GCP project switcher, and **nothing in it affects this site's deploys**. A past
+  session spent ~6 days debugging a deploy failure entirely inside `bliss-one` (IAM
+  roles, Deny Policies, audit logs — all real findings, just on the wrong project)
+  before discovering the mistake. The actual root cause was simple: the real deploy
+  service account, `github-deployer@bliss-gems-one.iam.gserviceaccount.com` (role
+  `roles/firebasehosting.admin`), was missing `roles/serviceusage.serviceUsageConsumer`
+  — granting that one role fixed the `firebase deploy` step immediately. **If a GCP
+  Console investigation is ever needed again: always run `gcloud projects list` /
+  `firebase projects:list` first and confirm you're in `bliss-gems-one` specifically —
+  never assume by display-name matching alone.**
 - When asked for "link" with no other context, give the Bliss One hub link:
   https://bliss-gems-one.web.app/
 - Must stay on the Firebase **Spark (free)** plan — no paid features/APIs.
