@@ -937,7 +937,9 @@ async function verifyAndSettleSpending(issueId){
 function renderMyIssuedCash(){
   const wrap=$('myIssuedCashWrap');
   if(!wrap)return;
-  const mine=liveLedger().filter(x=>x.type==='out'&&x.personId===currentUser).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  // Sort by the full creation timestamp (not just the date string), so same-day entries still
+  // come out newest-first - the Date alone can't tell two same-day issues apart.
+  const mine=liveLedger().filter(x=>x.type==='out'&&x.personId===currentUser).sort((a,b)=>String(b.at||b.date).localeCompare(String(a.at||a.date)));
   if(!mine.length){wrap.innerHTML='';return;}
   wrap.innerHTML=`<div class="panel"><div class="ph"><span>💳 Cash Issued to Me</span></div><div class="pb">${mine.map(x=>{
     const spent=issueSpentTotal(x.id);
