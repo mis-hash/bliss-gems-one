@@ -151,11 +151,11 @@ tbody tr:hover td{background:#f7faf8}
     <div class="grouplabel">Admin</div>
     <button class="adminOnly hidden" data-page="admin" onclick="goPage('admin')">⚙ Admin</button>
     <div class="grouplabel">Operations</div>
-    <button class="on" data-page="ledger" onclick="goPage('ledger')">📊 Ledger</button>
+    <button class="on staffHidden" data-page="ledger" onclick="goPage('ledger')">📊 Ledger</button>
     <button data-page="my" id="myPageTabBtn" onclick="goPage('my')">👤 My Petty Cash</button>
     <div class="grouplabel">Insights</div>
     <button class="accountantOnly hidden" data-page="team" onclick="goPage('team')">👥 Team Overview</button>
-    <button data-page="reports" onclick="goPage('reports')">📈 Reports</button>
+    <button class="staffHidden" data-page="reports" onclick="goPage('reports')">📈 Reports</button>
   </nav>
   <main>
 
@@ -306,10 +306,10 @@ tbody tr:hover td{background:#f7faf8}
 
 <div class="bottomNav" id="bottomNav">
   <button class="adminOnly hidden" data-page="admin" onclick="goPage('admin')"><span>⚙</span>Admin</button>
-  <button class="on" data-page="ledger" onclick="goPage('ledger')"><span>📊</span>Ledger</button>
+  <button class="on staffHidden" data-page="ledger" onclick="goPage('ledger')"><span>📊</span>Ledger</button>
   <button data-page="my" onclick="goPage('my')"><span>👤</span>My Cash</button>
   <button class="accountantOnly hidden" data-page="team" onclick="goPage('team')"><span>👥</span>Team</button>
-  <button data-page="reports" onclick="goPage('reports')"><span>📈</span>Reports</button>
+  <button class="staffHidden" data-page="reports" onclick="goPage('reports')"><span>📈</span>Reports</button>
 </div>
 
 <!-- Login modal -->
@@ -607,8 +607,18 @@ function applyFeatureVisibility(){
   document.querySelectorAll('.superAdminStrict').forEach(el=>el.classList.toggle('hidden',!superAdminUnlocked));
   document.querySelectorAll('.accountantOnly').forEach(el=>el.classList.toggle('hidden',!canCloseLoan()));
   document.querySelectorAll('.adminOnly').forEach(el=>el.classList.toggle('hidden',!canAddFund()));
-  if(!canCloseLoan()&&document.getElementById('page-team')?.classList.contains('on'))goPage('ledger');
-  if(!canAddFund()&&document.getElementById('page-admin')?.classList.contains('on'))goPage('ledger');
+  // A plain Doer (no accountant/admin/director role, not Super Admin) is hard-locked to "My
+  // Petty Cash" only - Ledger and Reports show company-wide data they shouldn't see. Unlike
+  // Admin/Team Overview above, those two pages had no role gate of their own and default to
+  // Ledger being "on" in the static HTML, so a fresh Doer login would otherwise land there
+  // first - checked here on every render, same pattern as Trip Expense's Sales-role lock.
+  document.querySelectorAll('.staffHidden').forEach(el=>el.classList.toggle('hidden',!canCloseLoan()));
+  if(!canCloseLoan()){
+    if(!document.getElementById('page-my')?.classList.contains('on'))goPage('my');
+    refreshAddFundVisibility();
+    return;
+  }
+  if(document.getElementById('page-admin')?.classList.contains('on')&&!canAddFund())goPage('ledger');
   refreshAddFundVisibility();
 }
 
