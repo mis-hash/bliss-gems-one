@@ -143,11 +143,10 @@ if(window.self!==window.top){
 
 <div id="gateWrap" class="shell" style="display:none"><div class="gate" id="gateBox"></div></div>
 
-<div class="shell" id="appWrap" style="display:none"><div id="pcWidget" class="hidden" style="grid-column:1/-1"></div><nav>
+<div class="shell" id="appWrap" style="display:none"><nav>
 <div class="grouplabel">Operations</div>
 <button class="on" data-page="admin" data-role="admin,director" onclick="go('admin',this)">▦ Admin Control</button>
 <button data-page="ledger" data-role="admin,director,accounts" onclick="go('ledger',this)">₹ Advance Ledger</button>
-<button data-page="pettyCash" data-role="admin,director,accounts" onclick="go('pettyCash',this)">💰 Petty Cash</button>
 <button data-page="pending" data-role="admin,director" onclick="go('pending',this)">⏱ Pending Hisaab</button>
 <button data-page="sales" onclick="go('sales',this)">👤 My Trip</button>
 <div class="grouplabel">Insights</div>
@@ -190,13 +189,6 @@ if(window.self!==window.top){
 <section id="ledger" class="page"><div class="panel"><div class="ph"><span>Complete Money Timeline</span><select id="ledgerTripPicker" onchange="renderLedgerPage()" style="padding:9px;border:1px solid var(--line);border-radius:7px;font-size:13px"></select></div><div class="pb"><div class="timeline" id="ledgerTimeline"></div></div></div></section>
 
 <section id="pending" class="page"><div class="panel"><div class="ph">Overdue Hisaab</div><div class="pb" id="pendingList"></div></div></section>
-
-<section id="pettyCash" class="page">
-<div class="hero"><div><h1>💰 Petty Cash</h1><p>Fund Release → Accept → Issue → Accept → Balance Return → Verify &amp; Receive</p></div></div>
-<div class="money" id="pcTiles" style="grid-template-columns:repeat(3,1fr)"></div>
-<div class="panel"><div class="ph"><span>Quick Actions</span></div><div class="pb" id="pcQuickActions"></div></div>
-<div class="panel"><div class="ph"><span>Ledger History</span></div><div class="pb" id="pcLedgerList"><div class="row"><small>Loading…</small></div></div></div>
-</section>
 
 <section id="analytics" class="page"><div class="ph" style="padding-left:0">Expense Intelligence (Live)</div><div class="analytics">
 <div class="metric"><h3>📍 Location Expense</h3><div id="anaLocation"></div></div>
@@ -266,7 +258,6 @@ if(window.self!==window.top){
 <div class="bottomNav" id="bottomNav">
 <button class="on" data-page="admin" data-role="admin,director" onclick="mgo('admin',this)"><span>▦</span>Admin</button>
 <button data-page="ledger" data-role="admin,director,accounts" onclick="mgo('ledger',this)"><span>₹</span>Ledger</button>
-<button data-page="pettyCash" data-role="admin,director,accounts" onclick="mgo('pettyCash',this)"><span>💰</span>Petty</button>
 <button data-page="pending" data-role="admin,director" onclick="mgo('pending',this)"><span>⏱</span>Pending</button>
 <button data-page="sales" onclick="mgo('sales',this)"><span>👤</span>My Trip</button>
 <button data-page="analytics" data-role="admin,director" onclick="mgo('analytics',this)"><span>📊</span>Analytics</button>
@@ -331,35 +322,6 @@ if(window.self!==window.top){
 <div class="field" style="margin-top:8px"><label>Amount *</label><input type="number" id="partyCashAmount" placeholder="₹ 0"></div>
 <div class="field" style="margin-top:8px"><label>Remark</label><input id="partyCashRemark" placeholder="Optional"></div>
 <div class="actions"><button class="btn" onclick="hide('partyCashModal')">Cancel</button><button class="btn primary" id="partyCashSubmitBtn" onclick="submitPartyCash()">Save</button></div><div class="msg" id="partyCashMsg"></div></div></div>
-
-<div class="modal" id="pcAddFundModal"><div class="box"><h3>➕ Release Fund (Admin)</h3>
-<div class="field"><label>Amount *</label><input type="number" id="pcFundAmount" placeholder="₹ 0"></div>
-<div class="field" style="margin-top:8px"><label>Remark</label><input id="pcFundRemark" placeholder="Optional"></div>
-<div class="actions"><button class="btn" onclick="hide('pcAddFundModal')">Cancel</button><button class="btn primary" id="pcFundSubmitBtn" onclick="submitPcAddFund()">Release</button></div><div class="msg" id="pcFundMsg"></div></div></div>
-
-<div class="modal" id="pcIssueModal"><div class="box"><h3>📤 Issue to Doer</h3>
-<div class="field"><label>Person *</label><select id="pcIssueTo"></select></div>
-<div class="field" style="margin-top:8px"><label>Amount *</label><input type="number" id="pcIssueAmount" placeholder="₹ 0"></div>
-<div class="field" style="margin-top:8px"><label>Remark</label><input id="pcIssueRemark" placeholder="Optional"></div>
-<div class="actions"><button class="btn" onclick="hide('pcIssueModal')">Cancel</button><button class="btn primary" id="pcIssueSubmitBtn" onclick="submitPcIssue()">Issue</button></div><div class="msg" id="pcIssueMsg"></div></div></div>
-
-<div class="modal" id="pcReturnModal"><div class="box"><h3>↩ Return Petty Cash Balance</h3>
-<div class="field"><label>Against Issue *</label><select id="pcReturnIssue" onchange="updatePcReturnHint()"></select></div>
-<div class="field" style="margin-top:8px"><label>Amount *</label><input type="number" id="pcReturnAmount" placeholder="₹ 0"></div>
-<div id="pcReturnHint" class="msg"></div>
-<div class="field" style="margin-top:8px"><label>Remark</label><input id="pcReturnRemark" placeholder="Optional"></div>
-<div class="actions"><button class="btn" onclick="hide('pcReturnModal')">Cancel</button><button class="btn primary" id="pcReturnSubmitBtn" onclick="submitPcReturn()">Return</button></div><div class="msg" id="pcReturnMsg"></div></div></div>
-
-<div class="modal" id="pcAcceptModal"><div class="box" style="width:min(380px,100%)">
-<h3 id="pcAcceptTitle">Petty Cash</h3>
-<p id="pcAcceptSub" style="font-size:12.5px;color:var(--muted);margin:0 0 12px"></p>
-<div class="money" style="grid-template-columns:1fr"><div class="m" style="text-align:center;padding:16px"><small>AMOUNT</small><b id="pcAcceptAmount" style="font-size:24px">₹0</b></div></div>
-<div class="actions" style="margin-top:14px">
-<button class="btn danger" onclick="pcResolvePendingFromModal('rejected')">✕ Reject</button>
-<button class="btn primary" onclick="pcResolvePendingFromModal('accepted')">✓ Accept</button>
-</div>
-<div class="msg" id="pcAcceptMsg"></div>
-</div></div>
 
 <div class="modal" id="expense"><div class="box"><h3>Add Expense</h3><div class="fields">
 <div class="field"><label>Category *</label><input id="expCategory" list="expCategoryList" autocomplete="off" placeholder="Select ya naya likhein"><datalist id="expCategoryList"></datalist></div>
@@ -441,7 +403,7 @@ const todayISO=()=>new Date().toISOString().slice(0,10);
 function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;return `TRP-${ds}-${String(Date.now()).slice(-4)}`}
 function genLedgerId(){return 'LG-'+Date.now()+'-'+Math.floor(Math.random()*1000)}
 
-let users=[],trips=[],allTripsRaw=[],deletedTrips=[],ledger=[],pettyCash=[],notifySettings={issued:true,additional:true,overdue:true,submitted:true,closed:true,booked:true};
+let users=[],trips=[],allTripsRaw=[],deletedTrips=[],ledger=[],notifySettings={issued:true,additional:true,overdue:true,submitted:true,closed:true,booked:true};
 let messageTemplates={
   issued:'💰 Trip Advance Issued\nAmount: {amount}\nLocation: {location}\nHisaab Due: {due}\nTrip: {tripId}',
   additional:'💰 Additional Advance Issued\nAmount: {amount}\nTrip: {tripId}',
@@ -451,7 +413,7 @@ let messageTemplates={
   overdue:'⏰ Hisaab Reminder\n{location} trip ka hisaab pending hai.\nDue: {due}\nOutstanding: {balance}'
 };
 let currentUser=null;
-let usersStarted=false,tripsStarted=false,ledgerStarted=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false,pettyCashStarted=false;
+let usersStarted=false,tripsStarted=false,ledgerStarted=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false;
 let tripOptions={locations:['Surat','Mumbai','Chennai','Udaipur','Ahmedabad','Hyderabad'],purposes:['Exhibition','Client Visit','Sales Tour']};
 let EXPENSE_CATEGORIES=['Hotel','Breakfast','Lunch','Dinner','Food','Tea / Snacks','Taxi / Cab','Local Conveyance','Bus','Train','Flight','Fuel','Toll / Parking','Party Entertainment','Sample / Gift to Party','Courier / Parcel','Mobile / Internet','Stationery / Printing','Porter / Coolie','Labour Charges','Godown / Warehouse','Vehicle Repair','Medical','Laundry','Bank / ATM Charges','Misc','Other'];
 let ledgerHeads={cash:'Cash-in-Hand',advance:'Staff Advance A/c',categories:{Hotel:'Travelling Expenses',Breakfast:'Business Promotion Exp.',Lunch:'Business Promotion Exp.',Dinner:'Business Promotion Exp.',Food:'Business Promotion Exp.','Tea / Snacks':'Business Promotion Exp.','Taxi / Cab':'Travelling Expenses','Local Conveyance':'Travelling Expenses',Bus:'Travelling Expenses',Train:'Travelling Expenses',Flight:'Travelling Expenses',Fuel:'Travelling Expenses','Toll / Parking':'Travelling Expenses','Party Entertainment':'Business Promotion Exp.','Sample / Gift to Party':'Business Promotion Exp.','Courier / Parcel':'Miscellaneous Expenses','Mobile / Internet':'Miscellaneous Expenses','Stationery / Printing':'Miscellaneous Expenses','Porter / Coolie':'Travelling Expenses','Labour Charges':'Travelling Expenses','Godown / Warehouse':'Miscellaneous Expenses','Vehicle Repair':'Travelling Expenses',Medical:'Miscellaneous Expenses',Laundry:'Travelling Expenses','Bank / ATM Charges':'Miscellaneous Expenses',Misc:'Miscellaneous Expenses',Other:'Miscellaneous Expenses'}};
@@ -610,15 +572,6 @@ function startLedgerSync(){
     ledger=[];snap.forEach(d=>ledger.push(d.data()));
     renderAll();
   },err=>console.error('ledger sync error',err));
-}
-// Petty Cash lives in its own collection, separate from te_ledger, so its Fund Release/Issue/
-// Balance Return records never touch the trip advance/expense totals other pages depend on.
-function startPettyCashSync(){
-  if(pettyCashStarted)return;pettyCashStarted=true;
-  db.collection('te_petty_cash').onSnapshot(snap=>{
-    pettyCash=[];snap.forEach(d=>pettyCash.push(d.data()));
-    renderAll();
-  },err=>console.error('petty cash sync error',err));
 }
 function startSettingsSync(){
   if(settingsStarted)return;settingsStarted=true;
@@ -969,265 +922,6 @@ async function submitPartyCash(){
     usersWithRole('admin').concat(usersWithRole('director')).forEach(u=>u.phone&&sendWA(u.phone,notifyMsg));
   }finally{_partyCashSubmitting=false;if(btn)btn.disabled=false;}
 }
-/* ===== Petty Cash =====
-   Separate Firestore collection (te_petty_cash), never touching te_ledger, so this never
-   inflates the trip advance/expense totals other pages (Admin Control, Bookkeeping,
-   Analytics) depend on. Two independent accept steps, same pattern both times:
-     Admin releases fund  -> any Accounts/Admin/Director accepts it -> counts in Total Fund Added
-     Accounts issues to a Doer -> that Doer accepts it -> counts in that Doer's Issue Total
-   Balance Return (Doer returning leftover) -> Accounts Verify & Receive is tracked on its own
-   tile, deliberately never folded into Total Fund Added or Total Issued.
-   The Accept/Reject prompt and the Return Balance button live in #pcWidget, rendered on every
-   page (not just the Petty Cash tab) because a Sales-role Doer is hard-locked to the My Trip
-   page only (see applyRoleVisibility()) and can never open a role-gated tab - the widget is
-   how they still get to Accept/Reject/Return without that restriction being touched at all. */
-function pcGenId(){return 'PC-'+Date.now()+'-'+Math.floor(Math.random()*1000)}
-function pcAccountsLikeRole(){const r=effectiveRole();return r==='admin'||r==='director'||r==='accounts'}
-function pcTotalFundAdded(){return pettyCash.filter(p=>p.type==='fund_release'&&p.status==='accepted').reduce((s,p)=>s+Number(p.amount||0),0)}
-function pcTotalIssued(){return pettyCash.filter(p=>p.type==='issue'&&p.status==='accepted').reduce((s,p)=>s+Number(p.amount||0),0)}
-function pcTotalVerified(){return pettyCash.filter(p=>p.type==='balance_return'&&p.status==='verified').reduce((s,p)=>s+Number(p.amount||0),0)}
-// How much of a given accepted issue is still with the Doer - total returned (pending or
-// verified; a rejected return never happened, so it doesn't reduce the outstanding balance).
-function pcIssueOutstanding(issue){
-  const returned=pettyCash.filter(p=>p.type==='balance_return'&&p.issueId===issue.id&&p.status!=='rejected').reduce((s,p)=>s+Number(p.amount||0),0);
-  return Number(issue.amount||0)-returned;
-}
-function pcMyOpenIssues(){
-  if(!currentUser)return [];
-  return pettyCash.filter(p=>p.type==='issue'&&p.status==='accepted'&&p.toId===currentUser&&pcIssueOutstanding(p)>0.5);
-}
-// The one pending item most relevant to the CURRENT user right now - drives the global
-// Accept/Reject popup regardless of which page/role they're on.
-function pcPendingForMe(){
-  if(!currentUser)return null;
-  const myIssue=pettyCash.find(p=>p.type==='issue'&&p.status==='pending'&&p.toId===currentUser);
-  if(myIssue)return myIssue;
-  if(pcAccountsLikeRole()){
-    const fund=pettyCash.find(p=>p.type==='fund_release'&&p.status==='pending');
-    if(fund)return fund;
-  }
-  return null;
-}
-let pcExpandedIssues={};
-function togglePcIssueExpand(id){ pcExpandedIssues[id]=!pcExpandedIssues[id]; renderPettyCashPage(); }
-// Mirrors Purchase Price Estimator's Deals History "Lot-wise Breakdown" expand pattern -
-// clicking an Issue row reveals the Balance Return entries made against it, right below it.
-function pcIssueBreakdownHtml(issue){
-  const returns=pettyCash.filter(p=>p.type==='balance_return'&&p.issueId===issue.id).sort((a,b)=>(a.at||'').localeCompare(b.at||''));
-  const inner=returns.length?returns.map(r=>{
-    const statusBadge=r.status==='pending'?`<span class="tag amber">Pending Verify</span>`:`<span class="tag">✓ Verified</span>`;
-    const verifyBtn=r.status==='pending'&&pcAccountsLikeRole()?`<button class="btn" style="margin-left:8px" onclick="pcVerifyReceive('${esc(r.id)}')">✅ Verify</button>`:'';
-    return `<div class="row"><span>${esc((r.at||'').slice(0,10))} ${statusBadge}${r.note?' · '+esc(r.note):''}</span><span style="display:flex;align-items:center"><b style="color:var(--g)">+${money(r.amount)}</b>${verifyBtn}</span></div>`;
-  }).join(''):`<div class="row"><small style="color:var(--muted)">Abhi tak koi Balance Return nahi hua is Issue ke against.</small></div>`;
-  return `<div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:#f7faf8">
-    <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:4px">🔽 BALANCE RETURNS FOR THIS ISSUE <span style="font-weight:400">(belongs to the row above ↑)</span></div>
-    ${inner}
-  </div>`;
-}
-let _pcAcceptShownId=null;
-function renderPcWidget(){
-  const wrap=$('pcWidget');if(!wrap)return;
-  if(!currentUser||!myUserObj()){wrap.classList.add('hidden');wrap.innerHTML='';_pcAcceptShownId=null;return}
-  const pending=pcPendingForMe();
-  if(pending){
-    if(_pcAcceptShownId!==pending.id){_pcAcceptShownId=pending.id;openPcAcceptModal(pending);}
-  } else if($('pcAcceptModal').classList.contains('show')){
-    hide('pcAcceptModal');_pcAcceptShownId=null;
-  }
-  const myOpen=pcMyOpenIssues();
-  const myOutstanding=myOpen.reduce((s,p)=>s+pcIssueOutstanding(p),0);
-  if(myOutstanding>0.5){
-    wrap.classList.remove('hidden');
-    wrap.innerHTML=`<div class="panel" style="margin-bottom:12px;border-left:4px solid var(--g2)"><div class="pb" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>💰 Petty Cash aapke paas hai</b><div style="font-size:12px;color:var(--muted);margin-top:2px">Outstanding: ${money(myOutstanding)}</div></div><button class="btn primary" onclick="openPcReturnModal()">↩ Return Balance</button></div></div>`;
-  } else {
-    wrap.classList.add('hidden');wrap.innerHTML='';
-  }
-}
-function openPcAcceptModal(item){
-  const title=item.type==='fund_release'?'Admin ne Fund Release kiya hai':'Aapko Petty Cash Issue hua hai';
-  const sub=`By: ${esc(item.createdByName||'-')}${item.note?' · '+esc(item.note):''}`;
-  $('pcAcceptTitle').textContent=title;
-  $('pcAcceptSub').textContent=sub;
-  $('pcAcceptAmount').textContent=money(item.amount);
-  $('pcAcceptMsg').textContent='';
-  $('pcAcceptModal').dataset.pcId=item.id;
-  show('pcAcceptModal');
-}
-let _pcResolving=false;
-async function pcResolvePendingFromModal(decision){
-  if(_pcResolving)return;
-  const id=$('pcAcceptModal').dataset.pcId;
-  const item=pettyCash.find(p=>p.id===id);
-  if(!item){hide('pcAcceptModal');return}
-  _pcResolving=true;
-  try{
-    const actor=myUserObj();const myName=actor?actor.name:currentUser;
-    await db.collection('te_petty_cash').doc(item.id).set(Object.assign({},item,{
-      status:decision,resolvedBy:currentUser,resolvedByName:myName,resolvedAt:new Date().toISOString()
-    }));
-    hide('pcAcceptModal');_pcAcceptShownId=null;
-    toast(decision==='accepted'?'Accept ho gaya':'Reject kar diya');
-    if(item.createdBy){
-      const creator=users.find(u=>u.id===item.createdBy);
-      if(creator&&creator.phone){
-        const label=item.type==='fund_release'?'Fund Release':'Petty Cash Issue';
-        sendWA(creator.phone,`${decision==='accepted'?'✅':'❌'} ${label} ${money(item.amount)} ${myName} ne ${decision==='accepted'?'Accept':'Reject'} kar diya hai.`);
-      }
-    }
-  }finally{_pcResolving=false;}
-}
-
-function openPcAddFundModal(){
-  $('pcFundAmount').value='';$('pcFundRemark').value='';$('pcFundMsg').textContent='';
-  show('pcAddFundModal');
-}
-let _pcFundSubmitting=false;
-async function submitPcAddFund(){
-  if(_pcFundSubmitting)return;
-  const amount=Number($('pcFundAmount').value);
-  const remark=$('pcFundRemark').value.trim();
-  const msg=$('pcFundMsg');
-  if(!amount||amount<=0){msg.textContent='Sahi amount bharein.';return}
-  _pcFundSubmitting=true;
-  const btn=$('pcFundSubmitBtn');if(btn)btn.disabled=true;
-  try{
-    const actor=myUserObj();const myName=actor?actor.name:currentUser;
-    const rec={id:pcGenId(),type:'fund_release',amount,status:'pending',note:remark,createdBy:currentUser,createdByName:myName,at:new Date().toISOString()};
-    await db.collection('te_petty_cash').doc(rec.id).set(rec);
-    hide('pcAddFundModal');
-    toast('Fund Release bhej diya, Accounts Accept karega');
-    usersWithRole('accounts').forEach(u=>u.phone&&sendWA(u.phone,`💰 Petty Cash Fund Release\n\nBy: ${myName}\nAmount: ${money(amount)}${remark?'\nRemark: '+remark:''}\n\nAccept karne ke liye app kholein.`));
-  }finally{_pcFundSubmitting=false;if(btn)btn.disabled=false;}
-}
-
-function openPcIssueModal(){
-  const sel=$('pcIssueTo');
-  const eligible=users.filter(u=>u.appRoles&&u.appRoles[APP_SLUG]&&u.active!==false&&u.id!==currentUser);
-  sel.innerHTML=eligible.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
-  $('pcIssueAmount').value='';$('pcIssueRemark').value='';$('pcIssueMsg').textContent='';
-  show('pcIssueModal');
-}
-let _pcIssueSubmitting=false;
-async function submitPcIssue(){
-  if(_pcIssueSubmitting)return;
-  const toId=$('pcIssueTo').value;
-  const amount=Number($('pcIssueAmount').value);
-  const remark=$('pcIssueRemark').value.trim();
-  const msg=$('pcIssueMsg');
-  if(!toId){msg.textContent='Person select karein.';return}
-  if(!amount||amount<=0){msg.textContent='Sahi amount bharein.';return}
-  _pcIssueSubmitting=true;
-  const btn=$('pcIssueSubmitBtn');if(btn)btn.disabled=true;
-  try{
-    const actor=myUserObj();const myName=actor?actor.name:currentUser;
-    const toUser=users.find(u=>u.id===toId);
-    const rec={id:pcGenId(),type:'issue',amount,status:'pending',note:remark,toId,toName:toUser?toUser.name:toId,createdBy:currentUser,createdByName:myName,at:new Date().toISOString()};
-    await db.collection('te_petty_cash').doc(rec.id).set(rec);
-    hide('pcIssueModal');
-    toast('Issue bhej diya, Doer ko Accept karna hoga');
-    if(toUser&&toUser.phone)sendWA(toUser.phone,`💰 Petty Cash Issue\n\nBy: ${myName}\nAmount: ${money(amount)}${remark?'\nRemark: '+remark:''}\n\nAccept karne ke liye app kholein.`);
-  }finally{_pcIssueSubmitting=false;if(btn)btn.disabled=false;}
-}
-
-function openPcReturnModal(){
-  const sel=$('pcReturnIssue');
-  const open=pcMyOpenIssues();
-  if(!open.length){alert('Koi outstanding Petty Cash nahi hai.');return}
-  sel.innerHTML=open.map(p=>`<option value="${esc(p.id)}">${esc((p.at||'').slice(0,10))} — Issued ${money(p.amount)} (Outstanding ${money(pcIssueOutstanding(p))})</option>`).join('');
-  $('pcReturnAmount').value='';$('pcReturnRemark').value='';$('pcReturnMsg').textContent='';
-  updatePcReturnHint();
-  show('pcReturnModal');
-}
-function updatePcReturnHint(){
-  const id=$('pcReturnIssue').value;
-  const issue=pettyCash.find(p=>p.id===id);
-  $('pcReturnHint').textContent=issue?`Outstanding: ${money(pcIssueOutstanding(issue))}`:'';
-}
-let _pcReturnSubmitting=false;
-async function submitPcReturn(){
-  if(_pcReturnSubmitting)return;
-  const issueId=$('pcReturnIssue').value;
-  const issue=pettyCash.find(p=>p.id===issueId);
-  const amount=Number($('pcReturnAmount').value);
-  const remark=$('pcReturnRemark').value.trim();
-  const msg=$('pcReturnMsg');
-  if(!issue){msg.textContent='Issue select karein.';return}
-  if(!amount||amount<=0){msg.textContent='Sahi amount bharein.';return}
-  const outstanding=pcIssueOutstanding(issue);
-  if(amount>outstanding+0.5){msg.textContent=`Outstanding sirf ${money(outstanding)} hai.`;return}
-  _pcReturnSubmitting=true;
-  const btn=$('pcReturnSubmitBtn');if(btn)btn.disabled=true;
-  try{
-    const actor=myUserObj();const myName=actor?actor.name:currentUser;
-    const rec={id:pcGenId(),type:'balance_return',amount,status:'pending',note:remark,issueId:issue.id,issueAmount:issue.amount,issueAt:issue.at,fromId:currentUser,fromName:myName,createdBy:currentUser,createdByName:myName,at:new Date().toISOString()};
-    await db.collection('te_petty_cash').doc(rec.id).set(rec);
-    hide('pcReturnModal');
-    toast('Balance return bhej diya, Accounts Verify karega');
-    usersWithRole('accounts').forEach(u=>u.phone&&sendWA(u.phone,`↩ Petty Cash Balance Return\n\nBy: ${myName}\nAmount: ${money(amount)}\nAgainst Issue: ${money(issue.amount)} (${(issue.at||'').slice(0,10)})\n\nVerify & Receive karne ke liye app kholein.`));
-  }finally{_pcReturnSubmitting=false;if(btn)btn.disabled=false;}
-}
-
-let _pcVerifying=false;
-async function pcVerifyReceive(id){
-  if(_pcVerifying)return;
-  const item=pettyCash.find(p=>p.id===id&&p.type==='balance_return');
-  if(!item)return;
-  if(!confirm(`${money(item.amount)} receive ho gaya confirm karein?`))return;
-  _pcVerifying=true;
-  try{
-    const actor=myUserObj();const myName=actor?actor.name:currentUser;
-    await db.collection('te_petty_cash').doc(item.id).set(Object.assign({},item,{
-      status:'verified',resolvedBy:currentUser,resolvedByName:myName,resolvedAt:new Date().toISOString()
-    }));
-    toast('Verify ho gaya');
-  }finally{_pcVerifying=false;}
-}
-
-function pcLedgerRowHtml(p){
-  if(p.type==='fund_release'){
-    const statusBadge=p.status==='pending'?`<span class="tag amber" style="margin-left:6px">Pending Accept</span>`:p.status==='accepted'?`<span class="tag" style="margin-left:6px">✓ Accepted</span>`:`<span class="tag" style="background:var(--redbg);color:var(--red);margin-left:6px">✕ Rejected</span>`;
-    return `<div class="row"><span><span class="tag">IN</span>${statusBadge}<br><small>${esc(p.createdByName||'-')} — FOR PETTY CASH${p.note?' · '+esc(p.note):''}</small></span><b style="color:var(--g)">+${money(p.amount)}</b></div>`;
-  }
-  if(p.type==='issue'){
-    const statusBadge=p.status==='pending'?`<span class="tag amber" style="margin-left:6px">Pending Accept</span>`:p.status==='accepted'?`<span class="tag" style="margin-left:6px">✓ Accepted</span>`:`<span class="tag" style="background:var(--redbg);color:var(--red);margin-left:6px">✕ Rejected</span>`;
-    const isOpen=!!pcExpandedIssues[p.id];
-    const toggleBtn=`<button class="btn" style="margin-left:8px" onclick="togglePcIssueExpand('${esc(p.id)}')" title="View returns against this issue">${isOpen?'🔽':'👁'}</button>`;
-    const mainRow=`<div class="row"><span><span class="tag" style="background:var(--redbg);color:var(--red)">OUT</span>${statusBadge}<br><small>${esc(p.toName||p.toId||'-')} — Issued by ${esc(p.createdByName||'-')}${p.note?' · '+esc(p.note):''}</small></span><span style="display:flex;align-items:center"><b style="color:var(--red)">-${money(p.amount)}</b>${toggleBtn}</span></div>`;
-    return mainRow+(isOpen?pcIssueBreakdownHtml(p):'');
-  }
-  if(p.type==='balance_return'){
-    const statusBadge=p.status==='pending'?`<span class="tag amber" style="margin-left:6px">Pending Verify</span>`:`<span class="tag" style="margin-left:6px">✓ Verified</span>`;
-    const verifyBtn=p.status==='pending'&&pcAccountsLikeRole()?`<button class="btn" style="margin-top:6px" onclick="pcVerifyReceive('${esc(p.id)}')">✅ Verify &amp; Receive</button>`:'';
-    return `<div class="row"><span><span class="tag">IN</span>${statusBadge}<br><small>Balance returned by ${esc(p.fromName||p.fromId||'-')} (issued ${money(p.issueAmount||0)} on ${esc((p.issueAt||'').slice(0,10))})${p.note?' · '+esc(p.note):''}</small>${verifyBtn}</span><b style="color:var(--g)">+${money(p.amount)}</b></div>`;
-  }
-  return '';
-}
-
-function renderPettyCashPage(){
-  const tiles=$('pcTiles');
-  if(tiles)tiles.innerHTML=`
-    <div class="m"><small>TOTAL FUND ADDED</small><b>${money(pcTotalFundAdded())}</b></div>
-    <div class="m"><small>TOTAL ISSUED</small><b>${money(pcTotalIssued())}</b></div>
-    <div class="m" style="background:var(--amberbg)"><small style="color:var(--amber)">BALANCE VERIFY &amp; RECEIVE</small><b style="color:var(--amber)">${money(pcTotalVerified())}</b></div>`;
-  const role=effectiveRole();
-  const actions=$('pcQuickActions');
-  if(actions){
-    let btns='';
-    // Admin only ever sees Release Fund, Accounts only ever sees Issue - Director (oversight
-    // role across this whole app) keeps both, matching the access pattern every other page here
-    // already gives Director over Admin/Accounts-specific actions.
-    if(role==='admin'||role==='director')btns+=`<button class="btn primary" style="margin-right:8px;margin-bottom:8px" onclick="openPcAddFundModal()">➕ Release Fund</button>`;
-    if(role==='accounts'||role==='director')btns+=`<button class="btn primary" style="margin-right:8px;margin-bottom:8px" onclick="openPcIssueModal()">📤 Issue to Doer</button>`;
-    if(pcMyOpenIssues().length)btns+=`<button class="btn" style="margin-bottom:8px" onclick="openPcReturnModal()">↩ Return My Balance</button>`;
-    actions.innerHTML=btns||'<div class="row"><small>Koi action available nahi hai.</small></div>';
-  }
-  const list=$('pcLedgerList');
-  if(list){
-    const sorted=pettyCash.slice().sort((a,b)=>(b.at||'').localeCompare(a.at||''));
-    list.innerHTML=sorted.length?sorted.map(pcLedgerRowHtml).join(''):'<div class="row"><small>Koi entry nahi hai.</small></div>';
-  }
-}
-
 function fileToCompressedDataUri(file){
   return new Promise((resolve,reject)=>{
     const reader=new FileReader();
@@ -2288,7 +1982,6 @@ function renderPage(id){
   else if(id==='notify')renderNotifyPage();
   else if(id==='teamroles')renderTeamRolesPage();
   else if(id==='manageRecords')renderManageRecordsPage();
-  else if(id==='pettyCash')renderPettyCashPage();
 }
 function currentPageId(){const on=document.querySelector('.page.on');return on?on.id:'admin'}
 function applyRoleVisibility(){
@@ -2375,14 +2068,13 @@ function renderAll(){
   if(currentUser&&myUserObj()&&effectiveRole()){
     applyRoleVisibility();
     renderPage(currentPageId());
-    renderPcWidget();
   }
 }
 function boot(){
   currentUser=localStorage.getItem(SESSION_KEY)||null;
   // Each sync isolated so one failing (e.g. Firebase unavailable) can't stop the rest from
   // starting or block renderAll() below — the page should still show local/cached data.
-  [startUsersSync,startTripsSync,startLedgerSync,startSettingsSync,startOptionsSync,startLedgerHeadsSync,startActivitySync,startTemplatesSync,startExpenseCategoriesSync,startPettyCashSync].forEach(fn=>{
+  [startUsersSync,startTripsSync,startLedgerSync,startSettingsSync,startOptionsSync,startLedgerHeadsSync,startActivitySync,startTemplatesSync,startExpenseCategoriesSync].forEach(fn=>{
     try{fn();}catch(e){console.error(fn.name+' failed:',e);}
   });
   renderExpenseCategoryOptions();
