@@ -1008,6 +1008,22 @@ function pcPendingForMe(){
   }
   return null;
 }
+let pcExpandedIssues={};
+function togglePcIssueExpand(id){ pcExpandedIssues[id]=!pcExpandedIssues[id]; renderPettyCashPage(); }
+// Mirrors Purchase Price Estimator's Deals History "Lot-wise Breakdown" expand pattern -
+// clicking an Issue row reveals the Balance Return entries made against it, right below it.
+function pcIssueBreakdownHtml(issue){
+  const returns=pettyCash.filter(p=>p.type==='balance_return'&&p.issueId===issue.id).sort((a,b)=>(a.at||'').localeCompare(b.at||''));
+  const inner=returns.length?returns.map(r=>{
+    const statusBadge=r.status==='pending'?`<span class="tag amber">Pending Verify</span>`:`<span class="tag">✓ Verified</span>`;
+    const verifyBtn=r.status==='pending'&&pcAccountsLikeRole()?`<button class="btn" style="margin-left:8px" onclick="pcVerifyReceive('${esc(r.id)}')">✅ Verify</button>`:'';
+    return `<div class="row"><span>${esc((r.at||'').slice(0,10))} ${statusBadge}${r.note?' · '+esc(r.note):''}</span><span style="display:flex;align-items:center"><b style="color:var(--g)">+${money(r.amount)}</b>${verifyBtn}</span></div>`;
+  }).join(''):`<div class="row"><small style="color:var(--muted)">Abhi tak koi Balance Return nahi hua is Issue ke against.</small></div>`;
+  return `<div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:#f7faf8">
+    <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:4px">🔽 BALANCE RETURNS FOR THIS ISSUE <span style="font-weight:400">(belongs to the row above ↑)</span></div>
+    ${inner}
+  </div>`;
+}
 let _pcAcceptShownId=null;
 function renderPcWidget(){
   const wrap=$('pcWidget');if(!wrap)return;
@@ -1174,7 +1190,10 @@ function pcLedgerRowHtml(p){
   }
   if(p.type==='issue'){
     const statusBadge=p.status==='pending'?`<span class="tag amber" style="margin-left:6px">Pending Accept</span>`:p.status==='accepted'?`<span class="tag" style="margin-left:6px">✓ Accepted</span>`:`<span class="tag" style="background:var(--redbg);color:var(--red);margin-left:6px">✕ Rejected</span>`;
-    return `<div class="row"><span><span class="tag" style="background:var(--redbg);color:var(--red)">OUT</span>${statusBadge}<br><small>${esc(p.toName||p.toId||'-')} — Issued by ${esc(p.createdByName||'-')}${p.note?' · '+esc(p.note):''}</small></span><b style="color:var(--red)">-${money(p.amount)}</b></div>`;
+    const isOpen=!!pcExpandedIssues[p.id];
+    const toggleBtn=`<button class="btn" style="margin-left:8px" onclick="togglePcIssueExpand('${esc(p.id)}')" title="View returns against this issue">${isOpen?'🔽':'👁'}</button>`;
+    const mainRow=`<div class="row"><span><span class="tag" style="background:var(--redbg);color:var(--red)">OUT</span>${statusBadge}<br><small>${esc(p.toName||p.toId||'-')} — Issued by ${esc(p.createdByName||'-')}${p.note?' · '+esc(p.note):''}</small></span><span style="display:flex;align-items:center"><b style="color:var(--red)">-${money(p.amount)}</b>${toggleBtn}</span></div>`;
+    return mainRow+(isOpen?pcIssueBreakdownHtml(p):'');
   }
   if(p.type==='balance_return'){
     const statusBadge=p.status==='pending'?`<span class="tag amber" style="margin-left:6px">Pending Verify</span>`:`<span class="tag" style="margin-left:6px">✓ Verified</span>`;
