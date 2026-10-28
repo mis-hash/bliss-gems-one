@@ -399,6 +399,7 @@ try{
 try{if(typeof firebase!=='undefined'&&firebase.auth)firebase.auth().signInAnonymously().catch(e=>console.error('anon auth failed:',e));}catch(e){console.error('anon auth failed:',e);}
 
 const APP_SLUG='petty-cash';
+const APP_URL='https://bliss-gems-one.web.app/petty-cash/';
 const UU_COLLECTION='universal_users';
 const SESSION_KEY='pd_logged_user_v1'; // same key as Bliss One hub / other apps — one login everywhere
 const $=id=>document.getElementById(id);
@@ -703,10 +704,10 @@ async function addLedgerEntry(){
       const pending={id:pcGenPendingId(),type:entryType,amount,date,person,note,personId:personId||'',by:actor?actor.id:'',byName:actor?actor.name:'',at:new Date().toISOString(),status:'pending'};
       await db.collection('pc_pending_entries').doc(pending.id).set(pending);
       if(entryType==='in'){
-        pcAccountantLikeUsers().forEach(u=>u.phone&&sendRawWA(u.phone,`💰 Petty Cash — Fund Add Pending Accept\n\nBy: ${actor?actor.name:'-'}\nAmount: ${fmtAmt(amount)}${note?'\nNote: '+note:''}\n\nAccept karne ke liye app kholein.`));
+        pcAccountantLikeUsers().forEach(u=>u.phone&&sendRawWA(u.phone,`💰 Petty Cash — Fund Add Pending Accept\n\nBy: ${actor?actor.name:'-'}\nAmount: ${fmtAmt(amount)}${note?'\nNote: '+note:''}\n\nAccept karne ke liye app kholein:\n${APP_URL}`));
       }else{
         const u=users.find(x=>x.id===personId);
-        if(u&&u.phone)sendRawWA(u.phone,`💳 Petty Cash — Cash Issue Pending Accept\n\nAapko ${fmtAmt(amount)} issue hua hai${note?' ('+note+')':''}.\n\nAccept/Reject karne ke liye app kholein.`);
+        if(u&&u.phone)sendRawWA(u.phone,`💳 Petty Cash — Cash Issue Pending Accept\n\nAapko ${fmtAmt(amount)} issue hua hai${note?' ('+note+')':''}.\n\nAccept/Reject karne ke liye app kholein:\n${APP_URL}`);
       }
     }else{
       const payload={type:entryType,amount,date,person,note,by:actor?actor.id:'',at:new Date().toISOString()};
@@ -775,7 +776,7 @@ async function pcAcceptPending(id){
     await db.collection('pc_ledger').add(payload);
     await db.collection('pc_pending_entries').doc(id).update({status:'accepted',resolvedBy:currentUser,resolvedByName:actor?actor.name:currentUser,resolvedAt:new Date().toISOString()});
     const creator=users.find(u=>u.id===p.by);
-    if(creator&&creator.phone)sendRawWA(creator.phone,`✅ Petty Cash ${p.type==='in'?'Fund Add':'Cash Out'} ${fmtAmt(p.amount)} accept ho gaya (${actor?actor.name:'-'}).`);
+    if(creator&&creator.phone)sendRawWA(creator.phone,`✅ Petty Cash ${p.type==='in'?'Fund Add':'Cash Out'} ${fmtAmt(p.amount)} accept ho gaya (${actor?actor.name:'-'}).\n\n${APP_URL}`);
     toast('Accept ho gaya');
   }finally{_pcResolving=false;}
 }
@@ -791,7 +792,7 @@ async function pcRejectPending(id){
     const actor=loggedUser();
     await db.collection('pc_pending_entries').doc(id).update({status:'rejected',resolvedBy:currentUser,resolvedByName:actor?actor.name:currentUser,resolvedAt:new Date().toISOString()});
     const creator=users.find(u=>u.id===p.by);
-    if(creator&&creator.phone)sendRawWA(creator.phone,`❌ Petty Cash ${p.type==='in'?'Fund Add':'Cash Out'} ${fmtAmt(p.amount)} reject kar diya gaya (${actor?actor.name:'-'}).`);
+    if(creator&&creator.phone)sendRawWA(creator.phone,`❌ Petty Cash ${p.type==='in'?'Fund Add':'Cash Out'} ${fmtAmt(p.amount)} reject kar diya gaya (${actor?actor.name:'-'}).\n\n${APP_URL}`);
     toast('Reject kar diya');
   }finally{_pcResolving=false;}
 }
