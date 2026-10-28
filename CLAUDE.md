@@ -63,7 +63,7 @@ lost) can pick up exactly where the previous session left off. Read this first.
   local `python3 -m http.server` serving `public/` + Playwright screenshots, (c) GitHub
   Actions deploy status as the source of truth for "is it actually live".
 
-## The four apps (all in `public/`, all on one Firebase Hosting site)
+## The five apps (all in `public/`, all on one Firebase Hosting site)
 
 1. **Bliss One hub** — `public/index.html` — https://bliss-gems-one.web.app/
    App launcher/dashboard; embeds the other apps in an iframe when opened inline.
@@ -74,6 +74,10 @@ lost) can pick up exactly where the previous session left off. Read this first.
 4. **Stationery Inventory** — `public/stationery-inventory/index.html` —
    https://bliss-gems-one.web.app/stationery-inventory/ — Stock In/Out entries against an
    Item master, with low-stock alerts.
+5. **Purchase Price Estimator** — `public/purchase-price-estimator/index.html` —
+   https://bliss-gems-one.web.app/purchase-price-estimator/ — Director-rate deal entry
+   (per-lot, per-director ₹/ct pricing) with an auto-WhatsApp-sent Purchase Slip PDF once
+   the Due Date is filled.
 
 ## Shared architecture
 
@@ -244,6 +248,17 @@ lost) can pick up exactly where the previous session left off. Read this first.
   suggestion too (same self-growing-list pattern as Parcel Dispatch's `courierNames`).
 - **Submit Hisaab** WhatsApps a full breakdown (advance, expense, party cash, transfers,
   net receivable/payable) to both Admin/Director **and** the Sales person themselves.
+- **Trip Summary PDF** (`sendTripSummaryToDirectors(tripId, extra)`): auto-sent on WhatsApp
+  to **both Hitesh Dusad and Nitesh Dusad** when Admin clicks "Close Trip" — looked up via
+  `findUserByName()` (case-insensitive `startsWith` match against the shared Universal
+  Users `users` array, independent of their per-app role). Contents (`buildTripSummaryHtml`):
+  gradient hero banner (green, `.tripPdfHero`), money breakdown, expense-category bars
+  (`tripExpenseCategoryBreakdown`), Expense Entries/Proof Rate glance tiles, and an NOC card
+  with the settled amount, mode, and a **"Received By"** row (who actually collected/paid
+  the balance — `extra.closerName`). Filename: `Trip Summary - <Location> - <TripID>.pdf`.
+  Uses the same direct-html2canvas-then-jsPDF pipeline as Purchase Price Estimator's PDF
+  (see below) — built from a standalone HTML string (`buildTripSummaryHtml`), not a clone
+  of any on-screen panel, since this app has no single "deal form" panel to clone.
 
 ## Stationery Inventory — specifics
 
@@ -251,6 +266,47 @@ lost) can pick up exactly where the previous session left off. Read this first.
   <datalist>` starting blank (not a pre-filled `<select>` defaulting to whichever item is
   first in the list — that was a real bug: a wrong-item entry could go unnoticed). A
   hidden field tracks the resolved item's real Firestore ID for the existing save logic.
+
+## Purchase Price Estimator — specifics
+
+- **Deal entry**: per-lot, per-director ₹/ct rates (3 directors — editable display names
+  `g1Name`/`g2Name`/`g3Name`). `Guess Avg` = average of the live director rates; once a
+  deal closes, `Final Rate` is entered manually and all lots' `Final Cost` scale off the
+  `Guess Avg → Final Rate` diff %.
+- **Deals History filter defaults to "Pending"** on every fresh app load (`let dealFilter
+  = 'pending'` + the `active` class on the Pending button in the static HTML, both kept in
+  sync) — changed from the old default of "All" so the app always opens on the
+  still-open/actionable deals, not a mixed list.
+- **WhatsApp-auto-sent Purchase Slip PDF** (fires automatically once the Due Date is filled
+  on a deal — no manual Print/Share needed): built via `generateSlipPdfBlob()`, which
+  drives **html2canvas 1.4.1 + jsPDF 2.5.1 directly** (loaded as separate CDN libraries,
+  NOT via the `html2pdf.js` convenience chain — that chain was the root cause of a
+  persistent, hard-to-diagnose "blank PDF" bug fixed in a prior session; see git history
+  for `generateSlipPdfBlob` if this pattern is ever touched again). Pipeline: clone
+  `#dealFormPanel` off-screen (`buildPdfExportClone()`, `.pdfExportMode` class) → swap the
+  on-screen wide lot table for per-lot vertical cards (`buildTransposedItemsHtml()`, full
+  director names as row labels, not abbreviated initials) → `html2canvas` capture →
+  `canvasHasContent()` sparse-pixel-sample guard (aborts rather than sending a blank PDF)
+  → `jsPDF` with the page sized to the captured canvas's own aspect ratio (150mm wide —
+  a deliberate mobile/desktop compromise, see code comments) → WhatsApp via GREEN-API
+  (`sendFileWA`, `sendFileByUpload` endpoint).
+  - **PDF header** (`.pdfExportMode #printHeader`, injected into the clone only inside
+    `buildPdfExportClone()` — the physical `@media print` Print Slip keeps its original
+    plain look untouched): a gradient hero banner with a "B" logo badge (matching the
+    letter-badge pattern every other Bliss app uses — there is no real logo image file
+    anywhere in this repo) and the full company name **"Bliss Gems & Minerals"** (not the
+    shorter "Bliss Gems"). Current theme: **Slate Gray** gradient
+    (`#3A4550` → `#717E8C`) — deliberately different from Trip Expense's green hero so the
+    two apps' PDFs are visually distinguishable at a glance. User picked this from ~8
+    color options previewed first (amber/gold, royal purple, wine/maroon, navy blue, and
+    several grays) — do not change the color again without showing options first, per the
+    standing "preview before implementing" pattern below.
+  - **Standing pattern for ANY visual/PDF-design change in this app** (established over
+    many iterations): always build and send a preview (mockup screenshot and/or an actual
+    openable example PDF, e.g. via `weasyprint` in the scratchpad if the real CDN pipeline
+    can't run in-sandbox) **before** touching the real file, and wait for explicit
+    approval. This was asked for and reinforced repeatedly — don't skip it even for a
+    "small" tweak.
 
 ## Bliss One hub — specifics
 
