@@ -171,8 +171,6 @@ tbody tr:hover td{background:#f7faf8}
     <div class="ph"><span>Quick Actions</span></div>
     <div class="pb" style="display:flex;gap:8px;flex-wrap:wrap">
       <button type="button" class="btn primary" onclick="openEntryModal('in')">➕ Add Fund</button>
-      <button type="button" class="btn primary" onclick="openEntryModal('out')">➖ Issue / Cash Out</button>
-      <button type="button" class="btn primary" onclick="openEntryModal('loan')">🤝 Loan Given</button>
     </div>
   </div>
   <div class="pendingRemindersWrap"></div>
@@ -190,9 +188,7 @@ tbody tr:hover td{background:#f7faf8}
   <div class="panel">
     <div class="ph"><span>New Entry</span></div>
     <div class="pb" style="display:flex;gap:8px;flex-wrap:wrap">
-      <button type="button" class="btn primary" id="quickBtn_in" onclick="openEntryModal('in')">➕ Cash In</button>
-      <button type="button" class="btn primary" id="quickBtn_out" onclick="openEntryModal('out')">➖ Cash Out</button>
-      <button type="button" class="btn primary" id="quickBtn_loan" onclick="openEntryModal('loan')">🤝 Loan Given</button>
+      <button type="button" class="btn primary" id="quickBtn_out" onclick="openEntryModal('out')">➖ Issue</button>
     </div>
   </div>
 
@@ -332,13 +328,13 @@ tbody tr:hover td{background:#f7faf8}
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeSuperAdminModal()">Cancel</button><button class="btn primary" onclick="unlockSuperAdmin()">Unlock</button></div>
 </div></div>
 
-<!-- New Entry modal (Cash In / Cash Out / Loan Given) -->
+<!-- New Entry modal (Cash In / Cash Out) - Loan Given is retired: no new loan can be created,
+     but existing loan entries keep rendering/Mark-Repaid everywhere else untouched. -->
 <div class="modal" id="entryModal"><div class="box" style="width:min(480px,100%)">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">New Entry</h3><button class="btn small" onclick="closeEntryModal()">✕</button></div>
 <div class="typeRow">
   <button type="button" class="tab" id="typeBtn_in" onclick="selectEntryType('in')">➕ Cash In</button>
   <button type="button" class="tab on" id="typeBtn_out" onclick="selectEntryType('out')">➖ Cash Out</button>
-  <button type="button" class="tab" id="typeBtn_loan" onclick="selectEntryType('loan')">🤝 Loan Given</button>
 </div>
 <div class="grid">
   <div class="field"><label>Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="entryAmount"></div>
@@ -617,15 +613,18 @@ function applyFeatureVisibility(){
 
 /* ===== Entry form ===== */
 function openEntryModal(t){
+  if(t==='loan'){toast('Loan Given feature band kar diya gaya hai.');return}
   if(t==='in'&&!canAddFund()){toast('Add Fund sirf Admin/Director kar sakte hain.');return}
   selectEntryType(t);
   $('entryModal').classList.add('show');
 }
 function closeEntryModal(){$('entryModal')?.classList.remove('show')}
 function selectEntryType(t){
+  if(t==='loan'){toast('Loan Given feature band kar diya gaya hai.');return}
   if(t==='in'&&!canAddFund()){toast('Add Fund sirf Admin/Director kar sakte hain.');return}
   entryType=t;
-  ['in','out','loan'].forEach(x=>$('typeBtn_'+x).classList.toggle('on',x===t));
+  // typeBtn_loan no longer exists (Loan Given retired) - only toggle the tabs that remain.
+  ['in','out'].forEach(x=>$('typeBtn_'+x).classList.toggle('on',x===t));
   const textInp=$('entryPerson'),sel=$('entryPersonSelect');
   if(t==='out'){
     $('entryPersonLabel').textContent='Issued To (optional — select to let them log their own spend)';
@@ -913,10 +912,14 @@ async function verifyAndSettleSpending(issueId){
   const actor=loggedUser();
   try{
     if(remaining>0){
+      // source:'verify_settle' marks this apart from a genuine Fund Add - computeBalance()
+      // still counts it in totalIn/balance (the cash really did come back into the box), but
+      // the dashboard tiles break it out into its own "Verify & Receive" tile instead of
+      // inflating "Fund Added", since nobody actually added fresh fund here.
       await db.collection('pc_ledger').add({
         type:'in',amount:remaining,date:todayISO(),
         note:'Balance returned by '+(x.person||'-')+' (issued '+fmtAmt(x.amount)+' on '+x.date+')',
-        person:x.person||'',by:actor?actor.id:'',at:new Date().toISOString()
+        person:x.person||'',by:actor?actor.id:'',at:new Date().toISOString(),source:'verify_settle'
       });
     }
     await db.collection('pc_ledger').doc(issueId).update({verified:true,settledAt:new Date().toISOString(),settledBy:actor?actor.id:'Unknown',returnedAmount:remaining});
@@ -1334,19 +1337,25 @@ async function permanentlyDeleteIssueSpend(id){
 function computeBalance(){
   const live=liveLedger();
   const totalIn=live.filter(x=>x.type==='in').reduce((s,x)=>s+(x.amount||0),0);
+  // Verify & Receive (cash returned from a previously-issued, now-settled Cash Out) is real
+  // money in the box - it stays inside totalIn/balance below - but it isn't a fresh Fund Add,
+  // so it's split out separately here purely for the dashboard tiles to report on its own.
+  const verifyReceiveTotal=live.filter(x=>x.type==='in'&&x.source==='verify_settle').reduce((s,x)=>s+(x.amount||0),0);
+  const fundAdded=totalIn-verifyReceiveTotal;
   const totalOut=live.filter(x=>x.type==='out').reduce((s,x)=>s+(x.amount||0),0);
   const outstandingLoans=live.filter(x=>x.type==='loan'&&!x.repaid).reduce((s,x)=>s+(x.amount||0),0);
   const outstandingCount=live.filter(x=>x.type==='loan'&&!x.repaid).length;
   const balance=totalIn-totalOut-outstandingLoans;
-  return {totalIn,totalOut,outstandingLoans,outstandingCount,balance};
+  return {totalIn,fundAdded,verifyReceiveTotal,totalOut,outstandingLoans,outstandingCount,balance};
 }
 function renderDash(){
-  const {totalIn,totalOut,outstandingLoans,outstandingCount,balance}=computeBalance();
+  const {fundAdded,verifyReceiveTotal,totalOut,outstandingLoans,outstandingCount,balance}=computeBalance();
   const live=liveLedger();
   const totalLoanGiven=live.filter(x=>x.type==='loan').reduce((s,x)=>s+(x.amount||0),0);
   const tiles=[
     {label:'CURRENT BALANCE',val:fmtAmt(balance)},
-    {label:'TOTAL IN',val:fmtAmt(totalIn)},
+    {label:'FUND ADDED',val:fmtAmt(fundAdded)},
+    {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
     {label:'TOTAL OUT',val:fmtAmt(totalOut)},
     {label:'TOTAL LOAN GIVEN',val:fmtAmt(totalLoanGiven)},
     {label:'OUTSTANDING LOANS',val:fmtAmt(outstandingLoans)+' ('+outstandingCount+')',warn:outstandingCount>0}
@@ -1591,10 +1600,11 @@ function goPage(id){
 function renderAdminPanel(){
   const wrap=$('adminStatTiles');
   if(!wrap)return;
-  const {totalIn,totalOut,outstandingLoans,outstandingCount}=computeBalance();
+  const {fundAdded,verifyReceiveTotal,totalOut,outstandingLoans,outstandingCount}=computeBalance();
   const pendingHisaab=computeAllPersonPendingTotals().reduce((s,r)=>s+r.issuedPending,0);
   const tiles=[
-    {label:'TOTAL FUND ADDED',val:fmtAmt(totalIn)},
+    {label:'TOTAL FUND ADDED',val:fmtAmt(fundAdded)},
+    {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
     {label:'TOTAL ISSUED (OUT)',val:fmtAmt(totalOut)},
     {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
     {label:'OUTSTANDING LOANS',val:fmtAmt(outstandingLoans)+' ('+outstandingCount+')',warn:outstandingCount>0}
