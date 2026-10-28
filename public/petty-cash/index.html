@@ -1156,11 +1156,57 @@ function computeExpenseReport(from,to){
   const byNote={};
   live.forEach(s=>{
     const key=(s.note||'').trim()||'(Reason nahi diya)';
-    if(!byNote[key])byNote[key]={note:key,total:0,count:0};
+    if(!byNote[key])byNote[key]={note:key,total:0,count:0,items:[]};
     byNote[key].total+=(s.amount||0);
     byNote[key].count++;
+    byNote[key].items.push(s);
   });
-  return Object.values(byNote).sort((a,b)=>b.total-a.total);
+  const rows=Object.values(byNote);
+  rows.forEach(r=>r.items.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))));
+  return rows.sort((a,b)=>b.total-a.total);
+}
+// Expand/collapse state for the Reports page's two tables - keyed by personId (Staff-wise)
+// and by expense note/category (Expense-wise). Mirrors the same "click a row, see a detail
+// table right below it" pattern as the Ledger's View Spending and PPE's Lot-wise Breakdown.
+let pcStaffExpanded={};
+let pcExpenseExpanded={};
+function togglePcStaffExpand(pid){ pcStaffExpanded[pid]=!pcStaffExpanded[pid]; renderReports(); }
+function togglePcExpenseExpand(key){ pcExpenseExpanded[key]=!pcExpenseExpanded[key]; renderReports(); }
+function pcStaffDetailRowHtml(row){
+  const issued=liveLedger().filter(x=>x.type==='out'&&x.personId===row.pid).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const loans=liveLedger().filter(x=>x.type==='loan'&&x.personId===row.pid).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const issuedHtml=issued.length?issued.map(x=>{
+    const remaining=x.amount-issueSpentTotal(x.id);
+    const spends=issueSpends.filter(s=>s.issueId===x.id&&!s.deletedAt);
+    const statusPill=x.verified?'<span class="pill repaid">✓ Settled</span>':`<span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>`;
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:4px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><span><b>${fmtAmt(x.amount)}</b> issued ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>${statusPill}</div>
+      ${spends.map(s=>`<small style="color:var(--muted);padding-left:4px">— ${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''} (${esc(s.date)})</small>`).join('')}
+    </div>`;
+  }).join(''):'<div class="note" style="padding:6px 0">Koi cash issue nahi hui.</div>';
+  const loansHtml=loans.length?loans.map(x=>`<div class="item"><span><b>${fmtAmt(x.amount)}</b> given ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>${x.repaid?'<span class="pill repaid">Repaid</span>':'<span class="pill loan">Outstanding</span>'}</div>`).join(''):'<div class="note" style="padding:6px 0">Koi loan nahi diya gaya.</div>';
+  return `<tr><td colspan="5" style="padding:0;border:0">
+    <div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:#f7faf8">
+      <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:6px">🔽 ${esc(row.name)} KA BREAKDOWN <span style="font-weight:400">(belongs to the row above ↑)</span></div>
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:4px">💳 Cash Issued</div>
+      ${issuedHtml}
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:10px 0 4px">📋 Loans Given</div>
+      ${loansHtml}
+    </div>
+  </td></tr>`;
+}
+function pcExpenseDetailRowHtml(group){
+  const itemsHtml=group.items.map(s=>{
+    const issue=ledger.find(x=>x.id===s.issueId);
+    const delBtn=superAdminUnlocked?`<button class="btn small danger" style="padding:2px 7px;font-size:10px" onclick="permanentlyDeleteIssueSpend('${esc(s.id)}')">✕ Delete</button>`:'';
+    return `<div class="item"><span><b>${fmtAmt(s.amount)}</b> on ${esc(s.date)}${issue?' — issue se: '+esc(issue.person||'-')+' ('+fmtAmt(issue.amount||0)+')':''}<br><small style="color:var(--muted)">by ${esc(nameOfUserId(s.by))}</small></span>${delBtn}</div>`;
+  }).join('');
+  return `<tr><td colspan="3" style="padding:0;border:0">
+    <div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:#f7faf8">
+      <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:6px">🔽 "${esc(group.note)}" KI ENTRIES <span style="font-weight:400">(belongs to the row above ↑)</span></div>
+      ${itemsHtml}
+    </div>
+  </td></tr>`;
 }
 function renderReports(){
   const {from,to}=resolveReportRange();
@@ -1169,10 +1215,18 @@ function renderReports(){
   if($('reportPrintRangeLabel'))$('reportPrintRangeLabel').textContent=label;
 
   const staffRows=computeStaffReport(from,to);
-  if($('staffReportTable'))$('staffReportTable').innerHTML=staffRows.length?staffRows.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td class="num">${fmtAmt(r.issuedTotal)}</td><td class="num">${r.issuedPending>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.issuedPending)}</span>`:fmtAmt(0)}</td><td class="num">${fmtAmt(r.loansTotal)}</td><td class="num">${r.loansOutstanding>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.loansOutstanding)}</span>`:fmtAmt(0)}</td></tr>`).join(''):`<tr><td colspan="5"><div class="emptystate">📊<p>Is date range mein koi record nahi hai.</p></div></td></tr>`;
+  if($('staffReportTable'))$('staffReportTable').innerHTML=staffRows.length?staffRows.map(r=>{
+    const open=!!pcStaffExpanded[r.pid];
+    const mainRow=`<tr style="cursor:pointer" onclick="togglePcStaffExpand('${esc(r.pid)}')"><td><b>${open?'🔽':'▶'} ${esc(r.name)}</b></td><td class="num">${fmtAmt(r.issuedTotal)}</td><td class="num">${r.issuedPending>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.issuedPending)}</span>`:fmtAmt(0)}</td><td class="num">${fmtAmt(r.loansTotal)}</td><td class="num">${r.loansOutstanding>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.loansOutstanding)}</span>`:fmtAmt(0)}</td></tr>`;
+    return mainRow+(open?pcStaffDetailRowHtml(r):'');
+  }).join(''):`<tr><td colspan="5"><div class="emptystate">📊<p>Is date range mein koi record nahi hai.</p></div></td></tr>`;
 
   const expenseRows=computeExpenseReport(from,to);
-  if($('expenseReportTable'))$('expenseReportTable').innerHTML=expenseRows.length?expenseRows.map(r=>`<tr><td>${esc(r.note)}</td><td class="num">${r.count}</td><td class="num">${fmtAmt(r.total)}</td></tr>`).join(''):`<tr><td colspan="3"><div class="emptystate">🧾<p>Is date range mein koi spend entry nahi hai.</p></div></td></tr>`;
+  if($('expenseReportTable'))$('expenseReportTable').innerHTML=expenseRows.length?expenseRows.map((r,i)=>{
+    const open=!!pcExpenseExpanded[i];
+    const mainRow=`<tr style="cursor:pointer" onclick="togglePcExpenseExpand(${i})"><td>${open?'🔽':'▶'} ${esc(r.note)}</td><td class="num">${r.count}</td><td class="num">${fmtAmt(r.total)}</td></tr>`;
+    return mainRow+(open?pcExpenseDetailRowHtml(r):'');
+  }).join(''):`<tr><td colspan="3"><div class="emptystate">🧾<p>Is date range mein koi spend entry nahi hai.</p></div></td></tr>`;
 
   renderPendingReminders();
 }
