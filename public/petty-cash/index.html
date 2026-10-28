@@ -912,10 +912,14 @@ async function verifyAndSettleSpending(issueId){
   const actor=loggedUser();
   try{
     if(remaining>0){
+      // source:'verify_settle' marks this apart from a genuine Fund Add - computeBalance()
+      // still counts it in totalIn/balance (the cash really did come back into the box), but
+      // the dashboard tiles break it out into its own "Verify & Receive" tile instead of
+      // inflating "Fund Added", since nobody actually added fresh fund here.
       await db.collection('pc_ledger').add({
         type:'in',amount:remaining,date:todayISO(),
         note:'Balance returned by '+(x.person||'-')+' (issued '+fmtAmt(x.amount)+' on '+x.date+')',
-        person:x.person||'',by:actor?actor.id:'',at:new Date().toISOString()
+        person:x.person||'',by:actor?actor.id:'',at:new Date().toISOString(),source:'verify_settle'
       });
     }
     await db.collection('pc_ledger').doc(issueId).update({verified:true,settledAt:new Date().toISOString(),settledBy:actor?actor.id:'Unknown',returnedAmount:remaining});
@@ -1333,19 +1337,25 @@ async function permanentlyDeleteIssueSpend(id){
 function computeBalance(){
   const live=liveLedger();
   const totalIn=live.filter(x=>x.type==='in').reduce((s,x)=>s+(x.amount||0),0);
+  // Verify & Receive (cash returned from a previously-issued, now-settled Cash Out) is real
+  // money in the box - it stays inside totalIn/balance below - but it isn't a fresh Fund Add,
+  // so it's split out separately here purely for the dashboard tiles to report on its own.
+  const verifyReceiveTotal=live.filter(x=>x.type==='in'&&x.source==='verify_settle').reduce((s,x)=>s+(x.amount||0),0);
+  const fundAdded=totalIn-verifyReceiveTotal;
   const totalOut=live.filter(x=>x.type==='out').reduce((s,x)=>s+(x.amount||0),0);
   const outstandingLoans=live.filter(x=>x.type==='loan'&&!x.repaid).reduce((s,x)=>s+(x.amount||0),0);
   const outstandingCount=live.filter(x=>x.type==='loan'&&!x.repaid).length;
   const balance=totalIn-totalOut-outstandingLoans;
-  return {totalIn,totalOut,outstandingLoans,outstandingCount,balance};
+  return {totalIn,fundAdded,verifyReceiveTotal,totalOut,outstandingLoans,outstandingCount,balance};
 }
 function renderDash(){
-  const {totalIn,totalOut,outstandingLoans,outstandingCount,balance}=computeBalance();
+  const {fundAdded,verifyReceiveTotal,totalOut,outstandingLoans,outstandingCount,balance}=computeBalance();
   const live=liveLedger();
   const totalLoanGiven=live.filter(x=>x.type==='loan').reduce((s,x)=>s+(x.amount||0),0);
   const tiles=[
     {label:'CURRENT BALANCE',val:fmtAmt(balance)},
-    {label:'TOTAL IN',val:fmtAmt(totalIn)},
+    {label:'FUND ADDED',val:fmtAmt(fundAdded)},
+    {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
     {label:'TOTAL OUT',val:fmtAmt(totalOut)},
     {label:'TOTAL LOAN GIVEN',val:fmtAmt(totalLoanGiven)},
     {label:'OUTSTANDING LOANS',val:fmtAmt(outstandingLoans)+' ('+outstandingCount+')',warn:outstandingCount>0}
@@ -1590,10 +1600,11 @@ function goPage(id){
 function renderAdminPanel(){
   const wrap=$('adminStatTiles');
   if(!wrap)return;
-  const {totalIn,totalOut,outstandingLoans,outstandingCount}=computeBalance();
+  const {fundAdded,verifyReceiveTotal,totalOut,outstandingLoans,outstandingCount}=computeBalance();
   const pendingHisaab=computeAllPersonPendingTotals().reduce((s,r)=>s+r.issuedPending,0);
   const tiles=[
-    {label:'TOTAL FUND ADDED',val:fmtAmt(totalIn)},
+    {label:'TOTAL FUND ADDED',val:fmtAmt(fundAdded)},
+    {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
     {label:'TOTAL ISSUED (OUT)',val:fmtAmt(totalOut)},
     {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
     {label:'OUTSTANDING LOANS',val:fmtAmt(outstandingLoans)+' ('+outstandingCount+')',warn:outstandingCount>0}
