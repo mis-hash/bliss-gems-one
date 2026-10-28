@@ -951,6 +951,7 @@ function renderMyIssuedCash(){
         ${x.verified?'<span class="pill repaid">✓ Verified &amp; Settled</span>':`<span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>`}
       </div>
       ${mySpends.map(s=>`<div style="font-size:12px;color:var(--muted);padding-left:4px">— ${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''} (${esc(s.date)})${superAdminUnlocked?` <button class="btn small danger" style="padding:2px 7px;font-size:10px" onclick="permanentlyDeleteIssueSpend('${esc(s.id)}')">✕</button>`:''}</div>`).join('')}
+      ${x.verified?`<div style="font-size:12px;color:var(--muted);padding-left:4px;margin-top:2px">Verified by ${esc(nameOfUserId(x.settledBy))} on ${esc((x.settledAt||'').slice(0,10))}${x.returnedAmount?' — '+fmtAmt(x.returnedAmount)+' cash wapas receive hua.':''}</div>`:''}
       ${x.verified?'':`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
         <input type="number" id="issueSpendAmt_${esc(x.id)}" placeholder="Amount spent" style="width:120px;padding:7px;border:1px solid var(--line);border-radius:7px">
         <input id="issueSpendNote_${esc(x.id)}" placeholder="Spent on what?" style="flex:1;min-width:140px;padding:7px;border:1px solid var(--line);border-radius:7px">
