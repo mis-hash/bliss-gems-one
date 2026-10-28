@@ -652,6 +652,15 @@ async function sendWA(phone,message){
   }catch(e){console.error('WA send failed',e);}
 }
 function usersWithRole(role){return users.filter(u=>u.appRoles && u.appRoles[APP_SLUG]===role && u.active!==false)}
+// Hitesh, Nitesh and Ankur should only ever get the Close Trip Trip Summary PDF from this
+// app (sent separately via sendTripSummaryToDirectors, name-matched, untouched by this) -
+// every other automatic Trip Expense WhatsApp message (Party Cash notify, Hisaab Submit,
+// NOC text, Trip Booked, Overdue Reminder) must skip them even if their Universal User
+// record has an admin/director/accounts role assigned.
+const DIRECTOR_PDF_ONLY_NAMES=['hitesh','nitesh','ankur'];
+function excludeDirectorPdfOnlyRecipients(list){
+  return list.filter(u=>!DIRECTOR_PDF_ONLY_NAMES.some(n=>String(u.name||'').trim().toLowerCase().startsWith(n)));
+}
 async function notifyRole(role,message){
   if(!notifySettings.issued && role)return; // placeholder guard unused; per-event checks done at call sites
   usersWithRole(role).forEach(u=>sendWA(u.phone,message));
@@ -919,7 +928,7 @@ async function submitPartyCash(){
     hide('partyCashModal');
     toast('Party cash record ho gaya');
     const notifyMsg=`💰 Add Fund From Party Cash\n\nSales: ${myName}\nTrip: ${myTrip.location}\nParty: ${partyName}\nAmount: ${money(amount)}${remark?'\nRemark: '+remark:''}\n\nIs party se mila cash trip expense ke liye use ho raha hai.`;
-    usersWithRole('admin').concat(usersWithRole('director')).forEach(u=>u.phone&&sendWA(u.phone,notifyMsg));
+    excludeDirectorPdfOnlyRecipients(usersWithRole('admin').concat(usersWithRole('director'))).forEach(u=>u.phone&&sendWA(u.phone,notifyMsg));
   }finally{_partyCashSubmitting=false;if(btn)btn.disabled=false;}
 }
 function fileToCompressedDataUri(file){
@@ -1008,7 +1017,7 @@ async function submitHisaab(tripId){
   const summary=hisaabSummaryLines(trip.id);
   if(notifySettings.submitted){
     const submittedMsg=renderTemplate(messageTemplates.submitted,{name:trip.salesName,location:trip.location,tripId:trip.id})+'\n\n'+summary;
-    usersWithRole('admin').concat(usersWithRole('director')).forEach(u=>sendWA(u.phone,submittedMsg));
+    excludeDirectorPdfOnlyRecipients(usersWithRole('admin').concat(usersWithRole('director'))).forEach(u=>sendWA(u.phone,submittedMsg));
     const me=myUserObj();
     if(me)sendWA(me.phone,`🧾 Aapka Hisaab Submit Ho Gaya\n${trip.location} • ${trip.id}\n\n${summary}\n\nAdmin verify karega.`);
   }
@@ -1061,12 +1070,9 @@ async function confirmCloseTrip(){
     const sales=users.find(u=>u.id===trip.salesId);
     const msg=renderTemplate(messageTemplates.closed,{noc:nocNumber,name:trip.salesName,location:trip.location,tripId,balance:money(balance),returned:money(returned),mode});
     if(sales)sendWA(sales.phone,msg);
-    // Hitesh, Nitesh and Ankur get the overall Director insights/escalation notices
-    // already - don't also put every single NOC in their chat, only the actual closers
-    // (admin) and accounts (who book it) need the per-trip message.
-    const NOC_EXCLUDED_NAMES=['hitesh','nitesh','ankur'];
-    usersWithRole('admin').concat(usersWithRole('accounts'))
-      .filter(u=>!NOC_EXCLUDED_NAMES.some(n=>String(u.name||'').trim().toLowerCase().startsWith(n)))
+    // Only the actual closers (admin) and accounts (who book it) need the per-trip NOC
+    // message - Hitesh/Nitesh/Ankur are excluded (see DIRECTOR_PDF_ONLY_NAMES above).
+    excludeDirectorPdfOnlyRecipients(usersWithRole('admin').concat(usersWithRole('accounts')))
       .forEach(u=>sendWA(u.phone,msg));
   }
   sendTripSummaryToDirectors(tripId,{returned,mode,nocNumber,closerName});
@@ -1224,7 +1230,7 @@ async function markBooked(tripId){
   const trip=trips.find(t=>t.id===tripId);
   logActivity(`${(myUserObj()||{}).name||currentUser} marked ${tripId} as Booked`,trip?`${trip.salesName} · ${trip.location}`:'');
   if(notifySettings.booked && trip){
-    usersWithRole('director').forEach(u=>sendWA(u.phone,renderTemplate(messageTemplates.booked,{tripId:trip.id})));
+    excludeDirectorPdfOnlyRecipients(usersWithRole('director')).forEach(u=>sendWA(u.phone,renderTemplate(messageTemplates.booked,{tripId:trip.id})));
   }
 }
 function sendOverdueReminder(tripId){
@@ -1233,7 +1239,7 @@ function sendOverdueReminder(tripId){
   const bal=tripBalance(tripId);
   const msg=renderTemplate(messageTemplates.overdue,{location:trip.location,due:trip.dueDate,balance:money(bal)});
   if(sales)sendWA(sales.phone,msg);
-  usersWithRole('admin').forEach(u=>sendWA(u.phone,msg));
+  excludeDirectorPdfOnlyRecipients(usersWithRole('admin')).forEach(u=>sendWA(u.phone,msg));
   toast('Reminder bhej diya.');
 }
 function toast(t){const b=$('loginBadge');const old=b.textContent;b.textContent=t;setTimeout(()=>refreshLoginBadge(),1500);}
