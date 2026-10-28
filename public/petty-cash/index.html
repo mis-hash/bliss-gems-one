@@ -734,6 +734,13 @@ function pcAccountantLikeUsers(){return users.filter(u=>u.active!==false&&u.phon
 function myPendingAcceptItems(){
   return pendingEntries.filter(p=>p.status==='pending'&&(p.type==='in'?canCloseLoan():p.personId===currentUser));
 }
+// Global count/amount across ALL still-pending Fund Add + Cash Out requests, regardless of
+// who's authorized to resolve each one - drives the dashboard "PENDING ACCEPT" tile so Admin/
+// Accountant get a quick-glance number without opening the full Pending Accept panel.
+function pendingAcceptSummary(){
+  const pending=pendingEntries.filter(p=>p.status==='pending');
+  return {count:pending.length,amount:pending.reduce((s,p)=>s+(p.amount||0),0)};
+}
 function renderPendingAcceptPanel(){
   const wrap=$('pcPendingAcceptWrap');
   if(!wrap)return;
@@ -930,7 +937,9 @@ async function verifyAndSettleSpending(issueId){
 function renderMyIssuedCash(){
   const wrap=$('myIssuedCashWrap');
   if(!wrap)return;
-  const mine=liveLedger().filter(x=>x.type==='out'&&x.personId===currentUser).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  // Sort by the full creation timestamp (not just the date string), so same-day entries still
+  // come out newest-first - the Date alone can't tell two same-day issues apart.
+  const mine=liveLedger().filter(x=>x.type==='out'&&x.personId===currentUser).sort((a,b)=>String(b.at||b.date).localeCompare(String(a.at||a.date)));
   if(!mine.length){wrap.innerHTML='';return;}
   wrap.innerHTML=`<div class="panel"><div class="ph"><span>💳 Cash Issued to Me</span></div><div class="pb">${mine.map(x=>{
     const spent=issueSpentTotal(x.id);
@@ -1355,6 +1364,7 @@ function renderDash(){
   // out, not what's been accounted for yet.
   const totalSpent=issueSpends.filter(s=>!s.deletedAt).reduce((s,x)=>s+(x.amount||0),0);
   const pendingHisaab=computeAllPersonPendingTotals().reduce((s,r)=>s+r.issuedPending,0);
+  const pendingAccept=pendingAcceptSummary();
   // Loan Given is retired (see addLedgerEntry()/openEntryModal()) - no Loan tile here anymore,
   // even though existing loan entries still count toward balance via computeBalance().
   const tiles=[
@@ -1363,6 +1373,7 @@ function renderDash(){
     {label:'TOTAL SPENT',val:fmtAmt(totalSpent)},
     {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
     {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
+    {label:'PENDING ACCEPT',val:fmtAmt(pendingAccept.amount)+' ('+pendingAccept.count+')',warn:pendingAccept.count>0},
     {label:'CURRENT BALANCE',val:fmtAmt(balance)}
   ];
   $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
@@ -1607,12 +1618,14 @@ function renderAdminPanel(){
   if(!wrap)return;
   const {fundAdded,verifyReceiveTotal,totalOut}=computeBalance();
   const pendingHisaab=computeAllPersonPendingTotals().reduce((s,r)=>s+r.issuedPending,0);
+  const pendingAccept=pendingAcceptSummary();
   // Loan Given is retired - no Outstanding Loans tile here anymore (matches the Ledger page).
   const tiles=[
     {label:'TOTAL FUND ADDED',val:fmtAmt(fundAdded)},
     {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
     {label:'TOTAL ISSUED (OUT)',val:fmtAmt(totalOut)},
-    {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0}
+    {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
+    {label:'PENDING ACCEPT',val:fmtAmt(pendingAccept.amount)+' ('+pendingAccept.count+')',warn:pendingAccept.count>0}
   ];
   wrap.innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
 }
