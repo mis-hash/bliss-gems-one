@@ -1349,16 +1349,21 @@ function computeBalance(){
   return {totalIn,fundAdded,verifyReceiveTotal,totalOut,outstandingLoans,outstandingCount,balance};
 }
 function renderDash(){
-  const {fundAdded,verifyReceiveTotal,totalOut,outstandingLoans,outstandingCount,balance}=computeBalance();
-  const live=liveLedger();
-  const totalLoanGiven=live.filter(x=>x.type==='loan').reduce((s,x)=>s+(x.amount||0),0);
+  const {fundAdded,verifyReceiveTotal,totalOut,balance}=computeBalance();
+  // Total actually spent by recipients against issued cash (from their own "Cash Issued to
+  // Me" spend entries) - a different number from Total Issue, which is just what was handed
+  // out, not what's been accounted for yet.
+  const totalSpent=issueSpends.filter(s=>!s.deletedAt).reduce((s,x)=>s+(x.amount||0),0);
+  const pendingHisaab=computeAllPersonPendingTotals().reduce((s,r)=>s+r.issuedPending,0);
+  // Loan Given is retired (see addLedgerEntry()/openEntryModal()) - no Loan tile here anymore,
+  // even though existing loan entries still count toward balance via computeBalance().
   const tiles=[
-    {label:'CURRENT BALANCE',val:fmtAmt(balance)},
-    {label:'FUND ADDED',val:fmtAmt(fundAdded)},
+    {label:'FUND RECEIVED (FROM ADMIN)',val:fmtAmt(fundAdded)},
+    {label:'TOTAL ISSUE',val:fmtAmt(totalOut)},
+    {label:'TOTAL SPENT',val:fmtAmt(totalSpent)},
     {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
-    {label:'TOTAL OUT',val:fmtAmt(totalOut)},
-    {label:'TOTAL LOAN GIVEN',val:fmtAmt(totalLoanGiven)},
-    {label:'OUTSTANDING LOANS',val:fmtAmt(outstandingLoans)+' ('+outstandingCount+')',warn:outstandingCount>0}
+    {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
+    {label:'CURRENT BALANCE',val:fmtAmt(balance)}
   ];
   $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
 }
