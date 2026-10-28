@@ -1148,7 +1148,11 @@ function computeStaffReport(from,to){
 }
 function computeExpenseReport(from,to){
   const inRange=d=>{ if(!d)return true; if(from&&d<from)return false; if(to&&d>to)return false; return true; };
-  const live=issueSpends.filter(s=>!s.deletedAt&&inRange(s.date));
+  // Exclude spend entries whose parent Issue was itself deleted/disabled - same orphan
+  // guard as the Total Spent dashboard tile, otherwise a deleted test Cash Out's spend
+  // entries keep inflating this report forever even though the Issue is gone.
+  const liveIssueIds=new Set(liveLedger().filter(x=>x.type==='out').map(x=>x.id));
+  const live=issueSpends.filter(s=>!s.deletedAt&&liveIssueIds.has(s.issueId)&&inRange(s.date));
   const byNote={};
   live.forEach(s=>{
     const key=(s.note||'').trim()||'(Reason nahi diya)';
