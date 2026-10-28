@@ -159,6 +159,8 @@ tbody tr:hover td{background:#f7faf8}
   </nav>
   <main>
 
+  <div id="pcPendingAcceptWrap"></div>
+
   <div id="page-admin" class="pcPage">
   <div class="hero">
     <h1>Admin Panel</h1>
@@ -688,20 +690,112 @@ async function addLedgerEntry(){
   const btn=$('entrySubmitBtn');if(btn)btn.disabled=true;
   try{
     const actor=loggedUser();
-    const payload={type:entryType,amount,date,person,note,by:actor?actor.id:'',at:new Date().toISOString()};
-    if(entryType==='loan')payload.repaid=false;
-    if((entryType==='out'||entryType==='loan')&&personId)payload.personId=personId;
-    checkAndNotifyHighAmount(entryType,amount,date,person,note);
-    if((entryType==='out'||entryType==='loan')&&personId)notifyRecipientOfNewEntry(entryType,personId,amount,note);
-    await db.collection('pc_ledger').add(payload);
+    // Cash In always needs an Accountant/Admin/Director to Accept it (confirming the cash
+    // physically reached the box) before it counts anywhere; Cash Out needs the NAMED
+    // recipient's own Accept (confirming they actually received it) - only when a specific
+    // recipient was picked, since there's no one to ask otherwise. A pending entry is held in
+    // its own collection (pc_pending_entries) and only written to pc_ledger once accepted -
+    // so every existing balance/report/CSV/Team-Overview calculation, which all read straight
+    // from pc_ledger, needs no changes at all: a pending entry simply doesn't exist there yet.
+    // Loan Given and an unlinked ("outsider") Cash Out keep the original direct-to-ledger
+    // behavior untouched.
+    const needsAccept = entryType==='in' || (entryType==='out'&&personId);
+    if(needsAccept){
+      const pending={id:pcGenPendingId(),type:entryType,amount,date,person,note,personId:personId||'',by:actor?actor.id:'',byName:actor?actor.name:'',at:new Date().toISOString(),status:'pending'};
+      await db.collection('pc_pending_entries').doc(pending.id).set(pending);
+      if(entryType==='in'){
+        pcAccountantLikeUsers().forEach(u=>u.phone&&sendRawWA(u.phone,`💰 Petty Cash — Fund Add Pending Accept\n\nBy: ${actor?actor.name:'-'}\nAmount: ${fmtAmt(amount)}${note?'\nNote: '+note:''}\n\nAccept karne ke liye app kholein.`));
+      }else{
+        const u=users.find(x=>x.id===personId);
+        if(u&&u.phone)sendRawWA(u.phone,`💳 Petty Cash — Cash Issue Pending Accept\n\nAapko ${fmtAmt(amount)} issue hua hai${note?' ('+note+')':''}.\n\nAccept/Reject karne ke liye app kholein.`);
+      }
+    }else{
+      const payload={type:entryType,amount,date,person,note,by:actor?actor.id:'',at:new Date().toISOString()};
+      if(entryType==='loan')payload.repaid=false;
+      if((entryType==='out'||entryType==='loan')&&personId)payload.personId=personId;
+      checkAndNotifyHighAmount(entryType,amount,date,person,note);
+      if((entryType==='out'||entryType==='loan')&&personId)notifyRecipientOfNewEntry(entryType,personId,amount,note);
+      await db.collection('pc_ledger').add(payload);
+    }
     $('entryAmount').value='';$('entryPerson').value='';$('entryNote').value='';
     if($('entryPersonSelect'))$('entryPersonSelect').value='';
     closeEntryModal();
-    toast('Entry saved');
+    toast(needsAccept?'Bheji gayi — Accept hone ka wait hai':'Entry saved');
   }finally{
     _entrySubmitting=false;
     if(btn)btn.disabled=false;
   }
+}
+
+/* ===== Pending Accept (Cash In / named Cash Out) =====
+   Held entirely outside pc_ledger until Accepted, so no existing balance/report/CSV/Team
+   Overview code needs to change - see addLedgerEntry() above for the full rationale. */
+function pcGenPendingId(){return 'PCP-'+Date.now()+'-'+Math.floor(Math.random()*1000)}
+function pcAccountantLikeUsers(){return users.filter(u=>u.active!==false&&u.phone&&u.appRoles&&['accountant','admin','director'].includes(u.appRoles[APP_SLUG]))}
+function myPendingAcceptItems(){
+  return pendingEntries.filter(p=>p.status==='pending'&&(p.type==='in'?canCloseLoan():p.personId===currentUser));
+}
+function renderPendingAcceptPanel(){
+  const wrap=$('pcPendingAcceptWrap');
+  if(!wrap)return;
+  const mine=myPendingAcceptItems();
+  if(!mine.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div class="panel" style="border-left:4px solid var(--g2)"><div class="ph"><span>⏳ Pending Accept</span></div><div class="pb">${mine.map(p=>{
+    const label=p.type==='in'?'Fund Add':'Cash Out';
+    return `<div class="item">
+      <span><b>${esc(label)} — ${fmtAmt(p.amount)}</b><br><small style="color:var(--muted)">By: ${esc(p.byName||nameOfUserId(p.by))}${p.note?' · '+esc(p.note):''} (${esc(p.date)})</small></span>
+      <span style="display:flex;gap:6px">
+        <button class="btn small danger" onclick="pcRejectPending('${esc(p.id)}')">✕ Reject</button>
+        <button class="btn small primary" onclick="pcAcceptPending('${esc(p.id)}')">✓ Accept</button>
+      </span>
+    </div>`;
+  }).join('')}</div></div>`;
+}
+let _pcResolving=false;
+async function pcAcceptPending(id){
+  if(_pcResolving)return;
+  const p=pendingEntries.find(x=>x.id===id);
+  if(!p)return;
+  // Re-checked here, not just relied on from the button's own visibility rule - this is the
+  // actual write.
+  const authorized=p.type==='in'?canCloseLoan():(p.personId===currentUser);
+  if(!authorized){alert('Aapko is entry ko Accept karne ka access nahi hai.');return}
+  _pcResolving=true;
+  try{
+    const actor=loggedUser();
+    const payload={type:p.type,amount:p.amount,date:p.date,person:p.person,note:p.note,by:p.by,at:p.at};
+    if(p.personId)payload.personId=p.personId;
+    checkAndNotifyHighAmount(p.type,p.amount,p.date,p.person,p.note);
+    await db.collection('pc_ledger').add(payload);
+    await db.collection('pc_pending_entries').doc(id).update({status:'accepted',resolvedBy:currentUser,resolvedByName:actor?actor.name:currentUser,resolvedAt:new Date().toISOString()});
+    const creator=users.find(u=>u.id===p.by);
+    if(creator&&creator.phone)sendRawWA(creator.phone,`✅ Petty Cash ${p.type==='in'?'Fund Add':'Cash Out'} ${fmtAmt(p.amount)} accept ho gaya (${actor?actor.name:'-'}).`);
+    toast('Accept ho gaya');
+  }finally{_pcResolving=false;}
+}
+async function pcRejectPending(id){
+  if(_pcResolving)return;
+  const p=pendingEntries.find(x=>x.id===id);
+  if(!p)return;
+  const authorized=p.type==='in'?canCloseLoan():(p.personId===currentUser);
+  if(!authorized){alert('Aapko is entry ko Reject karne ka access nahi hai.');return}
+  if(!confirm('Ye entry reject karni hai? Ye kabhi bhi ledger/balance mein add nahi hogi.'))return;
+  _pcResolving=true;
+  try{
+    const actor=loggedUser();
+    await db.collection('pc_pending_entries').doc(id).update({status:'rejected',resolvedBy:currentUser,resolvedByName:actor?actor.name:currentUser,resolvedAt:new Date().toISOString()});
+    const creator=users.find(u=>u.id===p.by);
+    if(creator&&creator.phone)sendRawWA(creator.phone,`❌ Petty Cash ${p.type==='in'?'Fund Add':'Cash Out'} ${fmtAmt(p.amount)} reject kar diya gaya (${actor?actor.name:'-'}).`);
+    toast('Reject kar diya');
+  }finally{_pcResolving=false;}
+}
+let pendingEntries=[],pendingEntriesStarted=false;
+function startPendingEntriesSync(){
+  if(pendingEntriesStarted)return;pendingEntriesStarted=true;
+  db.collection('pc_pending_entries').onSnapshot(snap=>{
+    pendingEntries=[];snap.forEach(d=>pendingEntries.push({id:d.id,...d.data()}));
+    renderAll();
+  },err=>console.error('pending entries sync error',err));
 }
 async function markLoanRepaid(id){
   if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin loan Repaid mark kar sakte hain.');return}
@@ -1515,6 +1609,7 @@ function renderAll(){
   renderDash();
   renderAdminPanel();
   renderHighAmountAlerts();
+  renderPendingAcceptPanel();
   renderMyPage();
   renderTeamOverview();
   renderLedger();
@@ -1530,6 +1625,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   startLedgerSync();
   startMastersSync();
   startIssueSpendsSync();
+  startPendingEntriesSync();
   renderAll();
 });
 window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
