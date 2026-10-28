@@ -171,8 +171,6 @@ tbody tr:hover td{background:#f7faf8}
     <div class="ph"><span>Quick Actions</span></div>
     <div class="pb" style="display:flex;gap:8px;flex-wrap:wrap">
       <button type="button" class="btn primary" onclick="openEntryModal('in')">➕ Add Fund</button>
-      <button type="button" class="btn primary" onclick="openEntryModal('out')">➖ Issue / Cash Out</button>
-      <button type="button" class="btn primary" onclick="openEntryModal('loan')">🤝 Loan Given</button>
     </div>
   </div>
   <div class="pendingRemindersWrap"></div>
@@ -190,9 +188,7 @@ tbody tr:hover td{background:#f7faf8}
   <div class="panel">
     <div class="ph"><span>New Entry</span></div>
     <div class="pb" style="display:flex;gap:8px;flex-wrap:wrap">
-      <button type="button" class="btn primary" id="quickBtn_in" onclick="openEntryModal('in')">➕ Cash In</button>
-      <button type="button" class="btn primary" id="quickBtn_out" onclick="openEntryModal('out')">➖ Cash Out</button>
-      <button type="button" class="btn primary" id="quickBtn_loan" onclick="openEntryModal('loan')">🤝 Loan Given</button>
+      <button type="button" class="btn primary" id="quickBtn_out" onclick="openEntryModal('out')">➖ Issue</button>
     </div>
   </div>
 
@@ -332,13 +328,13 @@ tbody tr:hover td{background:#f7faf8}
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeSuperAdminModal()">Cancel</button><button class="btn primary" onclick="unlockSuperAdmin()">Unlock</button></div>
 </div></div>
 
-<!-- New Entry modal (Cash In / Cash Out / Loan Given) -->
+<!-- New Entry modal (Cash In / Cash Out) - Loan Given is retired: no new loan can be created,
+     but existing loan entries keep rendering/Mark-Repaid everywhere else untouched. -->
 <div class="modal" id="entryModal"><div class="box" style="width:min(480px,100%)">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">New Entry</h3><button class="btn small" onclick="closeEntryModal()">✕</button></div>
 <div class="typeRow">
   <button type="button" class="tab" id="typeBtn_in" onclick="selectEntryType('in')">➕ Cash In</button>
   <button type="button" class="tab on" id="typeBtn_out" onclick="selectEntryType('out')">➖ Cash Out</button>
-  <button type="button" class="tab" id="typeBtn_loan" onclick="selectEntryType('loan')">🤝 Loan Given</button>
 </div>
 <div class="grid">
   <div class="field"><label>Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="entryAmount"></div>
@@ -617,15 +613,18 @@ function applyFeatureVisibility(){
 
 /* ===== Entry form ===== */
 function openEntryModal(t){
+  if(t==='loan'){toast('Loan Given feature band kar diya gaya hai.');return}
   if(t==='in'&&!canAddFund()){toast('Add Fund sirf Admin/Director kar sakte hain.');return}
   selectEntryType(t);
   $('entryModal').classList.add('show');
 }
 function closeEntryModal(){$('entryModal')?.classList.remove('show')}
 function selectEntryType(t){
+  if(t==='loan'){toast('Loan Given feature band kar diya gaya hai.');return}
   if(t==='in'&&!canAddFund()){toast('Add Fund sirf Admin/Director kar sakte hain.');return}
   entryType=t;
-  ['in','out','loan'].forEach(x=>$('typeBtn_'+x).classList.toggle('on',x===t));
+  // typeBtn_loan no longer exists (Loan Given retired) - only toggle the tabs that remain.
+  ['in','out'].forEach(x=>$('typeBtn_'+x).classList.toggle('on',x===t));
   const textInp=$('entryPerson'),sel=$('entryPersonSelect');
   if(t==='out'){
     $('entryPersonLabel').textContent='Issued To (optional — select to let them log their own spend)';
