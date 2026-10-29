@@ -1198,7 +1198,7 @@ function pcStaffDetailRowHtml(row){
   }).join(''):'<div class="note" style="padding:6px 0">Koi cash issue nahi hui.</div>';
   const loansHtml=loans.length?loans.map(x=>`<div class="item"><span><b>${fmtAmt(x.amount)}</b> given ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>${x.repaid?'<span class="pill repaid">Repaid</span>':'<span class="pill loan">Outstanding</span>'}</div>`).join(''):'<div class="note" style="padding:6px 0">Koi loan nahi diya gaya.</div>';
   return `<tr><td colspan="5" style="padding:0;border:0">
-    <div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:#f7faf8">
+    <div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:var(--mint)">
       <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:6px">🔽 ${esc(row.name)} KA BREAKDOWN <span style="font-weight:400">(belongs to the row above ↑)</span></div>
       <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:4px">💳 Cash Issued</div>
       ${issuedHtml}
@@ -1214,7 +1214,7 @@ function pcExpenseDetailRowHtml(group){
     return `<tr><td>${esc(s.date)}</td><td class="num" style="background:var(--bluebg);color:var(--blue);font-weight:700">${fmtAmt(s.amount)}</td><td>${issue?esc(issue.person||'-'):'<span style="color:var(--red)">Issue mil nahi raha</span>'}</td><td>${esc(nameOfUserId(s.by))}</td><td>${delBtn}</td></tr>`;
   }).join('');
   return `<tr><td colspan="3" style="padding:0;border:0">
-    <div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:#f7faf8">
+    <div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:var(--mint)">
       <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:8px">🔽 "${esc(group.note)}" KI ENTRIES <span style="font-weight:400">(belongs to the row above ↑)</span></div>
       <table style="width:100%;border-collapse:collapse;font-size:12.5px">
         <thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase"><th style="padding:0 6px 6px 0">Date</th><th style="padding:6px;background:var(--bluebg)">Amount</th><th style="padding:0 6px 6px 0">Issued To</th><th style="padding:0 6px 6px 0">Entry By</th><th></th></tr></thead>
@@ -1611,7 +1611,7 @@ function pcSpendBreakdownRowHtml(x){
       </table>`
     : '<div class="note" style="padding:6px 0">Abhi tak koi spending entry nahi daali gayi.</div>';
   return `<tr><td colspan="6" style="padding:0;border:0">
-    <div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:#f7faf8">
+    <div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:var(--mint)">
       <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:6px">🔽 SPENDING BY ${esc(x.person||'-')} <span style="font-weight:400">(belongs to the row above ↑)</span></div>
       <div class="item"><span>Remaining</span><b>${fmtAmt(remaining)}</b></div>
       ${spendRows}
