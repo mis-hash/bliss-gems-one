@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<script>
+/* Crash safety net — same pattern as the other Bliss apps: registered first so a later
+   script error still surfaces as a visible banner instead of a silently dead page. */
+(function(){
+  function showCrashBanner(msg){
+    if(document.getElementById('spCrashBanner'))return;
+    var b=document.createElement('div');
+    b.id='spCrashBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b42318;color:#fff;padding:10px 14px;font:600 13px Arial,sans-serif;text-align:center;box-shadow:0 2px 10px #0004';
+    b.innerHTML='⚠ App me error aa gaya hai. Page reload karein.'
+      +' <button type="button" style="margin-left:10px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#b42318;font-weight:700;cursor:pointer" onclick="location.reload()">Reload</button>'
+      +'<div style="font-weight:400;font-size:11px;opacity:.85;margin-top:3px">'+String(msg||'').slice(0,200).replace(/[<>]/g,'')+'</div>';
+    function attach(){document.body&&document.body.prepend(b)}
+    if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach);
+  }
+  window.addEventListener('error',function(e){console.error('Uncaught error:',e.error||e.message);showCrashBanner((e.error&&e.error.message)||e.message);});
+  window.addEventListener('unhandledrejection',function(e){console.error('Unhandled promise rejection:',e.reason);showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));});
+})();
+</script>
+<title>Sales Panel</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Same design system as the other Bliss apps, so all apps read as one family. */
+:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df;--blue:#1D5FA6;--bluebg:#E8F1FC}
+*{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit}
+h1,h2,h3,.card b,.tabular{font-family:'Manrope',sans-serif}
+.hidden{display:none!important}
+header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.head{height:100%;max-width:1100px;margin:auto;padding:0 18px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:24px;font-weight:900;color:var(--g2)}
+.brand b{color:var(--g);font-size:20px;font-family:'Manrope',sans-serif}
+.brand small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.headRight{display:flex;align-items:center;gap:10px}
+.pillbadge{font-size:13px;font-weight:700;background:var(--mint);color:var(--g);padding:7px 12px;border-radius:999px}
+.btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--g);color:#fff}
+.btn.secondary{background:#eef2f0;color:var(--txt)}
+.btn.danger{background:var(--redbg);color:var(--red)}
+.btn.small{padding:7px 11px;font-size:12px}
+.shell{max-width:1100px;margin:auto;display:grid;grid-template-columns:210px 1fr;gap:16px;padding:17px 18px 60px}
+nav{background:#fff;border:1px solid var(--line);border-radius:14px;padding:9px;height:max-content;position:sticky;top:85px}
+nav button{width:100%;border:0;background:transparent;text-align:left;padding:12px 11px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin:2px 0;display:flex;align-items:center;gap:8px;border-left:3px solid transparent;color:var(--txt);font-family:inherit}
+nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
+nav button.hidden{display:none}
+.page{display:none}
+.page.on{display:block;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px}
+.hero h1{font-size:24px;margin:0 0 5px}
+.hero p{font-size:13px;margin:0;opacity:.9}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
+.card{background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent,var(--g));border-radius:13px;padding:16px;display:flex;flex-direction:column;gap:8px;box-shadow:0 3px 10px rgba(22,36,31,.05)}
+.card .ic{width:34px;height:34px;border-radius:10px;background:var(--accentbg,var(--mint));color:var(--accent,var(--g));display:grid;place-items:center;font-size:17px}
+.card small{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.card b{display:block;font-size:22px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:18px;box-shadow:0 3px 10px rgba(22,36,31,.05)}
+.ph{padding:16px 18px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.pb{padding:18px;line-height:1.55}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.field label{display:block;font-size:11px;font-weight:bold;margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;padding:11px;border:1px solid var(--line);border-radius:7px;font-size:14px;background:#fff;color:var(--txt)}
+.span2{grid-column:1/-1}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 8px 9px;border-bottom:2px solid var(--line)}
+td{padding:11px 8px;border-bottom:1px solid #edf1ee;font-size:12.5px;vertical-align:top}
+tbody tr:nth-child(even) td{background:#F7FAF8}
+tr:last-child td{border-bottom:0}
+.tablewrap{overflow-x:auto}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font-size:11px;font-weight:700;background:var(--mint);color:var(--g)}
+.pill.quotation{background:var(--bluebg);color:var(--blue)}
+.pill.confirmed{background:var(--amberbg);color:var(--amber)}
+.pill.dispatched{background:#F5EEFF;color:#6B2FBD}
+.pill.paid{background:var(--mint);color:var(--g)}
+.item{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #edf1ee;gap:10px;flex-wrap:wrap;line-height:1.5}
+.item:last-child{border-bottom:0}
+.emptystate{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;text-align:center;font-size:24px}
+.emptystate p{font-size:13.5px;font-weight:600;color:var(--txt);margin:10px 0 2px;font-family:'Work Sans',sans-serif}
+.emptystate small{color:var(--muted);font-size:12px}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:50}
+.modal.show{display:flex}
+.box{width:min(560px,100%);background:#fff;border-radius:14px;padding:19px;max-height:90vh;overflow:auto}
+.box h3{margin:0 0 14px;font-size:19px}
+.note{font-size:12px;color:var(--muted);line-height:1.5}
+.gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px}
+.gate h3{font-size:19px}
+.gate p{font-size:13px;color:var(--muted)}
+.gate .btn{margin-top:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:#fff;color:var(--muted);padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--g);border-color:var(--g);color:#fff}
+.bottomNav{display:none}
+.adminOnly.hidden{display:none!important}
+@media(max-width:900px){
+  header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:20px}.brand b{font-size:16px}.brand small{display:none}
+  .shell{display:block;padding:11px 10px 76px}nav{display:none}
+  .hero{padding:17px}.hero h1{font-size:20px}
+  .grid{grid-template-columns:1fr}
+  .grid3{grid-template-columns:1fr}
+  .bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}
+  .bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:0 0 auto;padding:2px 12px;white-space:nowrap}
+  .bottomNav button.hidden{display:none}
+  .bottomNav span{display:block;font-size:19px}
+  .bottomNav button.on{color:var(--g)}
+}
+</style>
+</head>
+<body>
+
+<div id="gateWrap" style="display:none"><div class="gate" id="gateBox"></div></div>
+
+<div id="appWrap" style="display:none">
+<header><div class="head">
+  <div class="brand"><div class="logo">b</div><div><b>Sales Panel</b><small>Bliss Gems &amp; Minerals</small></div></div>
+  <div class="headRight">
+    <span class="pillbadge" id="loginBadge">Not Logged In</span>
+    <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
+  </div>
+</div></header>
+
+<div class="shell">
+<nav>
+<button data-page="dash" onclick="go('dash',this)">📊 Dashboard</button>
+<button data-page="neworder" onclick="go('neworder',this)">➕ New Order</button>
+<button data-page="orders" onclick="go('orders',this)">📋 Orders</button>
+<button data-page="customers" onclick="go('customers',this)">👥 Customers</button>
+<button data-page="reports" onclick="go('reports',this)">📈 Reports</button>
+</nav>
+
+<main>
+
+  <section class="page on" id="page-dash">
+  <div class="hero">
+    <h1>Sales Panel</h1>
+    <p>Orders, customers, pending payment aur sales pattern — ek hi jagah.</p>
+  </div>
+  <div class="cards" id="statTiles"></div>
+
+  <div class="panel">
+    <div class="ph"><span>🏆 Top Customers (by sales)</span></div>
+    <div class="pb"><div class="tablewrap"><table>
+      <thead><tr><th>Customer</th><th class="num">Orders</th><th class="num">Total Sales</th><th>Last Order</th></tr></thead>
+      <tbody id="topCustomersTable"></tbody>
+    </table></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><span>💤 Dormant Customers (60+ din se koi order nahi)</span></div>
+    <div class="pb" id="dormantCustomersWrap"></div>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><span>🕑 Recent Orders</span></div>
+    <div class="pb" id="recentOrdersWrap"></div>
+  </div>
+  </section>
+
+  <section class="page" id="page-neworder">
+  <div class="panel">
+    <div class="ph"><span>New Order Entry</span></div>
+    <div class="pb">
+      <div class="grid">
+        <div class="field span2"><label>Customer <span style="color:var(--red)">*</span></label>
+          <input id="ordCustomerSearch" list="customerDatalist" autocomplete="off" placeholder="Type karke existing customer dhundhein ya naya naam likhein" oninput="syncOrderCustomerFromSearch()">
+          <input type="hidden" id="ordCustomerId">
+          <datalist id="customerDatalist"></datalist>
+        </div>
+        <div class="field span2"><label>Item / Stone Description <span style="color:var(--red)">*</span></label><input id="ordItemDesc" placeholder="Jaise: Ruby 5.2ct, Emerald lot, etc."></div>
+        <div class="field"><label>Quantity</label><input type="number" id="ordQty" value="1" oninput="recalcOrderAmount()"></div>
+        <div class="field"><label>Rate (₹)</label><input type="number" id="ordRate" oninput="recalcOrderAmount()"></div>
+        <div class="field"><label>Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="ordAmount"></div>
+        <div class="field"><label>Date</label><input type="date" id="ordDate"></div>
+        <div class="field"><label>Status</label><select id="ordStatus">
+          <option value="quotation">Quotation</option>
+          <option value="confirmed" selected>Confirmed</option>
+          <option value="dispatched">Dispatched</option>
+          <option value="paid">Paid</option>
+        </select></div>
+        <div class="field"><label>Payment Due Date</label><input type="date" id="ordDueDate"></div>
+        <div class="field span2"><label>Note</label><input id="ordNote" placeholder="Optional"></div>
+      </div>
+      <div style="margin-top:14px;text-align:right"><button class="btn primary" id="ordSubmitBtn" onclick="submitOrder()">＋ Save Order</button></div>
+    </div>
+  </div>
+  </section>
+
+  <section class="page" id="page-orders">
+  <div class="panel">
+    <div class="ph">
+      <span>All Orders</span>
+      <div class="tabs">
+        <button class="tab on" id="ordersFilterBtn_all" onclick="setOrdersFilter('all')">All</button>
+        <button class="tab" id="ordersFilterBtn_quotation" onclick="setOrdersFilter('quotation')">Quotation</button>
+        <button class="tab" id="ordersFilterBtn_confirmed" onclick="setOrdersFilter('confirmed')">Confirmed</button>
+        <button class="tab" id="ordersFilterBtn_dispatched" onclick="setOrdersFilter('dispatched')">Dispatched</button>
+        <button class="tab" id="ordersFilterBtn_paid" onclick="setOrdersFilter('paid')">Paid</button>
+        <button class="tab" id="ordersFilterBtn_pending" onclick="setOrdersFilter('pending')">Payment Pending</button>
+      </div>
+    </div>
+    <div class="pb" id="ordersListWrap"></div>
+  </div>
+  </section>
+
+  <section class="page" id="page-customers">
+  <div class="panel">
+    <div class="ph"><span>Customers</span></div>
+    <div class="pb" id="customersListWrap"></div>
+  </div>
+  </section>
+
+  <section class="page" id="page-reports">
+  <div class="panel">
+    <div class="ph"><span>Reports</span></div>
+    <div class="pb">
+      <div class="grid">
+        <div class="field"><label>From</label><input type="date" id="repFrom" onchange="renderReports()"></div>
+        <div class="field"><label>To</label><input type="date" id="repTo" onchange="renderReports()"></div>
+      </div>
+      <div id="repSummary" style="margin-top:12px"></div>
+      <div style="margin-top:14px"><button class="btn" onclick="exportOrdersCSV()">⬇ Export Orders CSV</button></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>Customer-wise Sales</span></div>
+    <div class="pb"><div class="tablewrap"><table>
+      <thead><tr><th>Customer</th><th class="num">Orders</th><th class="num">Total Sales</th></tr></thead>
+      <tbody id="repCustomerTable"></tbody>
+    </table></div></div>
+  </div>
+  </section>
+
+</main>
+</div>
+</div>
+
+<div class="bottomNav" id="bottomNav">
+<button class="on" data-page="dash" onclick="go('dash',this)"><span>📊</span>Dashboard</button>
+<button data-page="neworder" onclick="go('neworder',this)"><span>➕</span>New Order</button>
+<button data-page="orders" onclick="go('orders',this)"><span>📋</span>Orders</button>
+<button data-page="customers" onclick="go('customers',this)"><span>👥</span>Customers</button>
+<button data-page="reports" onclick="go('reports',this)"><span>📈</span>Reports</button>
+</div>
+
+<!-- Login modal -->
+<div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
+<h3>Login</h3>
+<div class="field"><label>Username</label><input id="loginUsername" autocomplete="off"></div>
+<div class="field" style="margin-top:8px"><label>Password</label><input id="loginPassword" type="password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<p class="note" id="loginMsg" style="margin:8px 0 0"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeLogin()">Cancel</button><button class="btn primary" onclick="doLogin()">Login</button></div>
+</div></div>
+
+<!-- Edit Order modal -->
+<div class="modal" id="editOrderModal"><div class="box" style="width:min(520px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Edit Order</h3><button class="btn small" onclick="closeEditOrder()">✕</button></div>
+<div class="grid">
+  <div class="field span2"><label>Item / Stone Description</label><input id="eoItemDesc"></div>
+  <div class="field"><label>Quantity</label><input type="number" id="eoQty"></div>
+  <div class="field"><label>Rate (₹)</label><input type="number" id="eoRate"></div>
+  <div class="field"><label>Amount (₹)</label><input type="number" id="eoAmount"></div>
+  <div class="field"><label>Status</label><select id="eoStatus">
+    <option value="quotation">Quotation</option>
+    <option value="confirmed">Confirmed</option>
+    <option value="dispatched">Dispatched</option>
+    <option value="paid">Paid</option>
+  </select></div>
+  <div class="field"><label>Payment Due Date</label><input type="date" id="eoDueDate"></div>
+  <div class="field span2"><label>Note</label><input id="eoNote"></div>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditOrder()">Cancel</button><button class="btn primary" onclick="saveEditOrder()">Save</button></div>
+</div></div>
+
+<button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:14px;right:14px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:13px;line-height:26px;cursor:default;z-index:999999;transition:background .15s">•</button>
+<div class="modal" id="superAdminModal"><div class="box" style="width:min(340px,100%)">
+<h3>🔒 Super Admin</h3>
+<div class="field"><label>Password</label><input id="superAdminPassword" type="password" onkeydown="if(event.key==='Enter')unlockSuperAdmin()"></div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeSuperAdminModal()">Cancel</button><button class="btn primary" onclick="unlockSuperAdmin()">Unlock</button></div>
+</div></div>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
+let db=null;
+try{
+  if(typeof firebase!=='undefined'){
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+  }else{console.error('firebase SDK not loaded — cloud sync unavailable this session');}
+}catch(e){console.error('firebase init failed:',e);}
+try{if(typeof firebase!=='undefined'&&firebase.auth)firebase.auth().signInAnonymously().catch(e=>console.error('anon auth failed:',e));}catch(e){console.error('anon auth failed:',e);}
+
+const APP_SLUG='sales-panel';
+const UU_COLLECTION='universal_users';
+const SESSION_KEY='pd_logged_user_v1'; // same key as other Bliss apps - one login everywhere
+const DORMANT_DAYS=60;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const todayISO=()=>new Date().toISOString().slice(0,10);
+const fmtAmt=n=>'₹'+Number(n||0).toLocaleString('en-IN');
+function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
+
+let users=[],customers=[],orders=[];
+let usersStarted=false,customersStarted=false,ordersStarted=false;
+let ordersFilter='all';
+let currentUser=null;
+
+function loggedUser(){return users.find(x=>x.id===currentUser)||null}
+function myRole(){const u=loggedUser();return (u&&u.appRoles&&u.appRoles[APP_SLUG])||''}
+function isAdminRole(){return superAdminUnlocked||['admin','director'].includes(myRole())}
+
+/* ===== Super Admin (same shared password as other Bliss apps) ===== */
+const SUPER_ADMIN_PASSWORD_HASH='0cb73e5ce7c7e7b2bc347bc16e73c2a16331fdedaec4c1c787815eab4daa6fad';
+async function sha256Hex(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+let superAdminUnlocked=false;
+let secretAdminTapCount=0,secretAdminTapTimer=null,secretAdminFlashTimer=null;
+function secretAdminTap(){
+  secretAdminTapCount++;
+  const dot=$('secretAdminIcon');
+  if(dot){dot.style.background='rgba(214,48,49,.45)';clearTimeout(secretAdminFlashTimer);secretAdminFlashTimer=setTimeout(()=>{dot.style.background='transparent'},200);}
+  clearTimeout(secretAdminTapTimer);
+  secretAdminTapTimer=setTimeout(()=>secretAdminTapCount=0,2500);
+  if(secretAdminTapCount>=10){secretAdminTapCount=0;clearTimeout(secretAdminTapTimer);openSuperAdminModal();}
+}
+function openSuperAdminModal(){
+  if(superAdminUnlocked){renderAll();return}
+  $('superAdminPassword').value='';
+  $('superAdminModal').classList.add('show');
+  setTimeout(()=>$('superAdminPassword')?.focus(),30);
+}
+function closeSuperAdminModal(){$('superAdminModal')?.classList.remove('show')}
+async function unlockSuperAdmin(){
+  const pw=$('superAdminPassword')?.value||'';
+  if((await sha256Hex(pw))!==SUPER_ADMIN_PASSWORD_HASH){alert('Galat password.');return}
+  superAdminUnlocked=true;
+  closeSuperAdminModal();
+  renderAll();
+}
+function silentUnlockSuperAdmin(){ if(!superAdminUnlocked){superAdminUnlocked=true;renderAll();} }
+
+/* ===== Login ===== */
+function loginFromHub(){
+  try{ if(window.self!==window.top && window.top.openStaffLoginModal){window.top.openStaffLoginModal();return;} }catch(e){}
+  openLogin();
+}
+function openLogin(){$('loginModal').classList.add('show');$('loginMsg').textContent='';}
+function closeLogin(){$('loginModal').classList.remove('show')}
+function doLogin(){
+  const uname=$('loginUsername').value.trim(),pass=$('loginPassword').value;
+  const msg=$('loginMsg');
+  if(!uname||!pass){msg.style.color='#b43a35';msg.textContent='Username aur Password dono bharein.';return}
+  const u=users.find(x=>String(x.username||x.id).toLowerCase()===uname.toLowerCase() && x.active!==false);
+  if(!u||pass!==String(u.password||'1234')){msg.style.color='#b43a35';msg.textContent='Invalid Username / Password';return}
+  if(u.appAccess && u.appAccess[APP_SLUG]===false){msg.style.color='#b43a35';msg.textContent='Aapko is app ka access nahi hai.';return}
+  localStorage.setItem(SESSION_KEY,u.id);
+  currentUser=u.id;
+  closeLogin();
+  renderAll();
+}
+function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
+
+/* ===== Firestore sync ===== */
+function startUsersSync(){
+  if(usersStarted||!db)return;usersStarted=true;
+  db.collection(UU_COLLECTION).onSnapshot(snap=>{users=[];snap.forEach(d=>users.push(d.data()));renderAll();},err=>console.error('users sync error',err));
+}
+function startCustomersSync(){
+  if(customersStarted||!db)return;customersStarted=true;
+  db.collection('sp_customers').onSnapshot(snap=>{customers=[];snap.forEach(d=>customers.push({id:d.id,...d.data()}));renderAll();},err=>console.error('customers sync error',err));
+}
+function startOrdersSync(){
+  if(ordersStarted||!db)return;ordersStarted=true;
+  db.collection('sp_orders').onSnapshot(snap=>{orders=[];snap.forEach(d=>orders.push({id:d.id,...d.data()}));renderAll();},err=>console.error('orders sync error',err));
+}
+function liveOrders(){return orders.filter(x=>!x.deletedAt)}
+
+/* ===== Nav / gate ===== */
+function go(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('nav button[data-page],.bottomNav button[data-page]').forEach(b=>b.classList.remove('on'));
+  $('page-'+id).classList.add('on');
+  document.querySelectorAll('[data-page="'+id+'"]').forEach(b=>b.classList.add('on'));
+}
+function renderGate(){
+  const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
+  const u=loggedUser();
+  if(!currentUser||!u){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    const inFrame=window.self!==window.top;
+    gateBox.innerHTML=inFrame
+      ? `<h3>Login Required</h3><p class="note">Sales Panel dekhne ke liye Bliss One dashboard se login karein.</p><button class="btn primary" onclick="loginFromHub()">Login</button>`
+      : `<h3>Login Required</h3><p class="note">Sales Panel dekhne ke liye login karein — wahi username/password jo baaki Bliss apps me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
+    return;
+  }
+  if(u.appAccess && u.appAccess[APP_SLUG]===false){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    gateBox.innerHTML=`<h3>No Access</h3>`;
+    return;
+  }
+  gateWrap.style.display='none';appWrap.style.display='';
+}
+function refreshLoginBadge(){
+  const u=loggedUser();
+  $('loginBadge').textContent=u?'👤 '+u.name:'Not Logged In';
+  $('logoutBtn').classList.toggle('hidden',!u);
+}
+
+/* ===== Customers (auto-created from orders, editable) ===== */
+// A customer is created automatically the first time their name is used on an order (see
+// submitOrder()) - no separate "Add Customer" step needed before placing a first order,
+// same self-growing-list pattern as courierNames/expenseCategories in the other apps.
+function findOrCreateCustomer(name){
+  const existing=customers.find(c=>c.name.toLowerCase()===name.toLowerCase());
+  if(existing)return Promise.resolve(existing.id);
+  return db.collection('sp_customers').add({name,phone:'',createdAt:new Date().toISOString()}).then(ref=>ref.id);
+}
+function syncOrderCustomerFromSearch(){
+  const name=$('ordCustomerSearch').value.trim();
+  const match=customers.find(c=>c.name.toLowerCase()===name.toLowerCase());
+  $('ordCustomerId').value=match?match.id:'';
+}
+function renderCustomerDatalist(){
+  const dl=$('customerDatalist');
+  if(!dl)return;
+  dl.innerHTML=customers.map(c=>`<option value="${esc(c.name)}"></option>`).join('');
+}
+
+/* ===== Order entry ===== */
+function recalcOrderAmount(){
+  const qty=parseFloat($('ordQty').value)||0,rate=parseFloat($('ordRate').value)||0;
+  if(qty&&rate)$('ordAmount').value=(qty*rate).toFixed(2);
+}
+let _orderSubmitting=false;
+async function submitOrder(){
+  if(_orderSubmitting)return;
+  const custName=$('ordCustomerSearch').value.trim();
+  const itemDesc=$('ordItemDesc').value.trim();
+  const amount=parseFloat($('ordAmount').value);
+  if(!custName){alert('Customer name zaroori hai.');return}
+  if(!itemDesc){alert('Item/Stone description zaroori hai.');return}
+  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  _orderSubmitting=true;
+  const btn=$('ordSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const customerId=await findOrCreateCustomer(custName);
+    const actor=loggedUser();
+    const payload={
+      customerId,customerName:custName,
+      itemDesc,
+      qty:parseFloat($('ordQty').value)||0,
+      rate:parseFloat($('ordRate').value)||0,
+      amount,
+      date:$('ordDate').value||todayISO(),
+      status:$('ordStatus').value,
+      dueDate:$('ordDueDate').value||'',
+      note:$('ordNote').value.trim(),
+      by:actor?actor.id:'',byName:actor?actor.name:'',
+      at:new Date().toISOString()
+    };
+    await db.collection('sp_orders').add(payload);
+    $('ordItemDesc').value='';$('ordQty').value='1';$('ordRate').value='';$('ordAmount').value='';$('ordNote').value='';
+    $('ordCustomerSearch').value='';$('ordCustomerId').value='';
+    $('ordDate').value=todayISO();
+    toast('Order save ho gaya');
+    go('orders');
+  }finally{
+    _orderSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
+}
+
+/* ===== Orders list ===== */
+function setOrdersFilter(f){
+  ordersFilter=f;
+  ['all','quotation','confirmed','dispatched','paid','pending'].forEach(k=>{const b=$('ordersFilterBtn_'+k);if(b)b.classList.toggle('on',k===f);});
+  renderOrdersList();
+}
+function orderIsPaymentPending(o){ return o.status!=='quotation' && o.status!=='paid'; }
+function statusPillHtml(status){
+  const labels={quotation:'Quotation',confirmed:'Confirmed',dispatched:'Dispatched',paid:'Paid'};
+  return `<span class="pill ${esc(status)}">${esc(labels[status]||status)}</span>`;
+}
+function filteredOrders(){
+  const live=liveOrders().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.at||'').localeCompare(String(a.at||'')));
+  if(ordersFilter==='all')return live;
+  if(ordersFilter==='pending')return live.filter(orderIsPaymentPending);
+  return live.filter(o=>o.status===ordersFilter);
+}
+function orderRowHtml(o){
+  return `<div class="item">
+    <span><b>${esc(o.customerName)}</b> — ${esc(o.itemDesc)}<br><small style="color:var(--muted)">${esc(o.date)}${o.note?' • '+esc(o.note):''}</small></span>
+    <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      ${statusPillHtml(o.status)}
+      <b>${fmtAmt(o.amount)}</b>
+      <button class="btn small" onclick="openEditOrder('${esc(o.id)}')">✎ Edit</button>
+    </span>
+  </div>`;
+}
+function renderOrdersList(){
+  const wrap=$('ordersListWrap');
+  if(!wrap)return;
+  const rows=filteredOrders();
+  wrap.innerHTML=rows.length?rows.map(orderRowHtml).join(''):`<div class="emptystate">📋<p>Is filter mein koi order nahi hai.</p></div>`;
+}
+let _editOrderId=null;
+function openEditOrder(id){
+  const o=orders.find(x=>x.id===id);if(!o)return;
+  _editOrderId=id;
+  $('eoItemDesc').value=o.itemDesc||'';
+  $('eoQty').value=o.qty||'';
+  $('eoRate').value=o.rate||'';
+  $('eoAmount').value=o.amount||'';
+  $('eoStatus').value=o.status||'confirmed';
+  $('eoDueDate').value=o.dueDate||'';
+  $('eoNote').value=o.note||'';
+  $('editOrderModal').classList.add('show');
+}
+function closeEditOrder(){$('editOrderModal')?.classList.remove('show');_editOrderId=null;}
+async function saveEditOrder(){
+  if(!_editOrderId)return;
+  const amount=parseFloat($('eoAmount').value);
+  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  await db.collection('sp_orders').doc(_editOrderId).update({
+    itemDesc:$('eoItemDesc').value.trim(),
+    qty:parseFloat($('eoQty').value)||0,
+    rate:parseFloat($('eoRate').value)||0,
+    amount,
+    status:$('eoStatus').value,
+    dueDate:$('eoDueDate').value||'',
+    note:$('eoNote').value.trim()
+  });
+  closeEditOrder();
+  toast('Order update ho gaya');
+}
+
+/* ===== Customer-wise aggregation (buying pattern basics) ===== */
+function customerStatsAll(){
+  const live=liveOrders();
+  const byCust={};
+  live.forEach(o=>{
+    const key=o.customerId||o.customerName;
+    if(!byCust[key])byCust[key]={name:o.customerName,orders:0,total:0,lastDate:''};
+    const d=byCust[key];
+    d.orders++;
+    if(o.status!=='quotation')d.total+=(o.amount||0);
+    if(!d.lastDate||o.date>d.lastDate)d.lastDate=o.date;
+  });
+  return Object.values(byCust).sort((a,b)=>b.total-a.total);
+}
+
+/* ===== Dashboard ===== */
+function renderDash(){
+  const live=liveOrders();
+  const realSales=live.filter(o=>o.status!=='quotation');
+  const totalSales=realSales.reduce((s,o)=>s+(o.amount||0),0);
+  const pendingPayment=live.filter(orderIsPaymentPending).reduce((s,o)=>s+(o.amount||0),0);
+  const stats=customerStatsAll();
+  const tiles=[
+    {label:'TOTAL SALES',val:fmtAmt(totalSales),ic:'💰',accent:'#1B7A63',accentbg:'#E8F8F2'},
+    {label:'TOTAL ORDERS',val:live.length,ic:'📋',accent:'#2155B8',accentbg:'#EAF1FF'},
+    {label:'PENDING PAYMENT',val:fmtAmt(pendingPayment),ic:'⏳',accent:'#A6350C',accentbg:'#FDEDE6'},
+    {label:'ACTIVE CUSTOMERS',val:stats.length,ic:'👥',accent:'#6B2FBD',accentbg:'#F5EEFF'}
+  ];
+  $('statTiles').innerHTML=tiles.map(t=>`<div class="card" style="--accent:${t.accent};--accentbg:${t.accentbg}"><div class="ic">${t.ic}</div><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+
+  $('topCustomersTable').innerHTML=stats.slice(0,10).map(c=>`<tr><td><b>${esc(c.name)}</b></td><td class="num">${c.orders}</td><td class="num">${fmtAmt(c.total)}</td><td>${esc(c.lastDate||'-')}</td></tr>`).join('')||`<tr><td colspan="4"><div class="emptystate">🏆<p>Abhi koi order nahi hai.</p></div></td></tr>`;
+
+  // Hidden-opportunity finder (rule-based, not AI): a customer who previously bought but
+  // hasn't ordered in DORMANT_DAYS+ is worth a follow-up call before they go elsewhere.
+  const today=todayISO();
+  const dormant=stats.filter(c=>c.lastDate&&daysBetween(c.lastDate,today)>=DORMANT_DAYS).sort((a,b)=>daysBetween(b.lastDate,today)-daysBetween(a.lastDate,today));
+  $('dormantCustomersWrap').innerHTML=dormant.length?dormant.map(c=>`<div class="item"><span><b>${esc(c.name)}</b><br><small style="color:var(--muted)">Last order: ${esc(c.lastDate)} (${daysBetween(c.lastDate,today)} din pehle) • Total: ${fmtAmt(c.total)}</small></span><span class="pill" style="background:var(--amberbg);color:var(--amber)">Follow-up karein</span></div>`).join(''):`<div class="emptystate">✓<p>Koi dormant customer nahi hai.</p></div>`;
+
+  const recent=liveOrders().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))).slice(0,8);
+  $('recentOrdersWrap').innerHTML=recent.length?recent.map(orderRowHtml).join(''):`<div class="emptystate">🕑<p>Abhi koi order nahi hai.</p></div>`;
+}
+
+/* ===== Customers page ===== */
+function renderCustomersPage(){
+  const wrap=$('customersListWrap');
+  if(!wrap)return;
+  const stats=customerStatsAll();
+  wrap.innerHTML=stats.length?stats.map(c=>{
+    const custOrders=liveOrders().filter(o=>(o.customerId&&o.customerId===(customers.find(x=>x.name===c.name)||{}).id)||o.customerName===c.name).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:6px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <span><b>${esc(c.name)}</b><br><small style="color:var(--muted)">${c.orders} orders • Total: ${fmtAmt(c.total)} • Last: ${esc(c.lastDate||'-')}</small></span>
+      </div>
+      <div style="padding-left:4px">${custOrders.slice(0,5).map(o=>`<div style="font-size:12px;color:var(--muted);padding:3px 0">— ${esc(o.itemDesc)} ${fmtAmt(o.amount)} (${esc(o.date)}) ${statusPillHtml(o.status)}</div>`).join('')}</div>
+    </div>`;
+  }).join(''):`<div class="emptystate">👥<p>Abhi koi customer nahi hai.</p></div>`;
+}
+
+/* ===== Reports ===== */
+function reportRange(){ return {from:$('repFrom')?.value||'',to:$('repTo')?.value||''}; }
+function inRange(d,from,to){ if(from&&d<from)return false; if(to&&d>to)return false; return true; }
+function renderReports(){
+  if(!$('repCustomerTable'))return;
+  const {from,to}=reportRange();
+  const rangeOrders=liveOrders().filter(o=>inRange(String(o.date||''),from,to));
+  const realSales=rangeOrders.filter(o=>o.status!=='quotation');
+  const totalSales=realSales.reduce((s,o)=>s+(o.amount||0),0);
+  $('repSummary').innerHTML=`<div class="cards"><div class="card"><small>ORDERS</small><b>${rangeOrders.length}</b></div><div class="card"><small>TOTAL SALES</small><b>${fmtAmt(totalSales)}</b></div></div>`;
+  const byCust={};
+  rangeOrders.forEach(o=>{
+    const key=o.customerName;
+    if(!byCust[key])byCust[key]={orders:0,total:0};
+    byCust[key].orders++;
+    if(o.status!=='quotation')byCust[key].total+=(o.amount||0);
+  });
+  const rows=Object.entries(byCust).sort((a,b)=>b[1].total-a[1].total);
+  $('repCustomerTable').innerHTML=rows.map(([n,d])=>`<tr><td>${esc(n)}</td><td class="num">${d.orders}</td><td class="num">${fmtAmt(d.total)}</td></tr>`).join('')||`<tr><td colspan="3"><div class="emptystate">📈<p>Is range mein koi order nahi hai.</p></div></td></tr>`;
+}
+function downloadCSV(filename,rows){
+  const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+function exportOrdersCSV(){
+  const {from,to}=reportRange();
+  const rows=[['Date','Customer','Item','Qty','Rate','Amount','Status','Due Date','Note']];
+  liveOrders().filter(o=>inRange(String(o.date||''),from,to)).forEach(o=>rows.push([o.date,o.customerName,o.itemDesc,o.qty,o.rate,o.amount,o.status,o.dueDate||'',o.note||'']));
+  downloadCSV('sales-orders-report.csv',rows);
+}
+
+/* ===== Toast ===== */
+let toastTimer=null;
+function toast(msg){
+  let t=$('spToast');
+  if(!t){t=document.createElement('div');t.id='spToast';t.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#17211b;color:#fff;padding:9px 16px;border-radius:20px;font-size:12px;z-index:99999;opacity:0;transition:opacity .2s';document.body.appendChild(t);}
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.opacity='0',2200);
+}
+
+function renderAll(){
+  renderGate();
+  refreshLoginBadge();
+  renderCustomerDatalist();
+  renderDash();
+  renderOrdersList();
+  renderCustomersPage();
+  renderReports();
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  currentUser=localStorage.getItem(SESSION_KEY)||null;
+  if($('ordDate'))$('ordDate').value=todayISO();
+  if($('repFrom'))$('repFrom').value=todayISO().slice(0,8)+'01';
+  if($('repTo'))$('repTo').value=todayISO();
+  startUsersSync();
+  startCustomersSync();
+  startOrdersSync();
+  renderAll();
+  const deepPage=new URLSearchParams(location.search).get('page');
+  if(deepPage && currentUser && $('page-'+deepPage))go(deepPage);
+});
+window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
+</script>
+</body>
+</html>
