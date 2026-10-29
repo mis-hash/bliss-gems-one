@@ -1222,7 +1222,8 @@ async function sendTripSummaryToDirectors(tripId,extra){
   if(!blob)return;
   const trip=trips.find(t=>t.id===tripId);
   const locationPart=(trip&&trip.location?trip.location:'Trip').replace(/[\\/:*?"<>|]/g,'').trim();
-  const fileName=`Trip Summary - ${locationPart} - ${tripId}.pdf`;
+  const salesNamePart=(trip&&trip.salesName?trip.salesName:'Sales person').replace(/[\\/:*?"<>|]/g,'').trim();
+  const fileName=`Trip Summary — ${salesNamePart} (${locationPart}).pdf`;
   const msg=`✅ ${trip&&trip.salesName?trip.salesName:'Sales person'} submitted the trip hisaab — ${locationPart} (${tripId})`;
   // Sent as its own text message (not a file caption) so it shows as a separate WhatsApp
   // bubble, per explicit user request.
