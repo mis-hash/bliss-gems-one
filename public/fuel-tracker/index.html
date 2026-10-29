@@ -62,9 +62,9 @@ nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
 .card small{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.02em}
 .card b{display:block;font-size:22px}
 .card.warn{background:var(--amberbg)!important;color:var(--amber)!important}
-.panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:18px;box-shadow:0 3px 10px rgba(22,36,31,.06)}
-.ph{padding:14px 16px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-.pb{padding:15px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:24px;box-shadow:0 3px 10px rgba(22,36,31,.06)}
+.ph{padding:16px 18px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.pb{padding:18px;line-height:1.55}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .field label{display:block;font-size:11px;font-weight:bold;margin-bottom:5px}
@@ -82,9 +82,9 @@ tbody tr:hover td{background:#f7faf8}
 .pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font-size:11px;font-weight:700;background:var(--mint);color:var(--g)}
 /* Document Alerts gets its own card treatment (scoped here, not the shared .item used
    elsewhere) - a colored left accent per severity instead of a plain divider-line row. */
-.docAlertCard{display:flex;flex-direction:column;gap:5px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent,var(--amber));border-radius:11px;padding:12px 14px;margin-bottom:8px}
+.docAlertCard{display:flex;flex-direction:column;gap:7px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent,var(--amber));border-radius:11px;padding:14px 16px;margin-bottom:10px;line-height:1.5}
 .docAlertCard:last-child{margin-bottom:0}
-.item{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #edf1ee;gap:10px;flex-wrap:wrap}
+.item{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #edf1ee;gap:10px;flex-wrap:wrap;line-height:1.5}
 .item:last-child{border-bottom:0}
 .emptystate{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;text-align:center;font-size:24px}
 .emptystate p{font-size:13.5px;font-weight:600;color:var(--txt);margin:10px 0 2px;font-family:'Work Sans',sans-serif}
@@ -93,7 +93,7 @@ tbody tr:hover td{background:#f7faf8}
 .modal.show{display:flex}
 .box{width:min(640px,100%);background:#fff;border-radius:14px;padding:19px;max-height:90vh;overflow:auto}
 .box h3{margin:0 0 14px;font-size:19px}
-.note{font-size:12px;color:var(--muted)}
+.note{font-size:12px;color:var(--muted);line-height:1.5}
 .gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px}
 .gate h3{font-size:19px}
 .gate p{font-size:13px;color:var(--muted)}
