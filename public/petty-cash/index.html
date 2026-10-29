@@ -347,7 +347,12 @@ tbody tr:hover td{background:#f7faf8}
 <div class="grid">
   <div class="field"><label>Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="entryAmount"></div>
   <div class="field"><label>Date</label><input type="date" id="entryDate"></div>
-  <div class="field span2" id="entryPersonField"><label id="entryPersonLabel">Person Name</label><input id="entryPerson" placeholder="Optional"><select id="entryPersonSelect" class="hidden" onchange="toggleLoanPersonTextVisibility()"></select></div>
+  <div class="field span2" id="entryPersonField"><label id="entryPersonLabel">Person Name</label>
+    <input id="entryPersonSearch" list="entryPersonDatalist" autocomplete="off" class="hidden" placeholder="Type to search a Doer" oninput="syncEntryPersonIdFromSearch()">
+    <input type="hidden" id="entryPersonSelect">
+    <datalist id="entryPersonDatalist"></datalist>
+    <input id="entryPerson" placeholder="Optional">
+  </div>
   <div class="field span2"><label>Note / Reason</label><input id="entryNote" placeholder="Optional"></div>
 </div>
 <div style="margin-top:14px;text-align:right"><button class="btn primary" id="entrySubmitBtn" onclick="addLedgerEntry()">＋ Save Entry</button></div>
@@ -563,6 +568,27 @@ function notifyHighAmount(a){
   const msg=`⚠️ ${label} Alert — Petty Cash\n\n${who}\nAmount: ${fmtAmt(a.amount)}\nUsual Avg: ${fmtAmt(a.priorAvg)}\nIncrease: +${a.pct.toFixed(0)}%\nDate: ${a.date}`;
   recipients.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('high amount WA failed:',e)));
 }
+// Same Alert Recipients list/fallback as notifyHighAmount() above - reuses the existing
+// Manage > Alert Recipients config rather than adding a second, parallel recipient list.
+const LOW_BALANCE_ALERT_THRESHOLD=5000;
+function notifyLowBalance(balance){
+  const configured=(masters.alertRecipients||[]).length>0;
+  const recipients=configured
+    ? users.filter(u=>u.active!==false&&u.phone&&masters.alertRecipients.includes(u.id))
+    : users.filter(u=>u.active!==false&&u.phone&&u.appRoles&&(u.appRoles['bliss-one']==='admin'||u.appRoles['bliss-one']==='director'));
+  if(!recipients.length)return;
+  const msg=`⚠️ Low Balance Alert — Petty Cash\n\nCurrent Balance: ${fmtAmt(balance)}\n\nKripya fund add karein.\n${APP_URL}`;
+  recipients.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('low balance WA failed:',e)));
+}
+// Called with the balance as it stood just BEFORE a Cash Out is committed (same reason
+// checkAndNotifyHighAmount() above uses pre-entry state: the live onSnapshot sync hasn't
+// caught up at this point) plus the amount just going out, to get the resulting balance.
+// Fires every time that resulting balance is at/below the threshold, same no-dedup
+// behavior as Stationery Inventory's notifyLowStock() on every qualifying Stock Out.
+function checkAndNotifyLowBalanceAfterOut(priorBalance,amount){
+  const newBalance=priorBalance-amount;
+  if(newBalance<=LOW_BALANCE_ALERT_THRESHOLD)notifyLowBalance(newBalance);
+}
 // Tells the recipient directly (not just Admin) the moment cash/a loan is tagged to them,
 // so they find out about their own "👤 My Petty Cash" tab without having to be told in
 // person or open the app speculatively.
@@ -644,25 +670,25 @@ function selectEntryType(t){
   entryType=t;
   // typeBtn_loan no longer exists (Loan Given retired) - only toggle the tabs that remain.
   ['in','out'].forEach(x=>$('typeBtn_'+x).classList.toggle('on',x===t));
-  const textInp=$('entryPerson'),sel=$('entryPersonSelect');
+  const textInp=$('entryPerson'),searchInp=$('entryPersonSearch');
   if(t==='out'){
     $('entryPersonLabel').textContent='Issued To (optional — select to let them log their own spend)';
-    textInp.classList.add('hidden');sel.classList.remove('hidden');
+    textInp.classList.add('hidden');searchInp.classList.remove('hidden');
   }else if(t==='loan'){
     $('entryPersonLabel').textContent='Given To *';
-    sel.classList.remove('hidden');
+    searchInp.classList.remove('hidden');
     textInp.placeholder='Non-staff name (if not in the list above)';
     toggleLoanPersonTextVisibility();
   }else{
     $('entryPersonLabel').textContent='Person Name (optional — select a Doer so only they get the Accept request, or leave unselected to notify all Accountants/Admins)';
-    sel.classList.remove('hidden');
+    searchInp.classList.remove('hidden');
     textInp.placeholder='Custom label (e.g. "Patty cash") if not a specific Doer';
     toggleLoanPersonTextVisibility();
   }
 }
-// For a Loan or a Fund Add, picking a staff member from the dropdown links it to their login
-// (for a Loan: shows up in their own "My Loans"; for Fund Add: only they get the Accept
-// WhatsApp request instead of every Accountant/Admin); leaving it on "Not linked / outsider"
+// For a Loan or a Fund Add, picking a staff member from the searchable dropdown links it to
+// their login (for a Loan: shows up in their own "My Loans"; for Fund Add: only they get the
+// Accept WhatsApp request instead of every Accountant/Admin); leaving it blank (no match)
 // falls back to a plain typed name/label, since both a loan and a fund note can be for
 // someone/something with no app account at all (e.g. "Patty cash").
 function toggleLoanPersonTextVisibility(){
@@ -671,13 +697,22 @@ function toggleLoanPersonTextVisibility(){
   textInp.classList.toggle('hidden',!!sel.value);
   if(sel.value)textInp.value='';
 }
-function renderEntryPersonSelect(){
-  const sel=$('entryPersonSelect');
-  if(!sel)return;
-  const cur=sel.value;
+// Matches the typed text in the searchable Person Name field against an active Doer's name
+// (case-insensitive exact match, same convention as the Item search fields elsewhere in this
+// app family) and stores the resolved id in the hidden entryPersonSelect field; no match ->
+// treated as "not linked", same as leaving the old <select> on its default option.
+function syncEntryPersonIdFromSearch(){
+  const name=$('entryPersonSearch').value.trim();
   const au=users.filter(u=>u.active!==false);
-  sel.innerHTML='<option value="">-- Not linked / outsider --</option>'+au.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
-  if(au.some(u=>u.id===cur))sel.value=cur;
+  const match=au.find(u=>u.name.toLowerCase()===name.toLowerCase());
+  $('entryPersonSelect').value=match?match.id:'';
+  toggleLoanPersonTextVisibility();
+}
+function renderEntryPersonSelect(){
+  const dl=$('entryPersonDatalist');
+  if(!dl)return;
+  const au=users.filter(u=>u.active!==false);
+  dl.innerHTML=au.map(u=>`<option value="${esc(u.name)}"></option>`).join('');
 }
 let _entrySubmitting=false;
 async function addLedgerEntry(){
@@ -704,8 +739,10 @@ async function addLedgerEntry(){
   if(entryType==='loan'&&!person){alert('Loan ke liye Person (staff select ya naam type) zaroori hai.');return}
   // Cash-box can't hand out more than it actually has - Cash Out and Loan Given are both
   // real money leaving the box, so both are capped at the Current Balance (Cash In isn't).
+  let priorBalanceForOut=null;
   if(entryType==='out'||entryType==='loan'){
     const {balance}=computeBalance();
+    priorBalanceForOut=balance;
     if(amount>balance){alert('Current Balance ('+fmtAmt(balance)+') se zyada '+(entryType==='loan'?'Loan':'Cash Out')+' nahi de sakte.');return}
   }
   _entrySubmitting=true;
@@ -746,9 +783,11 @@ async function addLedgerEntry(){
       checkAndNotifyHighAmount(entryType,amount,date,person,note);
       if((entryType==='out'||entryType==='loan')&&personId)notifyRecipientOfNewEntry(entryType,personId,amount,note);
       await db.collection('pc_ledger').add(payload);
+      if(entryType==='out')checkAndNotifyLowBalanceAfterOut(priorBalanceForOut,amount);
     }
     $('entryAmount').value='';$('entryPerson').value='';$('entryNote').value='';
     if($('entryPersonSelect'))$('entryPersonSelect').value='';
+    if($('entryPersonSearch'))$('entryPersonSearch').value='';
     closeEntryModal();
     toast(needsAccept?'Bheji gayi — Accept hone ka wait hai':'Entry saved');
   }finally{
@@ -800,10 +839,12 @@ async function pcAcceptPending(id){
   _pcResolving=true;
   try{
     const actor=loggedUser();
+    const priorBalance=p.type==='out'?computeBalance().balance:null;
     const payload={type:p.type,amount:p.amount,date:p.date,person:p.person,note:p.note,by:p.by,at:p.at};
     if(p.personId)payload.personId=p.personId;
     checkAndNotifyHighAmount(p.type,p.amount,p.date,p.person,p.note);
     await db.collection('pc_ledger').add(payload);
+    if(p.type==='out')checkAndNotifyLowBalanceAfterOut(priorBalance,p.amount);
     await db.collection('pc_pending_entries').doc(id).update({status:'accepted',resolvedBy:currentUser,resolvedByName:actor?actor.name:currentUser,resolvedAt:new Date().toISOString()});
     const creator=users.find(u=>u.id===p.by);
     if(creator&&creator.phone)sendRawWA(creator.phone,`✅ Petty Cash ${p.type==='in'?'Fund Add':'Cash Out'} ${fmtAmt(p.amount)} accept ho gaya (${actor?actor.name:'-'}).\n\n${APP_URL}`);
