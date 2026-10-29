@@ -57,9 +57,10 @@ nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
 .hero h1{font-size:24px;margin:0 0 5px}
 .hero p{font-size:13px;margin:0;opacity:.9}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
-.card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px}
-.card small{font-size:11px;color:var(--muted)}
-.card b{display:block;font-size:22px;margin-top:6px}
+.card{background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent,var(--g));border-radius:13px;padding:15px;display:flex;flex-direction:column;gap:8px}
+.card .ic{width:34px;height:34px;border-radius:10px;background:var(--accentbg,var(--mint));color:var(--accent,var(--g));display:grid;place-items:center;font-size:17px}
+.card small{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.card b{display:block;font-size:22px}
 .card.warn{background:var(--amberbg)!important;color:var(--amber)!important}
 .panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:12px}
 .ph{padding:14px 16px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
@@ -709,12 +710,12 @@ function renderDash(){
   const totalDistance=live.reduce((s,x)=>s+entryDistance(x),0);
   const avgCost=totalDistance>0?totalSpend/totalDistance:0;
   const tiles=[
-    {label:'TOTAL ENTRIES',val:live.length},
-    {label:'TOTAL FUEL SPEND',val:fmtAmt(totalSpend)},
-    {label:'TOTAL DISTANCE',val:totalDistance.toLocaleString('en-IN')},
-    {label:'AVG COST / UNIT',val:avgCost>0?('₹'+avgCost.toFixed(2)):'-'}
+    {label:'TOTAL ENTRIES',val:live.length,ic:'📋',accent:'#2155B8',accentbg:'#EAF1FF'},
+    {label:'TOTAL FUEL SPEND',val:fmtAmt(totalSpend),ic:'💰',accent:'#1B7A63',accentbg:'#E8F8F2'},
+    {label:'TOTAL DISTANCE',val:totalDistance.toLocaleString('en-IN'),ic:'🛣️',accent:'#B4541A',accentbg:'#FFF0E6'},
+    {label:'AVG COST / UNIT',val:avgCost>0?('₹'+avgCost.toFixed(2)):'-',ic:'📊',accent:'#6B2FBD',accentbg:'#F5EEFF'}
   ];
-  $('statTiles').innerHTML=tiles.map(t=>`<div class="card"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+  $('statTiles').innerHTML=tiles.map(t=>`<div class="card" style="--accent:${t.accent};--accentbg:${t.accentbg}"><div class="ic">${t.ic}</div><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
 }
 function monthKeyOf(dateStr){return String(dateStr||'').slice(0,7)}
 function prevMonthKey(key){
