@@ -72,13 +72,18 @@ nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
 .span2{grid-column:1/-1}
 #fuelSubmitBtn{padding:13px 22px;font-size:14px}
 table{width:100%;border-collapse:collapse}
-th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 0 9px;border-bottom:1px solid var(--line)}
-td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px;vertical-align:top}
+th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 8px 9px;border-bottom:2px solid var(--line)}
+td{padding:11px 8px;border-bottom:1px solid #edf1ee;font-size:12.5px;vertical-align:top}
+tbody tr:nth-child(even) td{background:#F7FAF8}
 tr:last-child td{border-bottom:0}
 tbody tr:hover td{background:#f7faf8}
 .tablewrap{overflow-x:auto}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 .pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font-size:11px;font-weight:700;background:var(--mint);color:var(--g)}
+/* Document Alerts gets its own card treatment (scoped here, not the shared .item used
+   elsewhere) - a colored left accent per severity instead of a plain divider-line row. */
+.docAlertCard{display:flex;flex-direction:column;gap:5px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent,var(--amber));border-radius:11px;padding:12px 14px;margin-bottom:8px}
+.docAlertCard:last-child{margin-bottom:0}
 .item{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #edf1ee;gap:10px;flex-wrap:wrap}
 .item:last-child{border-bottom:0}
 .emptystate{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;text-align:center;font-size:24px}
@@ -1004,7 +1009,7 @@ function renderDocAlerts(){
   wrap.innerHTML=`<div class="panel"><div class="ph"><span>📋 Document Alerts</span></div><div class="pb">${alerts.map(a=>{
     const expired=a.days<0;
     const recipients=[a.doerName,'Admin','Accounts'].filter(Boolean).join(', ');
-    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:4px">
+    return `<div class="docAlertCard" style="--accent:${expired?'var(--red)':'var(--amber)'}">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
         <span><b>${esc(a.vehicle)}</b> — ${esc(a.docLabel)} ${expired?`<span style="color:var(--red);font-weight:700">EXPIRED</span> (${esc(a.expiryDate)})`:`expire ho raha hai <b>${a.days} din</b> mein (${esc(a.expiryDate)})`}</span>
         <span class="pill" style="background:${expired?'var(--redbg)':'var(--amberbg)'};color:${expired?'var(--red)':'var(--amber)'}">${expired?'⛔ Expired':'⚠ Renew Soon'}</span>
