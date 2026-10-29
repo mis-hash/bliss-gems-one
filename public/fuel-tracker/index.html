@@ -56,7 +56,7 @@ nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
 .hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px}
 .hero h1{font-size:24px;margin:0 0 5px}
 .hero p{font-size:13px;margin:0;opacity:.9}
-.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
 .card{background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent,var(--g));border-radius:13px;padding:15px;display:flex;flex-direction:column;gap:8px}
 .card .ic{width:34px;height:34px;border-radius:10px;background:var(--accentbg,var(--mint));color:var(--accent,var(--g));display:grid;place-items:center;font-size:17px}
 .card small{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.02em}
@@ -732,6 +732,7 @@ function renderDash(){
   const avgCost=totalDistance>0?totalSpend/totalDistance:0;
   const tiles=[
     {label:'TOTAL ENTRIES',val:live.length,ic:'📋',accent:'#2155B8',accentbg:'#EAF1FF'},
+    {label:'TOTAL VEHICLES',val:(masters.vehicles||[]).length,ic:'🚗',accent:'#C2255C',accentbg:'#FDE7F0'},
     {label:'TOTAL FUEL SPEND',val:fmtAmt(totalSpend),ic:'💰',accent:'#1B7A63',accentbg:'#E8F8F2'},
     {label:'TOTAL DISTANCE',val:totalDistance.toLocaleString('en-IN'),ic:'🛣️',accent:'#B4541A',accentbg:'#FFF0E6'},
     {label:'AVG COST / UNIT',val:avgCost>0?('₹'+avgCost.toFixed(2)):'-',ic:'📊',accent:'#6B2FBD',accentbg:'#F5EEFF'},
