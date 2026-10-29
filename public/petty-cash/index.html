@@ -167,8 +167,7 @@ tbody tr:hover td{background:#f7faf8}
     <button class="on staffHidden" data-page="ledger" onclick="goPage('ledger')">📊 Accounts</button>
     <button data-page="my" id="myPageTabBtn" onclick="goPage('my')">👤 My Petty Cash</button>
     <div class="grouplabel">Insights</div>
-    <button class="accountantOnly hidden" data-page="team" onclick="goPage('team')">👥 Team Overview</button>
-    <button class="staffHidden" data-page="reports" onclick="goPage('reports')">📈 Reports</button>
+    <button class="staffHidden" data-page="reports" onclick="goPage('reports')">📈 Team &amp; Reports</button>
   </nav>
   <main>
 
@@ -240,7 +239,7 @@ tbody tr:hover td{background:#f7faf8}
     <div id="myPageEmptyState" class="panel hidden"><div class="pb"><div class="emptystate">👤<p>Abhi aapko koi cash issue ya loan nahi diya gaya hai.</p><small>Jab koi aapko Cash Out "Issued To" se dega ya Loan dega, yahan dikhega.</small></div></div></div>
   </div>
 
-  <div id="page-team" class="pcPage">
+  <div id="page-reports" class="pcPage">
     <div id="teamAgingAlerts"></div>
     <div class="panel">
       <div class="ph"><span>📊 Top Pending/Outstanding</span></div>
@@ -269,9 +268,6 @@ tbody tr:hover td{background:#f7faf8}
         </table></div>
       </div>
     </div>
-  </div>
-
-  <div id="page-reports" class="pcPage">
     <div class="panel no-print">
       <div class="ph"><span>📈 Reports</span></div>
       <div class="pb">
@@ -321,7 +317,6 @@ tbody tr:hover td{background:#f7faf8}
   <button class="adminOnly hidden" data-page="admin" onclick="goPage('admin')"><span>⚙</span>Admin</button>
   <button class="on staffHidden" data-page="ledger" onclick="goPage('ledger')"><span>📊</span>Accounts</button>
   <button data-page="my" onclick="goPage('my')"><span>👤</span>My Cash</button>
-  <button class="accountantOnly hidden" data-page="team" onclick="goPage('team')"><span>👥</span>Team</button>
   <button class="staffHidden" data-page="reports" onclick="goPage('reports')"><span>📈</span>Reports</button>
 </div>
 
