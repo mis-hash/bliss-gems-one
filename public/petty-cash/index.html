@@ -80,8 +80,16 @@ tbody tr:hover td{background:#f7faf8}
 .tablewrap{overflow-x:auto}
 /* When one row's detail is expanded, dim+blur the other sibling rows in that same table so
    the open one stands out instead of the list looking cluttered/messy. */
-.pcDimRow td{opacity:.4;filter:blur(1.2px);transition:opacity .2s ease,filter .2s ease}
-.pcDimRow:hover td{opacity:.7;filter:blur(0)}
+.pcDimRow,.pcDimRow td{opacity:.4;filter:blur(1.2px);transition:opacity .2s ease,filter .2s ease}
+.pcDimRow:hover,.pcDimRow:hover td{opacity:.7;filter:blur(0)}
+/* Ledger History card rows (replaces a plain table for readability on mobile) */
+.pcLedgerCard{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
+.pcLedgerCardTop{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.pcLedgerCardAmt{font-weight:800;font-size:16px;white-space:nowrap}
+.pcLedgerCardSub{font-size:12.5px}
+.pcLedgerCardNote{font-size:11.5px;color:var(--muted)}
+.pcLedgerCardMeta{font-size:11px;color:var(--muted)}
+.pcLedgerCardActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 .pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font-size:11px;font-weight:700}
 .pill.in{background:var(--mint);color:var(--g)}
@@ -221,10 +229,8 @@ tbody tr:hover td{background:#f7faf8}
         <div class="field" style="width:auto;flex:1;min-width:160px;margin:0"><label>Person</label><input id="histPerson" placeholder="Search person name" oninput="onLedgerFilterChange()"></div>
         <button class="btn small secondary" onclick="clearLedgerFilters()" style="margin-top:17px">✕ Clear Filters</button>
       </div>
-      <div class="tablewrap"><table>
-      <thead><tr><th>Date</th><th>Type</th><th>Person / Note</th><th class="num">Amount</th><th>By</th><th>Action</th></tr></thead>
-      <tbody id="ledgerTable"></tbody>
-    </table></div></div>
+      <div id="ledgerTable"></div>
+    </div>
   </div>
   </div>
 
@@ -1611,15 +1617,13 @@ function pcSpendBreakdownRowHtml(x){
         <tbody>${mySpends.map(s=>`<tr><td>${esc(s.date)}</td><td class="num" style="background:var(--bluebg);color:var(--blue);font-weight:700">${fmtAmt(s.amount)}</td><td>${s.note?esc(s.note):'-'}</td><td>${esc(nameOfUserId(s.by))}</td></tr>`).join('')}</tbody>
       </table>`
     : '<div class="note" style="padding:6px 0">Abhi tak koi spending entry nahi daali gayi.</div>';
-  return `<tr><td colspan="6" style="padding:0;border:0">
-    <div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:var(--mint)">
-      <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:6px">🔽 SPENDING BY ${esc(x.person||'-')} <span style="font-weight:400">(belongs to the row above ↑)</span></div>
+  return `<div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:-4px 0 10px;background:var(--mint)">
+      <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:6px">🔽 SPENDING BY ${esc(x.person||'-')} <span style="font-weight:400">(belongs to the card above ↑)</span></div>
       <div class="item"><span>Remaining</span><b>${fmtAmt(remaining)}</b></div>
       ${spendRows}
       ${x.verified?`<p class="note" style="margin-top:8px">Verified by ${esc(nameOfUserId(x.settledBy))} on ${esc((x.settledAt||'').slice(0,10))}${x.returnedAmount?' — '+fmtAmt(x.returnedAmount)+' cash wapas receive hua.':''}</p>`:''}
       ${verifyBtn?`<div style="margin-top:10px;text-align:right">${verifyBtn}</div>`:''}
-    </div>
-  </td></tr>`;
+    </div>`;
 }
 function renderLedger(){
   const deletedN=ledger.filter(x=>x.deletedAt).length;
@@ -1643,15 +1647,28 @@ function renderLedger(){
     const canExpandSpend=x.type==='out'&&x.personId;
     const isSpendOpen=canExpandSpend&&!!pcLedgerExpanded[x.id];
     const viewSpendBtn=canExpandSpend?`<button class="btn small secondary" onclick="togglePcLedgerSpendExpand('${esc(x.id)}')">${isSpendOpen?'🔽':'👁'} View Spending</button>`:'';
-    const mainRow=`<tr class="${anyLedgerSpendOpen&&!isSpendOpen?'pcDimRow':''}"><td>${esc(x.date)}${deletedInfo(x)}</td><td><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}${settledBadge}</td><td>${esc(x.person||'-')}${x.note?'<br><small style="color:var(--muted)">'+esc(x.note)+'</small>':''}</td><td class="num">${sign}${fmtAmt(x.amount)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${repayBtn} ${viewSpendBtn} ${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
-    return mainRow+(isSpendOpen?pcSpendBreakdownRowHtml(x):'');
-  }).join('')||`<tr><td colspan="6"><div class="emptystate">💵<p>Koi entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
+    const actions=[repayBtn,viewSpendBtn,editBtn,adminBtn,permBtn].filter(Boolean).join(' ');
+    const amtColor=x.type==='in'?'var(--g)':x.type==='out'?'var(--red)':'var(--amber)';
+    const card=`<div class="pcLedgerCard${anyLedgerSpendOpen&&!isSpendOpen?' pcDimRow':''}">
+      <div class="pcLedgerCardTop">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}${settledBadge}</div>
+        <span class="pcLedgerCardAmt" style="color:${amtColor}">${sign}${fmtAmt(x.amount)}</span>
+      </div>
+      <div class="pcLedgerCardSub"><b>${esc(x.person||'-')}</b></div>
+      ${x.note?`<div class="pcLedgerCardNote">${esc(x.note)}</div>`:''}
+      <div class="pcLedgerCardMeta">${esc(x.date)}${deletedInfo(x)} · by ${esc(nameOfUserId(x.by))}</div>
+      ${actions?`<div class="pcLedgerCardActions">${actions}</div>`:''}
+    </div>`;
+    return card+(isSpendOpen?pcSpendBreakdownRowHtml(x):'');
+  }).join('')||`<div class="emptystate">💵<p>Koi entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div>`;
   if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
   if(allRows.length>rows.length){
-    const tr=document.createElement('tr');
-    tr.id='ledgerLoadMoreRow';
-    tr.innerHTML=`<td colspan="6" style="text-align:center;padding:14px 0"><button class="btn small secondary" onclick="loadMoreLedger()">Load More (${rows.length} / ${allRows.length})</button></td>`;
-    $('ledgerTable').appendChild(tr);
+    const div=document.createElement('div');
+    div.id='ledgerLoadMoreRow';
+    div.style.textAlign='center';
+    div.style.padding='4px 0 14px';
+    div.innerHTML=`<button class="btn small secondary" onclick="loadMoreLedger()">Load More (${rows.length} / ${allRows.length})</button>`;
+    $('ledgerTable').appendChild(div);
   }
 }
 
