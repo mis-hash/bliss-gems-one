@@ -1095,7 +1095,7 @@ function findUserByName(partialName){
   if(!q)return null;
   return users.find(u=>String(u.name||'').trim().toLowerCase().startsWith(q))||null;
 }
-async function sendTripFileWA(phone,blob,fileName,caption){
+async function sendTripFileWA(phone,blob,fileName){
   if(!phone)return false;
   const creds=await getGreenApiCreds();
   if(!creds)return false;
@@ -1106,7 +1106,6 @@ async function sendTripFileWA(phone,blob,fileName,caption){
   form.append('chatId',chatId);
   form.append('file',blob,fileName);
   form.append('fileName',fileName);
-  if(caption)form.append('caption',caption);
   try{
     const res=await fetch(`${base}/waInstance${id}/sendFileByUpload/${token}`,{method:'POST',body:form});
     return res.ok;
@@ -1224,8 +1223,10 @@ async function sendTripSummaryToDirectors(tripId,extra){
   const trip=trips.find(t=>t.id===tripId);
   const locationPart=(trip&&trip.location?trip.location:'Trip').replace(/[\\/:*?"<>|]/g,'').trim();
   const fileName=`Trip Summary - ${locationPart} - ${tripId}.pdf`;
-  const caption=`✅ ${trip&&trip.salesName?trip.salesName:'Sales person'} submitted the trip hisaab — ${locationPart} (${tripId})`;
-  recipients.forEach(u=>sendTripFileWA(u.phone,blob,fileName,caption));
+  const msg=`✅ ${trip&&trip.salesName?trip.salesName:'Sales person'} submitted the trip hisaab — ${locationPart} (${tripId})`;
+  // Sent as its own text message (not a file caption) so it shows as a separate WhatsApp
+  // bubble, per explicit user request.
+  recipients.forEach(u=>{ sendWA(u.phone,msg); sendTripFileWA(u.phone,blob,fileName); });
 }
 async function markBooked(tripId){
   await db.collection('te_trips').doc(tripId).update({bookedByAccounts:true});
