@@ -731,7 +731,6 @@ function renderDash(){
   const totalDistance=live.reduce((s,x)=>s+entryDistance(x),0);
   const avgCost=totalDistance>0?totalSpend/totalDistance:0;
   const tiles=[
-    {label:'TOTAL ENTRIES',val:live.length,ic:'📋',accent:'#2155B8',accentbg:'#EAF1FF'},
     {label:'TOTAL VEHICLES',val:(masters.vehicles||[]).length,ic:'🚗',accent:'#C2255C',accentbg:'#FDE7F0'},
     {label:'TOTAL FUEL SPEND',val:fmtAmt(totalSpend),ic:'💰',accent:'#1B7A63',accentbg:'#E8F8F2'},
     {label:'TOTAL DISTANCE',val:totalDistance.toLocaleString('en-IN'),ic:'🛣️',accent:'#B4541A',accentbg:'#FFF0E6'},
