@@ -1591,7 +1591,10 @@ function pcSpendBreakdownRowHtml(x){
         : `<button class="btn small primary" onclick="verifyAndSettleSpending('${esc(x.id)}')">✓ Verify Spending (fully spent, nothing to receive)</button>`)
     : '';
   const spendRows=mySpends.length
-    ? mySpends.map(s=>`<div class="item"><span>${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''}<br><small style="color:var(--muted)">${esc(s.date)} • by ${esc(nameOfUserId(s.by))}</small></span></div>`).join('')
+    ? `<table style="width:100%;border-collapse:collapse;font-size:12.5px">
+        <thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase"><th style="padding:0 6px 6px 0">Date</th><th style="padding:0 6px 6px 0">Amount</th><th style="padding:0 6px 6px 0">Note</th><th style="padding:0 6px 6px 0">Entry By</th></tr></thead>
+        <tbody>${mySpends.map(s=>`<tr><td>${esc(s.date)}</td><td class="num">${fmtAmt(s.amount)}</td><td>${s.note?esc(s.note):'-'}</td><td>${esc(nameOfUserId(s.by))}</td></tr>`).join('')}</tbody>
+      </table>`
     : '<div class="note" style="padding:6px 0">Abhi tak koi spending entry nahi daali gayi.</div>';
   return `<tr><td colspan="6" style="padding:0;border:0">
     <div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:#f7faf8">
