@@ -56,7 +56,7 @@ nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
 .hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px}
 .hero h1{font-size:24px;margin:0 0 5px}
 .hero p{font-size:13px;margin:0;opacity:.9}
-.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
 .card{background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent,var(--g));border-radius:13px;padding:15px;display:flex;flex-direction:column;gap:8px}
 .card .ic{width:34px;height:34px;border-radius:10px;background:var(--accentbg,var(--mint));color:var(--accent,var(--g));display:grid;place-items:center;font-size:17px}
 .card small{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.02em}
@@ -709,6 +709,22 @@ function nameOfUserId(id){return (users.find(x=>x.id===id)||{}).name||id||'-'}
 function liveFuel(){return fuelLog.filter(x=>!x.deletedAt)}
 function entryDistance(x){ const d=(x.meterAfter||0)-(x.meterBefore||0); return d>0?d:0; }
 function entryCostPerUnit(x){ const d=entryDistance(x); return d>0?(x.amount||0)/d:null; }
+// All-time totals (no date filter) - deliberately independent of the Total Vehicle Cost
+// panel's own quick-range picker below, same as every other Dashboard tile.
+function totalServiceSpendAllTime(){ return liveService().reduce((s,x)=>s+(x.amount||0),0); }
+function totalDocsSpendAllTime(){
+  let sum=0;
+  (masters.vehicles||[]).forEach(v=>{
+    const vd=(masters.vehicleDocs&&masters.vehicleDocs[v])||{};
+    DOC_TYPES.forEach(dt=>{
+      const rec=vd[dt.key];
+      if(!rec)return;
+      if(rec.cost)sum+=rec.cost;
+      (rec.history||[]).forEach(h=>{ if(h.cost)sum+=h.cost; });
+    });
+  });
+  return sum;
+}
 function renderDash(){
   const live=liveFuel();
   const totalSpend=live.reduce((s,x)=>s+(x.amount||0),0);
@@ -718,7 +734,9 @@ function renderDash(){
     {label:'TOTAL ENTRIES',val:live.length,ic:'📋',accent:'#2155B8',accentbg:'#EAF1FF'},
     {label:'TOTAL FUEL SPEND',val:fmtAmt(totalSpend),ic:'💰',accent:'#1B7A63',accentbg:'#E8F8F2'},
     {label:'TOTAL DISTANCE',val:totalDistance.toLocaleString('en-IN'),ic:'🛣️',accent:'#B4541A',accentbg:'#FFF0E6'},
-    {label:'AVG COST / UNIT',val:avgCost>0?('₹'+avgCost.toFixed(2)):'-',ic:'📊',accent:'#6B2FBD',accentbg:'#F5EEFF'}
+    {label:'AVG COST / UNIT',val:avgCost>0?('₹'+avgCost.toFixed(2)):'-',ic:'📊',accent:'#6B2FBD',accentbg:'#F5EEFF'},
+    {label:'TOTAL SERVICE & REPAIR',val:fmtAmt(totalServiceSpendAllTime()),ic:'🔧',accent:'#A6350C',accentbg:'#FDEDE6'},
+    {label:'TOTAL DOCUMENTS EXPENSE',val:fmtAmt(totalDocsSpendAllTime()),ic:'📄',accent:'#0F7A8C',accentbg:'#E6F6F9'}
   ];
   $('statTiles').innerHTML=tiles.map(t=>`<div class="card" style="--accent:${t.accent};--accentbg:${t.accentbg}"><div class="ic">${t.ic}</div><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
 }
