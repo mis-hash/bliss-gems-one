@@ -969,7 +969,7 @@ function renderMyIssuedCash(){
     const spent=issueSpentTotal(x.id);
     const remaining=x.amount-spent;
     const mySpends=issueSpends.filter(s=>s.issueId===x.id&&!s.deletedAt).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
-    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:8px">
+    return `<div class="pcLedgerCard" style="align-items:stretch">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
         <span><b>${fmtAmt(x.amount)}</b> issued on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>
         ${x.verified?'<span class="pill repaid">✓ Verified &amp; Settled</span>':`<span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>`}
