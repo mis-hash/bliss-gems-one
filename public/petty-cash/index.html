@@ -77,6 +77,10 @@ td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px;vertical-alig
 tr:last-child td{border-bottom:0}
 tbody tr:hover td{background:#f7faf8}
 .tablewrap{overflow-x:auto}
+/* When one row's detail is expanded, dim+blur the other sibling rows in that same table so
+   the open one stands out instead of the list looking cluttered/messy. */
+.pcDimRow td{opacity:.4;filter:blur(1.2px);transition:opacity .2s ease,filter .2s ease}
+.pcDimRow:hover td{opacity:.7;filter:blur(0)}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 .pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font-size:11px;font-weight:700}
 .pill.in{background:var(--mint);color:var(--g)}
@@ -1218,16 +1222,18 @@ function renderReports(){
   if($('reportPrintRangeLabel'))$('reportPrintRangeLabel').textContent=label;
 
   const staffRows=computeStaffReport(from,to);
+  const anyStaffOpen=Object.values(pcStaffExpanded).some(Boolean);
   if($('staffReportTable'))$('staffReportTable').innerHTML=staffRows.length?staffRows.map(r=>{
     const open=!!pcStaffExpanded[r.pid];
-    const mainRow=`<tr style="cursor:pointer" onclick="togglePcStaffExpand('${esc(r.pid)}')"><td><b>${open?'🔽':'▶'} ${esc(r.name)}</b></td><td class="num">${fmtAmt(r.issuedTotal)}</td><td class="num">${r.issuedPending>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.issuedPending)}</span>`:fmtAmt(0)}</td><td class="num">${fmtAmt(r.loansTotal)}</td><td class="num">${r.loansOutstanding>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.loansOutstanding)}</span>`:fmtAmt(0)}</td></tr>`;
+    const mainRow=`<tr class="${anyStaffOpen&&!open?'pcDimRow':''}" style="cursor:pointer" onclick="togglePcStaffExpand('${esc(r.pid)}')"><td><b>${open?'🔽':'▶'} ${esc(r.name)}</b></td><td class="num">${fmtAmt(r.issuedTotal)}</td><td class="num">${r.issuedPending>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.issuedPending)}</span>`:fmtAmt(0)}</td><td class="num">${fmtAmt(r.loansTotal)}</td><td class="num">${r.loansOutstanding>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.loansOutstanding)}</span>`:fmtAmt(0)}</td></tr>`;
     return mainRow+(open?pcStaffDetailRowHtml(r):'');
   }).join(''):`<tr><td colspan="5"><div class="emptystate">📊<p>Is date range mein koi record nahi hai.</p></div></td></tr>`;
 
   const expenseRows=computeExpenseReport(from,to);
+  const anyExpenseOpen=Object.values(pcExpenseExpanded).some(Boolean);
   if($('expenseReportTable'))$('expenseReportTable').innerHTML=expenseRows.length?expenseRows.map((r,i)=>{
     const open=!!pcExpenseExpanded[i];
-    const mainRow=`<tr style="cursor:pointer" onclick="togglePcExpenseExpand(${i})"><td>${open?'🔽':'▶'} ${esc(r.note)}</td><td class="num">${r.count}</td><td class="num" style="background:var(--amberbg);color:var(--amber);font-weight:700">${fmtAmt(r.total)}</td></tr>`;
+    const mainRow=`<tr class="${anyExpenseOpen&&!open?'pcDimRow':''}" style="cursor:pointer" onclick="togglePcExpenseExpand(${i})"><td>${open?'🔽':'▶'} ${esc(r.note)}</td><td class="num">${r.count}</td><td class="num" style="background:var(--amberbg);color:var(--amber);font-weight:700">${fmtAmt(r.total)}</td></tr>`;
     return mainRow+(open?pcExpenseDetailRowHtml(r):'');
   }).join(''):`<tr><td colspan="3"><div class="emptystate">🧾<p>Is date range mein koi spend entry nahi hai.</p></div></td></tr>`;
 
@@ -1612,6 +1618,7 @@ function renderLedger(){
   if($('deletedCount'))$('deletedCount').textContent=deletedN;
   const allRows=filteredLedgerRows();
   const rows=allRows.slice(0,ledgerPageSize);
+  const anyLedgerSpendOpen=Object.values(pcLedgerExpanded).some(Boolean);
   $('ledgerTable').innerHTML=rows.map(x=>{
     const pillClass=x.type==='in'?'in':x.type==='out'?'out':'loan';
     const pillLabel=x.type==='in'?'IN':x.type==='out'?'OUT':'LOAN';
@@ -1627,7 +1634,7 @@ function renderLedger(){
     const canExpandSpend=x.type==='out'&&x.personId;
     const isSpendOpen=canExpandSpend&&!!pcLedgerExpanded[x.id];
     const viewSpendBtn=canExpandSpend?`<button class="btn small secondary" onclick="togglePcLedgerSpendExpand('${esc(x.id)}')">${isSpendOpen?'🔽':'👁'} View Spending</button>`:'';
-    const mainRow=`<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}${settledBadge}</td><td>${esc(x.person||'-')}${x.note?'<br><small style="color:var(--muted)">'+esc(x.note)+'</small>':''}</td><td class="num">${sign}${fmtAmt(x.amount)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${repayBtn} ${viewSpendBtn} ${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
+    const mainRow=`<tr class="${anyLedgerSpendOpen&&!isSpendOpen?'pcDimRow':''}"><td>${esc(x.date)}${deletedInfo(x)}</td><td><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}${settledBadge}</td><td>${esc(x.person||'-')}${x.note?'<br><small style="color:var(--muted)">'+esc(x.note)+'</small>':''}</td><td class="num">${sign}${fmtAmt(x.amount)}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${repayBtn} ${viewSpendBtn} ${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
     return mainRow+(isSpendOpen?pcSpendBreakdownRowHtml(x):'');
   }).join('')||`<tr><td colspan="6"><div class="emptystate">💵<p>Koi entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
   if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
