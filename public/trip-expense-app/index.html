@@ -1224,7 +1224,7 @@ async function sendTripSummaryToDirectors(tripId,extra){
   const trip=trips.find(t=>t.id===tripId);
   const locationPart=(trip&&trip.location?trip.location:'Trip').replace(/[\\/:*?"<>|]/g,'').trim();
   const fileName=`Trip Summary - ${locationPart} - ${tripId}.pdf`;
-  const caption=`✅ ${trip&&trip.salesName?trip.salesName:'Sales person'} ne is trip ka hisaab submit kar diya — ${locationPart} (${tripId})`;
+  const caption=`✅ ${trip&&trip.salesName?trip.salesName:'Sales person'} submitted the trip hisaab — ${locationPart} (${tripId})`;
   recipients.forEach(u=>sendTripFileWA(u.phone,blob,fileName,caption));
 }
 async function markBooked(tripId){
