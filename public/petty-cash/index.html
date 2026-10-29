@@ -30,7 +30,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* Same design system as the other Bliss apps, so all apps read as one family. */
-:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
+:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df;--blue:#1D5FA6;--bluebg:#E8F1FC}
 *{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
 button,input,select,textarea{font:inherit}
 h1,h2,h3,.card b,.tabular{font-family:'Manrope',sans-serif}
@@ -257,7 +257,7 @@ tbody tr:hover td{background:#f7faf8}
           <button class="btn small secondary" onclick="clearTeamFilters()" style="margin-top:17px">✕ Clear</button>
         </div>
         <div class="tablewrap"><table>
-          <thead><tr><th>Person</th><th class="num">Issued</th><th class="num">Pending (Issued)</th><th class="num">Loans Given</th><th class="num">Outstanding (Loan)</th><th>Action</th></tr></thead>
+          <thead><tr><th>Person</th><th class="num">Issued</th><th class="num">Pending (Issued)</th><th class="num">Loans Given</th><th class="num">Outstanding (Loan)</th></tr></thead>
           <tbody id="teamOverviewTable"></tbody>
         </table></div>
       </div>
@@ -299,7 +299,7 @@ tbody tr:hover td{background:#f7faf8}
     <div class="panel">
       <div class="ph"><span>🧾 Expense-wise Report</span></div>
       <div class="pb"><div class="tablewrap"><table>
-        <thead><tr><th>Spent On</th><th class="num">Entries</th><th class="num" style="background:var(--amberbg)">Total Amount</th></tr></thead>
+        <thead><tr><th>Spent On</th><th class="num">Entries</th><th class="num" style="background:var(--bluebg)">Total Amount</th></tr></thead>
         <tbody id="expenseReportTable"></tbody>
       </table></div></div>
     </div>
@@ -1052,19 +1052,27 @@ function computeTeamRows(){
   else rows.sort((a,b)=>(b.issuedPending+b.loansOutstanding)-(a.issuedPending+a.loansOutstanding));
   return rows;
 }
+// Same inline "click a row, see the breakdown below it" pattern as Reports' Staff-wise
+// table - separate expand state from pcStaffExpanded since this is a different page/filter.
+let pcTeamExpanded={};
+function togglePcTeamExpand(pid){ pcTeamExpanded[pid]=!pcTeamExpanded[pid]; renderTeamOverview(); }
 function renderTeamOverview(){
   const tbody=$('teamOverviewTable');
   if(!tbody)return;
   if(!canCloseLoan()){tbody.innerHTML='';if($('teamAgingAlerts'))$('teamAgingAlerts').innerHTML='';if($('teamOverviewChart'))$('teamOverviewChart').innerHTML='';return;}
   const rows=computeTeamRows();
-  tbody.innerHTML=rows.length?rows.map(r=>`<tr>
-    <td><b>${esc(r.name)}</b>${r.aging?' <span class="pill" style="background:var(--redbg);color:var(--red)">⚠ Follow-up ('+r.oldestAgeDays+'d)</span>':''}</td>
+  const anyTeamOpen=Object.values(pcTeamExpanded).some(Boolean);
+  tbody.innerHTML=rows.length?rows.map(r=>{
+    const open=!!pcTeamExpanded[r.pid];
+    const mainRow=`<tr class="${anyTeamOpen&&!open?'pcDimRow':''}" style="cursor:pointer" onclick="togglePcTeamExpand('${esc(r.pid)}')">
+    <td><b>${open?'🔽':'▶'} ${esc(r.name)}</b>${r.aging?' <span class="pill" style="background:var(--redbg);color:var(--red)">⚠ Follow-up ('+r.oldestAgeDays+'d)</span>':''}</td>
     <td class="num">${fmtAmt(r.issuedTotal)}</td>
     <td class="num">${r.issuedPending>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.issuedPending)}</span>`:fmtAmt(0)}</td>
     <td class="num">${fmtAmt(r.loansTotal)}</td>
     <td class="num">${r.loansOutstanding>0?`<span style="color:var(--amber);font-weight:700">${fmtAmt(r.loansOutstanding)}</span>`:fmtAmt(0)}</td>
-    <td><button class="btn small secondary" onclick="openPersonDetailModal('${esc(r.pid)}')">👁 Details</button></td>
-  </tr>`).join(''):`<tr><td colspan="6"><div class="emptystate">👥<p>Koi record nahi mila.</p></div></td></tr>`;
+  </tr>`;
+    return mainRow+(open?pcStaffDetailRowHtml(r):'');
+  }).join(''):`<tr><td colspan="5"><div class="emptystate">👥<p>Koi record nahi mila.</p></div></td></tr>`;
   renderTeamAgingAlerts(rows);
   renderTeamOverviewChart(rows);
 }
@@ -1203,13 +1211,13 @@ function pcExpenseDetailRowHtml(group){
   const rows=group.items.map(s=>{
     const issue=ledger.find(x=>x.id===s.issueId);
     const delBtn=superAdminUnlocked?`<button class="btn small danger" style="padding:2px 7px;font-size:10px;white-space:nowrap" onclick="permanentlyDeleteIssueSpend('${esc(s.id)}')">✕ Delete</button>`:'';
-    return `<tr><td>${esc(s.date)}</td><td class="num" style="background:var(--amberbg);color:var(--amber);font-weight:700">${fmtAmt(s.amount)}</td><td>${issue?esc(issue.person||'-'):'<span style="color:var(--red)">Issue mil nahi raha</span>'}</td><td>${esc(nameOfUserId(s.by))}</td><td>${delBtn}</td></tr>`;
+    return `<tr><td>${esc(s.date)}</td><td class="num" style="background:var(--bluebg);color:var(--blue);font-weight:700">${fmtAmt(s.amount)}</td><td>${issue?esc(issue.person||'-'):'<span style="color:var(--red)">Issue mil nahi raha</span>'}</td><td>${esc(nameOfUserId(s.by))}</td><td>${delBtn}</td></tr>`;
   }).join('');
   return `<tr><td colspan="3" style="padding:0;border:0">
     <div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:2px 0 10px;background:#f7faf8">
       <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:8px">🔽 "${esc(group.note)}" KI ENTRIES <span style="font-weight:400">(belongs to the row above ↑)</span></div>
       <table style="width:100%;border-collapse:collapse;font-size:12.5px">
-        <thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase"><th style="padding:0 6px 6px 0">Date</th><th style="padding:6px;background:var(--amberbg)">Amount</th><th style="padding:0 6px 6px 0">Issued To</th><th style="padding:0 6px 6px 0">Entry By</th><th></th></tr></thead>
+        <thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase"><th style="padding:0 6px 6px 0">Date</th><th style="padding:6px;background:var(--bluebg)">Amount</th><th style="padding:0 6px 6px 0">Issued To</th><th style="padding:0 6px 6px 0">Entry By</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -1233,7 +1241,7 @@ function renderReports(){
   const anyExpenseOpen=Object.values(pcExpenseExpanded).some(Boolean);
   if($('expenseReportTable'))$('expenseReportTable').innerHTML=expenseRows.length?expenseRows.map((r,i)=>{
     const open=!!pcExpenseExpanded[i];
-    const mainRow=`<tr class="${anyExpenseOpen&&!open?'pcDimRow':''}" style="cursor:pointer" onclick="togglePcExpenseExpand(${i})"><td>${open?'🔽':'▶'} ${esc(r.note)}</td><td class="num">${r.count}</td><td class="num" style="background:var(--amberbg);color:var(--amber);font-weight:700">${fmtAmt(r.total)}</td></tr>`;
+    const mainRow=`<tr class="${anyExpenseOpen&&!open?'pcDimRow':''}" style="cursor:pointer" onclick="togglePcExpenseExpand(${i})"><td>${open?'🔽':'▶'} ${esc(r.note)}</td><td class="num">${r.count}</td><td class="num" style="background:var(--bluebg);color:var(--blue);font-weight:700">${fmtAmt(r.total)}</td></tr>`;
     return mainRow+(open?pcExpenseDetailRowHtml(r):'');
   }).join(''):`<tr><td colspan="3"><div class="emptystate">🧾<p>Is date range mein koi spend entry nahi hai.</p></div></td></tr>`;
 
@@ -1598,8 +1606,8 @@ function pcSpendBreakdownRowHtml(x){
     : '';
   const spendRows=mySpends.length
     ? `<table style="width:100%;border-collapse:collapse;font-size:12.5px">
-        <thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase"><th style="padding:0 6px 6px 0">Date</th><th style="padding:6px;background:var(--amberbg)">Amount</th><th style="padding:0 6px 6px 0">Note</th><th style="padding:0 6px 6px 0">Entry By</th></tr></thead>
-        <tbody>${mySpends.map(s=>`<tr><td>${esc(s.date)}</td><td class="num" style="background:var(--amberbg);color:var(--amber);font-weight:700">${fmtAmt(s.amount)}</td><td>${s.note?esc(s.note):'-'}</td><td>${esc(nameOfUserId(s.by))}</td></tr>`).join('')}</tbody>
+        <thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase"><th style="padding:0 6px 6px 0">Date</th><th style="padding:6px;background:var(--bluebg)">Amount</th><th style="padding:0 6px 6px 0">Note</th><th style="padding:0 6px 6px 0">Entry By</th></tr></thead>
+        <tbody>${mySpends.map(s=>`<tr><td>${esc(s.date)}</td><td class="num" style="background:var(--bluebg);color:var(--blue);font-weight:700">${fmtAmt(s.amount)}</td><td>${s.note?esc(s.note):'-'}</td><td>${esc(nameOfUserId(s.by))}</td></tr>`).join('')}</tbody>
       </table>`
     : '<div class="note" style="padding:6px 0">Abhi tak koi spending entry nahi daali gayi.</div>';
   return `<tr><td colspan="6" style="padding:0;border:0">
