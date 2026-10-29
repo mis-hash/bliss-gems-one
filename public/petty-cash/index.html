@@ -339,11 +339,7 @@ tbody tr:hover td{background:#f7faf8}
 <!-- New Entry modal (Cash In / Cash Out) - Loan Given is retired: no new loan can be created,
      but existing loan entries keep rendering/Mark-Repaid everywhere else untouched. -->
 <div class="modal" id="entryModal"><div class="box" style="width:min(480px,100%)">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">New Entry</h3><button class="btn small" onclick="closeEntryModal()">✕</button></div>
-<div class="typeRow">
-  <button type="button" class="tab" id="typeBtn_in" onclick="selectEntryType('in')">➕ Cash In</button>
-  <button type="button" class="tab on" id="typeBtn_out" onclick="selectEntryType('out')">➖ Cash Out</button>
-</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0" id="entryModalTitle">New Entry</h3><button class="btn small" onclick="closeEntryModal()">✕</button></div>
 <div class="grid">
   <div class="field"><label>Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="entryAmount"></div>
   <div class="field"><label>Date</label><input type="date" id="entryDate"></div>
@@ -432,13 +428,6 @@ function canCloseLoan(){return superAdminUnlocked||['accountant','admin','direct
 // Add Fund (Cash In) is restricted to Admin/Director — Accountant/staff only Issue (Cash
 // Out), Loan Given, and Receive/Verify/Mark Repaid (already gated by canCloseLoan above).
 function canAddFund(){return superAdminUnlocked||['admin','director'].includes(myRole())}
-function refreshAddFundVisibility(){
-  const allowed=canAddFund();
-  const btn=$('typeBtn_in');
-  if(btn)btn.classList.toggle('hidden',!allowed);
-  const quickBtn=$('quickBtn_in');
-  if(quickBtn)quickBtn.classList.toggle('hidden',!allowed);
-}
 
 /* ===== Super Admin (same shared password as other Bliss apps) ===== */
 const SUPER_ADMIN_PASSWORD_HASH='0cb73e5ce7c7e7b2bc347bc16e73c2a16331fdedaec4c1c787815eab4daa6fad';
@@ -491,7 +480,7 @@ function doLogin(){
   closeLogin();
   // Reset the entry-type selector so a new login on the same page never inherits a stale
   // "Cash In" state (and its gate) left over from whoever was logged in before.
-  if($('typeBtn_out'))selectEntryType('out');
+  if($('entryModalTitle'))selectEntryType('out');
   renderAll();
 }
 function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
@@ -649,11 +638,9 @@ function applyFeatureVisibility(){
   document.querySelectorAll('.staffHidden').forEach(el=>el.classList.toggle('hidden',!canCloseLoan()));
   if(!canCloseLoan()){
     if(!document.getElementById('page-my')?.classList.contains('on'))goPage('my');
-    refreshAddFundVisibility();
     return;
   }
   if(document.getElementById('page-admin')?.classList.contains('on')&&!canAddFund())goPage('ledger');
-  refreshAddFundVisibility();
 }
 
 /* ===== Entry form ===== */
@@ -668,8 +655,10 @@ function selectEntryType(t){
   if(t==='loan'){toast('Loan Given feature band kar diya gaya hai.');return}
   if(t==='in'&&!canAddFund()){toast('Add Fund sirf Admin/Director kar sakte hain.');return}
   entryType=t;
-  // typeBtn_loan no longer exists (Loan Given retired) - only toggle the tabs that remain.
-  ['in','out'].forEach(x=>$('typeBtn_'+x).classList.toggle('on',x===t));
+  // Each quick-action button (Admin Panel's "Add Fund", Ledger's "Issue") opens the modal
+  // already committed to one action - no in-modal Cash In/Cash Out toggle anymore, so the
+  // title is the only thing that reflects which one this is.
+  $('entryModalTitle').textContent=t==='in'?'➕ Add Fund':'➖ Issue Fund';
   const textInp=$('entryPerson'),searchInp=$('entryPersonSearch');
   if(t==='out'){
     $('entryPersonLabel').textContent='Issued To (optional — select to let them log their own spend)';
