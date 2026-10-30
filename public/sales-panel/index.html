@@ -231,8 +231,7 @@ tr:last-child td{border-bottom:0}
           <input id="callCustomerSearch" list="customerDatalist" autocomplete="off" placeholder="Type karke existing customer dhundhein ya naya naam likhein">
         </div>
         <div class="field"><label>Sales Person</label>
-          <input id="callSalesPerson" list="salesPersonDatalist" autocomplete="off" placeholder="Naam likhein">
-          <datalist id="salesPersonDatalist"></datalist>
+          <input id="callSalesPerson" readonly disabled style="background:#f3f5f4;cursor:not-allowed">
         </div>
         <div class="field"><label>Call Date</label><input type="date" id="callDate"></div>
         <div class="field span2"><label>Note / Context (optional)</label><input id="callNote" placeholder="Jaise: follow-up call, pehla contact, etc."></div>
@@ -650,11 +649,14 @@ function renderCustomersPage(){
    recording safely into the cloud and visible in a list, so that piece can plug in later
    without changing this upload flow. */
 let _selectedCallFile=null;
-function renderSalesPersonDatalist(){
-  const dl=$('salesPersonDatalist');
-  if(!dl)return;
-  const au=users.filter(u=>u.active!==false);
-  dl.innerHTML=au.map(u=>`<option value="${esc(u.name)}"></option>`).join('');
+// Sales Person is locked to whoever is actually logged in (own User ID/password) - not a
+// free-text/searchable field anymore, so a call recording can never be mis-attributed to
+// the wrong person.
+function renderSalesPersonField(){
+  const el=$('callSalesPerson');
+  if(!el)return;
+  const u=loggedUser();
+  el.value=u?u.name:'';
 }
 function fmtFileSize(bytes){
   if(!bytes)return '0 KB';
@@ -713,7 +715,7 @@ async function uploadCallRecording(){
       at:new Date().toISOString()
     });
     $('callFileInput').value='';$('callCustomerSearch').value='';
-    $('callSalesPerson').value='';$('callNote').value='';$('callDate').value=todayISO();
+    $('callNote').value='';$('callDate').value=todayISO();
     $('callFilePreviewWrap').classList.add('hidden');$('callFilePreviewWrap').innerHTML='';
     _selectedCallFile=null;
     toast('Recording upload ho gayi');
@@ -733,10 +735,11 @@ function callStatusPillHtml(status){
 }
 // AssemblyAI/GPT se poora analysis aane par ek call doc mein ye shape expect hoti hai:
 // { transcript: "...", analysis: { sentiment, summary, objections:[...], keyPoints:[...],
-// coachingTip, suggestion } } - ye renderer ab se hi us shape ke liye ready hai, data aate
-// hi automatically dikhega. coachingTip khaas taur par Sales Person ke liye hai (unki apni
-// performance par feedback - jaise "customer ko zyada bolne ka mauka dein"), suggestion agle
-// business step ke liye (follow-up/pitch action).
+// coachingTips:[...], suggestion } } - ye renderer ab se hi us shape ke liye ready hai, data
+// aate hi automatically dikhega. coachingTips Sales Person ki khud ki communication/pitch par
+// poora, multi-point guidance hai (jaise "customer ko zyada bolne ka mauka dein", "pehle
+// value explain karein phir rate", etc. - ek se zyada ho sakte hain), suggestion agle
+// business step ke liye (follow-up action).
 // Dark "call intelligence" treatment (Gong.io-style) - deliberately different palette from
 // the rest of the app (which stays on the light Bliss house style), scoped to just this
 // card since that's what was asked for.
@@ -755,7 +758,7 @@ function callAnalysisCardHtml(c){
     ${a.summary?`<div style="font-size:12.5px;color:#C9D0E8;line-height:1.6">${esc(a.summary)}</div>`:''}
     ${(a.keyPoints&&a.keyPoints.length)?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#2A3356;display:grid;place-items:center;font-size:12px;flex:none">🔑</div><div style="font-size:12px;color:#C9D0E8;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Key Points</b>${a.keyPoints.map(esc).join(' • ')}</div></div>`:''}
     ${(a.objections&&a.objections.length)?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#2A3356;display:grid;place-items:center;font-size:12px;flex:none">⚠</div><div style="font-size:12px;color:#C9D0E8;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Objections</b>${a.objections.map(esc).join(', ')}</div></div>`:''}
-    ${a.coachingTip?`<div style="background:linear-gradient(135deg,#3A2E10,#2A2108);border:1px solid #5C4A1A;border-radius:10px;padding:10px 12px;font-size:12px;color:#E8C97A">🎯 Sales Person ke liye: ${esc(a.coachingTip)}</div>`:''}
+    ${(a.coachingTips&&a.coachingTips.length)?`<div style="background:linear-gradient(135deg,#3A2E10,#2A2108);border:1px solid #5C4A1A;border-radius:10px;padding:10px 12px;font-size:12px;color:#E8C97A"><b style="display:block;margin-bottom:5px">🎯 Sales Person ke liye Communication Guidance</b><ul style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:4px">${a.coachingTips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`:''}
     ${a.suggestion?`<div style="background:linear-gradient(135deg,#1F3B2E,#15291F);border:1px solid #2E5940;border-radius:10px;padding:10px 12px;font-size:12px;color:#8FE388">💡 Next Step: ${esc(a.suggestion)}</div>`:''}
     ${c.transcript?`<details style="font-size:12px;color:#8891B5"><summary style="cursor:pointer;font-weight:600;color:#C9D0E8">Poora Transcript dekhein</summary><div style="margin-top:6px;white-space:pre-wrap;line-height:1.6">${esc(c.transcript)}</div></details>`:''}
   </div>`;
@@ -826,7 +829,7 @@ function renderAll(){
   renderGate();
   refreshLoginBadge();
   renderCustomerDatalist();
-  renderSalesPersonDatalist();
+  renderSalesPersonField();
   renderDash();
   renderOrdersList();
   renderCustomersPage();
