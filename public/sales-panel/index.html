@@ -731,30 +731,33 @@ function callStatusPillHtml(status){
   const s=map[status]||map.uploaded;
   return `<span class="pill ${s.cls}">${s.label}</span>`;
 }
-function sentimentPillHtml(sentiment){
-  const map={positive:{label:'🙂 Positive',color:'var(--g)',bg:'var(--mint)'},neutral:{label:'😐 Neutral',color:'var(--blue)',bg:'var(--bluebg)'},negative:{label:'🙁 Negative',color:'var(--red)',bg:'var(--redbg)'}};
-  const s=map[sentiment]||map.neutral;
-  return `<span class="pill" style="background:${s.bg};color:${s.color}">${s.label}</span>`;
-}
 // AssemblyAI/GPT se poora analysis aane par ek call doc mein ye shape expect hoti hai:
 // { transcript: "...", analysis: { sentiment, summary, objections:[...], keyPoints:[...],
 // coachingTip, suggestion } } - ye renderer ab se hi us shape ke liye ready hai, data aate
 // hi automatically dikhega. coachingTip khaas taur par Sales Person ke liye hai (unki apni
 // performance par feedback - jaise "customer ko zyada bolne ka mauka dein"), suggestion agle
 // business step ke liye (follow-up/pitch action).
+// Dark "call intelligence" treatment (Gong.io-style) - deliberately different palette from
+// the rest of the app (which stays on the light Bliss house style), scoped to just this
+// card since that's what was asked for.
+function sentimentPillHtmlDark(sentiment){
+  const map={positive:{label:'🙂 Positive',color:'#8FE388',bg:'#2E3A21'},neutral:{label:'😐 Neutral',color:'#A8B4E8',bg:'#262F4A'},negative:{label:'🙁 Negative',color:'#F2A8B8',bg:'#3A2130'}};
+  const s=map[sentiment]||map.neutral;
+  return `<span style="font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:99px;background:${s.bg};color:${s.color}">${s.label}</span>`;
+}
 function callAnalysisCardHtml(c){
   const a=c.analysis||{};
-  return `<div style="background:var(--mint);border-radius:10px;padding:12px 14px;margin-top:4px;display:flex;flex-direction:column;gap:8px">
+  return `<div style="background:linear-gradient(160deg,#151B2E,#1E2640);border-radius:14px;padding:16px 18px;margin-top:4px;color:#fff;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 26px rgba(10,14,30,.25)">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
-      <b style="font-size:12.5px">🧠 Call Analysis</b>
-      ${sentimentPillHtml(a.sentiment)}
+      <b style="font-size:13px">🧠 Call Analysis</b>
+      ${sentimentPillHtmlDark(a.sentiment)}
     </div>
-    ${a.summary?`<div style="font-size:12.5px"><b>Summary:</b> ${esc(a.summary)}</div>`:''}
-    ${(a.keyPoints&&a.keyPoints.length)?`<div style="font-size:12.5px"><b>Key Points:</b> ${a.keyPoints.map(esc).join(' • ')}</div>`:''}
-    ${(a.objections&&a.objections.length)?`<div style="font-size:12.5px"><b>Objections:</b> ${a.objections.map(esc).join(', ')}</div>`:''}
-    ${a.coachingTip?`<div style="font-size:12.5px;background:var(--amberbg);color:var(--amber);border-radius:8px;padding:8px 10px;font-weight:600">🎯 Sales Person ke liye: ${esc(a.coachingTip)}</div>`:''}
-    ${a.suggestion?`<div style="font-size:12.5px;color:var(--g);font-weight:600">💡 Next Step: ${esc(a.suggestion)}</div>`:''}
-    ${c.transcript?`<details style="font-size:12px;color:var(--muted)"><summary style="cursor:pointer;font-weight:600">Poora Transcript dekhein</summary><div style="margin-top:6px;white-space:pre-wrap;line-height:1.6">${esc(c.transcript)}</div></details>`:''}
+    ${a.summary?`<div style="font-size:12.5px;color:#C9D0E8;line-height:1.6">${esc(a.summary)}</div>`:''}
+    ${(a.keyPoints&&a.keyPoints.length)?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#2A3356;display:grid;place-items:center;font-size:12px;flex:none">🔑</div><div style="font-size:12px;color:#C9D0E8;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Key Points</b>${a.keyPoints.map(esc).join(' • ')}</div></div>`:''}
+    ${(a.objections&&a.objections.length)?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#2A3356;display:grid;place-items:center;font-size:12px;flex:none">⚠</div><div style="font-size:12px;color:#C9D0E8;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Objections</b>${a.objections.map(esc).join(', ')}</div></div>`:''}
+    ${a.coachingTip?`<div style="background:linear-gradient(135deg,#3A2E10,#2A2108);border:1px solid #5C4A1A;border-radius:10px;padding:10px 12px;font-size:12px;color:#E8C97A">🎯 Sales Person ke liye: ${esc(a.coachingTip)}</div>`:''}
+    ${a.suggestion?`<div style="background:linear-gradient(135deg,#1F3B2E,#15291F);border:1px solid #2E5940;border-radius:10px;padding:10px 12px;font-size:12px;color:#8FE388">💡 Next Step: ${esc(a.suggestion)}</div>`:''}
+    ${c.transcript?`<details style="font-size:12px;color:#8891B5"><summary style="cursor:pointer;font-weight:600;color:#C9D0E8">Poora Transcript dekhein</summary><div style="margin-top:6px;white-space:pre-wrap;line-height:1.6">${esc(c.transcript)}</div></details>`:''}
   </div>`;
 }
 let callsExpanded={};
