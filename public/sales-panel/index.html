@@ -21,7 +21,7 @@
   window.addEventListener('unhandledrejection',function(e){console.error('Unhandled promise rejection:',e.reason);showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));});
 })();
 </script>
-<title>Sales Panel</title>
+<title>PitchIQ</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -31,7 +31,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* Same design system as the other Bliss apps, so all apps read as one family. */
-:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df;--blue:#1D5FA6;--bluebg:#E8F1FC}
+:root{--g:#3F54D1;--g2:#18B8A6;--mint:#EEF1FF;--bg:#F8F9FD;--line:#E1E4F5;--txt:#161B2E;--muted:#6B7290;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df;--blue:#1D5FA6;--bluebg:#E8F1FC}
 *{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
 button,input,select,textarea{font:inherit}
 h1,h2,h3,.card b,.tabular{font-family:'Manrope',sans-serif}
@@ -57,7 +57,7 @@ nav button.hidden{display:none}
 .page{display:none}
 .page.on{display:block;animation:fadeIn .25s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-.hero{background:radial-gradient(circle at 100% 0%,rgba(242,168,192,.32),transparent 55%),linear-gradient(135deg,#1B7A63,#3FAF93);color:#fff;border-radius:17px;padding:22px}
+.hero{background:radial-gradient(circle at 100% 0%,rgba(168,196,255,.32),transparent 55%),linear-gradient(135deg,#3F54D1,#18B8A6);color:#fff;border-radius:17px;padding:22px}
 .hero h1{font-size:24px;margin:0 0 5px}
 .hero p{font-size:13px;margin:0;opacity:.9}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
@@ -124,7 +124,7 @@ tr:last-child td{border-bottom:0}
 
 <div id="appWrap" style="display:none">
 <header><div class="head">
-  <div class="brand"><div class="logo">b</div><div><b>Sales Panel</b><small>Bliss Gems &amp; Minerals</small></div></div>
+  <div class="brand"><div class="logo" style="background:linear-gradient(135deg,#3F54D1,#18B8A6);color:#fff">⚡</div><div><b>PitchIQ</b><small>Sales Intelligence</small></div></div>
   <div class="headRight">
     <span class="pillbadge" id="loginBadge">Not Logged In</span>
     <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
@@ -145,7 +145,7 @@ tr:last-child td{border-bottom:0}
 
   <section class="page on" id="page-dash">
   <div class="hero">
-    <h1>Sales Panel</h1>
+    <h1>PitchIQ</h1>
     <p>Orders, customers, pending payment aur sales pattern — ek hi jagah.</p>
   </div>
   <div class="cards" id="statTiles"></div>
