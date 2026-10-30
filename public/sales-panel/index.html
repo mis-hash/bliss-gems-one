@@ -25,6 +25,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -136,6 +137,7 @@ tr:last-child td{border-bottom:0}
 <button data-page="neworder" onclick="go('neworder',this)">➕ New Order</button>
 <button data-page="orders" onclick="go('orders',this)">📋 Orders</button>
 <button data-page="customers" onclick="go('customers',this)">👥 Customers</button>
+<button data-page="calls" onclick="go('calls',this)">📞 Calls</button>
 <button data-page="reports" onclick="go('reports',this)">📈 Reports</button>
 </nav>
 
@@ -220,6 +222,38 @@ tr:last-child td{border-bottom:0}
   </div>
   </section>
 
+  <section class="page" id="page-calls">
+  <div class="panel">
+    <div class="ph"><span>Call Recording Upload</span></div>
+    <div class="pb">
+      <div class="grid">
+        <div class="field span2"><label>Customer</label>
+          <input id="callCustomerSearch" list="customerDatalist" autocomplete="off" placeholder="Type karke existing customer dhundhein ya naya naam likhein">
+        </div>
+        <div class="field"><label>Sales Person</label>
+          <input id="callSalesPerson" list="salesPersonDatalist" autocomplete="off" placeholder="Naam likhein">
+          <datalist id="salesPersonDatalist"></datalist>
+        </div>
+        <div class="field"><label>Call Date</label><input type="date" id="callDate"></div>
+        <div class="field span2"><label>Note / Context (optional)</label><input id="callNote" placeholder="Jaise: follow-up call, pehla contact, etc."></div>
+        <div class="field span2"><label>Recording File <span style="color:var(--red)">*</span></label>
+          <input type="file" id="callFileInput" accept="audio/*" onchange="onCallFileSelected()">
+        </div>
+      </div>
+      <div id="callFilePreviewWrap" class="hidden" style="margin-top:12px;background:var(--mint);border-radius:10px;padding:12px"></div>
+      <div id="callUploadProgressWrap" class="hidden" style="margin-top:12px">
+        <div style="background:#edf1ee;border-radius:99px;height:8px;overflow:hidden"><div id="callUploadProgressBar" style="background:var(--g);height:100%;width:0%;transition:width .2s"></div></div>
+        <small class="note" id="callUploadProgressText">Uploading...</small>
+      </div>
+      <div style="margin-top:14px;text-align:right"><button class="btn primary" id="callUploadBtn" onclick="uploadCallRecording()" disabled>⬆ Upload Recording</button></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>Uploaded Calls</span></div>
+    <div class="pb" id="callsListWrap"></div>
+  </div>
+  </section>
+
   <section class="page" id="page-reports">
   <div class="panel">
     <div class="ph"><span>Reports</span></div>
@@ -250,6 +284,7 @@ tr:last-child td{border-bottom:0}
 <button data-page="neworder" onclick="go('neworder',this)"><span>➕</span>New Order</button>
 <button data-page="orders" onclick="go('orders',this)"><span>📋</span>Orders</button>
 <button data-page="customers" onclick="go('customers',this)"><span>👥</span>Customers</button>
+<button data-page="calls" onclick="go('calls',this)"><span>📞</span>Calls</button>
 <button data-page="reports" onclick="go('reports',this)"><span>📈</span>Reports</button>
 </div>
 
@@ -310,8 +345,8 @@ const todayISO=()=>new Date().toISOString().slice(0,10);
 const fmtAmt=n=>'₹'+Number(n||0).toLocaleString('en-IN');
 function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
 
-let users=[],customers=[],orders=[];
-let usersStarted=false,customersStarted=false,ordersStarted=false;
+let users=[],customers=[],orders=[],calls=[];
+let usersStarted=false,customersStarted=false,ordersStarted=false,callsStarted=false;
 let ordersFilter='all';
 let currentUser=null;
 
@@ -386,6 +421,10 @@ function startOrdersSync(){
   db.collection('sp_orders').onSnapshot(snap=>{orders=[];snap.forEach(d=>orders.push({id:d.id,...d.data()}));renderAll();},err=>console.error('orders sync error',err));
 }
 function liveOrders(){return orders.filter(x=>!x.deletedAt)}
+function startCallsSync(){
+  if(callsStarted||!db)return;callsStarted=true;
+  db.collection('sp_calls').onSnapshot(snap=>{calls=[];snap.forEach(d=>calls.push({id:d.id,...d.data()}));renderAll();},err=>console.error('calls sync error',err));
+}
 
 /* ===== Nav / gate ===== */
 function go(id,btn){
@@ -604,6 +643,107 @@ function renderCustomersPage(){
   }).join(''):`<div class="emptystate">👥<p>Abhi koi customer nahi hai.</p></div>`;
 }
 
+/* ===== Call Recording Upload =====
+   First piece only: pick a file, preview/play it locally, upload to Firebase Storage, and
+   log it in Firestore (sp_calls) with status 'uploaded'. No transcription/analysis wired
+   yet - that comes once an AssemblyAI (or similar) key is available; this just gets the
+   recording safely into the cloud and visible in a list, so that piece can plug in later
+   without changing this upload flow. */
+let _selectedCallFile=null;
+function renderSalesPersonDatalist(){
+  const dl=$('salesPersonDatalist');
+  if(!dl)return;
+  const au=users.filter(u=>u.active!==false);
+  dl.innerHTML=au.map(u=>`<option value="${esc(u.name)}"></option>`).join('');
+}
+function fmtFileSize(bytes){
+  if(!bytes)return '0 KB';
+  if(bytes<1024*1024)return (bytes/1024).toFixed(0)+' KB';
+  return (bytes/(1024*1024)).toFixed(1)+' MB';
+}
+function onCallFileSelected(){
+  const input=$('callFileInput');
+  const file=input.files&&input.files[0];
+  const wrap=$('callFilePreviewWrap');
+  const btn=$('callUploadBtn');
+  if(!file){wrap.classList.add('hidden');wrap.innerHTML='';btn.disabled=true;_selectedCallFile=null;return}
+  _selectedCallFile=file;
+  const url=URL.createObjectURL(file);
+  wrap.innerHTML=`<div style="font-size:12.5px;font-weight:700;margin-bottom:6px">🎧 ${esc(file.name)} <span style="color:var(--muted);font-weight:400">(${fmtFileSize(file.size)})</span></div><audio controls style="width:100%" src="${url}"></audio>`;
+  wrap.classList.remove('hidden');
+  btn.disabled=false;
+}
+let _callUploading=false;
+async function uploadCallRecording(){
+  if(_callUploading)return;
+  const file=_selectedCallFile;
+  if(!file){alert('Pehle recording file select karein.');return}
+  const custName=$('callCustomerSearch').value.trim();
+  if(!custName){alert('Customer name zaroori hai.');return}
+  const salesPerson=$('callSalesPerson').value.trim();
+  if(!salesPerson){alert('Sales Person name zaroori hai.');return}
+  if(!firebase.storage){alert('Storage SDK load nahi hua - page reload karein.');return}
+  _callUploading=true;
+  const btn=$('callUploadBtn');btn.disabled=true;
+  const progWrap=$('callUploadProgressWrap'),progBar=$('callUploadProgressBar'),progText=$('callUploadProgressText');
+  progWrap.classList.remove('hidden');
+  try{
+    const customerId=await findOrCreateCustomer(custName);
+    const actor=loggedUser();
+    const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path=`sales_panel_calls/${Date.now()}_${safeName}`;
+    const ref=firebase.storage().ref(path);
+    const task=ref.put(file);
+    await new Promise((resolve,reject)=>{
+      task.on('state_changed',snap=>{
+        const pct=Math.round((snap.bytesTransferred/snap.totalBytes)*100);
+        progBar.style.width=pct+'%';
+        progText.textContent='Uploading... '+pct+'%';
+      },reject,resolve);
+    });
+    const audioUrl=await task.snapshot.ref.getDownloadURL();
+    await db.collection('sp_calls').add({
+      customerId,customerName:custName,
+      salesPerson,
+      date:$('callDate').value||todayISO(),
+      note:$('callNote').value.trim(),
+      audioUrl,audioFileName:file.name,audioStoragePath:path,
+      status:'uploaded',
+      by:actor?actor.id:'',byName:actor?actor.name:'',
+      at:new Date().toISOString()
+    });
+    $('callFileInput').value='';$('callCustomerSearch').value='';
+    $('callSalesPerson').value='';$('callNote').value='';$('callDate').value=todayISO();
+    $('callFilePreviewWrap').classList.add('hidden');$('callFilePreviewWrap').innerHTML='';
+    _selectedCallFile=null;
+    toast('Recording upload ho gayi');
+  }catch(e){
+    console.error('call upload failed:',e);
+    alert('Upload fail ho gaya: '+(e.message||e));
+  }finally{
+    _callUploading=false;
+    btn.disabled=true;
+    progWrap.classList.add('hidden');progBar.style.width='0%';
+  }
+}
+function callStatusPillHtml(status){
+  const map={uploaded:{label:'⏳ Analysis Pending',cls:'quotation'},analyzing:{label:'🔄 Analyzing',cls:'confirmed'},done:{label:'✓ Analyzed',cls:'paid'}};
+  const s=map[status]||map.uploaded;
+  return `<span class="pill ${s.cls}">${s.label}</span>`;
+}
+function renderCallsList(){
+  const wrap=$('callsListWrap');
+  if(!wrap)return;
+  const rows=calls.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+  wrap.innerHTML=rows.length?rows.map(c=>`<div class="item" style="flex-direction:column;align-items:stretch;gap:6px">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+      <span><b>${esc(c.customerName)}</b> — ${esc(c.salesPerson)}<br><small style="color:var(--muted)">${esc(c.date)}${c.note?' • '+esc(c.note):''}</small></span>
+      ${callStatusPillHtml(c.status)}
+    </div>
+    <audio controls style="width:100%" src="${esc(c.audioUrl)}"></audio>
+  </div>`).join(''):`<div class="emptystate">📞<p>Abhi koi call recording upload nahi hui.</p></div>`;
+}
+
 /* ===== Reports ===== */
 function reportRange(){ return {from:$('repFrom')?.value||'',to:$('repTo')?.value||''}; }
 function inRange(d,from,to){ if(from&&d<from)return false; if(to&&d>to)return false; return true; }
@@ -650,20 +790,24 @@ function renderAll(){
   renderGate();
   refreshLoginBadge();
   renderCustomerDatalist();
+  renderSalesPersonDatalist();
   renderDash();
   renderOrdersList();
   renderCustomersPage();
+  renderCallsList();
   renderReports();
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
   currentUser=localStorage.getItem(SESSION_KEY)||null;
   if($('ordDate'))$('ordDate').value=todayISO();
+  if($('callDate'))$('callDate').value=todayISO();
   if($('repFrom'))$('repFrom').value=todayISO().slice(0,8)+'01';
   if($('repTo'))$('repTo').value=todayISO();
   startUsersSync();
   startCustomersSync();
   startOrdersSync();
+  startCallsSync();
   renderAll();
   const deepPage=new URLSearchParams(location.search).get('page');
   if(deepPage && currentUser && $('page-'+deepPage))go(deepPage);
