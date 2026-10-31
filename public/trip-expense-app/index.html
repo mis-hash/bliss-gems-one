@@ -416,7 +416,7 @@ let messageTemplates={
   submitted:'🧾 Hisaab Submitted\n{name} • {location} • {tripId}\nVerify karke Close/NOC karein.',
   closed:'✅ Trip Closed — {noc}\n{name} • {location} • {tripId}\nFinal Balance: {balance}\nReceived: {returned} via {mode}',
   booked:'📚 Trip Booked by Accounts\n{tripId}',
-  overdue:'⏰ Hisaab Reminder\n{location} trip ka hisaab pending hai.\nDue: {due}\nOutstanding: {balance}'
+  overdue:'🔴 *Hisaab Reminder — OVERDUE*\n\n👤 {name}\n📍 {location}\n📅 Due: {due} ({daysOverdue} din se pending)\n💰 Outstanding: *{balance}*\n\nKripya jald se jald hisaab submit karein.'
 };
 let currentUser=null;
 let usersStarted=false,tripsStarted=false,ledgerStarted=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false;
@@ -1247,7 +1247,8 @@ function sendOverdueReminder(tripId){
   const trip=trips.find(t=>t.id===tripId);if(!trip)return;
   const sales=users.find(u=>u.id===trip.salesId);
   const bal=tripBalance(tripId);
-  const msg=renderTemplate(messageTemplates.overdue,{location:trip.location,due:trip.dueDate,balance:money(bal)});
+  const daysOverdue=Math.max(0,Math.round((Date.now()-new Date(trip.dueDate))/86400000));
+  const msg=renderTemplate(messageTemplates.overdue,{name:trip.salesName,location:trip.location,due:trip.dueDate,balance:money(bal),daysOverdue});
   if(sales)sendWA(sales.phone,msg);
   // Was 'admin'-only - every other trip notification (Party Cash, Hisaab Submitted) combines
   // admin+director, so an Admin set up with just the 'director' role never got this one.
@@ -1545,7 +1546,7 @@ const TEMPLATE_ROWS=[
   ['submitted','🧾 Hisaab Submitted','{name} {location} {tripId}'],
   ['closed','✅ Trip Closed / NOC','{noc} {name} {location} {tripId} {balance} {returned} {mode}'],
   ['booked','📚 Trip Booked','{tripId}'],
-  ['overdue','⏰ Overdue Reminder','{location} {due} {balance}']
+  ['overdue','⏰ Overdue Reminder','{name} {location} {due} {daysOverdue} {balance}']
 ];
 function renderTemplatesPage(){
   const wrap=$('templatesRows');if(!wrap)return;
