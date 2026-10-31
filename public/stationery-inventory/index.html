@@ -63,30 +63,33 @@ nav button.hidden{display:none}
 .hero .heroStat{text-align:right}
 .hero .heroStat small{display:block;font-size:11px;opacity:.85}
 .hero .heroStat strong{font-size:30px}
-.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
-.card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px}
-.card small{font-size:11px;color:var(--muted)}
-.card b{display:block;font-size:22px;margin-top:6px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
+.card{background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent,var(--g));border-radius:13px;padding:15px;display:flex;flex-direction:column;gap:8px}
+.card .ic{width:34px;height:34px;border-radius:10px;background:var(--accentbg,var(--mint));color:var(--accent,var(--g));display:grid;place-items:center;font-size:17px}
+.card small{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.card b{display:block;font-size:22px}
 .card.warn{background:var(--amberbg)!important;color:var(--amber)!important}
-.panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:12px}
-.ph{padding:14px 16px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:24px;box-shadow:0 3px 10px rgba(22,36,31,.06)}
+.ph{padding:16px 18px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 .pb{padding:15px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .field label{display:block;font-size:11px;font-weight:bold;margin-bottom:5px}
 .field input,.field select{width:100%;padding:10px;border:1px solid var(--line);border-radius:7px;font-size:14px;background:#fff;color:var(--txt)}
 .span2{grid-column:1/-1}
 table{width:100%;border-collapse:collapse}
-th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 0 9px;border-bottom:1px solid var(--line)}
-td{padding:11px 0;border-bottom:1px solid #edf1ee;font-size:12.5px}
+th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 8px 9px;border-bottom:2px solid var(--line)}
+td{padding:11px 8px;border-bottom:1px solid #edf1ee;font-size:12.5px;vertical-align:top}
 tr:last-child td{border-bottom:0}
+tbody tr:nth-child(even) td{background:#F7FAF8}
 tbody tr:hover td{background:#f7faf8}
 .tablewrap{overflow-x:auto}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 .pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font-size:11px;font-weight:700}
 .pill.ok{background:var(--mint);color:var(--g)}
 .pill.low{background:var(--amberbg);color:var(--amber)}
-.itemrow{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #edf1ee;gap:12px}
+.itemrow{display:flex;justify-content:space-between;align-items:center;padding:13px 10px;margin:0 -10px;border-radius:9px;border-bottom:1px solid #edf1ee;gap:12px}
 .itemrow:last-child{border-bottom:0}
+.itemrow:hover{background:#f7faf8}
 .itemrow b{font-size:13.5px;font-weight:600}
 .itemrow small{color:var(--muted);display:block;font-size:11.5px;margin-top:3px}
 .item{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #edf1ee}
@@ -264,7 +267,7 @@ tbody tr:hover td{background:#f7faf8}
       </div>
     </div>
     <div class="panel">
-      <div class="ph"><span>All Items</span></div>
+      <div class="ph"><span>All Items</span><input id="itemSearchBox" placeholder="🔍 Item ya category search karein..." oninput="renderItems()" style="max-width:240px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;background:#fff;color:var(--txt)"></div>
       <div class="pb" id="itemList"></div>
     </div>
   </section>
@@ -542,9 +545,15 @@ function notifyIssue(item,qty,toUserId,byUserId){
   admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('issue WA failed:',e)));
 }
 // Sent only to Amit Sharma (not the general admin/director list) at the user's request,
-// with a direct link into the Requests review page.
+// with a direct link into the Requests review page. If no active user's name matches exactly
+// (typo, rename, deactivated, missing phone), that used to mean the notification silently went
+// to nobody - now falls back to the general Admin/Director list so a Request is never dropped.
 function notifyRequestSubmitted(item,qty,requesterId,purpose){
-  const recipients=users.filter(u=>u.active!==false && u.phone && String(u.name||'').trim().toLowerCase()==='amit sharma');
+  const normName=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  let recipients=users.filter(u=>u.active!==false && u.phone && normName(u.name)==='amit sharma');
+  if(!recipients.length){
+    recipients=users.filter(u=>u.active!==false && u.phone && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director'));
+  }
   const link='https://bliss-gems-one.web.app/stationery-inventory/?page=requests';
   const msg=fillTemplate(templateText('request_submitted'),{ItemName:item.name,Qty:qty,Unit:item.unit||'',RequestedBy:nameOfUserId(requesterId),Purpose:purpose||'-',Link:link});
   recipients.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('request-submitted WA failed:',e)));
@@ -624,16 +633,16 @@ function renderDash(){
   const inThisMonth=inLog.filter(x=>!x.deletedAt&&String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
   const outThisMonth=outLog.filter(x=>!x.deletedAt&&String(x.date||'').startsWith(monthPrefix)).reduce((s,x)=>s+(x.qty||0),0);
   const tiles=[
-    {label:'TOTAL ITEMS',val:items.length},
-    {label:'LOW STOCK ALERTS',val:low,warn:low>0},
-    {label:'STOCK IN (THIS MONTH)',val:inThisMonth},
-    {label:'STOCK OUT (THIS MONTH)',val:outThisMonth}
+    {label:'TOTAL ITEMS',val:items.length,ic:'📦',accent:'#1D5FA6',accentbg:'#E8F1FC'},
+    {label:'LOW STOCK ALERTS',val:low,warn:low>0,ic:'⚠️',accent:'#a66b08',accentbg:'#fff6df'},
+    {label:'STOCK IN (THIS MONTH)',val:inThisMonth,ic:'📥',accent:'#1B7A63',accentbg:'#E8F8F2'},
+    {label:'STOCK OUT (THIS MONTH)',val:outThisMonth,ic:'📤',accent:'#A6350C',accentbg:'#FDEDE6'}
   ];
-  $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+  $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}" style="--accent:${t.accent};--accentbg:${t.accentbg}"><div class="ic">${t.ic}</div><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
   if($('heroTotalItems'))$('heroTotalItems').textContent=items.length;
   $('stockTable').innerHTML=items.map(x=>{
     const isLow=x.stock<=x.min;
-    return `<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category||'-')}</td><td class="num">${x.stock||0} ${esc(x.unit||'')}</td><td class="num">${x.min||0}</td><td><span class="pill ${isLow?'low':'ok'}">${isLow?'⚠ Low Stock':'✓ OK'}</span></td></tr>`;
+    return `<tr><td><b>${esc(x.name)}</b></td><td style="color:var(--muted)">${esc(x.category||'-')}</td><td class="num"><b>${x.stock||0}</b> ${esc(x.unit||'')}</td><td class="num" style="color:var(--muted)">${x.min||0}</td><td><span class="pill ${isLow?'low':'ok'}">${isLow?'⚠ Low Stock':'✓ OK'}</span></td></tr>`;
   }).join('')||`<tr><td colspan="5"><div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Item Master se naya item add karein.</small></div></td></tr>`;
 }
 function syncItemIdFromSearch(searchId,hiddenId){
@@ -677,10 +686,12 @@ function renderLogs(){
   $('outHistory').innerHTML=outRows.map(x=>`<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td>${esc(itemName(x.item))}</td><td class="num">-${x.qty}</td><td>${esc(nameOfUserId(x.to))}</td><td>${esc(nameOfUserId(x.by))}</td><td class="superAdminOnly${actionTh}">${logAction(x,'deleteStockOut','restoreStockOut')}</td></tr>`).join('')||`<tr><td colspan="6"><div class="emptystate">⬆<p>Koi Stock Out entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
 }
 function renderItems(){
-  $('itemList').innerHTML=items.map(x=>{
+  const q=(($('itemSearchBox')&&$('itemSearchBox').value)||'').trim().toLowerCase();
+  const list=q?items.filter(x=>(x.name||'').toLowerCase().includes(q)||(x.category||'').toLowerCase().includes(q)):items;
+  $('itemList').innerHTML=list.map(x=>{
     const isLow=x.stock<=x.min;
     return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span><button class="btn small" onclick="openEditItem('${x.id}')">✎ Edit</button></div>`;
-  }).join('')||`<div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Upar se pehla item add karein.</small></div>`;
+  }).join('')||(q?`<div class="emptystate">🔍<p>Koi matching item nahi mila.</p><small>Dusra naam ya category try karein.</small></div>`:`<div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Upar se pehla item add karein.</small></div>`);
 }
 let editItemTarget=null;
 function openEditItem(id){
