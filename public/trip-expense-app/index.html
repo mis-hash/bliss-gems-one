@@ -420,7 +420,7 @@ let messageTemplates={
   overdue_admin:'🔴 *Hisaab Reminder — OVERDUE*\n\n👤 {name}\n📍 {location}\n📅 Due: {due} ({daysOverdue} din se pending)\n💰 Outstanding: *{balance}*\n\nKripya {name} se follow-up karke hisaab jald complete karwayein.'
 };
 let currentUser=null;
-let usersStarted=false,tripsStarted=false,ledgerStarted=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false;
+let usersStarted=false,tripsStarted=false,ledgerStarted=false,ledgerLoaded=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false;
 let tripOptions={locations:['Surat','Mumbai','Chennai','Udaipur','Ahmedabad','Hyderabad'],purposes:['Exhibition','Client Visit','Sales Tour']};
 let EXPENSE_CATEGORIES=['Hotel','Breakfast','Lunch','Dinner','Food','Tea / Snacks','Taxi / Cab','Local Conveyance','Bus','Train','Flight','Fuel','Toll / Parking','Party Entertainment','Sample / Gift to Party','Courier / Parcel','Mobile / Internet','Stationery / Printing','Porter / Coolie','Labour Charges','Godown / Warehouse','Vehicle Repair','Medical','Laundry','Bank / ATM Charges','Misc','Other'];
 let ledgerHeads={cash:'Cash-in-Hand',advance:'Staff Advance A/c',categories:{Hotel:'Travelling Expenses',Breakfast:'Business Promotion Exp.',Lunch:'Business Promotion Exp.',Dinner:'Business Promotion Exp.',Food:'Business Promotion Exp.','Tea / Snacks':'Business Promotion Exp.','Taxi / Cab':'Travelling Expenses','Local Conveyance':'Travelling Expenses',Bus:'Travelling Expenses',Train:'Travelling Expenses',Flight:'Travelling Expenses',Fuel:'Travelling Expenses','Toll / Parking':'Travelling Expenses','Party Entertainment':'Business Promotion Exp.','Sample / Gift to Party':'Business Promotion Exp.','Courier / Parcel':'Miscellaneous Expenses','Mobile / Internet':'Miscellaneous Expenses','Stationery / Printing':'Miscellaneous Expenses','Porter / Coolie':'Travelling Expenses','Labour Charges':'Travelling Expenses','Godown / Warehouse':'Miscellaneous Expenses','Vehicle Repair':'Travelling Expenses',Medical:'Miscellaneous Expenses',Laundry:'Travelling Expenses','Bank / ATM Charges':'Miscellaneous Expenses',Misc:'Miscellaneous Expenses',Other:'Miscellaneous Expenses'}};
@@ -578,7 +578,9 @@ function startLedgerSync(){
   if(ledgerStarted)return;ledgerStarted=true;
   db.collection('te_ledger').onSnapshot(snap=>{
     ledger=[];snap.forEach(d=>ledger.push(d.data()));
+    ledgerLoaded=true;
     renderAll();
+    autoSendOverdueReminders();
   },err=>console.error('ledger sync error',err));
 }
 function startSettingsSync(){
@@ -1270,6 +1272,11 @@ function sendOverdueReminder(tripId,opts){
 // Admin sessions both check before either writes the stamp is an acceptable tradeoff here.
 async function autoSendOverdueReminders(){
   if(effectiveRole()!=='admin' && effectiveRole()!=='director')return;
+  // Must wait for ledger data too, not just trips - tripBalance()/Outstanding reads from
+  // `ledger`, which syncs separately and can still be empty the moment trips load (both
+  // syncs start together in boot() with no ordering guarantee), which would otherwise send
+  // a false "Outstanding: ₹0" regardless of the trip's real balance.
+  if(!ledgerLoaded)return;
   const today=todayISO();
   const due=trips.filter(t=>isOverdue(t) && t.lastOverdueReminderSentAt!==today);
   for(const t of due){
