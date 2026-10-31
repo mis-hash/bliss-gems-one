@@ -414,10 +414,12 @@ let messageTemplates={
   issued:'💰 Trip Advance Issued\nAmount: {amount}\nLocation: {location}\nHisaab Due: {due}\nTrip: {tripId}',
   additional:'💰 Additional Advance Issued\nAmount: {amount}\nTrip: {tripId}',
   submitted:'🧾 Hisaab Submitted\n{name} • {location} • {tripId}\nVerify karke Close/NOC karein.',
-  closed:'✅ Trip Closed — {noc}\n{name} • {location} • {tripId}\nFinal Balance: {balance}\nReceived: {returned} via {mode}',
+  closed:'✅ Trip Closed — {noc}\n{name} • {location} • {tripId}\nFinal Balance: {balance}\nReceived: {returned} via {mode}\n\nBooking mark karne ke liye:\n{link}',
   booked:'📚 Trip Booked by Accounts\n{tripId}',
   overdue:'🔴 *Hisaab Reminder — OVERDUE*\n\n👤 {name}\n📍 {location}\n📅 Due: {due} ({daysOverdue} din se pending)\n💰 Outstanding: *{balance}*\n\nKripya jald se jald hisaab submit karein.',
-  overdue_admin:'🔴 *Hisaab Reminder — OVERDUE*\n\n👤 {name}\n📍 {location}\n📅 Due: {due} ({daysOverdue} din se pending)\n💰 Outstanding: *{balance}*\n\nKripya {name} se follow-up karke hisaab jald complete karwayein.'
+  overdue_admin:'🔴 *Hisaab Reminder — OVERDUE*\n\n👤 {name}\n📍 {location}\n📅 Due: {due} ({daysOverdue} din se pending)\n💰 Outstanding: *{balance}*\n\nKripya {name} se follow-up karke hisaab jald complete karwayein.',
+  booking_pending:'📚 *Booking Pending — 1+ din se*\n{name} • {location} • {tripId}\nNOC: {noc}\n\nKripya jald booking mark karein:\n{link}',
+  booking_pending_urgent:'🔴 *URGENT — Booking Pending {daysPending}+ din se!*\n{name} • {location} • {tripId}\nNOC: {noc}\n\nBooking mark karna compulsory hai, kripya turant karein:\n{link}'
 };
 let currentUser=null;
 let usersStarted=false,tripsStarted=false,ledgerStarted=false,ledgerLoaded=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false;
@@ -572,6 +574,7 @@ function startTripsSync(){
     deletedTrips=allTripsRaw.filter(t=>t.deletedAt);
     renderAll();
     autoSendOverdueReminders();
+    autoSendBookingReminders();
   },err=>console.error('trips sync error',err));
 }
 function startLedgerSync(){
@@ -650,6 +653,11 @@ async function getGreenApiCreds(){
   }catch(e){}
   return null;
 }
+// A number excluded from the "Trip Closed" notification specifically (see confirmCloseTrip) -
+// every other automatic Trip Expense message still reaches it as normal. Matched on the last
+// 10 digits so it works with or without a country code / spacing.
+const TRIP_CLOSED_EXCLUDED_NUMBERS=['9251488655'];
+function isTripClosedExcluded(phone){return TRIP_CLOSED_EXCLUDED_NUMBERS.includes(String(phone||'').replace(/\D/g,'').slice(-10))}
 async function sendWA(phone,message){
   if(!phone)return;
   const creds=await getGreenApiCreds();
@@ -1078,11 +1086,14 @@ async function confirmCloseTrip(){
   toast(`Trip closed • Received ${money(returned)} via ${mode}`);
   if(notifySettings.closed){
     const sales=users.find(u=>u.id===trip.salesId);
-    const msg=renderTemplate(messageTemplates.closed,{noc:nocNumber,name:trip.salesName,location:trip.location,tripId,balance:money(balance),returned:money(returned),mode});
+    const msg=renderTemplate(messageTemplates.closed,{noc:nocNumber,name:trip.salesName,location:trip.location,tripId,balance:money(balance),returned:money(returned),mode,link:BOOKKEEPING_LINK});
     if(sales)sendWA(sales.phone,msg);
     // Only the actual closers (admin) and accounts (who book it) need the per-trip NOC
-    // message - Hitesh/Nitesh/Ankur are excluded (see DIRECTOR_PDF_ONLY_NAMES above).
+    // message - Hitesh/Nitesh/Ankur are excluded (see DIRECTOR_PDF_ONLY_NAMES above), and
+    // TRIP_CLOSED_EXCLUDED_NUMBERS is excluded from this Trip Closed message specifically
+    // (they still get every other automatic Trip Expense message as normal).
     excludeDirectorPdfOnlyRecipients(usersWithRole('admin').concat(usersWithRole('accounts')))
+      .filter(u=>!isTripClosedExcluded(u.phone))
       .forEach(u=>sendWA(u.phone,msg));
   }
   sendTripSummaryToDirectors(tripId,{returned,mode,nocNumber,closerName});
@@ -1282,6 +1293,37 @@ async function autoSendOverdueReminders(){
   for(const t of due){
     sendOverdueReminder(t.id,{silent:true});
     try{await db.collection('te_trips').doc(t.id).update({lastOverdueReminderSentAt:today});}catch(e){console.error('overdue reminder stamp failed',e);}
+  }
+}
+const BOOKKEEPING_LINK='https://bliss-gems-one.web.app/trip-expense-app/?page=accounts';
+// Same self-checking pattern as autoSendOverdueReminders(), for a closed-but-not-yet-"Mark
+// Booked" trip - goes ONLY to Accounts-role users (never Admin/Director), one-time at 1+ day
+// pending (bookingPendingAlertSentAt dedup), escalating to every 2 hours once 2+ days pending
+// (lastBookingUrgentSentAt is a timestamp, not just a date, so it re-checks elapsed hours
+// rather than once-per-day). Runs off whichever Admin/Accounts/Director session has the
+// Bookkeeping page's data loaded - no Cloud Function/cron (Spark plan).
+async function autoSendBookingReminders(){
+  if(!['admin','accounts','director'].includes(effectiveRole()))return;
+  const accountsUsers=usersWithRole('accounts');
+  if(!accountsUsers.length)return;
+  const now=Date.now();
+  const pending=trips.filter(t=>t.status==='closed' && !t.bookedByAccounts && t.closedAt);
+  for(const t of pending){
+    const hoursSinceClosed=(now-new Date(t.closedAt).getTime())/3600000;
+    const vars={name:t.salesName,location:t.location,tripId:t.id,noc:t.nocNumber||('NOC-'+t.id),link:BOOKKEEPING_LINK};
+    if(hoursSinceClosed>=48){
+      const lastSent=t.lastBookingUrgentSentAt?new Date(t.lastBookingUrgentSentAt).getTime():0;
+      if(now-lastSent<2*3600000)continue;
+      const daysPending=Math.floor(hoursSinceClosed/24);
+      const msg=renderTemplate(messageTemplates.booking_pending_urgent,Object.assign({},vars,{daysPending}));
+      accountsUsers.forEach(u=>sendWA(u.phone,msg));
+      try{await db.collection('te_trips').doc(t.id).update({lastBookingUrgentSentAt:new Date().toISOString()});}catch(e){console.error('booking urgent stamp failed',e);}
+    }else if(hoursSinceClosed>=24){
+      if(t.bookingPendingAlertSentAt)continue;
+      const msg=renderTemplate(messageTemplates.booking_pending,vars);
+      accountsUsers.forEach(u=>sendWA(u.phone,msg));
+      try{await db.collection('te_trips').doc(t.id).update({bookingPendingAlertSentAt:new Date().toISOString()});}catch(e){console.error('booking pending stamp failed',e);}
+    }
   }
 }
 function toast(t){const b=$('loginBadge');const old=b.textContent;b.textContent=t;setTimeout(()=>refreshLoginBadge(),1500);}
@@ -1573,10 +1615,12 @@ const TEMPLATE_ROWS=[
   ['issued','💰 Advance Issued','{amount} {location} {due} {tripId}'],
   ['additional','💰 Additional Advance','{amount} {tripId}'],
   ['submitted','🧾 Hisaab Submitted','{name} {location} {tripId}'],
-  ['closed','✅ Trip Closed / NOC','{noc} {name} {location} {tripId} {balance} {returned} {mode}'],
+  ['closed','✅ Trip Closed / NOC','{noc} {name} {location} {tripId} {balance} {returned} {mode} {link}'],
   ['booked','📚 Trip Booked','{tripId}'],
   ['overdue','⏰ Overdue Reminder (to Doer)','{name} {location} {due} {daysOverdue} {balance}'],
-  ['overdue_admin','⏰ Overdue Reminder (to Admin/Director)','{name} {location} {due} {daysOverdue} {balance}']
+  ['overdue_admin','⏰ Overdue Reminder (to Admin/Director)','{name} {location} {due} {daysOverdue} {balance}'],
+  ['booking_pending','📚 Booking Pending (to Accounts, 1+ day)','{name} {location} {tripId} {noc} {link}'],
+  ['booking_pending_urgent','📚 Booking Pending Urgent (to Accounts, 2+ days)','{name} {location} {tripId} {noc} {daysPending} {link}']
 ];
 function renderTemplatesPage(){
   const wrap=$('templatesRows');if(!wrap)return;
