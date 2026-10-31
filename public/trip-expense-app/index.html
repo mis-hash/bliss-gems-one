@@ -1291,13 +1291,13 @@ async function autoSendOverdueReminders(){
   // returns null regardless of the real logged-in user's actual role, and this gate fails
   // even for a genuine Admin/Director - so this never silently sends nothing again once
   // users data has actually loaded.
-  if(!usersLoaded)return;
-  if(effectiveRole()!=='admin' && effectiveRole()!=='director')return;
+  if(!usersLoaded){console.log('[overdue-reminder] skipped: users data not loaded yet');return;}
+  if(effectiveRole()!=='admin' && effectiveRole()!=='director'){console.log('[overdue-reminder] skipped: effectiveRole() is',JSON.stringify(effectiveRole()),'(need admin/director) - currentUser:',JSON.stringify(currentUser));return;}
   // Must wait for ledger data too, not just trips - tripBalance()/Outstanding reads from
   // `ledger`, which syncs separately and can still be empty the moment trips load (both
   // syncs start together in boot() with no ordering guarantee), which would otherwise send
   // a false "Outstanding: ₹0" regardless of the trip's real balance.
-  if(!ledgerLoaded)return;
+  if(!ledgerLoaded){console.log('[overdue-reminder] skipped: ledger data not loaded yet');return;}
   const today=todayISO();
   const due=trips.filter(t=>isOverdue(t) && t.lastOverdueReminderSentAt!==today);
   for(const t of due){
@@ -1316,27 +1316,36 @@ async function autoSendBookingReminders(){
   // Same users-data race as autoSendOverdueReminders() above - without this, a trips snapshot
   // that arrives before users does makes effectiveRole() read as null and silently skips
   // everyone, even a real Accounts/Admin/Director session.
-  if(!usersLoaded)return;
-  if(!['admin','accounts','director'].includes(effectiveRole()))return;
+  if(!usersLoaded){console.log('[booking-reminder] skipped: users data not loaded yet');return;}
+  const er=effectiveRole();
+  if(!['admin','accounts','director'].includes(er)){console.log('[booking-reminder] skipped: effectiveRole() is',JSON.stringify(er),'(need admin/accounts/director) - currentUser:',JSON.stringify(currentUser));return;}
   const accountsUsers=usersWithRole('accounts');
-  if(!accountsUsers.length)return;
+  if(!accountsUsers.length){console.log('[booking-reminder] skipped: no Universal User has the Accounts role for trip-expense-app. Total users loaded:',users.length);return;}
+  console.log('[booking-reminder] running - accountsUsers:',accountsUsers.map(u=>u.name+' ('+(u.phone||'NO PHONE')+')'));
   const now=Date.now();
+  const closedTrips=trips.filter(t=>t.status==='closed');
+  console.log('[booking-reminder] closed trips:',closedTrips.length,'| not yet bookedByAccounts:',closedTrips.filter(t=>!t.bookedByAccounts).length);
   const pending=trips.filter(t=>t.status==='closed' && !t.bookedByAccounts && t.closedAt);
   for(const t of pending){
     const hoursSinceClosed=(now-new Date(t.closedAt).getTime())/3600000;
+    console.log('[booking-reminder]',t.id,t.salesName,'- closed',hoursSinceClosed.toFixed(1),'hours ago. bookingPendingAlertSentAt:',t.bookingPendingAlertSentAt||'(none)','lastBookingUrgentSentAt:',t.lastBookingUrgentSentAt||'(none)');
     const vars={name:t.salesName,location:t.location,tripId:t.id,noc:t.nocNumber||('NOC-'+t.id),link:BOOKKEEPING_LINK};
     if(hoursSinceClosed>=48){
       const lastSent=t.lastBookingUrgentSentAt?new Date(t.lastBookingUrgentSentAt).getTime():0;
-      if(now-lastSent<2*3600000)continue;
+      if(now-lastSent<2*3600000){console.log('[booking-reminder]',t.id,'- urgent already sent within last 2 hours, skipping');continue;}
       const daysPending=Math.floor(hoursSinceClosed/24);
       const msg=renderTemplate(messageTemplates.booking_pending_urgent,Object.assign({},vars,{daysPending}));
+      console.log('[booking-reminder]',t.id,'- SENDING urgent reminder to',accountsUsers.map(u=>u.phone));
       accountsUsers.forEach(u=>sendWA(u.phone,msg));
       try{await db.collection('te_trips').doc(t.id).update({lastBookingUrgentSentAt:new Date().toISOString()});}catch(e){console.error('booking urgent stamp failed',e);}
     }else if(hoursSinceClosed>=24){
-      if(t.bookingPendingAlertSentAt)continue;
+      if(t.bookingPendingAlertSentAt){console.log('[booking-reminder]',t.id,'- 1-day alert already sent once, skipping');continue;}
       const msg=renderTemplate(messageTemplates.booking_pending,vars);
+      console.log('[booking-reminder]',t.id,'- SENDING 1+ day alert to',accountsUsers.map(u=>u.phone));
       accountsUsers.forEach(u=>sendWA(u.phone,msg));
       try{await db.collection('te_trips').doc(t.id).update({bookingPendingAlertSentAt:new Date().toISOString()});}catch(e){console.error('booking pending stamp failed',e);}
+    }else{
+      console.log('[booking-reminder]',t.id,'- only',hoursSinceClosed.toFixed(1),'hours pending, not 24h yet, no message due');
     }
   }
 }
