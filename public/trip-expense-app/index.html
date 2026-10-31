@@ -1261,6 +1261,14 @@ async function markBooked(tripId){
     excludeDirectorPdfOnlyRecipients(usersWithRole('director')).forEach(u=>sendWA(u.phone,renderTemplate(messageTemplates.booked,{tripId:trip.id})));
   }
 }
+// Undo an accidental "Mark Booked" click - puts the trip back to Ready to Book so it
+// shows up for booking (and booking reminders) again.
+async function unmarkBooked(tripId){
+  if(!confirm('Is trip ko dobara "Ready to Book" mein daalna hai?'))return;
+  await db.collection('te_trips').doc(tripId).update({bookedByAccounts:false});
+  const trip=trips.find(t=>t.id===tripId);
+  logActivity(`${(myUserObj()||{}).name||currentUser} un-marked ${tripId} as Booked`,trip?`${trip.salesName} · ${trip.location}`:'');
+}
 function sendOverdueReminder(tripId,opts){
   const trip=trips.find(t=>t.id===tripId);if(!trip)return;
   const sales=users.find(u=>u.id===trip.salesId);
@@ -1630,7 +1638,7 @@ function renderAccountsPage(){
     const tag=t.bookedByAccounts?'<span class="tag">BOOKED</span>':'<span class="tag amber">READY TO BOOK</span>';
     return `<div class="person" style="cursor:pointer" onclick="openTripDetail('${esc(t.id)}')"><div class="pt"><div><h3>${esc(t.salesName)} • ${esc(t.location)} • ${esc(t.id)}</h3><p>${esc(t.purpose||'')} • ${esc(t.startDate)} → ${esc(t.dueDate)}</p></div>${tag}</div>
     <div class="money"><div class="m"><small>ISSUED</small><b>${money(issued)}</b></div><div class="m"><small>EXPENSE</small><b>${money(expense)}</b></div><div class="m"><small>RECEIVED</small><b>${money(t.returnedAmount||0)}</b></div><div class="m"><small>RECEIVED BY</small><b>${esc(t.closedBy||'-')}</b></div><div class="m"><small>STATUS</small><b>${esc(t.status)}</b></div><div class="m"><small>NOC</small><b>${esc(t.nocNumber||'-')}</b></div>
-    <div class="m"><small>ACTION</small>${!t.bookedByAccounts?`<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn primary" onclick="event.stopPropagation();markBooked('${esc(t.id)}')">Mark Booked</button><button class="btn" onclick="event.stopPropagation();sendBookingReminderNow('${esc(t.id)}')">🔔 Send Reminder</button></div>`:''}</div></div></div>`;
+    <div class="m"><small>ACTION</small>${!t.bookedByAccounts?`<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn primary" onclick="event.stopPropagation();markBooked('${esc(t.id)}')">Mark Booked</button><button class="btn" onclick="event.stopPropagation();sendBookingReminderNow('${esc(t.id)}')">🔔 Send Reminder</button></div>`:`<button class="btn" onclick="event.stopPropagation();unmarkBooked('${esc(t.id)}')">↩ Unmark Booked</button>`}</div></div></div>`;
   }).join('');
 }
 function renderNotifyPage(){
