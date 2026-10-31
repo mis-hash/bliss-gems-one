@@ -1249,7 +1249,9 @@ function sendOverdueReminder(tripId){
   const bal=tripBalance(tripId);
   const msg=renderTemplate(messageTemplates.overdue,{location:trip.location,due:trip.dueDate,balance:money(bal)});
   if(sales)sendWA(sales.phone,msg);
-  excludeDirectorPdfOnlyRecipients(usersWithRole('admin')).forEach(u=>sendWA(u.phone,msg));
+  // Was 'admin'-only - every other trip notification (Party Cash, Hisaab Submitted) combines
+  // admin+director, so an Admin set up with just the 'director' role never got this one.
+  excludeDirectorPdfOnlyRecipients(usersWithRole('admin').concat(usersWithRole('director'))).forEach(u=>sendWA(u.phone,msg));
   toast('Reminder bhej diya.');
 }
 function toast(t){const b=$('loginBadge');const old=b.textContent;b.textContent=t;setTimeout(()=>refreshLoginBadge(),1500);}
