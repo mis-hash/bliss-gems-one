@@ -422,7 +422,7 @@ let messageTemplates={
   booking_pending_urgent:'🔴 *URGENT — Booking Pending {daysPending}+ din se!*\n{name} • {location} • {tripId}\nNOC: {noc}\n\nBooking mark karna compulsory hai, kripya turant karein:\n{link}'
 };
 let currentUser=null;
-let usersStarted=false,tripsStarted=false,ledgerStarted=false,ledgerLoaded=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false;
+let usersStarted=false,usersLoaded=false,tripsStarted=false,ledgerStarted=false,ledgerLoaded=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false;
 let tripOptions={locations:['Surat','Mumbai','Chennai','Udaipur','Ahmedabad','Hyderabad'],purposes:['Exhibition','Client Visit','Sales Tour']};
 let EXPENSE_CATEGORIES=['Hotel','Breakfast','Lunch','Dinner','Food','Tea / Snacks','Taxi / Cab','Local Conveyance','Bus','Train','Flight','Fuel','Toll / Parking','Party Entertainment','Sample / Gift to Party','Courier / Parcel','Mobile / Internet','Stationery / Printing','Porter / Coolie','Labour Charges','Godown / Warehouse','Vehicle Repair','Medical','Laundry','Bank / ATM Charges','Misc','Other'];
 let ledgerHeads={cash:'Cash-in-Hand',advance:'Staff Advance A/c',categories:{Hotel:'Travelling Expenses',Breakfast:'Business Promotion Exp.',Lunch:'Business Promotion Exp.',Dinner:'Business Promotion Exp.',Food:'Business Promotion Exp.','Tea / Snacks':'Business Promotion Exp.','Taxi / Cab':'Travelling Expenses','Local Conveyance':'Travelling Expenses',Bus:'Travelling Expenses',Train:'Travelling Expenses',Flight:'Travelling Expenses',Fuel:'Travelling Expenses','Toll / Parking':'Travelling Expenses','Party Entertainment':'Business Promotion Exp.','Sample / Gift to Party':'Business Promotion Exp.','Courier / Parcel':'Miscellaneous Expenses','Mobile / Internet':'Miscellaneous Expenses','Stationery / Printing':'Miscellaneous Expenses','Porter / Coolie':'Travelling Expenses','Labour Charges':'Travelling Expenses','Godown / Warehouse':'Miscellaneous Expenses','Vehicle Repair':'Travelling Expenses',Medical:'Miscellaneous Expenses',Laundry:'Travelling Expenses','Bank / ATM Charges':'Miscellaneous Expenses',Misc:'Miscellaneous Expenses',Other:'Miscellaneous Expenses'}};
@@ -438,7 +438,10 @@ function startUsersSync(){
   if(usersStarted)return;usersStarted=true;
   db.collection(UU_COLLECTION).onSnapshot(snap=>{
     users=[];snap.forEach(d=>users.push(d.data()));
+    usersLoaded=true;
     renderAll();
+    autoSendOverdueReminders();
+    autoSendBookingReminders();
   },err=>console.error('users sync error',err));
 }
 function myRole(){
@@ -1282,6 +1285,13 @@ function sendOverdueReminder(tripId,opts){
 // the app or multiple Admin sessions the same day don't resend; a rare double-send if two
 // Admin sessions both check before either writes the stamp is an acceptable tradeoff here.
 async function autoSendOverdueReminders(){
+  // Must wait for users data first - effectiveRole()/myRole() reads `users`, which syncs
+  // separately from trips with no ordering guarantee (both start together in boot()). If
+  // trips' snapshot arrives before users' does, `users` is still empty, myRole() silently
+  // returns null regardless of the real logged-in user's actual role, and this gate fails
+  // even for a genuine Admin/Director - so this never silently sends nothing again once
+  // users data has actually loaded.
+  if(!usersLoaded)return;
   if(effectiveRole()!=='admin' && effectiveRole()!=='director')return;
   // Must wait for ledger data too, not just trips - tripBalance()/Outstanding reads from
   // `ledger`, which syncs separately and can still be empty the moment trips load (both
@@ -1303,6 +1313,10 @@ const BOOKKEEPING_LINK='https://bliss-gems-one.web.app/trip-expense-app/?page=ac
 // rather than once-per-day). Runs off whichever Admin/Accounts/Director session has the
 // Bookkeeping page's data loaded - no Cloud Function/cron (Spark plan).
 async function autoSendBookingReminders(){
+  // Same users-data race as autoSendOverdueReminders() above - without this, a trips snapshot
+  // that arrives before users does makes effectiveRole() read as null and silently skips
+  // everyone, even a real Accounts/Admin/Director session.
+  if(!usersLoaded)return;
   if(!['admin','accounts','director'].includes(effectiveRole()))return;
   const accountsUsers=usersWithRole('accounts');
   if(!accountsUsers.length)return;
