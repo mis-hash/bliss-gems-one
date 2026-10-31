@@ -199,7 +199,7 @@ tbody tr:hover td{background:#f7faf8}
     </div>
     <div class="cards" id="statTiles"></div>
     <div class="panel">
-      <div class="ph"><span>Current Stock</span></div>
+      <div class="ph"><span>Current Stock</span><input id="stockSearchBox" placeholder="🔍 Item ya category search karein..." oninput="renderDash()" style="max-width:240px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;background:#fff;color:var(--txt)"></div>
       <div class="pb"><div class="tablewrap"><table>
         <thead><tr><th>Item</th><th>Category</th><th class="num">In Hand</th><th class="num">Min Level</th><th>Status</th></tr></thead>
         <tbody id="stockTable"></tbody>
@@ -640,10 +640,12 @@ function renderDash(){
   ];
   $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}" style="--accent:${t.accent};--accentbg:${t.accentbg}"><div class="ic">${t.ic}</div><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
   if($('heroTotalItems'))$('heroTotalItems').textContent=items.length;
-  $('stockTable').innerHTML=items.map(x=>{
+  const stockQ=(($('stockSearchBox')&&$('stockSearchBox').value)||'').trim().toLowerCase();
+  const stockList=stockQ?items.filter(x=>(x.name||'').toLowerCase().includes(stockQ)||(x.category||'').toLowerCase().includes(stockQ)):items;
+  $('stockTable').innerHTML=stockList.map(x=>{
     const isLow=x.stock<=x.min;
     return `<tr><td><b>${esc(x.name)}</b></td><td style="color:var(--muted)">${esc(x.category||'-')}</td><td class="num"><b>${x.stock||0}</b> ${esc(x.unit||'')}</td><td class="num" style="color:var(--muted)">${x.min||0}</td><td><span class="pill ${isLow?'low':'ok'}">${isLow?'⚠ Low Stock':'✓ OK'}</span></td></tr>`;
-  }).join('')||`<tr><td colspan="5"><div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Item Master se naya item add karein.</small></div></td></tr>`;
+  }).join('')||(stockQ?`<tr><td colspan="5"><div class="emptystate">🔍<p>Koi matching item nahi mila.</p><small>Dusra naam ya category try karein.</small></div></td></tr>`:`<tr><td colspan="5"><div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Item Master se naya item add karein.</small></div></td></tr>`);
 }
 function syncItemIdFromSearch(searchId,hiddenId){
   const name=$(searchId).value.trim();
