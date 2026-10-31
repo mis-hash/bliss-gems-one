@@ -1353,22 +1353,31 @@ async function autoSendBookingReminders(){
 // immediately regardless of the 1-day/2-hour auto-reminder timing/dedup, but still stamps the
 // same fields autoSendBookingReminders() checks, so it won't also fire again right after.
 async function sendBookingReminderNow(tripId){
-  const t=trips.find(x=>x.id===tripId);if(!t)return;
-  const accountsUsers=usersWithRole('accounts');
-  if(!accountsUsers.length){alert('Koi bhi Universal User ka Trip Expense role "Accounts" set nahi hai - pehle wo set karein.');return;}
-  const hoursSinceClosed=t.closedAt?(Date.now()-new Date(t.closedAt).getTime())/3600000:0;
-  const vars={name:t.salesName,location:t.location,tripId:t.id,noc:t.nocNumber||('NOC-'+t.id),link:BOOKKEEPING_LINK};
-  if(hoursSinceClosed>=48){
-    const daysPending=Math.floor(hoursSinceClosed/24);
-    const msg=renderTemplate(messageTemplates.booking_pending_urgent,Object.assign({},vars,{daysPending}));
-    accountsUsers.forEach(u=>sendWA(u.phone,msg));
-    try{await db.collection('te_trips').doc(t.id).update({lastBookingUrgentSentAt:new Date().toISOString()});}catch(e){console.error('booking urgent stamp failed',e);}
-  }else{
-    const msg=renderTemplate(messageTemplates.booking_pending,vars);
-    accountsUsers.forEach(u=>sendWA(u.phone,msg));
-    try{await db.collection('te_trips').doc(t.id).update({bookingPendingAlertSentAt:new Date().toISOString()});}catch(e){console.error('booking pending stamp failed',e);}
+  console.log('[send-reminder-btn] clicked, tripId=',tripId);
+  try{
+    const t=trips.find(x=>x.id===tripId);
+    if(!t){console.log('[send-reminder-btn] trip not found in trips[]');alert('Trip data abhi load nahi hua - thodi der mein phir try karein.');return;}
+    const accountsUsers=usersWithRole('accounts');
+    console.log('[send-reminder-btn] accountsUsers=',accountsUsers.map(u=>u.name+'/'+u.phone));
+    if(!accountsUsers.length){alert('Koi bhi Universal User ka Trip Expense role "Accounts" set nahi hai - pehle wo set karein.');return;}
+    const hoursSinceClosed=t.closedAt?(Date.now()-new Date(t.closedAt).getTime())/3600000:0;
+    const vars={name:t.salesName,location:t.location,tripId:t.id,noc:t.nocNumber||('NOC-'+t.id),link:BOOKKEEPING_LINK};
+    if(hoursSinceClosed>=48){
+      const daysPending=Math.floor(hoursSinceClosed/24);
+      const msg=renderTemplate(messageTemplates.booking_pending_urgent,Object.assign({},vars,{daysPending}));
+      accountsUsers.forEach(u=>sendWA(u.phone,msg));
+      await db.collection('te_trips').doc(t.id).update({lastBookingUrgentSentAt:new Date().toISOString()});
+    }else{
+      const msg=renderTemplate(messageTemplates.booking_pending,vars);
+      accountsUsers.forEach(u=>sendWA(u.phone,msg));
+      await db.collection('te_trips').doc(t.id).update({bookingPendingAlertSentAt:new Date().toISOString()});
+    }
+    console.log('[send-reminder-btn] done, sent to',accountsUsers.length,'accounts user(s)');
+    toast('Reminder Accounts ko bhej diya ('+accountsUsers.length+' log).');
+  }catch(e){
+    console.error('[send-reminder-btn] error',e);
+    alert('Reminder bhejte waqt error aaya: '+e.message);
   }
-  toast('Reminder Accounts ko bhej diya ('+accountsUsers.length+' log).');
 }
 function toast(t){const b=$('loginBadge');const old=b.textContent;b.textContent=t;setTimeout(()=>refreshLoginBadge(),1500);}
 
