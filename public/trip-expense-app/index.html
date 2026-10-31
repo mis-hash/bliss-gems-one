@@ -570,6 +570,7 @@ function startTripsSync(){
     trips=allTripsRaw.filter(t=>!t.deletedAt);
     deletedTrips=allTripsRaw.filter(t=>t.deletedAt);
     renderAll();
+    autoSendOverdueReminders();
   },err=>console.error('trips sync error',err));
 }
 function startLedgerSync(){
@@ -1243,7 +1244,7 @@ async function markBooked(tripId){
     excludeDirectorPdfOnlyRecipients(usersWithRole('director')).forEach(u=>sendWA(u.phone,renderTemplate(messageTemplates.booked,{tripId:trip.id})));
   }
 }
-function sendOverdueReminder(tripId){
+function sendOverdueReminder(tripId,opts){
   const trip=trips.find(t=>t.id===tripId);if(!trip)return;
   const sales=users.find(u=>u.id===trip.salesId);
   const bal=tripBalance(tripId);
@@ -1253,7 +1254,23 @@ function sendOverdueReminder(tripId){
   // Was 'admin'-only - every other trip notification (Party Cash, Hisaab Submitted) combines
   // admin+director, so an Admin set up with just the 'director' role never got this one.
   excludeDirectorPdfOnlyRecipients(usersWithRole('admin').concat(usersWithRole('director'))).forEach(u=>sendWA(u.phone,msg));
-  toast('Reminder bhej diya.');
+  if(!(opts&&opts.silent))toast('Reminder bhej diya.');
+}
+// Auto-fires the same Admin+Doer Overdue reminder the manual "Send WhatsApp Reminder" button
+// sends, the first time an Admin/Director's session sees a trip go overdue each day - no Cloud
+// Function/cron needed (Spark plan), the check just runs off whichever Admin/Director session
+// is open. isOverdue() is checked first so only trips that are actually overdue right now ever
+// fire. Dedup is a lastOverdueReminderSentAt date stamp on the trip doc itself, so re-opening
+// the app or multiple Admin sessions the same day don't resend; a rare double-send if two
+// Admin sessions both check before either writes the stamp is an acceptable tradeoff here.
+async function autoSendOverdueReminders(){
+  if(effectiveRole()!=='admin' && effectiveRole()!=='director')return;
+  const today=todayISO();
+  const due=trips.filter(t=>isOverdue(t) && t.lastOverdueReminderSentAt!==today);
+  for(const t of due){
+    sendOverdueReminder(t.id,{silent:true});
+    try{await db.collection('te_trips').doc(t.id).update({lastOverdueReminderSentAt:today});}catch(e){console.error('overdue reminder stamp failed',e);}
+  }
 }
 function toast(t){const b=$('loginBadge');const old=b.textContent;b.textContent=t;setTimeout(()=>refreshLoginBadge(),1500);}
 
