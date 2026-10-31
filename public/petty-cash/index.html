@@ -225,7 +225,7 @@ tbody tr:hover td{background:#f7faf8}
         </select></div>
         <div class="field" style="width:auto;margin:0"><label>From</label><input type="date" id="histFrom" onchange="onLedgerFilterChange()" style="width:auto"></div>
         <div class="field" style="width:auto;margin:0"><label>To</label><input type="date" id="histTo" onchange="onLedgerFilterChange()" style="width:auto"></div>
-        <div class="field" style="width:auto;flex:1;min-width:160px;margin:0"><label>Person</label><input id="histPerson" placeholder="Search person name" oninput="onLedgerFilterChange()"></div>
+        <div class="field" style="width:auto;flex:1;min-width:160px;margin:0"><label>Search</label><input id="histPerson" placeholder="🔍 Person ya note se search karein" oninput="onLedgerFilterChange()"></div>
         <button class="btn small secondary" onclick="clearLedgerFilters()" style="margin-top:17px">✕ Clear Filters</button>
       </div>
       <div id="ledgerTable"></div>
@@ -1660,7 +1660,7 @@ function filteredLedgerRows(){
   if(type!=='all')rows=rows.filter(x=>x.type===type);
   if(from)rows=rows.filter(x=>String(x.date)>=from);
   if(to)rows=rows.filter(x=>String(x.date)<=to);
-  if(personQ)rows=rows.filter(x=>String(x.person||'').toLowerCase().includes(personQ));
+  if(personQ)rows=rows.filter(x=>String(x.person||'').toLowerCase().includes(personQ)||String(x.note||'').toLowerCase().includes(personQ));
   return rows.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at||'').localeCompare(String(a.at||'')));
 }
 // Keeps the table from rendering hundreds of rows at once as the ledger grows - all
