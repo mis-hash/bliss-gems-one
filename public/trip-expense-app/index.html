@@ -653,11 +653,12 @@ async function getGreenApiCreds(){
   }catch(e){}
   return null;
 }
-// A number excluded from the "Trip Closed" notification specifically (see confirmCloseTrip) -
-// every other automatic Trip Expense message still reaches it as normal. Matched on the last
-// 10 digits so it works with or without a country code / spacing.
-const TRIP_CLOSED_EXCLUDED_NUMBERS=['9251488655'];
-function isTripClosedExcluded(phone){return TRIP_CLOSED_EXCLUDED_NUMBERS.includes(String(phone||'').replace(/\D/g,'').slice(-10))}
+// A number excluded from the booking-related notifications specifically - "Trip Closed" (see
+// confirmCloseTrip) and the Booking Pending/Urgent reminders (see autoSendBookingReminders) -
+// every other automatic Trip Expense message (Overdue Reminder, Party Cash, etc.) still reaches
+// it as normal. Matched on the last 10 digits so it works with or without a country code.
+const BOOKING_NOTICE_EXCLUDED_NUMBERS=['9251488655'];
+function isBookingNoticeExcluded(phone){return BOOKING_NOTICE_EXCLUDED_NUMBERS.includes(String(phone||'').replace(/\D/g,'').slice(-10))}
 async function sendWA(phone,message){
   if(!phone)return;
   const creds=await getGreenApiCreds();
@@ -1090,10 +1091,10 @@ async function confirmCloseTrip(){
     if(sales)sendWA(sales.phone,msg);
     // Only the actual closers (admin) and accounts (who book it) need the per-trip NOC
     // message - Hitesh/Nitesh/Ankur are excluded (see DIRECTOR_PDF_ONLY_NAMES above), and
-    // TRIP_CLOSED_EXCLUDED_NUMBERS is excluded from this Trip Closed message specifically
+    // BOOKING_NOTICE_EXCLUDED_NUMBERS is excluded from this Trip Closed message specifically
     // (they still get every other automatic Trip Expense message as normal).
     excludeDirectorPdfOnlyRecipients(usersWithRole('admin').concat(usersWithRole('accounts')))
-      .filter(u=>!isTripClosedExcluded(u.phone))
+      .filter(u=>!isBookingNoticeExcluded(u.phone))
       .forEach(u=>sendWA(u.phone,msg));
   }
   sendTripSummaryToDirectors(tripId,{returned,mode,nocNumber,closerName});
@@ -1304,7 +1305,7 @@ const BOOKKEEPING_LINK='https://bliss-gems-one.web.app/trip-expense-app/?page=ac
 // Bookkeeping page's data loaded - no Cloud Function/cron (Spark plan).
 async function autoSendBookingReminders(){
   if(!['admin','accounts','director'].includes(effectiveRole()))return;
-  const accountsUsers=usersWithRole('accounts');
+  const accountsUsers=usersWithRole('accounts').filter(u=>!isBookingNoticeExcluded(u.phone));
   if(!accountsUsers.length)return;
   const now=Date.now();
   const pending=trips.filter(t=>t.status==='closed' && !t.bookedByAccounts && t.closedAt);
