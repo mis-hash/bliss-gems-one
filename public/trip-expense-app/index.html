@@ -663,6 +663,12 @@ async function getGreenApiCreds(){
 // so it works with or without a country code / spacing.
 const BOOKING_NOTICE_EXCLUDED_NUMBERS=['9251488655'];
 function isBookingNoticeExcluded(phone){return BOOKING_NOTICE_EXCLUDED_NUMBERS.includes(String(phone||'').replace(/\D/g,'').slice(-10))}
+// This number should not get the "Trip Booked" notification or the Booking Pending /
+// Urgent reminders specifically (unlike BOOKING_NOTICE_EXCLUDED_NUMBERS above, which blocks
+// every automatic Trip Expense message) - checked only at the three Bookkeeping-notice call
+// sites (markBooked, autoSendBookingReminders, sendBookingReminderNow).
+const BOOKKEEPING_NOTICE_EXCLUDED_NUMBERS=['9251488653'];
+function isBookkeepingNoticeExcluded(phone){return BOOKKEEPING_NOTICE_EXCLUDED_NUMBERS.includes(String(phone||'').replace(/\D/g,'').slice(-10))}
 async function sendWA(phone,message){
   if(!phone||isBookingNoticeExcluded(phone))return;
   const creds=await getGreenApiCreds();
@@ -1258,7 +1264,7 @@ async function markBooked(tripId){
   const trip=trips.find(t=>t.id===tripId);
   logActivity(`${(myUserObj()||{}).name||currentUser} marked ${tripId} as Booked`,trip?`${trip.salesName} · ${trip.location}`:'');
   if(notifySettings.booked && trip){
-    excludeDirectorPdfOnlyRecipients(usersWithRole('director')).forEach(u=>sendWA(u.phone,renderTemplate(messageTemplates.booked,{tripId:trip.id})));
+    excludeDirectorPdfOnlyRecipients(usersWithRole('director')).filter(u=>!isBookkeepingNoticeExcluded(u.phone)).forEach(u=>sendWA(u.phone,renderTemplate(messageTemplates.booked,{tripId:trip.id})));
   }
 }
 // Undo an accidental "Mark Booked" click - puts the trip back to Ready to Book so it
@@ -1327,7 +1333,7 @@ async function autoSendBookingReminders(){
   if(!usersLoaded){console.log('[booking-reminder] skipped: users data not loaded yet');return;}
   const er=effectiveRole();
   if(!['admin','accounts','director'].includes(er)){console.log('[booking-reminder] skipped: effectiveRole() is',JSON.stringify(er),'(need admin/accounts/director) - currentUser:',JSON.stringify(currentUser));return;}
-  const accountsUsers=usersWithRole('accounts');
+  const accountsUsers=usersWithRole('accounts').filter(u=>!isBookkeepingNoticeExcluded(u.phone));
   if(!accountsUsers.length){console.log('[booking-reminder] skipped: no Universal User has the Accounts role for trip-expense-app. Total users loaded:',users.length);return;}
   console.log('[booking-reminder] running - accountsUsers:',accountsUsers.map(u=>u.name+' ('+(u.phone||'NO PHONE')+')'));
   const now=Date.now();
@@ -1365,7 +1371,7 @@ async function sendBookingReminderNow(tripId){
   try{
     const t=trips.find(x=>x.id===tripId);
     if(!t){console.log('[send-reminder-btn] trip not found in trips[]');alert('Trip data abhi load nahi hua - thodi der mein phir try karein.');return;}
-    const accountsUsers=usersWithRole('accounts');
+    const accountsUsers=usersWithRole('accounts').filter(u=>!isBookkeepingNoticeExcluded(u.phone));
     console.log('[send-reminder-btn] accountsUsers=',accountsUsers.map(u=>u.name+'/'+u.phone));
     if(!accountsUsers.length){alert('Koi bhi Universal User ka Trip Expense role "Accounts" set nahi hai - pehle wo set karein.');return;}
     const hoursSinceClosed=t.closedAt?(Date.now()-new Date(t.closedAt).getTime())/3600000:0;
