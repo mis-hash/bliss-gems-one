@@ -650,8 +650,14 @@ async function getGreenApiCreds(){
   }catch(e){}
   return null;
 }
+// Numbers that must never receive ANY automatic WhatsApp from this app, regardless of which
+// notification/role-list logic sent it - checked here as a single choke point (both sendWA and
+// sendTripFileWA) so a future notification type can't accidentally reach them either. Matched
+// on the last 10 digits so it works with or without a country code / spacing.
+const BLOCKED_WA_NUMBERS=['9251488655'];
+function waBlocked(phone){return BLOCKED_WA_NUMBERS.includes(String(phone||'').replace(/\D/g,'').slice(-10))}
 async function sendWA(phone,message){
-  if(!phone)return;
+  if(!phone||waBlocked(phone))return;
   const creds=await getGreenApiCreds();
   if(!creds)return;
   const id=String(creds.idInstance||'').trim(),token=String(creds.apiToken||'').trim(),base=String(creds.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
@@ -1106,7 +1112,7 @@ function findUserByName(partialName){
   return users.find(u=>String(u.name||'').trim().toLowerCase().startsWith(q))||null;
 }
 async function sendTripFileWA(phone,blob,fileName){
-  if(!phone)return false;
+  if(!phone||waBlocked(phone))return false;
   const creds=await getGreenApiCreds();
   if(!creds)return false;
   const id=String(creds.idInstance||'').trim(),token=String(creds.apiToken||'').trim(),base=String(creds.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
