@@ -1349,6 +1349,27 @@ async function autoSendBookingReminders(){
     }
   }
 }
+// Manual "Send Reminder" button on each Bookkeeping card (see renderBookkeeping) - sends
+// immediately regardless of the 1-day/2-hour auto-reminder timing/dedup, but still stamps the
+// same fields autoSendBookingReminders() checks, so it won't also fire again right after.
+async function sendBookingReminderNow(tripId){
+  const t=trips.find(x=>x.id===tripId);if(!t)return;
+  const accountsUsers=usersWithRole('accounts');
+  if(!accountsUsers.length){alert('Koi bhi Universal User ka Trip Expense role "Accounts" set nahi hai - pehle wo set karein.');return;}
+  const hoursSinceClosed=t.closedAt?(Date.now()-new Date(t.closedAt).getTime())/3600000:0;
+  const vars={name:t.salesName,location:t.location,tripId:t.id,noc:t.nocNumber||('NOC-'+t.id),link:BOOKKEEPING_LINK};
+  if(hoursSinceClosed>=48){
+    const daysPending=Math.floor(hoursSinceClosed/24);
+    const msg=renderTemplate(messageTemplates.booking_pending_urgent,Object.assign({},vars,{daysPending}));
+    accountsUsers.forEach(u=>sendWA(u.phone,msg));
+    try{await db.collection('te_trips').doc(t.id).update({lastBookingUrgentSentAt:new Date().toISOString()});}catch(e){console.error('booking urgent stamp failed',e);}
+  }else{
+    const msg=renderTemplate(messageTemplates.booking_pending,vars);
+    accountsUsers.forEach(u=>sendWA(u.phone,msg));
+    try{await db.collection('te_trips').doc(t.id).update({bookingPendingAlertSentAt:new Date().toISOString()});}catch(e){console.error('booking pending stamp failed',e);}
+  }
+  toast('Reminder Accounts ko bhej diya ('+accountsUsers.length+' log).');
+}
 function toast(t){const b=$('loginBadge');const old=b.textContent;b.textContent=t;setTimeout(()=>refreshLoginBadge(),1500);}
 
 /* ===== Team Roles (Director) ===== */
@@ -1600,7 +1621,7 @@ function renderAccountsPage(){
     const tag=t.bookedByAccounts?'<span class="tag">BOOKED</span>':'<span class="tag amber">READY TO BOOK</span>';
     return `<div class="person" style="cursor:pointer" onclick="openTripDetail('${esc(t.id)}')"><div class="pt"><div><h3>${esc(t.salesName)} • ${esc(t.location)} • ${esc(t.id)}</h3><p>${esc(t.purpose||'')} • ${esc(t.startDate)} → ${esc(t.dueDate)}</p></div>${tag}</div>
     <div class="money"><div class="m"><small>ISSUED</small><b>${money(issued)}</b></div><div class="m"><small>EXPENSE</small><b>${money(expense)}</b></div><div class="m"><small>RECEIVED</small><b>${money(t.returnedAmount||0)}</b></div><div class="m"><small>RECEIVED BY</small><b>${esc(t.closedBy||'-')}</b></div><div class="m"><small>STATUS</small><b>${esc(t.status)}</b></div><div class="m"><small>NOC</small><b>${esc(t.nocNumber||'-')}</b></div>
-    <div class="m"><small>ACTION</small>${!t.bookedByAccounts?`<button class="btn primary" onclick="event.stopPropagation();markBooked('${esc(t.id)}')">Mark Booked</button>`:''}</div></div></div>`;
+    <div class="m"><small>ACTION</small>${!t.bookedByAccounts?`<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn primary" onclick="event.stopPropagation();markBooked('${esc(t.id)}')">Mark Booked</button><button class="btn" onclick="event.stopPropagation();sendBookingReminderNow('${esc(t.id)}')">🔔 Send Reminder</button></div>`:''}</div></div></div>`;
   }).join('');
 }
 function renderNotifyPage(){
