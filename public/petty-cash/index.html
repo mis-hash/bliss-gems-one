@@ -800,6 +800,26 @@ function pendingAcceptSummary(){
   const pending=pendingEntries.filter(p=>p.status==='pending');
   return {count:pending.length,amount:pending.reduce((s,p)=>s+(p.amount||0),0)};
 }
+// Same Pending Accept pool, split by who actually resolves it: type 'in' (Fund Add) is always
+// Accountant/Admin/Director, type 'out' (named Cash Out) is always the specific recipient Doer -
+// drives the Admin panel's separate ACCOUNTS/EMPLOYEE tiles so Admin can see at a glance which
+// side a pending/rejected request is stuck on, instead of one merged number.
+function pendingAcceptByAccountsSummary(){
+  const p=pendingEntries.filter(x=>x.status==='pending'&&x.type==='in');
+  return {count:p.length,amount:p.reduce((s,x)=>s+(x.amount||0),0)};
+}
+function pendingAcceptByEmployeeSummary(){
+  const p=pendingEntries.filter(x=>x.status==='pending'&&x.type==='out');
+  return {count:p.length,amount:p.reduce((s,x)=>s+(x.amount||0),0)};
+}
+function rejectedByAccountsSummary(){
+  const p=pendingEntries.filter(x=>x.status==='rejected'&&x.type==='in');
+  return {count:p.length,amount:p.reduce((s,x)=>s+(x.amount||0),0)};
+}
+function rejectedByEmployeeSummary(){
+  const p=pendingEntries.filter(x=>x.status==='rejected'&&x.type==='out');
+  return {count:p.length,amount:p.reduce((s,x)=>s+(x.amount||0),0)};
+}
 function renderPendingAcceptPanel(){
   const wrap=$('pcPendingAcceptWrap');
   if(!wrap)return;
@@ -1854,14 +1874,20 @@ function renderAdminPanel(){
   if(!wrap)return;
   const {fundAdded,verifyReceiveTotal,totalOut}=computeBalance();
   const pendingHisaab=computeAllPersonPendingTotals().reduce((s,r)=>s+r.issuedPending,0);
-  const pendingAccept=pendingAcceptSummary();
+  const pendingAcceptAccounts=pendingAcceptByAccountsSummary();
+  const pendingAcceptEmployee=pendingAcceptByEmployeeSummary();
+  const rejectedAccounts=rejectedByAccountsSummary();
+  const rejectedEmployee=rejectedByEmployeeSummary();
   // Loan Given is retired - no Outstanding Loans tile here anymore (matches the Ledger page).
   const tiles=[
     {label:'TOTAL FUND ADDED',val:fmtAmt(fundAdded)},
     {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
     {label:'TOTAL ISSUED (OUT)',val:fmtAmt(totalOut)},
     {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
-    {label:'PENDING ACCEPT',val:fmtAmt(pendingAccept.amount)+' ('+pendingAccept.count+')',warn:pendingAccept.count>0}
+    {label:'PENDING ACCEPT (ACCOUNTS)',val:fmtAmt(pendingAcceptAccounts.amount)+' ('+pendingAcceptAccounts.count+')',warn:pendingAcceptAccounts.count>0},
+    {label:'PENDING ACCEPT (EMPLOYEE)',val:fmtAmt(pendingAcceptEmployee.amount)+' ('+pendingAcceptEmployee.count+')',warn:pendingAcceptEmployee.count>0},
+    {label:'REJECTED (ACCOUNTS)',val:fmtAmt(rejectedAccounts.amount)+' ('+rejectedAccounts.count+')'},
+    {label:'REJECTED (EMPLOYEE)',val:fmtAmt(rejectedEmployee.amount)+' ('+rejectedEmployee.count+')'}
   ];
   wrap.innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
 }
