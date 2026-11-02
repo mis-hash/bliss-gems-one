@@ -502,9 +502,9 @@ function startRequestsSync(){
 
 /* ===== WhatsApp (shared GREEN-API credentials) ===== */
 function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===10)p='91'+p;return p;}
-// Temporarily muted at the user's request (2026-10) while the Firestore permissions fix
-// is being tested, so no WhatsApp goes out from this app until re-enabled.
-const WA_MUTED=true;
+// Was temporarily muted (2026-10) while the Firestore permissions fix was being tested -
+// re-enabled now that si_* collections are confirmed open in the live rules.
+const WA_MUTED=false;
 async function sendRawWA(phone,message){
   if(WA_MUTED){console.warn('Stationery WA muted, not sending:',message);return false}
   const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
