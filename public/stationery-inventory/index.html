@@ -509,7 +509,7 @@ async function sendRawWA(phone,message){
   if(WA_MUTED){console.warn('Stationery WA muted, not sending:',message);return false}
   const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
   if(!id||!token){console.warn('GREEN-API settings missing');return false}
-  const p=normalizePhone(phone);if(p.length<11)return false;
+  const p=normalizePhone(phone);if(p.length<11){console.warn('sendRawWA: phone too short after normalize - raw:',phone,'normalized:',p);return false}
   try{
     const r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
     return r.ok;
@@ -550,13 +550,23 @@ function notifyIssue(item,qty,toUserId,byUserId){
 // to nobody - now falls back to the general Admin/Director list so a Request is never dropped.
 function notifyRequestSubmitted(item,qty,requesterId,purpose){
   const normName=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  console.log('[request-submitted] total users loaded:',users.length);
   let recipients=users.filter(u=>u.active!==false && u.phone && normName(u.name)==='amit sharma');
+  console.log('[request-submitted] exact-name match (Amit Sharma):',recipients.map(u=>u.name+'/'+u.phone+'/active='+u.active));
   if(!recipients.length){
     recipients=users.filter(u=>u.active!==false && u.phone && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director'));
+    console.log('[request-submitted] fallback to admin/director role:',recipients.map(u=>u.name+'/'+u.phone));
+  }
+  if(!recipients.length){
+    console.log('[request-submitted] NO RECIPIENTS FOUND - no "Amit Sharma" active user with a phone, and no user has admin/director role for',APP_SLUG,'. Check Universal Users.');
+    return;
   }
   const link='https://bliss-gems-one.web.app/stationery-inventory/?page=requests';
   const msg=fillTemplate(templateText('request_submitted'),{ItemName:item.name,Qty:qty,Unit:item.unit||'',RequestedBy:nameOfUserId(requesterId),Purpose:purpose||'-',Link:link});
-  recipients.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('request-submitted WA failed:',e)));
+  recipients.forEach(u=>{
+    console.log('[request-submitted] sending to',u.name,u.phone);
+    sendRawWA(u.phone,msg).then(ok=>console.log('[request-submitted] result for',u.phone,':',ok?'SENT':'FAILED (see sendRawWA warning above for why - missing GREEN-API creds, or phone too short after normalizePhone)')).catch(e=>console.error('[request-submitted] WA failed for',u.phone,':',e));
+  });
 }
 function notifyRequestIssued(item,qty,requesterId,issuedByUserId){
   const u=users.find(x=>x.id===requesterId);
