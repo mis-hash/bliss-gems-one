@@ -1481,7 +1481,10 @@ function renderAdminPage(){
   const active=scoped.filter(t=>t.status!=='closed');
   const totalIssued=scoped.reduce((s,t)=>s+tripIssued(t.id),0);
   const totalExpense=scoped.reduce((s,t)=>s+tripExpense(t.id),0);
-  $('admOutstanding').textContent=money(totalIssued-totalExpense);
+  // Use tripOutstanding() (nets out returnedAmount for closed trips), not raw
+  // issued-minus-expense - otherwise a trip that's fully settled and closed still shows
+  // its pre-settlement balance here forever, even with 0 Active Trips.
+  $('admOutstanding').textContent=money(scoped.reduce((s,t)=>s+tripOutstanding(t.id),0));
   $('admActive').textContent=active.length;
   $('admIssued').textContent=money(totalIssued);
   $('admToVerify').textContent=scoped.filter(t=>t.status==='hisaab_submitted').length;
@@ -1523,7 +1526,11 @@ function renderDirectorPage(){
   const overdue=trips.filter(isOverdue);
   $('dirTotalExpense').textContent=money(totalExpense);
   $('dirActive').textContent=active.length;
-  $('dirOutstanding').textContent=money(totalIssued-totalExpense);
+  // Net out actual cash returned at closing (returnedAmount, kept on the trip doc, not the
+  // ledger - see tripOutstanding()) - otherwise a closed, fully-settled trip still counts
+  // its pre-settlement balance here forever, even with 0 Active Trips.
+  const totalReturned=closed.reduce((s,t)=>s+Number(t.returnedAmount||0),0);
+  $('dirOutstanding').textContent=money(totalIssued-totalExpense-totalReturned);
   $('dirOverdue').textContent=overdue.length;
   $('dirAvg').textContent=closed.length?money(closed.reduce((s,t)=>s+tripExpense(t.id),0)/closed.length):'₹0';
   const noBill=activeLedger().filter(l=>l.type==='expense'&&!l.proofDataUri).length;
