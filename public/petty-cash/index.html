@@ -1820,11 +1820,11 @@ function pcSpendBreakdownRowHtml(x){
       ${verifyBtn?`<div style="margin-top:10px;text-align:right">${verifyBtn}</div>`:''}
     </div>`;
 }
-// Mirrors the "Active / Verified & Settled" tab pattern on My Petty Cash - splits the Ledger
-// History panel into still-awaiting-Accept items (Pending, default, since that's what
-// Accounts needs to act on) vs already-resolved pc_ledger entries (Complete). Shows every
-// pending item here (not just ones the viewer themself can resolve, unlike the
-// pcPendingAcceptWrap banner elsewhere) since this is the Accounts-wide ledger view;
+// "Active" here mirrors the SAME meaning as My Petty Cash's own Active/Verified & Settled
+// tabs: Cash Out already Accepted, spending ongoing, not yet Verified & Settled - not the
+// still-awaiting-Accept queue (that queue gets its own "Pending Accept" tab, since it's
+// already shown separately via the pcPendingAcceptWrap banner too - this tab just lets
+// Accounts also see/act on it from inside the full Ledger History view).
 // pcAcceptPending()/pcRejectPending() still enforce authorization on the actual action.
 let pcLedgerHistTab='active';
 function setPcLedgerHistTab(t){pcLedgerHistTab=t;renderLedger();}
@@ -1840,12 +1840,12 @@ function isOverdueVerify(x){return isAwaitingVerify(x)&&daysPendingVerify(x)>=PE
 function renderLedgerHistTabs(){
   const wrap=$('ledgerHistTabs');
   if(!wrap)return;
-  const activeN=pendingEntries.filter(p=>p.status==='pending').length;
-  const verifyN=ledger.filter(isAwaitingVerify).length;
+  const acceptN=pendingEntries.filter(p=>p.status==='pending').length;
+  const activeN=ledger.filter(isAwaitingVerify).length;
   const overdueN=ledger.filter(isOverdueVerify).length;
   wrap.innerHTML=`
-    <button class="tab${pcLedgerHistTab==='active'?' on':''}" onclick="setPcLedgerHistTab('active')">⏳ Active (${activeN})</button>
-    <button class="tab${pcLedgerHistTab==='verify'?' on':''}" onclick="setPcLedgerHistTab('verify')">👁 Verify &amp; Received (${verifyN})</button>
+    <button class="tab${pcLedgerHistTab==='accept'?' on':''}" onclick="setPcLedgerHistTab('accept')">🆕 Pending Accept (${acceptN})</button>
+    <button class="tab${pcLedgerHistTab==='active'?' on':''}" onclick="setPcLedgerHistTab('active')">🟢 Active (${activeN})</button>
     <button class="tab${pcLedgerHistTab==='overdue'?' on':''}" onclick="setPcLedgerHistTab('overdue')" style="${pcLedgerHistTab==='overdue'?'background:var(--red);border-color:var(--red)':''}">🔴 Overdue (${overdueN})</button>
     <button class="tab${pcLedgerHistTab==='complete'?' on':''}" onclick="setPcLedgerHistTab('complete')">✓ Complete</button>`;
   if($('histFiltersToggleBtn'))$('histFiltersToggleBtn').classList.toggle('hidden',pcLedgerHistTab!=='complete');
@@ -1880,7 +1880,7 @@ function ledgerCardHtml(x,anyLedgerSpendOpen){
   </div>`;
   return card+(isSpendOpen?pcSpendBreakdownRowHtml(x):'');
 }
-function renderActiveTabList(){
+function renderAcceptQueueList(){
   const pending=pendingEntries.filter(p=>p.status==='pending');
   $('ledgerTable').innerHTML=pending.map(p=>{
     const label=p.type==='in'?'Fund Add':'Cash Out';
@@ -1901,8 +1901,8 @@ function renderLedgerCardList(rows,emptyMsg){
 }
 function renderLedger(){
   renderLedgerHistTabs();
-  if(pcLedgerHistTab==='active'){renderActiveTabList();return;}
-  if(pcLedgerHistTab==='verify'){renderLedgerCardList(ledger.filter(isAwaitingVerify).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Hisaab verify pending nahi hai.');return;}
+  if(pcLedgerHistTab==='accept'){renderAcceptQueueList();return;}
+  if(pcLedgerHistTab==='active'){renderLedgerCardList(ledger.filter(isAwaitingVerify).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Hisaab verify pending nahi hai.');return;}
   if(pcLedgerHistTab==='overdue'){renderLedgerCardList(ledger.filter(isOverdueVerify).sort((a,b)=>daysPendingVerify(b)-daysPendingVerify(a)),'Koi overdue Hisaab nahi hai.');return;}
   const deletedN=ledger.filter(x=>x.deletedAt).length;
   if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
