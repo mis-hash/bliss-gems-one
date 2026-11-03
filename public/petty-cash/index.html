@@ -1848,25 +1848,32 @@ function isReceivedFund(x){return x.type==='in'}
 // Accounts can see "money that was issued and has now been verified/received back" on its
 // own, separate from Loan entries and direct (no-recipient) Cash Out entries.
 function isVerifiedReceived(x){return x.type==='out'&&x.personId&&!!x.verified}
+// Every named Cash Out Accounts has issued to a specific person, regardless of where it
+// currently stands (Active/Overdue/already Verified) - a single consolidated "everything we
+// ever issued" audit view, cutting across the status-based tabs above instead of replacing
+// them (an entry shows here AND in whichever status tab it's currently in).
+function isIssuedByAccounts(x){return x.type==='out'&&!!x.personId}
 function renderLedgerHistTabs(){
   const wrap=$('ledgerHistTabs');
   if(!wrap)return;
   const acceptN=pendingEntries.filter(p=>p.status==='pending').length;
   const activeN=ledger.filter(isAwaitingVerify).length;
   const overdueN=ledger.filter(isOverdueVerify).length;
+  const issuedN=ledger.filter(isIssuedByAccounts).length;
   const verifiedN=ledger.filter(isVerifiedReceived).length;
   const receivedN=ledger.filter(isReceivedFund).length;
   wrap.innerHTML=`
     <button class="tab${pcLedgerHistTab==='accept'?' on':''}" onclick="setPcLedgerHistTab('accept')">🆕 Pending Accept (${acceptN})</button>
     <button class="tab${pcLedgerHistTab==='active'?' on':''}" onclick="setPcLedgerHistTab('active')">🟢 Active (${activeN})</button>
     <button class="tab${pcLedgerHistTab==='overdue'?' on':''}" onclick="setPcLedgerHistTab('overdue')" style="${pcLedgerHistTab==='overdue'?'background:var(--red);border-color:var(--red)':''}">🔴 Overdue (${overdueN})</button>
+    <button class="tab${pcLedgerHistTab==='issued'?' on':''}" onclick="setPcLedgerHistTab('issued')">📤 Issued by Accounts (${issuedN})</button>
     <button class="tab${pcLedgerHistTab==='verified'?' on':''}" onclick="setPcLedgerHistTab('verified')">✅ Verified &amp; Received (${verifiedN})</button>
     <button class="tab${pcLedgerHistTab==='received'?' on':''}" onclick="setPcLedgerHistTab('received')">💵 Received Fund (${receivedN})</button>
     <button class="tab${pcLedgerHistTab==='complete'?' on':''}" onclick="setPcLedgerHistTab('complete')">✓ Complete</button>`;
   if($('histFiltersToggleBtn'))$('histFiltersToggleBtn').classList.toggle('hidden',pcLedgerHistTab!=='complete');
   if(pcLedgerHistTab!=='complete')$('histFiltersPanel')?.classList.add('hidden');
 }
-function ledgerCardHtml(x,anyLedgerSpendOpen){
+function ledgerCardHtml(x,anyLedgerSpendOpen,suppressReceiveFund){
   const pillClass=x.type==='in'?'in':x.type==='out'?'out':'loan';
   const pillLabel=x.type==='in'?'IN':x.type==='out'?'OUT':'LOAN';
   const sign=x.type==='in'?'+':'-';
@@ -1882,8 +1889,10 @@ function ledgerCardHtml(x,anyLedgerSpendOpen){
   const isSpendOpen=canExpandSpend&&!!pcLedgerExpanded[x.id];
   const viewSpendBtn=canExpandSpend?`<button class="btn small secondary" onclick="togglePcLedgerSpendExpand('${esc(x.id)}')">${isSpendOpen?'🔽':'👁'} View Spending</button>`:'';
   // Direct action on the card itself, not just inside the "View Spending" expand - so Accounts
-  // can Receive Fund straight from the Active tab list without an extra click.
-  const receiveFundBtn=(isAwaitingVerify(x)&&canCloseLoan())?`<button class="btn small primary" onclick="verifyAndSettleSpending('${esc(x.id)}')">💰 Receive Fund</button>`:'';
+  // can Receive Fund straight from the Active tab list without an extra click. Suppressed on
+  // the "Issued by Accounts" audit tab - that tab is a plain read-only list of everything
+  // ever issued, not an action queue (View Spending still has it, inside the expand).
+  const receiveFundBtn=(isAwaitingVerify(x)&&canCloseLoan()&&!suppressReceiveFund)?`<button class="btn small primary" onclick="verifyAndSettleSpending('${esc(x.id)}')">💰 Receive Fund</button>`:'';
   const actions=[repayBtn,viewSpendBtn,receiveFundBtn,editBtn,adminBtn,permBtn].filter(Boolean).join(' ');
   const amtColor=x.type==='in'?'var(--g)':x.type==='out'?'var(--red)':'var(--amber)';
   const card=`<div class="pcLedgerCard${anyLedgerSpendOpen&&!isSpendOpen?' pcDimRow':''}">
@@ -1913,9 +1922,9 @@ function renderAcceptQueueList(){
   }).join('')||`<div class="emptystate">✅<p>Koi Accept pending nahi hai.</p></div>`;
   if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
 }
-function renderLedgerCardList(rows,emptyMsg){
+function renderLedgerCardList(rows,emptyMsg,suppressReceiveFund){
   const anyLedgerSpendOpen=Object.values(pcLedgerExpanded).some(Boolean);
-  $('ledgerTable').innerHTML=rows.map(x=>ledgerCardHtml(x,anyLedgerSpendOpen)).join('')||`<div class="emptystate">✅<p>${emptyMsg}</p></div>`;
+  $('ledgerTable').innerHTML=rows.map(x=>ledgerCardHtml(x,anyLedgerSpendOpen,suppressReceiveFund)).join('')||`<div class="emptystate">✅<p>${emptyMsg}</p></div>`;
   if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
 }
 function renderLedger(){
@@ -1923,6 +1932,7 @@ function renderLedger(){
   if(pcLedgerHistTab==='accept'){renderAcceptQueueList();return;}
   if(pcLedgerHistTab==='active'){renderLedgerCardList(ledger.filter(isAwaitingVerify).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Hisaab verify pending nahi hai.');return;}
   if(pcLedgerHistTab==='overdue'){renderLedgerCardList(ledger.filter(isOverdueVerify).sort((a,b)=>daysPendingVerify(b)-daysPendingVerify(a)),'Koi overdue Hisaab nahi hai.');return;}
+  if(pcLedgerHistTab==='issued'){renderLedgerCardList(ledger.filter(isIssuedByAccounts).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Cash Out abhi tak issue nahi hui hai.',true);return;}
   if(pcLedgerHistTab==='verified'){renderLedgerCardList(ledger.filter(isVerifiedReceived).sort((a,b)=>String((b.settledAt||b.date)).localeCompare(String(a.settledAt||a.date))),'Koi Verified &amp; Received entry nahi hai.');return;}
   if(pcLedgerHistTab==='received'){renderLedgerCardList(ledger.filter(isReceivedFund).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Received Fund entry nahi hai.');return;}
   const deletedN=ledger.filter(x=>x.deletedAt).length;
