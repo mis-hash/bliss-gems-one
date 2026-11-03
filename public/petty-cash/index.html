@@ -1915,11 +1915,13 @@ function renderLedger(){
   if(pcLedgerHistTab==='accept'){renderAcceptQueueList();return;}
   if(pcLedgerHistTab==='active'){renderLedgerCardList(ledger.filter(isAwaitingVerify).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Hisaab verify pending nahi hai.');return;}
   if(pcLedgerHistTab==='overdue'){renderLedgerCardList(ledger.filter(isOverdueVerify).sort((a,b)=>daysPendingVerify(b)-daysPendingVerify(a)),'Koi overdue Hisaab nahi hai.');return;}
+  if(pcLedgerHistTab==='received'){renderLedgerCardList(ledger.filter(isReceivedFund).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Received Fund entry nahi hai.');return;}
   const deletedN=ledger.filter(x=>x.deletedAt).length;
   if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
   if($('deletedCount'))$('deletedCount').textContent=deletedN;
-  // Already-awaiting-verify entries live in the Pending tab (see above), not here.
-  const allRows=filteredLedgerRows().filter(x=>!isAwaitingVerify(x));
+  // Already-awaiting-verify entries live in the Pending tab, Cash In entries live in the
+  // Received Fund tab (see above) - not here.
+  const allRows=filteredLedgerRows().filter(x=>!isAwaitingVerify(x)&&!isReceivedFund(x));
   const rows=allRows.slice(0,ledgerPageSize);
   const anyLedgerSpendOpen=Object.values(pcLedgerExpanded).some(Boolean);
   $('ledgerTable').innerHTML=rows.map(x=>ledgerCardHtml(x,anyLedgerSpendOpen)).join('')||`<div class="emptystate">💵<p>Koi entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div>`;
