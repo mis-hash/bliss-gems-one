@@ -1837,16 +1837,31 @@ function daysPendingVerify(x){return Math.floor((Date.now()-new Date(x.date).get
 // Same threshold as the Pending Hisaab Reminders panel's own "day 1" alert
 // (PENDING_REMINDER_GAP_DAYS) - an awaiting-verify entry this old or older is flagged here too.
 function isOverdueVerify(x){return isAwaitingVerify(x)&&daysPendingVerify(x)>=PENDING_REMINDER_GAP_DAYS}
+// A "Received Fund" entry is a Cash In (type 'in') already in pc_ledger - it only gets there
+// via pcAcceptPending() accepting a Fund Add request, so being in pc_ledger at all already
+// means Accounts received/accepted it. Split out from the generic Complete tab into its own
+// tab so Accounts can see "money that came in from Admin" at a glance, separate from settled
+// Cash Out/Loan entries.
+function isReceivedFund(x){return x.type==='in'}
+// A Cash Out that's already gone through Verify & Receive (the "💰 Receive Fund" action) -
+// split out from the generic Complete tab too, same reasoning as Received Fund above, so
+// Accounts can see "money that was issued and has now been verified/received back" on its
+// own, separate from Loan entries and direct (no-recipient) Cash Out entries.
+function isVerifiedReceived(x){return x.type==='out'&&x.personId&&!!x.verified}
 function renderLedgerHistTabs(){
   const wrap=$('ledgerHistTabs');
   if(!wrap)return;
   const acceptN=pendingEntries.filter(p=>p.status==='pending').length;
   const activeN=ledger.filter(isAwaitingVerify).length;
   const overdueN=ledger.filter(isOverdueVerify).length;
+  const verifiedN=ledger.filter(isVerifiedReceived).length;
+  const receivedN=ledger.filter(isReceivedFund).length;
   wrap.innerHTML=`
     <button class="tab${pcLedgerHistTab==='accept'?' on':''}" onclick="setPcLedgerHistTab('accept')">🆕 Pending Accept (${acceptN})</button>
     <button class="tab${pcLedgerHistTab==='active'?' on':''}" onclick="setPcLedgerHistTab('active')">🟢 Active (${activeN})</button>
     <button class="tab${pcLedgerHistTab==='overdue'?' on':''}" onclick="setPcLedgerHistTab('overdue')" style="${pcLedgerHistTab==='overdue'?'background:var(--red);border-color:var(--red)':''}">🔴 Overdue (${overdueN})</button>
+    <button class="tab${pcLedgerHistTab==='verified'?' on':''}" onclick="setPcLedgerHistTab('verified')">✅ Verified &amp; Received (${verifiedN})</button>
+    <button class="tab${pcLedgerHistTab==='received'?' on':''}" onclick="setPcLedgerHistTab('received')">💵 Received Fund (${receivedN})</button>
     <button class="tab${pcLedgerHistTab==='complete'?' on':''}" onclick="setPcLedgerHistTab('complete')">✓ Complete</button>`;
   if($('histFiltersToggleBtn'))$('histFiltersToggleBtn').classList.toggle('hidden',pcLedgerHistTab!=='complete');
   if(pcLedgerHistTab!=='complete')$('histFiltersPanel')?.classList.add('hidden');
@@ -1879,6 +1894,7 @@ function ledgerCardHtml(x,anyLedgerSpendOpen){
     <div class="pcLedgerCardSub"><b>${esc(x.person||'-')}</b></div>
     ${x.note?`<div class="pcLedgerCardNote">${esc(x.note)}</div>`:''}
     <div class="pcLedgerCardMeta">${esc(x.date)}${deletedInfo(x)} · by ${esc(nameOfUserId(x.by))}</div>
+    ${isReceivedFund(x)?`<div class="pcLedgerCardMeta" style="opacity:.75">✓ Accepted from Admin</div>`:''}
     ${actions?`<div class="pcLedgerCardActions">${actions}</div>`:''}
   </div>`;
   return card+(isSpendOpen?pcSpendBreakdownRowHtml(x):'');
@@ -1907,11 +1923,14 @@ function renderLedger(){
   if(pcLedgerHistTab==='accept'){renderAcceptQueueList();return;}
   if(pcLedgerHistTab==='active'){renderLedgerCardList(ledger.filter(isAwaitingVerify).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Hisaab verify pending nahi hai.');return;}
   if(pcLedgerHistTab==='overdue'){renderLedgerCardList(ledger.filter(isOverdueVerify).sort((a,b)=>daysPendingVerify(b)-daysPendingVerify(a)),'Koi overdue Hisaab nahi hai.');return;}
+  if(pcLedgerHistTab==='verified'){renderLedgerCardList(ledger.filter(isVerifiedReceived).sort((a,b)=>String((b.settledAt||b.date)).localeCompare(String(a.settledAt||a.date))),'Koi Verified &amp; Received entry nahi hai.');return;}
+  if(pcLedgerHistTab==='received'){renderLedgerCardList(ledger.filter(isReceivedFund).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Received Fund entry nahi hai.');return;}
   const deletedN=ledger.filter(x=>x.deletedAt).length;
   if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
   if($('deletedCount'))$('deletedCount').textContent=deletedN;
-  // Already-awaiting-verify entries live in the Pending tab (see above), not here.
-  const allRows=filteredLedgerRows().filter(x=>!isAwaitingVerify(x));
+  // Already-awaiting-verify entries live in the Pending tab, Cash In entries live in the
+  // Received Fund tab (see above) - not here.
+  const allRows=filteredLedgerRows().filter(x=>!isAwaitingVerify(x)&&!isReceivedFund(x)&&!isVerifiedReceived(x));
   const rows=allRows.slice(0,ledgerPageSize);
   const anyLedgerSpendOpen=Object.values(pcLedgerExpanded).some(Boolean);
   $('ledgerTable').innerHTML=rows.map(x=>ledgerCardHtml(x,anyLedgerSpendOpen)).join('')||`<div class="emptystate">💵<p>Koi entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div>`;
