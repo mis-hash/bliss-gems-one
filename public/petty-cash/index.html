@@ -183,6 +183,7 @@ tbody tr:hover td{background:#f7faf8}
     <div class="ph"><span>Quick Actions</span></div>
     <div class="pb" style="display:flex;gap:8px;flex-wrap:wrap">
       <button type="button" class="btn primary" onclick="openEntryModal('in')">➕ Add Fund</button>
+      <button type="button" class="btn danger superAdminStrict hidden" onclick="clearAllPendingHistory()">🗑 Clear Pending/Rejected History</button>
     </div>
   </div>
   <div class="pendingRemindersWrap"></div>
@@ -894,6 +895,30 @@ function startPendingEntriesSync(){
     pendingEntries=[];snap.forEach(d=>pendingEntries.push({id:d.id,...d.data()}));
     renderAll();
   },err=>console.error('pending entries sync error',err));
+}
+let _pcClearingPendingHistory=false;
+// pc_pending_entries is its own collection (see addLedgerEntry() above) - deleting from
+// pc_ledger never touches it, so a still-pending or already-resolved (accepted/rejected)
+// record here keeps showing on the PENDING ACCEPT/REJECTED tiles forever regardless of any
+// ledger cleanup. This permanently deletes every record in it (not just resolved ones) -
+// a still-pending request is also wiped, not just moved to rejected, so use with care.
+async function clearAllPendingHistory(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin yeh kar sakta hai.');return}
+  if(_pcClearingPendingHistory)return;
+  if(!pendingEntries.length){alert('Koi Pending/Rejected entry hai hi nahi.');return}
+  if(!confirm(`${pendingEntries.length} Pending/Rejected entries (stale and still-open both) permanently delete karni hain? Ye wapas nahi aa sakti.`))return;
+  _pcClearingPendingHistory=true;
+  try{
+    const batch=db.batch();
+    pendingEntries.forEach(p=>batch.delete(db.collection('pc_pending_entries').doc(p.id)));
+    await batch.commit();
+    toast('Pending/Rejected history clear ho gayi');
+  }catch(e){
+    console.error('clear pending history failed:',e);
+    alert('Clear karte waqt error aaya: '+(e.message||e));
+  }finally{
+    _pcClearingPendingHistory=false;
+  }
 }
 async function markLoanRepaid(id){
   if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin loan Repaid mark kar sakte hain.');return}
