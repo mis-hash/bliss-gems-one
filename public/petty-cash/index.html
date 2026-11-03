@@ -1848,18 +1848,25 @@ function isReceivedFund(x){return x.type==='in'}
 // Accounts can see "money that was issued and has now been verified/received back" on its
 // own, separate from Loan entries and direct (no-recipient) Cash Out entries.
 function isVerifiedReceived(x){return x.type==='out'&&x.personId&&!!x.verified}
+// Every named Cash Out Accounts has issued to a specific person, regardless of where it
+// currently stands (Active/Overdue/already Verified) - a single consolidated "everything we
+// ever issued" audit view, cutting across the status-based tabs above instead of replacing
+// them (an entry shows here AND in whichever status tab it's currently in).
+function isIssuedByAccounts(x){return x.type==='out'&&!!x.personId}
 function renderLedgerHistTabs(){
   const wrap=$('ledgerHistTabs');
   if(!wrap)return;
   const acceptN=pendingEntries.filter(p=>p.status==='pending').length;
   const activeN=ledger.filter(isAwaitingVerify).length;
   const overdueN=ledger.filter(isOverdueVerify).length;
+  const issuedN=ledger.filter(isIssuedByAccounts).length;
   const verifiedN=ledger.filter(isVerifiedReceived).length;
   const receivedN=ledger.filter(isReceivedFund).length;
   wrap.innerHTML=`
     <button class="tab${pcLedgerHistTab==='accept'?' on':''}" onclick="setPcLedgerHistTab('accept')">🆕 Pending Accept (${acceptN})</button>
     <button class="tab${pcLedgerHistTab==='active'?' on':''}" onclick="setPcLedgerHistTab('active')">🟢 Active (${activeN})</button>
     <button class="tab${pcLedgerHistTab==='overdue'?' on':''}" onclick="setPcLedgerHistTab('overdue')" style="${pcLedgerHistTab==='overdue'?'background:var(--red);border-color:var(--red)':''}">🔴 Overdue (${overdueN})</button>
+    <button class="tab${pcLedgerHistTab==='issued'?' on':''}" onclick="setPcLedgerHistTab('issued')">📤 Issued by Accounts (${issuedN})</button>
     <button class="tab${pcLedgerHistTab==='verified'?' on':''}" onclick="setPcLedgerHistTab('verified')">✅ Verified &amp; Received (${verifiedN})</button>
     <button class="tab${pcLedgerHistTab==='received'?' on':''}" onclick="setPcLedgerHistTab('received')">💵 Received Fund (${receivedN})</button>
     <button class="tab${pcLedgerHistTab==='complete'?' on':''}" onclick="setPcLedgerHistTab('complete')">✓ Complete</button>`;
@@ -1923,6 +1930,7 @@ function renderLedger(){
   if(pcLedgerHistTab==='accept'){renderAcceptQueueList();return;}
   if(pcLedgerHistTab==='active'){renderLedgerCardList(ledger.filter(isAwaitingVerify).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Hisaab verify pending nahi hai.');return;}
   if(pcLedgerHistTab==='overdue'){renderLedgerCardList(ledger.filter(isOverdueVerify).sort((a,b)=>daysPendingVerify(b)-daysPendingVerify(a)),'Koi overdue Hisaab nahi hai.');return;}
+  if(pcLedgerHistTab==='issued'){renderLedgerCardList(ledger.filter(isIssuedByAccounts).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Cash Out abhi tak issue nahi hui hai.');return;}
   if(pcLedgerHistTab==='verified'){renderLedgerCardList(ledger.filter(isVerifiedReceived).sort((a,b)=>String((b.settledAt||b.date)).localeCompare(String(a.settledAt||a.date))),'Koi Verified &amp; Received entry nahi hai.');return;}
   if(pcLedgerHistTab==='received'){renderLedgerCardList(ledger.filter(isReceivedFund).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Received Fund entry nahi hai.');return;}
   const deletedN=ledger.filter(x=>x.deletedAt).length;
