@@ -1866,7 +1866,10 @@ function ledgerCardHtml(x,anyLedgerSpendOpen){
   const canExpandSpend=x.type==='out'&&x.personId;
   const isSpendOpen=canExpandSpend&&!!pcLedgerExpanded[x.id];
   const viewSpendBtn=canExpandSpend?`<button class="btn small secondary" onclick="togglePcLedgerSpendExpand('${esc(x.id)}')">${isSpendOpen?'🔽':'👁'} View Spending</button>`:'';
-  const actions=[repayBtn,viewSpendBtn,editBtn,adminBtn,permBtn].filter(Boolean).join(' ');
+  // Direct action on the card itself, not just inside the "View Spending" expand - so Accounts
+  // can Receive Fund straight from the Active tab list without an extra click.
+  const receiveFundBtn=(isAwaitingVerify(x)&&canCloseLoan())?`<button class="btn small primary" onclick="verifyAndSettleSpending('${esc(x.id)}')">💰 Receive Fund</button>`:'';
+  const actions=[repayBtn,viewSpendBtn,receiveFundBtn,editBtn,adminBtn,permBtn].filter(Boolean).join(' ');
   const amtColor=x.type==='in'?'var(--g)':x.type==='out'?'var(--red)':'var(--amber)';
   const card=`<div class="pcLedgerCard${anyLedgerSpendOpen&&!isSpendOpen?' pcDimRow':''}">
     <div class="pcLedgerCardTop">
