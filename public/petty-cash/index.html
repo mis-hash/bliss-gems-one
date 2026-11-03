@@ -217,6 +217,7 @@ tbody tr:hover td{background:#f7faf8}
       </div>
     </div>
     <div class="pb">
+      <div class="tabs" id="ledgerHistTabs" style="margin-bottom:12px"></div>
       <div id="histFiltersPanel" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
         <div class="field" style="width:auto;margin:0"><label>Type</label><select id="histType" onchange="onLedgerFilterChange()" style="width:auto;padding:10px;border:1px solid var(--line);border-radius:7px">
           <option value="all">All Types</option>
@@ -483,6 +484,11 @@ function doLogin(){
   // "Cash In" state (and its gate) left over from whoever was logged in before.
   if($('entryModalTitle'))selectEntryType('out');
   renderAll();
+  // Land each role on the page that's actually theirs, instead of whatever page happened to
+  // be showing before login - Admin/Director -> Admin Panel, Accountant -> Accounts (ledger),
+  // everyone else (no role) -> their own My Petty Cash.
+  const role=(u.appRoles&&u.appRoles[APP_SLUG])||'';
+  goPage(role==='admin'||role==='director'?'admin':role==='accountant'?'ledger':'my');
 }
 function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
 function hardRefreshApp(){
@@ -1472,7 +1478,6 @@ function renderPendingReminders(){
   const toggleHtml=superAdminUnlocked?`<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer"><input type="checkbox" style="width:auto" ${masters.autoReminderEnabled?'checked':''} onchange="toggleAutoReminder()"> Auto-Send WhatsApp</label>`:'';
   if(!due.length){wraps.forEach(wrap=>wrap.innerHTML=`<div class="panel"><div class="ph"><span>⏰ Pending Hisaab Reminders</span>${toggleHtml}</div><div class="pb" style="display:flex;align-items:center;gap:8px;color:var(--g);font-size:13px;font-weight:600"><span style="font-size:17px">✓</span><span>Koi pending hisaab nahi hai.</span></div></div>`);return;}
   const html=`<div class="panel"><div class="ph"><span>⏰ Pending Hisaab Reminders</span>${toggleHtml}</div><div class="pb">
-    <p class="note" style="margin:0 0 10px">Hisaab dene ke liye ${PENDING_REMINDER_GAP_DAYS} din milte hain, uske baad reminder due ho jata hai. ${ESCALATE_TO_ACCOUNTANT_DAYS}+ din se pending ho to Accountant ko bhi dikhega. ${masters.autoReminderEnabled?'Auto-Send ON hai — jab bhi koi app kholega, due reminders WhatsApp par khud chale jayenge.':'Auto-Send OFF hai — Super Admin isse upar diye "Auto-Send WhatsApp" toggle se on kar sakta hai, tab tak "Reminder Bhej Diya Mark Karein" button se manually mark karein.'} (Yeh check app khulne par hota hai — background mein khud-ba-khud nahi chalta, Spark free plan par ye possible nahi hai.)</p>
     ${due.map(r=>{
     const totalPending=r.issuedPending+r.loansOutstanding;
     return `<div class="item" style="flex-direction:column;align-items:stretch;gap:6px">
@@ -1734,7 +1739,41 @@ function pcSpendBreakdownRowHtml(x){
       ${verifyBtn?`<div style="margin-top:10px;text-align:right">${verifyBtn}</div>`:''}
     </div>`;
 }
+// Mirrors the "Active / Verified & Settled" tab pattern on My Petty Cash - splits the Ledger
+// History panel into still-awaiting-Accept items (Pending, default, since that's what
+// Accounts needs to act on) vs already-resolved pc_ledger entries (Complete). Shows every
+// pending item here (not just ones the viewer themself can resolve, unlike the
+// pcPendingAcceptWrap banner elsewhere) since this is the Accounts-wide ledger view;
+// pcAcceptPending()/pcRejectPending() still enforce authorization on the actual action.
+let pcLedgerHistTab='pending';
+function setPcLedgerHistTab(t){pcLedgerHistTab=t;renderLedger();}
+function renderLedgerHistTabs(){
+  const wrap=$('ledgerHistTabs');
+  if(!wrap)return;
+  const pendingN=pendingEntries.filter(p=>p.status==='pending').length;
+  wrap.innerHTML=`
+    <button class="tab${pcLedgerHistTab==='pending'?' on':''}" onclick="setPcLedgerHistTab('pending')">⏳ Pending (${pendingN})</button>
+    <button class="tab${pcLedgerHistTab==='complete'?' on':''}" onclick="setPcLedgerHistTab('complete')">✓ Complete</button>`;
+  if($('histFiltersToggleBtn'))$('histFiltersToggleBtn').classList.toggle('hidden',pcLedgerHistTab!=='complete');
+  if(pcLedgerHistTab!=='complete')$('histFiltersPanel')?.classList.add('hidden');
+}
+function renderPendingTabList(){
+  const pending=pendingEntries.filter(p=>p.status==='pending');
+  $('ledgerTable').innerHTML=pending.length?pending.map(p=>{
+    const label=p.type==='in'?'Fund Add':'Cash Out';
+    return `<div class="item">
+      <span><b>${esc(label)} — ${fmtAmt(p.amount)}</b><br><small style="color:var(--muted)">By: ${esc(p.byName||nameOfUserId(p.by))}${p.note?' · '+esc(p.note):''} (${esc(p.date)})</small></span>
+      <span style="display:flex;gap:6px">
+        <button class="btn small danger" onclick="pcRejectPending('${esc(p.id)}')">✕ Reject</button>
+        <button class="btn small primary" onclick="pcAcceptPending('${esc(p.id)}')">✓ Accept</button>
+      </span>
+    </div>`;
+  }).join(''):`<div class="emptystate">✅<p>Koi pending entry nahi hai.</p><small>Sab accept ho chuki hain.</small></div>`;
+  if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
+}
 function renderLedger(){
+  renderLedgerHistTabs();
+  if(pcLedgerHistTab==='pending'){renderPendingTabList();return;}
   const deletedN=ledger.filter(x=>x.deletedAt).length;
   if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
   if($('deletedCount'))$('deletedCount').textContent=deletedN;
