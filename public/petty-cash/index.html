@@ -381,6 +381,13 @@ tbody tr:hover td{background:#f7faf8}
 <div id="spendingDetailContent"></div>
 </div></div>
 
+<div class="modal" id="pcSpendProofModal"><div class="box" style="width:min(420px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Spend Proof</h3><button class="btn small" onclick="closePcSpendProofView()">✕</button></div>
+<img id="pcSpendProofImg" style="max-width:100%;border-radius:8px">
+</div></div>
+
+<datalist id="pcSpendNoteList"></datalist>
+
 <!-- Manage modal -->
 <div class="modal" id="manageModal"><div class="box" style="width:min(640px,100%)">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Admin / Manage Records</h3><button class="btn small" onclick="closeManage()">✕</button></div>
@@ -422,7 +429,12 @@ let users=[],ledger=[],issueSpends=[];
 let masters={alertRecipients:[],pendingReminders:{},autoReminderEnabled:false};
 let api={};
 let currentUser=null,currentTab='records',entryType='in';
-let usersStarted=false,ledgerStarted=false,mastersStarted=false,issueSpendsStarted=false;
+let usersStarted=false,ledgerStarted=false,mastersStarted=false,issueSpendsStarted=false,pcSpendCategoriesStarted=false;
+// Self-growing "Spent on what?" suggestion list for the Cash Issued to Me spend entries -
+// same pattern as Trip Expense's expense categories: starts with a small generic seed, and
+// typing a brand-new one on Add Spend auto-syncs it to pc_settings/spendCategories so every
+// other Doer's dropdown gets it as a suggestion too.
+let PC_SPEND_CATEGORIES=['Food','Tea / Snacks','Conveyance','Fuel','Stationery','Courier','Labour','Misc','Other'];
 
 function loggedUser(){return users.find(x=>x.id===currentUser)||null}
 function myRole(){const u=loggedUser();return (u&&u.appRoles&&u.appRoles[APP_SLUG])||''}
@@ -539,6 +551,57 @@ function startMastersSync(){
   db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed',e));
 }
 function saveMasters(){ if(db) db.collection('pc_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
+function renderPcSpendCategoryOptions(){
+  const list=$('pcSpendNoteList');
+  if(list)list.innerHTML=PC_SPEND_CATEGORIES.map(c=>`<option value="${esc(c)}"></option>`).join('');
+}
+function startPcSpendCategoriesSync(){
+  if(pcSpendCategoriesStarted||!db)return;pcSpendCategoriesStarted=true;
+  db.collection('pc_settings').doc('spendCategories').onSnapshot(doc=>{
+    if(doc.exists&&Array.isArray(doc.data().list)){
+      doc.data().list.forEach(c=>{
+        if(c&&!PC_SPEND_CATEGORIES.some(x=>x.toLowerCase()===String(c).toLowerCase()))PC_SPEND_CATEGORIES.push(c);
+      });
+    }
+    renderPcSpendCategoryOptions();
+  },err=>console.error('spendCategories sync error',err));
+}
+async function addPcSpendCategoryIfNew(category){
+  if(!category)return;
+  if(PC_SPEND_CATEGORIES.some(x=>x.toLowerCase()===category.toLowerCase()))return;
+  PC_SPEND_CATEGORIES.push(category);
+  renderPcSpendCategoryOptions();
+  try{await db.collection('pc_settings').doc('spendCategories').set({list:PC_SPEND_CATEGORIES},{merge:true});}
+  catch(e){console.error('addPcSpendCategoryIfNew failed:',e);}
+}
+// Same compress-before-storing approach as Trip Expense's expense Bill Photo (Firestore doc
+// 1MB limit) - resize to a 700px-wide JPEG rather than storing the original.
+function fileToCompressedDataUri(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        const maxW=700;const scale=Math.min(1,maxW/img.width);
+        const canvas=document.createElement('canvas');
+        canvas.width=img.width*scale;canvas.height=img.height*scale;
+        canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL('image/jpeg',0.6));
+      };
+      img.onerror=reject;
+      img.src=reader.result;
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+function viewPcSpendProof(id){
+  const s=issueSpends.find(x=>x.id===id);
+  if(!s||!s.proofDataUri)return;
+  $('pcSpendProofImg').src=s.proofDataUri;
+  $('pcSpendProofModal').classList.add('show');
+}
+function closePcSpendProofView(){$('pcSpendProofModal').classList.remove('show');}
 
 /* ===== WhatsApp (shared GREEN-API credentials, same pattern as Stationery Inventory) ===== */
 function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===10)p='91'+p;return p;}
@@ -1089,11 +1152,12 @@ function renderMyIssuedCash(){
         <span>${open?'🔽':'▶'} <b>${fmtAmt(x.amount)}</b> issued on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>
         ${x.verified?'<span class="pill repaid">✓ Verified &amp; Settled</span>':`<span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>`}
       </div>
-      ${open?`${mySpends.map(s=>`<div style="font-size:12px;color:var(--muted);padding-left:4px">— ${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''} (${esc(s.date)})${superAdminUnlocked?` <button class="btn small danger" style="padding:2px 7px;font-size:10px" onclick="permanentlyDeleteIssueSpend('${esc(s.id)}')">✕</button>`:''}</div>`).join('')||'<div class="note" style="padding-left:4px">Abhi tak koi spending entry nahi daali gayi.</div>'}
+      ${open?`${mySpends.map(s=>`<div style="font-size:12px;color:var(--muted);padding-left:4px">— ${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''} (${esc(s.date)})${s.proofDataUri?` <button class="btn small secondary" style="padding:2px 7px;font-size:10px" onclick="viewPcSpendProof('${esc(s.id)}')">📷 Photo</button>`:''}${superAdminUnlocked?` <button class="btn small danger" style="padding:2px 7px;font-size:10px" onclick="permanentlyDeleteIssueSpend('${esc(s.id)}')">✕</button>`:''}</div>`).join('')||'<div class="note" style="padding-left:4px">Abhi tak koi spending entry nahi daali gayi.</div>'}
       ${x.verified?`<div style="font-size:12px;color:var(--muted);padding-left:4px;margin-top:2px">Verified by ${esc(nameOfUserId(x.settledBy))} on ${esc((x.settledAt||'').slice(0,10))}${x.returnedAmount?' — '+fmtAmt(x.returnedAmount)+' cash received back.':''}</div>`:''}`:''}
       ${x.verified?'':`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
         <input type="number" id="issueSpendAmt_${esc(x.id)}" placeholder="Amount spent" style="width:120px;padding:7px;border:1px solid var(--line);border-radius:7px">
-        <input id="issueSpendNote_${esc(x.id)}" placeholder="Spent on what?" style="flex:1;min-width:140px;padding:7px;border:1px solid var(--line);border-radius:7px">
+        <input id="issueSpendNote_${esc(x.id)}" list="pcSpendNoteList" autocomplete="off" placeholder="Spent on what?" style="flex:1;min-width:140px;padding:7px;border:1px solid var(--line);border-radius:7px">
+        <input type="file" accept="image/*" capture="environment" id="issueSpendProof_${esc(x.id)}" style="width:150px;font-size:11px">
         <button class="btn small primary" onclick="addIssueSpend('${esc(x.id)}')">＋ Add Spend</button>
       </div>`}
     </div>`;
@@ -1534,14 +1598,20 @@ async function addIssueSpend(issueId){
   if(_issueSpendSubmitting)return;
   const issue=ledger.find(x=>x.id===issueId);
   if(issue&&issue.verified){alert('Yeh entry Accounts ne already verify/settle kar di hai, ab aur spend add nahi ho sakta.');return}
-  const amtEl=$('issueSpendAmt_'+issueId),noteEl=$('issueSpendNote_'+issueId);
+  const amtEl=$('issueSpendAmt_'+issueId),noteEl=$('issueSpendNote_'+issueId),proofEl=$('issueSpendProof_'+issueId);
   const amount=parseFloat(amtEl?.value);
   const note=(noteEl?.value||'').trim();
   if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
   _issueSpendSubmitting=true;
   try{
+    let proofDataUri='';
+    const file=proofEl?.files[0];
+    if(file){
+      try{proofDataUri=await fileToCompressedDataUri(file);}catch(e){console.error('spend proof compress failed:',e);}
+    }
+    if(note)await addPcSpendCategoryIfNew(note);
     const actor=loggedUser();
-    await db.collection('pc_issue_spends').add({issueId,amount,note,date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString()});
+    await db.collection('pc_issue_spends').add({issueId,amount,note,proofDataUri,date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString()});
     toast('Spend entry added');
   }finally{
     _issueSpendSubmitting=false;
@@ -1747,19 +1817,55 @@ function pcSpendBreakdownRowHtml(x){
 // pcAcceptPending()/pcRejectPending() still enforce authorization on the actual action.
 let pcLedgerHistTab='pending';
 function setPcLedgerHistTab(t){pcLedgerHistTab=t;renderLedger();}
+// A Cash Out issued to a specific person isn't actually done until Accounts Verifies &
+// Settles it (see the "Pending Verify" pill) - counts as Pending here too, not just items
+// still awaiting Accept, otherwise "Complete" misleadingly includes entries with an open
+// balance and a live "Verify & Receive Remaining" action still sitting on them.
+function isAwaitingVerify(x){return x.type==='out'&&x.personId&&!x.verified&&!x.deletedAt}
 function renderLedgerHistTabs(){
   const wrap=$('ledgerHistTabs');
   if(!wrap)return;
-  const pendingN=pendingEntries.filter(p=>p.status==='pending').length;
+  const pendingN=pendingEntries.filter(p=>p.status==='pending').length+ledger.filter(isAwaitingVerify).length;
   wrap.innerHTML=`
     <button class="tab${pcLedgerHistTab==='pending'?' on':''}" onclick="setPcLedgerHistTab('pending')">⏳ Pending (${pendingN})</button>
     <button class="tab${pcLedgerHistTab==='complete'?' on':''}" onclick="setPcLedgerHistTab('complete')">✓ Complete</button>`;
   if($('histFiltersToggleBtn'))$('histFiltersToggleBtn').classList.toggle('hidden',pcLedgerHistTab!=='complete');
   if(pcLedgerHistTab!=='complete')$('histFiltersPanel')?.classList.add('hidden');
 }
+function ledgerCardHtml(x,anyLedgerSpendOpen){
+  const pillClass=x.type==='in'?'in':x.type==='out'?'out':'loan';
+  const pillLabel=x.type==='in'?'IN':x.type==='out'?'OUT':'LOAN';
+  const sign=x.type==='in'?'+':'-';
+  const loanRepaidBadge=x.type==='loan'?(x.repaid?' <span class="pill repaid">Repaid</span>':' <span class="pill loan">Outstanding</span>'):'';
+  const settledBadge=(x.type==='out'&&x.personId)?(x.verified?' <span class="pill repaid">✓ Settled</span>':' <span class="pill loan">Pending Verify</span>'):'';
+  const repayBtn=(x.type==='loan'&&!x.repaid&&!x.deletedAt)?`<button class="btn small" onclick="markLoanRepaid('${esc(x.id)}')">↩ Mark Repaid</button>`:'';
+  const adminBtn=x.deletedAt
+    ?(superAdminUnlocked?`<button class="btn small" onclick="restoreLedgerEntry('${esc(x.id)}')">↩ Restore</button>`:'')
+    :(superAdminUnlocked?`<button class="btn small danger" onclick="deleteLedgerEntry('${esc(x.id)}')">Disable</button>`:'');
+  const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeleteLedgerEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
+  const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditLedgerModal('${esc(x.id)}')">✎ Edit</button>`:'';
+  const canExpandSpend=x.type==='out'&&x.personId;
+  const isSpendOpen=canExpandSpend&&!!pcLedgerExpanded[x.id];
+  const viewSpendBtn=canExpandSpend?`<button class="btn small secondary" onclick="togglePcLedgerSpendExpand('${esc(x.id)}')">${isSpendOpen?'🔽':'👁'} View Spending</button>`:'';
+  const actions=[repayBtn,viewSpendBtn,editBtn,adminBtn,permBtn].filter(Boolean).join(' ');
+  const amtColor=x.type==='in'?'var(--g)':x.type==='out'?'var(--red)':'var(--amber)';
+  const card=`<div class="pcLedgerCard${anyLedgerSpendOpen&&!isSpendOpen?' pcDimRow':''}">
+    <div class="pcLedgerCardTop">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}${settledBadge}</div>
+      <span class="pcLedgerCardAmt" style="color:${amtColor}">${sign}${fmtAmt(x.amount)}</span>
+    </div>
+    <div class="pcLedgerCardSub"><b>${esc(x.person||'-')}</b></div>
+    ${x.note?`<div class="pcLedgerCardNote">${esc(x.note)}</div>`:''}
+    <div class="pcLedgerCardMeta">${esc(x.date)}${deletedInfo(x)} · by ${esc(nameOfUserId(x.by))}</div>
+    ${actions?`<div class="pcLedgerCardActions">${actions}</div>`:''}
+  </div>`;
+  return card+(isSpendOpen?pcSpendBreakdownRowHtml(x):'');
+}
 function renderPendingTabList(){
   const pending=pendingEntries.filter(p=>p.status==='pending');
-  $('ledgerTable').innerHTML=pending.length?pending.map(p=>{
+  const awaitingVerify=ledger.filter(isAwaitingVerify).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const anyLedgerSpendOpen=Object.values(pcLedgerExpanded).some(Boolean);
+  const acceptCardsHtml=pending.map(p=>{
     const label=p.type==='in'?'Fund Add':'Cash Out';
     return `<div class="item">
       <span><b>${esc(label)} — ${fmtAmt(p.amount)}</b><br><small style="color:var(--muted)">By: ${esc(p.byName||nameOfUserId(p.by))}${p.note?' · '+esc(p.note):''} (${esc(p.date)})</small></span>
@@ -1768,7 +1874,9 @@ function renderPendingTabList(){
         <button class="btn small primary" onclick="pcAcceptPending('${esc(p.id)}')">✓ Accept</button>
       </span>
     </div>`;
-  }).join(''):`<div class="emptystate">✅<p>Koi pending entry nahi hai.</p><small>Sab accept ho chuki hain.</small></div>`;
+  }).join('');
+  const verifyCardsHtml=awaitingVerify.map(x=>ledgerCardHtml(x,anyLedgerSpendOpen)).join('');
+  $('ledgerTable').innerHTML=(acceptCardsHtml+verifyCardsHtml)||`<div class="emptystate">✅<p>Koi pending entry nahi hai.</p><small>Sab accept/verify ho chuki hain.</small></div>`;
   if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
 }
 function renderLedger(){
@@ -1777,38 +1885,11 @@ function renderLedger(){
   const deletedN=ledger.filter(x=>x.deletedAt).length;
   if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
   if($('deletedCount'))$('deletedCount').textContent=deletedN;
-  const allRows=filteredLedgerRows();
+  // Already-awaiting-verify entries live in the Pending tab (see above), not here.
+  const allRows=filteredLedgerRows().filter(x=>!isAwaitingVerify(x));
   const rows=allRows.slice(0,ledgerPageSize);
   const anyLedgerSpendOpen=Object.values(pcLedgerExpanded).some(Boolean);
-  $('ledgerTable').innerHTML=rows.map(x=>{
-    const pillClass=x.type==='in'?'in':x.type==='out'?'out':'loan';
-    const pillLabel=x.type==='in'?'IN':x.type==='out'?'OUT':'LOAN';
-    const sign=x.type==='in'?'+':'-';
-    const loanRepaidBadge=x.type==='loan'?(x.repaid?' <span class="pill repaid">Repaid</span>':' <span class="pill loan">Outstanding</span>'):'';
-    const settledBadge=(x.type==='out'&&x.personId)?(x.verified?' <span class="pill repaid">✓ Settled</span>':' <span class="pill loan">Pending Verify</span>'):'';
-    const repayBtn=(x.type==='loan'&&!x.repaid&&!x.deletedAt)?`<button class="btn small" onclick="markLoanRepaid('${esc(x.id)}')">↩ Mark Repaid</button>`:'';
-    const adminBtn=x.deletedAt
-      ?(superAdminUnlocked?`<button class="btn small" onclick="restoreLedgerEntry('${esc(x.id)}')">↩ Restore</button>`:'')
-      :(superAdminUnlocked?`<button class="btn small danger" onclick="deleteLedgerEntry('${esc(x.id)}')">Disable</button>`:'');
-    const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeleteLedgerEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
-    const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditLedgerModal('${esc(x.id)}')">✎ Edit</button>`:'';
-    const canExpandSpend=x.type==='out'&&x.personId;
-    const isSpendOpen=canExpandSpend&&!!pcLedgerExpanded[x.id];
-    const viewSpendBtn=canExpandSpend?`<button class="btn small secondary" onclick="togglePcLedgerSpendExpand('${esc(x.id)}')">${isSpendOpen?'🔽':'👁'} View Spending</button>`:'';
-    const actions=[repayBtn,viewSpendBtn,editBtn,adminBtn,permBtn].filter(Boolean).join(' ');
-    const amtColor=x.type==='in'?'var(--g)':x.type==='out'?'var(--red)':'var(--amber)';
-    const card=`<div class="pcLedgerCard${anyLedgerSpendOpen&&!isSpendOpen?' pcDimRow':''}">
-      <div class="pcLedgerCardTop">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span class="pill ${pillClass}">${pillLabel}</span>${loanRepaidBadge}${settledBadge}</div>
-        <span class="pcLedgerCardAmt" style="color:${amtColor}">${sign}${fmtAmt(x.amount)}</span>
-      </div>
-      <div class="pcLedgerCardSub"><b>${esc(x.person||'-')}</b></div>
-      ${x.note?`<div class="pcLedgerCardNote">${esc(x.note)}</div>`:''}
-      <div class="pcLedgerCardMeta">${esc(x.date)}${deletedInfo(x)} · by ${esc(nameOfUserId(x.by))}</div>
-      ${actions?`<div class="pcLedgerCardActions">${actions}</div>`:''}
-    </div>`;
-    return card+(isSpendOpen?pcSpendBreakdownRowHtml(x):'');
-  }).join('')||`<div class="emptystate">💵<p>Koi entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div>`;
+  $('ledgerTable').innerHTML=rows.map(x=>ledgerCardHtml(x,anyLedgerSpendOpen)).join('')||`<div class="emptystate">💵<p>Koi entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div>`;
   if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
   if(allRows.length>rows.length){
     const div=document.createElement('div');
@@ -1991,6 +2072,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   startMastersSync();
   startIssueSpendsSync();
   startPendingEntriesSync();
+  startPcSpendCategoriesSync();
+  renderPcSpendCategoryOptions();
   renderAll();
 });
 window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
