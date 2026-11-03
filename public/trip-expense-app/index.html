@@ -355,7 +355,12 @@ if(window.self!==window.top){
 <div class="field"><label>Cash / Bank Ledger</label><input id="lhCash" value="Cash-in-Hand"></div>
 <div class="field"><label>Staff Advance Ledger</label><input id="lhAdvance" value="Staff Advance A/c"></div>
 </div>
-<div id="lhCategoryRows" style="margin-top:10px"></div>
+<div style="margin-top:14px;display:flex;gap:6px;align-items:flex-end">
+  <div class="field" style="flex:1;margin:0"><label>Add New Expense Category</label><input id="lhNewCategory" placeholder="e.g. Hotel Deposit"></div>
+  <button class="btn" onclick="lhAddCategory()">➕ Add</button>
+</div>
+<p style="font-size:11px;color:var(--muted);margin:10px 0 0">Per-category: Ledger Head (for Tally/Busy export) and whether Proof Photo is mandatory on Add Expense.</p>
+<div id="lhCategoryRows" style="margin-top:6px"></div>
 <div class="actions"><button class="btn" onclick="hide('ledgerHeadsModal')">Cancel</button><button class="btn primary" onclick="saveLedgerHeads()">Save Ledger Heads</button></div>
 </div></div>
 
@@ -425,6 +430,10 @@ let currentUser=null;
 let usersStarted=false,usersLoaded=false,tripsStarted=false,ledgerStarted=false,ledgerLoaded=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false;
 let tripOptions={locations:['Surat','Mumbai','Chennai','Udaipur','Ahmedabad','Hyderabad'],purposes:['Exhibition','Client Visit','Sales Tour']};
 let EXPENSE_CATEGORIES=['Hotel','Breakfast','Lunch','Dinner','Food','Tea / Snacks','Taxi / Cab','Local Conveyance','Bus','Train','Flight','Fuel','Toll / Parking','Party Entertainment','Sample / Gift to Party','Courier / Parcel','Mobile / Internet','Stationery / Printing','Porter / Coolie','Labour Charges','Godown / Warehouse','Vehicle Repair','Medical','Laundry','Bank / ATM Charges','Prasad Exp','Petrol Exp (with KM)','Boxes','Ziplock','Packets','Parcel Outward Slip','Parcel Inward Slip','Speed Post','Gemstone Testing Exp','Misc','Other'];
+// Per-category override: when true, Add Expense requires an actual photo (a No-Bill reason
+// alone is not enough) - editable per category from the Ledger Heads modal (Accounts page).
+// Prasad Exp and Petrol Exp (with KM) start mandatory per the user's explicit request.
+let EXPENSE_PROOF_REQUIRED={'Prasad Exp':true,'Petrol Exp (with KM)':true};
 let ledgerHeads={cash:'Cash-in-Hand',advance:'Staff Advance A/c',categories:{Hotel:'Travelling Expenses',Breakfast:'Business Promotion Exp.',Lunch:'Business Promotion Exp.',Dinner:'Business Promotion Exp.',Food:'Business Promotion Exp.','Tea / Snacks':'Business Promotion Exp.','Taxi / Cab':'Travelling Expenses','Local Conveyance':'Travelling Expenses',Bus:'Travelling Expenses',Train:'Travelling Expenses',Flight:'Travelling Expenses',Fuel:'Travelling Expenses','Toll / Parking':'Travelling Expenses','Party Entertainment':'Business Promotion Exp.','Sample / Gift to Party':'Business Promotion Exp.','Courier / Parcel':'Miscellaneous Expenses','Mobile / Internet':'Miscellaneous Expenses','Stationery / Printing':'Miscellaneous Expenses','Porter / Coolie':'Travelling Expenses','Labour Charges':'Travelling Expenses','Godown / Warehouse':'Miscellaneous Expenses','Vehicle Repair':'Travelling Expenses',Medical:'Miscellaneous Expenses',Laundry:'Travelling Expenses','Bank / ATM Charges':'Miscellaneous Expenses','Prasad Exp':'Miscellaneous Expenses','Petrol Exp (with KM)':'Travelling Expenses',Boxes:'Miscellaneous Expenses',Ziplock:'Miscellaneous Expenses',Packets:'Miscellaneous Expenses','Parcel Outward Slip':'Miscellaneous Expenses','Parcel Inward Slip':'Miscellaneous Expenses','Speed Post':'Miscellaneous Expenses','Gemstone Testing Exp':'Miscellaneous Expenses',Misc:'Miscellaneous Expenses',Other:'Miscellaneous Expenses'}};
 let activity=[];
 let closeTripId=null,closeTripExpected=0;
@@ -624,6 +633,9 @@ function startExpenseCategoriesSync(){
       doc.data().list.forEach(c=>{
         if(c&&!EXPENSE_CATEGORIES.some(x=>x.toLowerCase()===String(c).toLowerCase()))EXPENSE_CATEGORIES.push(c);
       });
+    }
+    if(doc.exists&&doc.data().proofRequired){
+      EXPENSE_PROOF_REQUIRED=Object.assign({},EXPENSE_PROOF_REQUIRED,doc.data().proofRequired);
     }
     renderExpenseCategoryOptions();
   },err=>console.error('expenseCategories sync error',err));
@@ -1003,6 +1015,9 @@ async function submitExpense(){
   if(!trip){msg.style.color='#b43a35';msg.textContent='Koi active trip nahi hai.';return}
   const category=$('expCategory').value.trim(),amount=Number($('expAmount').value),paidTo=$('expPaidTo').value.trim(),remark=$('expRemark').value.trim();
   if(!category||!amount||!paidTo){msg.style.color='#b43a35';msg.textContent='Category, Amount aur Paid To zaroori hain.';return}
+  // A category marked Proof Required (set from Ledger Heads modal, Accounts page) must have
+  // an actual photo - a No-Bill remark alone isn't enough, unlike every other category below.
+  if(EXPENSE_PROOF_REQUIRED[category] && !$('expProof').files[0]){msg.style.color='#b43a35';msg.textContent='"'+category+'" ke liye Bill Photo zaroori hai (reason se nahi chalega).';return}
   if(!remark && !$('expProof').files[0]){msg.style.color='#b43a35';msg.textContent='Bill photo lagayein ya No-Bill reason likhein.';return}
   const today=todayISO();
   const isDupe=tripLedger(trip.id).some(l=>l.type==='expense'&&l.category===category&&Number(l.amount)===amount&&String(l.at||'').slice(0,10)===today);
@@ -1740,15 +1755,28 @@ function renderTemplate(tpl,vars){
 function openLedgerHeads(){
   $('lhCash').value=ledgerHeads.cash;
   $('lhAdvance').value=ledgerHeads.advance;
-  $('lhCategoryRows').innerHTML=EXPENSE_CATEGORIES.map(c=>`<div class="field" style="margin-top:8px"><label>${esc(c)}</label><input id="lhCat_${esc(c).replace(/\W/g,'_')}" value="${esc(ledgerHeads.categories[c]||'')}"></div>`).join('');
+  $('lhNewCategory').value='';
+  $('lhCategoryRows').innerHTML=EXPENSE_CATEGORIES.map(c=>`<div class="field" style="margin-top:8px;display:flex;gap:8px;align-items:flex-end"><div style="flex:1"><label>${esc(c)} — Ledger Head</label><input id="lhCat_${esc(c).replace(/\W/g,'_')}" value="${esc(ledgerHeads.categories[c]||'')}"></div><label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:bold;white-space:nowrap;padding-bottom:9px"><input type="checkbox" id="lhProof_${esc(c).replace(/\W/g,'_')}" style="width:auto" ${EXPENSE_PROOF_REQUIRED[c]?'checked':''}> Proof Required</label></div>`).join('');
   show('ledgerHeadsModal');
 }
+async function lhAddCategory(){
+  const c=$('lhNewCategory').value.trim();
+  if(!c)return;
+  await addExpenseCategoryIfNew(c);
+  $('lhNewCategory').value='';
+  openLedgerHeads();
+}
 async function saveLedgerHeads(){
-  const categories={};
-  EXPENSE_CATEGORIES.forEach(c=>{categories[c]=$(`lhCat_${c.replace(/\W/g,'_')}`).value.trim()||c;});
+  const categories={},proofRequired={};
+  EXPENSE_CATEGORIES.forEach(c=>{
+    categories[c]=$(`lhCat_${c.replace(/\W/g,'_')}`).value.trim()||c;
+    if($(`lhProof_${c.replace(/\W/g,'_')}`).checked)proofRequired[c]=true;
+  });
   const patch={cash:$('lhCash').value.trim()||'Cash-in-Hand',advance:$('lhAdvance').value.trim()||'Staff Advance A/c',categories};
   await db.collection('te_settings').doc('ledgerHeads').set(patch,{merge:true});
+  await db.collection('te_settings').doc('expenseCategories').set({proofRequired},{merge:true});
   ledgerHeads=Object.assign({},ledgerHeads,patch);
+  EXPENSE_PROOF_REQUIRED=proofRequired;
   hide('ledgerHeadsModal');
   logActivity(`${(myUserObj()||{}).name||currentUser} edited Ledger Heads`,'');
 }
