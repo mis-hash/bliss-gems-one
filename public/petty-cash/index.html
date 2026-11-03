@@ -1826,19 +1826,27 @@ function pcSpendBreakdownRowHtml(x){
 // pending item here (not just ones the viewer themself can resolve, unlike the
 // pcPendingAcceptWrap banner elsewhere) since this is the Accounts-wide ledger view;
 // pcAcceptPending()/pcRejectPending() still enforce authorization on the actual action.
-let pcLedgerHistTab='pending';
+let pcLedgerHistTab='active';
 function setPcLedgerHistTab(t){pcLedgerHistTab=t;renderLedger();}
 // A Cash Out issued to a specific person isn't actually done until Accounts Verifies &
-// Settles it (see the "Pending Verify" pill) - counts as Pending here too, not just items
+// Settles it (see the "Pending Verify" pill) - counts as open here too, not just items
 // still awaiting Accept, otherwise "Complete" misleadingly includes entries with an open
 // balance and a live "Verify & Receive Remaining" action still sitting on them.
 function isAwaitingVerify(x){return x.type==='out'&&x.personId&&!x.verified&&!x.deletedAt}
+function daysPendingVerify(x){return Math.floor((Date.now()-new Date(x.date).getTime())/86400000)}
+// Same threshold as the Pending Hisaab Reminders panel's own "day 1" alert
+// (PENDING_REMINDER_GAP_DAYS) - an awaiting-verify entry this old or older is flagged here too.
+function isOverdueVerify(x){return isAwaitingVerify(x)&&daysPendingVerify(x)>=PENDING_REMINDER_GAP_DAYS}
 function renderLedgerHistTabs(){
   const wrap=$('ledgerHistTabs');
   if(!wrap)return;
-  const pendingN=pendingEntries.filter(p=>p.status==='pending').length+ledger.filter(isAwaitingVerify).length;
+  const activeN=pendingEntries.filter(p=>p.status==='pending').length;
+  const verifyN=ledger.filter(isAwaitingVerify).length;
+  const overdueN=ledger.filter(isOverdueVerify).length;
   wrap.innerHTML=`
-    <button class="tab${pcLedgerHistTab==='pending'?' on':''}" onclick="setPcLedgerHistTab('pending')">⏳ Pending (${pendingN})</button>
+    <button class="tab${pcLedgerHistTab==='active'?' on':''}" onclick="setPcLedgerHistTab('active')">⏳ Active (${activeN})</button>
+    <button class="tab${pcLedgerHistTab==='verify'?' on':''}" onclick="setPcLedgerHistTab('verify')">👁 Verify &amp; Received (${verifyN})</button>
+    <button class="tab${pcLedgerHistTab==='overdue'?' on':''}" onclick="setPcLedgerHistTab('overdue')" style="${pcLedgerHistTab==='overdue'?'background:var(--red);border-color:var(--red)':''}">🔴 Overdue (${overdueN})</button>
     <button class="tab${pcLedgerHistTab==='complete'?' on':''}" onclick="setPcLedgerHistTab('complete')">✓ Complete</button>`;
   if($('histFiltersToggleBtn'))$('histFiltersToggleBtn').classList.toggle('hidden',pcLedgerHistTab!=='complete');
   if(pcLedgerHistTab!=='complete')$('histFiltersPanel')?.classList.add('hidden');
@@ -1848,7 +1856,7 @@ function ledgerCardHtml(x,anyLedgerSpendOpen){
   const pillLabel=x.type==='in'?'IN':x.type==='out'?'OUT':'LOAN';
   const sign=x.type==='in'?'+':'-';
   const loanRepaidBadge=x.type==='loan'?(x.repaid?' <span class="pill repaid">Repaid</span>':' <span class="pill loan">Outstanding</span>'):'';
-  const settledBadge=(x.type==='out'&&x.personId)?(x.verified?' <span class="pill repaid">✓ Settled</span>':' <span class="pill loan">Pending Verify</span>'):'';
+  const settledBadge=(x.type==='out'&&x.personId)?(x.verified?' <span class="pill repaid">✓ Settled</span>':(isOverdueVerify(x)?` <span class="pill" style="background:var(--redbg);color:var(--red)">${daysPendingVerify(x)} din se pending</span>`:' <span class="pill loan">Pending Verify</span>')):'';
   const repayBtn=(x.type==='loan'&&!x.repaid&&!x.deletedAt)?`<button class="btn small" onclick="markLoanRepaid('${esc(x.id)}')">↩ Mark Repaid</button>`:'';
   const adminBtn=x.deletedAt
     ?(superAdminUnlocked?`<button class="btn small" onclick="restoreLedgerEntry('${esc(x.id)}')">↩ Restore</button>`:'')
@@ -1872,11 +1880,9 @@ function ledgerCardHtml(x,anyLedgerSpendOpen){
   </div>`;
   return card+(isSpendOpen?pcSpendBreakdownRowHtml(x):'');
 }
-function renderPendingTabList(){
+function renderActiveTabList(){
   const pending=pendingEntries.filter(p=>p.status==='pending');
-  const awaitingVerify=ledger.filter(isAwaitingVerify).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  const anyLedgerSpendOpen=Object.values(pcLedgerExpanded).some(Boolean);
-  const acceptCardsHtml=pending.map(p=>{
+  $('ledgerTable').innerHTML=pending.map(p=>{
     const label=p.type==='in'?'Fund Add':'Cash Out';
     return `<div class="item">
       <span><b>${esc(label)} — ${fmtAmt(p.amount)}</b><br><small style="color:var(--muted)">By: ${esc(p.byName||nameOfUserId(p.by))}${p.note?' · '+esc(p.note):''} (${esc(p.date)})</small></span>
@@ -1885,14 +1891,19 @@ function renderPendingTabList(){
         <button class="btn small primary" onclick="pcAcceptPending('${esc(p.id)}')">✓ Accept</button>
       </span>
     </div>`;
-  }).join('');
-  const verifyCardsHtml=awaitingVerify.map(x=>ledgerCardHtml(x,anyLedgerSpendOpen)).join('');
-  $('ledgerTable').innerHTML=(acceptCardsHtml+verifyCardsHtml)||`<div class="emptystate">✅<p>Koi pending entry nahi hai.</p><small>Sab accept/verify ho chuki hain.</small></div>`;
+  }).join('')||`<div class="emptystate">✅<p>Koi Accept pending nahi hai.</p></div>`;
+  if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
+}
+function renderLedgerCardList(rows,emptyMsg){
+  const anyLedgerSpendOpen=Object.values(pcLedgerExpanded).some(Boolean);
+  $('ledgerTable').innerHTML=rows.map(x=>ledgerCardHtml(x,anyLedgerSpendOpen)).join('')||`<div class="emptystate">✅<p>${emptyMsg}</p></div>`;
   if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
 }
 function renderLedger(){
   renderLedgerHistTabs();
-  if(pcLedgerHistTab==='pending'){renderPendingTabList();return;}
+  if(pcLedgerHistTab==='active'){renderActiveTabList();return;}
+  if(pcLedgerHistTab==='verify'){renderLedgerCardList(ledger.filter(isAwaitingVerify).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Hisaab verify pending nahi hai.');return;}
+  if(pcLedgerHistTab==='overdue'){renderLedgerCardList(ledger.filter(isOverdueVerify).sort((a,b)=>daysPendingVerify(b)-daysPendingVerify(a)),'Koi overdue Hisaab nahi hai.');return;}
   const deletedN=ledger.filter(x=>x.deletedAt).length;
   if($('showDeletedWrap'))$('showDeletedWrap').classList.toggle('hidden',!deletedN);
   if($('deletedCount'))$('deletedCount').textContent=deletedN;
