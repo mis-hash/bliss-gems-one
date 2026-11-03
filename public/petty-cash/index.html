@@ -1695,9 +1695,20 @@ function renderSpendAudit(){
         <thead><tr style="text-align:left;color:var(--muted)"><th>Issue Date</th><th>Person</th><th>Issued</th><th>Spent</th></tr></thead>
         <tbody>${rows||'<tr><td colspan="4">Koi live issue ke against spend nahi mila.</td></tr>'}</tbody>
       </table>
-      ${orphanTotal?`<div style="margin-top:10px;padding:8px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-size:13px">⚠ ${orphanSpends.length} orphaned spend entr${orphanSpends.length===1?'y':'ies'} mile (jinka parent Issue delete ho chuka hai) totaling ${fmtAmt(orphanTotal)} — yeh Total Spent mein COUNT NAHI ho rahe, already excluded hain.</div>`:''}
+      ${orphanTotal?`<div style="margin-top:10px;padding:8px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-size:13px">⚠ ${orphanSpends.length} orphaned spend entr${orphanSpends.length===1?'y':'ies'} mile (jinka parent Issue delete ho chuka hai) totaling ${fmtAmt(orphanTotal)} — yeh Total Spent mein COUNT NAHI ho rahe, already excluded hain.${superAdminUnlocked?` <button type="button" class="btn small danger" style="margin-top:6px" onclick="clearOrphanedSpendEntries()">🗑 In entries ko delete karein</button>`:''}</div>`:''}
     </div>
   </div>`;
+}
+async function clearOrphanedSpendEntries(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin yeh kar sakta hai.');return}
+  const liveIssueIds=new Set(liveLedger().filter(x=>x.type==='out').map(x=>x.id));
+  const orphans=issueSpends.filter(s=>!s.deletedAt&&!liveIssueIds.has(s.issueId));
+  if(!orphans.length){alert('Koi orphaned spend entry hai hi nahi.');return}
+  if(!confirm(`${orphans.length} orphaned spend entries (total ${fmtAmt(orphans.reduce((s,x)=>s+(x.amount||0),0))}) permanently delete karni hain? Ye wapas nahi aa sakti.`))return;
+  const batch=db.batch();
+  orphans.forEach(s=>batch.delete(db.collection('pc_issue_spends').doc(s.id)));
+  await batch.commit();
+  toast('Orphaned spend entries delete ho gayi');
 }
 // A single Out/Loan entry costing much more than that type's own recent history is worth a
 // second look (same pattern as Fuel Tracker's Mileage Alert) - compares the latest live
