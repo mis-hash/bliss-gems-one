@@ -1873,7 +1873,7 @@ function renderLedgerHistTabs(){
   if($('histFiltersToggleBtn'))$('histFiltersToggleBtn').classList.toggle('hidden',pcLedgerHistTab!=='complete');
   if(pcLedgerHistTab!=='complete')$('histFiltersPanel')?.classList.add('hidden');
 }
-function ledgerCardHtml(x,anyLedgerSpendOpen,suppressReceiveFund){
+function ledgerCardHtml(x,anyLedgerSpendOpen){
   const pillClass=x.type==='in'?'in':x.type==='out'?'out':'loan';
   const pillLabel=x.type==='in'?'IN':x.type==='out'?'OUT':'LOAN';
   const sign=x.type==='in'?'+':'-';
@@ -1888,12 +1888,9 @@ function ledgerCardHtml(x,anyLedgerSpendOpen,suppressReceiveFund){
   const canExpandSpend=x.type==='out'&&x.personId;
   const isSpendOpen=canExpandSpend&&!!pcLedgerExpanded[x.id];
   const viewSpendBtn=canExpandSpend?`<button class="btn small secondary" onclick="togglePcLedgerSpendExpand('${esc(x.id)}')">${isSpendOpen?'🔽':'👁'} View Spending</button>`:'';
-  // Direct action on the card itself, not just inside the "View Spending" expand - so Accounts
-  // can Receive Fund straight from the Active tab list without an extra click. Suppressed on
-  // the "Issued by Accounts" audit tab - that tab is a plain read-only list of everything
-  // ever issued, not an action queue (View Spending still has it, inside the expand).
-  const receiveFundBtn=(isAwaitingVerify(x)&&canCloseLoan()&&!suppressReceiveFund)?`<button class="btn small primary" onclick="verifyAndSettleSpending('${esc(x.id)}')">💰 Receive Fund</button>`:'';
-  const actions=[repayBtn,viewSpendBtn,receiveFundBtn,editBtn,adminBtn,permBtn].filter(Boolean).join(' ');
+  // Receive Fund lives only inside the "View Spending" expand (pcSpendBreakdownRowHtml) - a
+  // direct card-level shortcut was tried and then explicitly removed by the user.
+  const actions=[repayBtn,viewSpendBtn,editBtn,adminBtn,permBtn].filter(Boolean).join(' ');
   const amtColor=x.type==='in'?'var(--g)':x.type==='out'?'var(--red)':'var(--amber)';
   const card=`<div class="pcLedgerCard${anyLedgerSpendOpen&&!isSpendOpen?' pcDimRow':''}">
     <div class="pcLedgerCardTop">
@@ -1922,9 +1919,9 @@ function renderAcceptQueueList(){
   }).join('')||`<div class="emptystate">✅<p>Koi Accept pending nahi hai.</p></div>`;
   if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
 }
-function renderLedgerCardList(rows,emptyMsg,suppressReceiveFund){
+function renderLedgerCardList(rows,emptyMsg){
   const anyLedgerSpendOpen=Object.values(pcLedgerExpanded).some(Boolean);
-  $('ledgerTable').innerHTML=rows.map(x=>ledgerCardHtml(x,anyLedgerSpendOpen,suppressReceiveFund)).join('')||`<div class="emptystate">✅<p>${emptyMsg}</p></div>`;
+  $('ledgerTable').innerHTML=rows.map(x=>ledgerCardHtml(x,anyLedgerSpendOpen)).join('')||`<div class="emptystate">✅<p>${emptyMsg}</p></div>`;
   if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
 }
 function renderLedger(){
@@ -1932,7 +1929,7 @@ function renderLedger(){
   if(pcLedgerHistTab==='accept'){renderAcceptQueueList();return;}
   if(pcLedgerHistTab==='active'){renderLedgerCardList(ledger.filter(isAwaitingVerify).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Hisaab verify pending nahi hai.');return;}
   if(pcLedgerHistTab==='overdue'){renderLedgerCardList(ledger.filter(isOverdueVerify).sort((a,b)=>daysPendingVerify(b)-daysPendingVerify(a)),'Koi overdue Hisaab nahi hai.');return;}
-  if(pcLedgerHistTab==='issued'){renderLedgerCardList(ledger.filter(isIssuedByAccounts).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Cash Out abhi tak issue nahi hui hai.',true);return;}
+  if(pcLedgerHistTab==='issued'){renderLedgerCardList(ledger.filter(isIssuedByAccounts).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Cash Out abhi tak issue nahi hui hai.');return;}
   if(pcLedgerHistTab==='verified'){renderLedgerCardList(ledger.filter(isVerifiedReceived).sort((a,b)=>String((b.settledAt||b.date)).localeCompare(String(a.settledAt||a.date))),'Koi Verified &amp; Received entry nahi hai.');return;}
   if(pcLedgerHistTab==='received'){renderLedgerCardList(ledger.filter(isReceivedFund).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Received Fund entry nahi hai.');return;}
   const deletedN=ledger.filter(x=>x.deletedAt).length;
