@@ -1894,6 +1894,7 @@ function ledgerCardHtml(x,anyLedgerSpendOpen){
     <div class="pcLedgerCardSub"><b>${esc(x.person||'-')}</b></div>
     ${x.note?`<div class="pcLedgerCardNote">${esc(x.note)}</div>`:''}
     <div class="pcLedgerCardMeta">${esc(x.date)}${deletedInfo(x)} · by ${esc(nameOfUserId(x.by))}</div>
+    ${isReceivedFund(x)?`<div class="pcLedgerCardMeta" style="opacity:.75">✓ Accepted from Admin</div>`:''}
     ${actions?`<div class="pcLedgerCardActions">${actions}</div>`:''}
   </div>`;
   return card+(isSpendOpen?pcSpendBreakdownRowHtml(x):'');
