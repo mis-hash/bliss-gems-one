@@ -535,7 +535,17 @@ function saveMasters(){ if(db) db.collection('pc_settings').doc('masters').set(m
 
 /* ===== WhatsApp (shared GREEN-API credentials, same pattern as Stationery Inventory) ===== */
 function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===10)p='91'+p;return p;}
+// Hitesh Dusad and Nitesh Dusad must never get ANY Petty Cash WhatsApp message, whatever
+// the notification type - matched by name (case-insensitive) against the Universal Users
+// list rather than a hardcoded number, since their phone isn't fixed here. Checked once at
+// this single choke point (sendRawWA) so no current or future notify function can bypass it.
+const PETTY_CASH_EXCLUDED_NAMES=['hitesh dusad','nitesh dusad'];
+function isPettyCashNoticeExcluded(phone){
+  const p=normalizePhone(phone);
+  return users.some(u=>normalizePhone(u.phone)===p && PETTY_CASH_EXCLUDED_NAMES.includes(String(u.name||'').trim().toLowerCase()));
+}
 async function sendRawWA(phone,message){
+  if(!phone||isPettyCashNoticeExcluded(phone))return false;
   const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
   if(!id||!token){console.warn('GREEN-API settings missing');return false}
   const p=normalizePhone(phone);if(p.length<11)return false;
