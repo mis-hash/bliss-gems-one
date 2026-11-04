@@ -40,5 +40,11 @@
     "name": "AI Business Assistant",
     "pushedAt": 0,
     "enabled": true
+  },
+  {
+    "slug": "sales-call-log",
+    "name": "Sales Call Log",
+    "pushedAt": 0,
+    "enabled": true
   }
 ]
