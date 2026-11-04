@@ -1844,13 +1844,12 @@ function isOverdueVerify(x){return isAwaitingVerify(x)&&daysPendingVerify(x)>=PE
 // fresh money Admin added. Split out from the generic Complete tab so Accounts can see "money
 // Admin actually put into the pool" at a glance, separate from settled Cash Out/Loan entries.
 function isReceivedFund(x){return x.type==='in'&&x.source!=='verify_settle'}
-// A Cash Out that's already gone through Verify & Receive (the "💰 Receive Fund" action), PLUS
-// the "Balance returned by..." Cash In entry that action creates alongside it - both halves of
-// the same Hisaab event shown together. Split out from the generic Complete tab too, same
-// reasoning as Received Fund above, so Accounts can see "money that was issued and has now
-// been verified/received back" on its own, separate from Loan entries and direct
-// (no-recipient) Cash Out entries.
-function isVerifiedReceived(x){return (x.type==='out'&&x.personId&&!!x.verified)||(x.type==='in'&&x.source==='verify_settle')}
+// Only the "Balance returned by..." Cash In entry verifyAndSettleSpending() creates
+// (source:'verify_settle') - the actual cash that came back during Hisaab. The original Cash
+// Out entry itself (now ✓ Settled) is NOT shown here - it falls through to Complete along
+// with every other already-closed entry, since this tab is specifically "money received
+// during a Hisaab", not a second home for the settled Cash Out.
+function isVerifiedReceived(x){return x.type==='in'&&x.source==='verify_settle'}
 // Every named Cash Out Accounts has issued to a specific person, regardless of where it
 // currently stands (Active/Overdue/already Verified) - a single consolidated "everything we
 // ever issued" audit view, cutting across the status-based tabs above instead of replacing
