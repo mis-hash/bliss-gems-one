@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<script>
+/* Crash safety net — same pattern as the other Bliss apps: registered first so a later
+   script error still surfaces as a visible banner instead of a silently dead page. */
+(function(){
+  function showCrashBanner(msg){
+    if(document.getElementById('sclCrashBanner'))return;
+    var b=document.createElement('div');
+    b.id='sclCrashBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b42318;color:#fff;padding:10px 14px;font:600 13px Arial,sans-serif;text-align:center;box-shadow:0 2px 10px #0004';
+    b.innerHTML='⚠ App me error aa gaya hai. Page reload karein.'
+      +' <button type="button" style="margin-left:10px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#b42318;font-weight:700;cursor:pointer" onclick="location.reload()">Reload</button>'
+      +'<div style="font-weight:400;font-size:11px;opacity:.85;margin-top:3px">'+String(msg||'').slice(0,200).replace(/[<>]/g,'')+'</div>';
+    function attach(){document.body&&document.body.prepend(b)}
+    if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach);
+  }
+  window.addEventListener('error',function(e){console.error('Uncaught error:',e.error||e.message);showCrashBanner((e.error&&e.error.message)||e.message);});
+  window.addEventListener('unhandledrejection',function(e){console.error('Unhandled promise rejection:',e.reason);showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));});
+})();
+</script>
+<title>Sales Call Log</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Same design system as the other Bliss apps, so all apps read as one family. */
+:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
+*{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit}
+h1,h2,h3{font-family:'Manrope',sans-serif}
+.hidden{display:none!important}
+header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.head{height:100%;max-width:980px;margin:auto;padding:0 18px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:24px;font-weight:900;color:var(--g2)}
+.brand b{color:var(--g);font-size:20px;font-family:'Manrope',sans-serif}
+.brand small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.headRight{display:flex;align-items:center;gap:10px}
+.pillbadge{font-size:13px;font-weight:700;background:var(--mint);color:var(--g);padding:7px 12px;border-radius:999px}
+.btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--g);color:#fff}
+.btn.small{padding:7px 11px;font-size:12px}
+.shell{max-width:980px;margin:auto;padding:20px 18px 60px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:18px;box-shadow:0 3px 10px rgba(22,36,31,.06)}
+.ph{padding:16px 18px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif}
+.pb{padding:18px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field label{display:block;font-size:11px;font-weight:bold;margin-bottom:5px}
+.field input,.field select{width:100%;padding:11px;border:1px solid var(--line);border-radius:7px;font-size:14px;background:#fff;color:var(--txt)}
+.note{font-size:12px;color:var(--muted)}
+.gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:50}
+.modal.show{display:flex}
+.box{width:min(360px,100%);background:#fff;border-radius:14px;padding:19px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;padding:10px;background:var(--bg);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;border-bottom:1px solid var(--line)}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.emptystate{text-align:center;padding:30px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<div id="gateWrap" style="display:none"><div class="gate" id="gateBox"></div></div>
+
+<div id="appWrap" style="display:none">
+<header><div class="head">
+  <div class="brand"><div class="logo">📞</div><div><b>Sales Call Log</b><small>Bliss Gems &amp; Minerals</small></div></div>
+  <div class="headRight">
+    <span class="pillbadge" id="loginBadge">Not Logged In</span>
+    <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
+  </div>
+</div></header>
+
+<div class="shell">
+  <div class="panel">
+    <div class="ph">➕ Call Log Karein</div>
+    <div class="pb">
+      <div class="note" style="margin-bottom:12px">Yeh sirf log/record karta hai - call ka content ya outcome AI se analyze nahi hota (uske liye paid speech-to-text API chahiye, jo abhi approve nahi hai).</div>
+      <div class="grid">
+        <div class="field"><label>Sales Person</label><select id="callSalesPerson"></select></div>
+        <div class="field"><label>Client/Party (optional)</label><input id="callClientName" type="text"></div>
+      </div>
+      <div class="grid" style="margin-top:10px">
+        <div class="field"><label>Recording File (optional, chhoti file)</label><input type="file" id="callFileInput" accept="audio/*"></div>
+        <div class="field"><label>Note (optional)</label><input id="callNote" type="text"></div>
+      </div>
+      <button type="button" class="btn primary" style="margin-top:14px" onclick="logCallRecording()">⬆ Call Log Karein</button>
+      <div class="note" id="callLogStatus" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <span>📋 Call History</span>
+      <select id="callFilterSalesPerson" onchange="renderCallHistory()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
+    </div>
+    <div class="pb" style="padding:0">
+      <table>
+        <thead><tr><th>Date</th><th>Sales Person</th><th>Client</th><th>Note</th><th>Recording</th><th>Logged By</th></tr></thead>
+        <tbody id="callHistoryTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="modal" id="loginModal"><div class="box">
+<h3>Login</h3>
+<div class="field"><label>Username</label><input id="loginUsername" autocomplete="off"></div>
+<div class="field" style="margin-top:8px"><label>Password</label><input id="loginPassword" type="password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<p class="note" id="loginMsg" style="margin:8px 0 0"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeLogin()">Cancel</button><button class="btn primary" onclick="doLogin()">Login</button></div>
+</div></div>
+
+<div class="modal" id="photoModal"><div class="box" style="width:min(420px,100%);text-align:center">
+<audio id="playRecordingAudio" controls style="width:100%"></audio>
+<div style="margin-top:12px"><button class="btn" onclick="closePlayRecording()">Close</button></div>
+</div></div>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
+let db=null;
+try{
+  if(typeof firebase!=='undefined'){
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+  }else{console.error('firebase SDK not loaded — cloud sync unavailable this session');}
+}catch(e){console.error('firebase init failed:',e);}
+try{if(typeof firebase!=='undefined'&&firebase.auth)firebase.auth().signInAnonymously().catch(e=>console.error('anon auth failed:',e));}catch(e){console.error('anon auth failed:',e);}
+
+const UU_COLLECTION='universal_users';
+const SESSION_KEY='pd_logged_user_v1'; // same key as the other Bliss apps - one login everywhere
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+let users=[],currentUser=null;
+function loggedUser(){return users.find(x=>x.id===currentUser)||null}
+
+function openLogin(){$('loginModal').classList.add('show');$('loginMsg').textContent='';}
+function closeLogin(){$('loginModal').classList.remove('show')}
+function doLogin(){
+  const uname=$('loginUsername').value.trim(),pass=$('loginPassword').value;
+  const msg=$('loginMsg');
+  const u=users.find(x=>String(x.username||'').toLowerCase()===uname.toLowerCase()&&x.active!==false);
+  if(!u||pass!==String(u.password||'1234')){msg.style.color='#b43a35';msg.textContent='Invalid Username / Password';return}
+  localStorage.setItem(SESSION_KEY,u.id);
+  currentUser=u.id;
+  closeLogin();
+  renderAll();
+}
+function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
+
+function startUsersSync(){
+  if(!db)return;
+  db.collection(UU_COLLECTION).onSnapshot(snap=>{users=[];snap.forEach(d=>users.push(d.data()));renderAll();},err=>console.error('users sync error',err));
+}
+
+function renderGate(){
+  const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
+  const u=loggedUser();
+  if(!currentUser||!u){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    gateBox.innerHTML=`<h3>Login Required</h3><p class="note">Sales Call Log dekhne ke liye login karein — wahi username/password jo baaki Bliss apps me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
+    return;
+  }
+  gateWrap.style.display='none';appWrap.style.display='block';
+  $('loginBadge').textContent='👤 '+(u.name||u.username||'User');
+  $('logoutBtn').classList.remove('hidden');
+}
+
+function renderSalesPersonOptions(){
+  const active=users.filter(u=>u.active!==false).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+  const opts=active.map(u=>`<option value="${esc(u.name||u.username)}">${esc(u.name||u.username)}</option>`).join('');
+  const sel=$('callSalesPerson');
+  if(sel){const cur=sel.value;sel.innerHTML='<option value="">-- Select --</option>'+opts;if(cur)sel.value=cur;}
+  const filterSel=$('callFilterSalesPerson');
+  if(filterSel){const cur=filterSel.value;filterSel.innerHTML='<option value="">Sab Sales Persons</option>'+opts;if(cur)filterSel.value=cur;}
+}
+
+function renderAll(){
+  renderGate();
+  renderSalesPersonOptions();
+  renderCallHistory();
+}
+
+// Stored in localStorage, not Firestore: a brand new Firestore collection for this would
+// hit the same "Missing or insufficient permissions" wall already found and worked around
+// in the AI Business Assistant app - this project's Firestore rules only cover
+// collections that already existed before these new apps, and adding one needs a Firebase
+// Console change this app can't make itself. The trade-off: this log is per-device, not
+// synced across everyone's browsers, until that rule is added.
+const CALL_LOG_KEY='scl_call_log';
+const CALL_LOG_MAX_FILE_BYTES=1500000; // ~1.5MB cap kept well under localStorage's ~5-10MB quota
+function liveCallLog(){
+  try{ const raw=localStorage.getItem(CALL_LOG_KEY); return raw?JSON.parse(raw):[]; }
+  catch(e){ console.error('liveCallLog read failed:',e); return []; }
+}
+function saveCallLog(rows){
+  try{ localStorage.setItem(CALL_LOG_KEY,JSON.stringify(rows)); }
+  catch(e){ console.error('saveCallLog write failed:',e); throw e; }
+}
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+async function logCallRecording(){
+  const salesPerson=$('callSalesPerson').value;
+  const clientName=$('callClientName').value.trim();
+  const note=$('callNote').value.trim();
+  const fileInput=$('callFileInput');
+  const file=fileInput.files[0]||null;
+  const status=$('callLogStatus');
+  if(!salesPerson){status.style.color='var(--red)';status.textContent='Sales Person select karein.';return}
+  try{
+    let recordingUrl=null,fileNote='';
+    if(file){
+      if(file.size<=CALL_LOG_MAX_FILE_BYTES){
+        recordingUrl=await fileToDataUrl(file);
+      }else{
+        fileNote=' (file bahut badi thi, sirf log hua, file save nahi hui)';
+      }
+    }
+    const rows=liveCallLog();
+    rows.push({id:'CL-'+Date.now()+'-'+Math.random().toString(36).slice(2),salesPerson,clientName,note,recordingUrl,fileName:file?file.name:'',loggedAt:new Date().toISOString(),loggedBy:(loggedUser()||{}).name||''});
+    saveCallLog(rows);
+    status.style.color='var(--g)';
+    status.textContent='Call log ho gayi'+fileNote+'.';
+    $('callClientName').value='';
+    $('callNote').value='';
+    fileInput.value='';
+    renderCallHistory();
+  }catch(e){
+    console.error('logCallRecording failed:',e);
+    status.style.color='var(--red)';
+    status.textContent='Error aaya: '+(e.message||e);
+  }
+}
+function renderCallHistory(){
+  const tbody=$('callHistoryTable');
+  if(!tbody)return;
+  const filter=$('callFilterSalesPerson')?$('callFilterSalesPerson').value:'';
+  const rows=liveCallLog().filter(r=>!filter||r.salesPerson===filter).sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt)));
+  tbody.innerHTML=rows.length?rows.map(r=>`<tr>
+    <td>${esc(new Date(r.loggedAt).toLocaleString('en-IN'))}</td>
+    <td>${esc(r.salesPerson)}</td>
+    <td>${esc(r.clientName||'-')}</td>
+    <td>${esc(r.note||'-')}</td>
+    <td>${r.recordingUrl?`<button type="button" class="btn small" onclick="playRecording('${esc(r.id)}')">▶ Play</button>`:'-'}</td>
+    <td>${esc(r.loggedBy||'-')}</td>
+  </tr>`).join(''):`<tr><td colspan="6"><div class="emptystate">📞<p>Koi call log nahi hui hai.</p></div></td></tr>`;
+}
+function playRecording(id){
+  const row=liveCallLog().find(r=>r.id===id);
+  if(!row||!row.recordingUrl)return;
+  $('playRecordingAudio').src=row.recordingUrl;
+  $('photoModal').classList.add('show');
+}
+function closePlayRecording(){
+  $('photoModal').classList.remove('show');
+  $('playRecordingAudio').pause();
+  $('playRecordingAudio').src='';
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  currentUser=localStorage.getItem(SESSION_KEY)||null;
+  if(db)startUsersSync();
+  renderAll();
+});
+window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
+</script>
+</body>
+</html>
