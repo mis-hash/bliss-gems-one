@@ -505,7 +505,17 @@ function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===10)p=
 // Was temporarily muted (2026-10) while the Firestore permissions fix was being tested -
 // re-enabled now that si_* collections are confirmed open in the live rules.
 const WA_MUTED=false;
+// These 3 Doers must never get any Stationery Inventory WhatsApp message, in any form -
+// matched by name (not phone, since none was given) against the shared Universal Users list,
+// resolved at the single sendRawWA() choke point so no current or future notify function can
+// bypass it. Same pattern as Petty Cash's PETTY_CASH_EXCLUDED_NAMES.
+const SI_EXCLUDED_NAMES=['hitesh dusad','nitesh dusad','ankur khandelwal'];
+function isSiNoticeExcluded(phone){
+  const p=normalizePhone(phone);
+  return users.some(u=>normalizePhone(u.phone)===p && SI_EXCLUDED_NAMES.includes(String(u.name||'').trim().toLowerCase()));
+}
 async function sendRawWA(phone,message){
+  if(!phone||isSiNoticeExcluded(phone))return false;
   if(WA_MUTED){console.warn('Stationery WA muted, not sending:',message);return false}
   const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
   if(!id||!token){console.warn('GREEN-API settings missing');return false}
