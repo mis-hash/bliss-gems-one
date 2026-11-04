@@ -669,8 +669,9 @@ function renderDash(){
 }
 function syncItemIdFromSearch(searchId,hiddenId){
   const name=$(searchId).value.trim();
-  const match=items.find(x=>x.name.toLowerCase()===name.toLowerCase());
+  const match=items.find(x=>String(x.name||'').trim().toLowerCase()===name.toLowerCase());
   $(hiddenId).value=match?match.id:'';
+  if(name&&!match)console.warn('[syncItemIdFromSearch] no exact item match for:',JSON.stringify(name),'- known items:',items.map(x=>x.name));
 }
 function renderSelects(){
   const itemOpts=items.map(x=>`<option value="${esc(x.name)}"></option>`).join('');
@@ -793,7 +794,12 @@ let _reqSubmitting=false;
 async function submitStationeryRequest(){
   if(_reqSubmitting)return;
   const item=$('reqItem').value,qty=parseInt($('reqQty').value,10),purpose=$('reqPurpose').value.trim();
-  if(!item||!qty){alert('Item aur Quantity zaroori hai.');return}
+  if(!item){
+    const typed=($('reqItemSearch').value||'').trim();
+    alert(typed?'"'+typed+'" list mein se match nahi hua - kripya dropdown se item select karein (spelling match karni chahiye).':'Item select karna zaroori hai.');
+    return;
+  }
+  if(!qty){alert('Quantity zaroori hai.');return}
   const actor=loggedUser();
   if(!actor)return;
   const it=items.find(x=>x.id===item);
