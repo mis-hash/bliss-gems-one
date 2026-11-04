@@ -195,10 +195,22 @@ function renderAll(){
 }
 
 /* ===== Cross-app read-only queries (same Firestore project, different collections) ===== */
-function liveTeTrips(cb){ return db.collection('te_trips').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}); }
-function liveSiItems(cb){ return db.collection('si_items').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows);}); }
-function livePcLedger(cb){ return db.collection('pc_ledger').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}); }
-function liveBusyImport(cb){ return db.collection('busy_import').doc('latest').get().then(doc=>cb(doc.exists?doc.data():null)); }
+function liveTeTrips(cb){ return db.collection('te_trips').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}).catch(e=>{console.error('liveTeTrips failed:',e);cb([]);}); }
+function liveSiItems(cb){ return db.collection('si_items').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows);}).catch(e=>{console.error('liveSiItems failed:',e);cb([]);}); }
+function livePcLedger(cb){ return db.collection('pc_ledger').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}).catch(e=>{console.error('livePcLedger failed:',e);cb([]);}); }
+// Busy import summary is stored in localStorage, not Firestore - "busy_import" is a brand
+// new collection this app introduced, and this project's Firestore security rules only
+// allow the collections that already existed (confirmed: a direct unauthenticated read on
+// it returns 403 PERMISSION_DENIED, while existing collections like te_trips are open).
+// Adding a new collection needs a rules change in the Firebase Console, which this app
+// can't make itself - localStorage avoids that entirely, at the cost of this one summary
+// being per-device rather than synced for every Director. Can move to Firestore once the
+// rule is added.
+const BUSY_IMPORT_KEY='ai_busy_import_latest';
+function liveBusyImport(cb){
+  try{ const raw=localStorage.getItem(BUSY_IMPORT_KEY); cb(raw?JSON.parse(raw):null); }
+  catch(e){ console.error('liveBusyImport read failed:',e); cb(null); }
+}
 
 async function answerOpenTrips(){
   const rows=await new Promise(res=>liveTeTrips(res));
@@ -306,7 +318,8 @@ function handleBusyFileSelected(e){
     const parsed=parseBusyCsv(String(reader.result||''));
     if(!parsed){alert('CSV parse nahi ho paya. Ek column amount/total/value naam ka hona chahiye, ya sabse right wali numeric column use hogi.');return}
     try{
-      await db.collection('busy_import').doc('latest').set({total:parsed.total,rowCount:parsed.rowCount,uploadedAt:new Date().toISOString(),fileName:file.name});
+      const record={total:parsed.total,rowCount:parsed.rowCount,uploadedAt:new Date().toISOString(),fileName:file.name};
+      localStorage.setItem(BUSY_IMPORT_KEY,JSON.stringify(record));
       $('busyStatus').textContent='Last export: '+file.name+' ('+parsed.rowCount+' rows)';
       alert('Busy export upload ho gaya: '+parsed.rowCount+' rows, total '+fmtAmt(parsed.total));
     }catch(err){console.error('busy import save failed',err);alert('Upload save karte waqt error aaya: '+err.message);}
@@ -319,7 +332,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   currentUser=localStorage.getItem(SESSION_KEY)||null;
   if(db)startUsersSync();
   renderAll();
-  if(db)liveBusyImport(data=>{ if(data&&$('busyStatus'))$('busyStatus').textContent='Last export: '+(data.fileName||'-')+' ('+data.rowCount+' rows, '+new Date(data.uploadedAt).toLocaleDateString('en-IN')+')'; });
+  liveBusyImport(data=>{ if(data&&$('busyStatus'))$('busyStatus').textContent='Last export: '+(data.fileName||'-')+' ('+data.rowCount+' rows, '+new Date(data.uploadedAt).toLocaleDateString('en-IN')+')'; });
 });
 window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
 </script>
