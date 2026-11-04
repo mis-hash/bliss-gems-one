@@ -1633,7 +1633,18 @@ async function downloadVehicleCostReportPdf(vehicle){
     const blob=await generateVehicleCostReportPdfBlob(vehicle);
     if(!blob){alert('PDF banane mein error aaya. Internet connection check karein aur dobara try karein.');return}
     const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download='Vehicle Cost Report - '+vehicle+'.pdf';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    // This app is normally opened inside the Bliss One hub's same-origin iframe
+    // (#appViewerFrame). A programmatic <a download> click can be silently ignored by
+    // some mobile browsers when triggered from inside an iframe - no JS error, no
+    // console warning, the click just does nothing. window.open() on the blob URL
+    // avoids that: it opens the PDF in a new top-level tab (browser's own PDF viewer),
+    // where the user can save/share it from there. Falls back to the download-link
+    // click only if the popup itself got blocked.
+    const win=window.open(url,'_blank');
+    if(!win){
+      const a=document.createElement('a');a.href=url;a.download='Vehicle Cost Report - '+vehicle+'.pdf';document.body.appendChild(a);a.click();document.body.removeChild(a);
+    }
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
   }catch(e){
     console.error('downloadVehicleCostReportPdf failed:',e);
     alert('PDF download karte waqt error aaya: '+(e.message||e));
