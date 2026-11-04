@@ -287,21 +287,23 @@ tbody tr:hover td{background:#f7faf8}
   <div class="field"><label>Date</label><input type="date" id="fDate"></div>
   <div class="field"><label>Unit <span style="color:var(--red)">*</span></label><select id="fUnit"><option value="KM">KM</option><option value="Miles">Miles</option></select></div>
 </div>
-<div class="grid3" style="margin-top:10px">
-  <div class="field"><label>Fuel Quantity (Liters)</label><input type="number" id="fLiters" placeholder="optional"></div>
-</div>
-<div class="grid3" style="margin-top:10px">
+<div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.4px;margin:14px 0 6px">🚗 VEHICLE METER</div>
+<div class="grid" style="margin-top:4px">
   <div class="field"><label>Vehicle Meter Reading — Before Fueling <span style="color:var(--red)">*</span></label><input type="number" id="fMeterBefore"></div>
   <div class="field"><label>Vehicle Meter Reading — After Fueling <span style="color:var(--red)">*</span></label><input type="number" id="fMeterAfter"></div>
-  <div class="field"><label>Fuel Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="fAmount"></div>
-</div>
-<div class="grid3" style="margin-top:10px">
-  <div class="field span2"><label>Petrol Pump Meter Photo (After Fueling)</label><input type="file" id="fPhotoPump" accept="image/*" capture="environment"></div>
 </div>
 <div class="grid" style="margin-top:10px">
   <div class="field"><label>Vehicle Meter Photo — Before Fueling</label><input type="file" id="fPhotoVehicleBefore" accept="image/*" capture="environment"></div>
   <div class="field"><label>Vehicle Meter Photo — After Fueling</label><input type="file" id="fPhotoVehicleAfter" accept="image/*" capture="environment"></div>
-  <div class="field span2"><label>Payment Mode</label><input id="fPaymentMode" list="paymentModeList" placeholder="Cash / UPI / Card / Company Account"></div>
+</div>
+<div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.4px;margin:14px 0 6px">⛽ FUEL FILL</div>
+<div class="grid" style="margin-top:4px">
+  <div class="field"><label>Fuel Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="fAmount"></div>
+  <div class="field"><label>Fuel Quantity (Liters)</label><input type="number" id="fLiters" placeholder="optional"></div>
+</div>
+<div class="grid" style="margin-top:10px">
+  <div class="field"><label>Petrol Pump Meter Photo (After Fueling)</label><input type="file" id="fPhotoPump" accept="image/*" capture="environment"></div>
+  <div class="field"><label>Payment Mode</label><input id="fPaymentMode" list="paymentModeList" placeholder="Cash / UPI / Card / Company Account"></div>
 </div>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeNewFuelModal()">Cancel</button><button class="btn primary" id="fuelSubmitBtn" onclick="addFuelEntry()">＋ Save Entry</button></div>
 </div></div>
