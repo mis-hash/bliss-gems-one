@@ -681,8 +681,24 @@ function isBookingNoticeExcluded(phone){return BOOKING_NOTICE_EXCLUDED_NUMBERS.i
 // sites (markBooked, autoSendBookingReminders, sendBookingReminderNow).
 const BOOKKEEPING_NOTICE_EXCLUDED_NUMBERS=['9251488653'];
 function isBookkeepingNoticeExcluded(phone){return BOOKKEEPING_NOTICE_EXCLUDED_NUMBERS.includes(String(phone||'').replace(/\D/g,'').slice(-10))}
-async function sendWA(phone,message){
+// Global backstop, on top of the per-call-site excludeDirectorPdfOnlyRecipients() wrapping
+// below - Hitesh/Nitesh/Ankur must never get ANY Trip Expense WhatsApp message through ANY
+// path, current or future, except the one explicit exception: the Close Trip Trip Summary
+// PDF's own short text (sendTripSummaryToDirectors passes allowDirectorPdfOnly:true for
+// that one call only). Matched by phone against the shared Universal Users list, same
+// pattern as Petty Cash/Stationery/Parcel Dispatch's name-matched exclusions.
+function isTeDirectorPdfOnlyRecipient(phone){
+  const p=String(phone||'').replace(/\D/g,'');
+  const norm=p.length===10?'91'+p:p;
+  return users.some(u=>{
+    const up=String(u.phone||'').replace(/\D/g,'');
+    const upNorm=up.length===10?'91'+up:up;
+    return upNorm===norm && DIRECTOR_PDF_ONLY_NAMES.some(n=>String(u.name||'').trim().toLowerCase().startsWith(n));
+  });
+}
+async function sendWA(phone,message,opts){
   if(!phone||isBookingNoticeExcluded(phone))return;
+  if(!(opts&&opts.allowDirectorPdfOnly) && isTeDirectorPdfOnlyRecipient(phone))return;
   const creds=await getGreenApiCreds();
   if(!creds)return;
   const id=String(creds.idInstance||'').trim(),token=String(creds.apiToken||'').trim(),base=String(creds.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
@@ -1272,7 +1288,7 @@ async function sendTripSummaryToDirectors(tripId,extra){
   const msg=`✅ ${trip&&trip.salesName?trip.salesName:'Sales person'} submitted the trip hisaab — ${locationPart} (${tripId})`;
   // Sent as its own text message (not a file caption) so it shows as a separate WhatsApp
   // bubble, per explicit user request.
-  recipients.forEach(u=>{ sendWA(u.phone,msg); sendTripFileWA(u.phone,blob,fileName); });
+  recipients.forEach(u=>{ sendWA(u.phone,msg,{allowDirectorPdfOnly:true}); sendTripFileWA(u.phone,blob,fileName); });
 }
 async function markBooked(tripId){
   await db.collection('te_trips').doc(tripId).update({bookedByAccounts:true});
