@@ -74,9 +74,9 @@ nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
 .span2{grid-column:1/-1}
 #fuelSubmitBtn{padding:13px 22px;font-size:14px}
 table{width:100%;border-collapse:collapse}
-th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 8px 9px;border-bottom:2px solid var(--line);white-space:nowrap}
-td{padding:11px 8px;border-bottom:1px solid #edf1ee;font-size:12.5px;vertical-align:middle}
-tbody tr:nth-child(even) td{background:#F7FAF8}
+th{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 10px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:12px 10px;border-bottom:1px solid #edf1ee;font-size:12.5px;vertical-align:middle}
+tbody tr:nth-child(even) td{background:#FAFCFB}
 tr:last-child td{border-bottom:0}
 tbody tr:hover td{background:#f7faf8}
 .tablewrap{overflow-x:auto}
@@ -1700,10 +1700,10 @@ function deletedInfo(x){return x.deletedAt?`<br><small style="color:var(--muted)
 function photoThumbs(x){
   let html='';
   if(x.vehiclePhotoBefore)html+=`<img class="thumb" src="${x.vehiclePhotoBefore}" onclick="openPhotoModal('${esc(x.id)}','vehiclePhotoBefore')" title="Vehicle Meter Photo — Before Fueling">`;
-  if(x.vehiclePhotoAfter)html+=` <img class="thumb" src="${x.vehiclePhotoAfter}" onclick="openPhotoModal('${esc(x.id)}','vehiclePhotoAfter')" title="Vehicle Meter Photo — After Fueling">`;
-  if(x.pumpPhoto)html+=` <img class="thumb" src="${x.pumpPhoto}" onclick="openPhotoModal('${esc(x.id)}','pumpPhoto')" title="Petrol Pump Meter Photo (After Fueling)">`;
+  if(x.vehiclePhotoAfter)html+=`<img class="thumb" src="${x.vehiclePhotoAfter}" onclick="openPhotoModal('${esc(x.id)}','vehiclePhotoAfter')" title="Vehicle Meter Photo — After Fueling">`;
+  if(x.pumpPhoto)html+=`<img class="thumb" src="${x.pumpPhoto}" onclick="openPhotoModal('${esc(x.id)}','pumpPhoto')" title="Petrol Pump Meter Photo (After Fueling)">`;
   if(!x.vehiclePhotoBefore&&!x.vehiclePhotoAfter&&x.vehiclePhoto)html+=`<img class="thumb" src="${x.vehiclePhoto}" onclick="openPhotoModal('${esc(x.id)}','vehiclePhoto')" title="Vehicle Meter Photo">`;
-  return html||'<small class="note">-</small>';
+  return html?`<div style="display:flex;flex-wrap:wrap;gap:5px">${html}</div>`:'<small class="note">-</small>';
 }
 function openPhotoModal(id,field){
   const x=fuelLog.find(e=>e.id===id);if(!x||!x[field])return;
