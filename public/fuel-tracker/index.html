@@ -1631,14 +1631,15 @@ async function runVehicleCostReportDownload(vehicle,range){
   // again - any failure (library not loaded, html2canvas error, etc.) now surfaces as a
   // real alert with the actual error message instead of failing silently in the console.
   //
-  // An earlier version of this function pre-opened a BLANK tab synchronously and only
-  // navigated it to the real blob URL once the PDF was ready, to dodge mobile popup
-  // blockers. On real Chrome that backfired differently: navigating an already-open
-  // blank tab via location.href some time after the click (not the click itself) trips
-  // Chrome's "delayed tab-under redirect" abuse heuristic, which silently blocks THAT
-  // navigation - the tab opens and then just sits on about:blank forever, no error, no
-  // console warning. A single window.open(url,'_blank') call made once the real blob URL
-  // already exists does not hit that heuristic, so that's what this does now.
+  // Two earlier attempts tried routing this through window.open() (first after the async
+  // render, then via a pre-opened blank tab) to dodge a suspected popup blocker - neither
+  // was the real problem, and the second one actively broke it worse (Chrome silently
+  // blocks a delayed location.href navigation of an already-open window as a suspected
+  // "tab-under" redirect, so the tab just sat on about:blank). The user also wants an
+  // actual file save, not a browser PDF-viewer tab. So this now downloads directly via a
+  // plain <a download> click, the exact same proven pattern Purchase Price Estimator's
+  // Purchase Slip PDF already uses successfully from inside this same hub iframe
+  // architecture - no popup/tab involved at all, so none of the above can apply.
   try{
     toast('PDF ban raha hai...');
     const blob=await generateVehicleCostReportPdfBlob(vehicle,range);
@@ -1647,10 +1648,7 @@ async function runVehicleCostReportDownload(vehicle,range){
       return;
     }
     const url=URL.createObjectURL(blob);
-    const win=window.open(url,'_blank');
-    if(!win){
-      const a=document.createElement('a');a.href=url;a.download='Vehicle Cost Report - '+vehicle+'.pdf';document.body.appendChild(a);a.click();document.body.removeChild(a);
-    }
+    const a=document.createElement('a');a.href=url;a.download='Vehicle Cost Report - '+vehicle+'.pdf';document.body.appendChild(a);a.click();document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url),60000);
   }catch(e){
     console.error('runVehicleCostReportDownload failed:',e);
