@@ -1628,24 +1628,39 @@ async function downloadVehicleCostReportPdf(vehicle){
   // Wrapped in try/catch so a button click that visibly "does nothing" is never possible
   // again - any failure (library not loaded, html2canvas error, etc.) now surfaces as a
   // real alert with the actual error message instead of failing silently in the console.
+  //
+  // The blank tab below is opened SYNCHRONOUSLY, before the "await" on the next line, so
+  // it still counts as a direct result of the button's click (user gesture) for mobile
+  // popup blockers. Opening window.open() only AFTER the async html2canvas/jsPDF render
+  // completes (the first fix attempted here) loses that gesture context by the time it
+  // runs, so strict mobile popup blockers silently swallow it too - same invisible
+  // failure as the original <a download> bug. Pre-opening a blank tab now and only
+  // navigating it to the real blob URL once ready avoids that.
+  const preOpenedWin=window.open('','_blank');
   try{
     toast('PDF ban raha hai...');
     const blob=await generateVehicleCostReportPdfBlob(vehicle);
-    if(!blob){alert('PDF banane mein error aaya. Internet connection check karein aur dobara try karein.');return}
+    if(!blob){
+      if(preOpenedWin)preOpenedWin.close();
+      alert('PDF banane mein error aaya. Internet connection check karein aur dobara try karein.');
+      return;
+    }
     const url=URL.createObjectURL(blob);
     // This app is normally opened inside the Bliss One hub's same-origin iframe
     // (#appViewerFrame). A programmatic <a download> click can be silently ignored by
     // some mobile browsers when triggered from inside an iframe - no JS error, no
-    // console warning, the click just does nothing. window.open() on the blob URL
-    // avoids that: it opens the PDF in a new top-level tab (browser's own PDF viewer),
-    // where the user can save/share it from there. Falls back to the download-link
-    // click only if the popup itself got blocked.
-    const win=window.open(url,'_blank');
-    if(!win){
+    // console warning, the click just does nothing. Navigating the pre-opened tab to the
+    // blob URL avoids that: it opens the PDF in a new top-level tab (browser's own PDF
+    // viewer), where the user can save/share it from there. Falls back to the old
+    // download-link click only if the popup itself got blocked (preOpenedWin is null).
+    if(preOpenedWin){
+      preOpenedWin.location.href=url;
+    }else{
       const a=document.createElement('a');a.href=url;a.download='Vehicle Cost Report - '+vehicle+'.pdf';document.body.appendChild(a);a.click();document.body.removeChild(a);
     }
     setTimeout(()=>URL.revokeObjectURL(url),60000);
   }catch(e){
+    if(preOpenedWin)preOpenedWin.close();
     console.error('downloadVehicleCostReportPdf failed:',e);
     alert('PDF download karte waqt error aaya: '+(e.message||e));
   }
