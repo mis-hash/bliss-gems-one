@@ -75,7 +75,7 @@ nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
 #fuelSubmitBtn{padding:13px 22px;font-size:14px}
 table{width:100%;border-collapse:collapse}
 th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 8px 9px;border-bottom:2px solid var(--line)}
-td{padding:11px 8px;border-bottom:1px solid #edf1ee;font-size:12.5px;vertical-align:top}
+td{padding:11px 8px;border-bottom:1px solid #edf1ee;font-size:12.5px;vertical-align:middle}
 tbody tr:nth-child(even) td{background:#F7FAF8}
 tr:last-child td{border-bottom:0}
 tbody tr:hover td{background:#f7faf8}
@@ -247,10 +247,12 @@ tbody tr:hover td{background:#f7faf8}
           <div class="field" style="width:auto;margin:0"><label>To</label><input type="date" id="fuelFilterTo" onchange="onFuelFilterChange()" style="width:auto"></div>
           <button class="btn small secondary" onclick="clearFuelFilters()" style="margin-top:17px">✕ Clear Filters</button>
         </div>
-        <div class="tablewrap"><table>
+        <div class="tablewrap desktopTable"><table>
         <thead><tr><th>Date</th><th>Vehicle</th><th>Meter (Before → After)</th><th class="num">Amount</th><th class="num">Cost/Unit</th><th>Payment</th><th>By</th><th>Photos</th><th>Action</th></tr></thead>
         <tbody id="historyTable"></tbody>
-      </table></div></div>
+      </table></div>
+      <div id="fuelHistoryCards" class="mobileCards"></div>
+      </div>
     </div>
   </div>
 
@@ -264,10 +266,12 @@ tbody tr:hover td{background:#f7faf8}
         <span>Service &amp; Repair History</span>
         <label id="showDeletedServiceWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeletedService" onchange="renderServiceHistory()" style="width:auto"> 🗑 Show Disabled (<span id="deletedServiceCount">0</span>)</label>
       </div>
-      <div class="pb"><div class="tablewrap"><table>
+      <div class="pb"><div class="tablewrap desktopTable"><table>
         <thead><tr><th>Date</th><th>Vehicle</th><th>Type</th><th class="num">Amount</th><th>Note</th><th>Photo</th><th>By</th><th>Action</th></tr></thead>
         <tbody id="serviceTable"></tbody>
-      </table></div></div>
+      </table></div>
+      <div id="serviceHistoryCards" class="mobileCards"></div>
+      </div>
     </div>
   </div>
 
@@ -1387,6 +1391,23 @@ function renderServiceHistory(){
     const photoHtml=x.billPhoto?`<img class="thumb" src="${x.billPhoto}" onclick="showServicePhoto('${esc(x.id)}')" title="Bill Photo">`:'<small class="note">-</small>';
     return `<tr><td>${esc(x.date)}${x.deletedAt?`<br><small style="color:var(--muted)">Disabled by ${esc(nameOfUserId(x.deletedBy))}</small>`:''}</td><td>${esc(x.vehicle)}</td><td>${esc(x.type||'Service')}</td><td class="num">${fmtAmt(x.amount)}</td><td>${esc(x.note||'-')}</td><td>${photoHtml}</td><td>${esc(nameOfUserId(x.by))}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
   }).join('')||`<tr><td colspan="8"><div class="emptystate">🔧<p>Koi Service/Repair entry nahi hai.</p></div></td></tr>`;
+  const cardsWrap=$('serviceHistoryCards');
+  if(cardsWrap){
+    cardsWrap.innerHTML=rows.length?rows.map(x=>{
+      const adminBtn=x.deletedAt
+        ?(superAdminUnlocked?`<button class="btn small" onclick="restoreServiceEntry('${esc(x.id)}')">↩ Restore</button>`:'')
+        :(superAdminUnlocked?`<button class="btn small danger" onclick="deleteServiceEntry('${esc(x.id)}')">Disable</button>`:'');
+      const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeleteServiceEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
+      const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditServiceModal('${esc(x.id)}')">✎ Edit</button>`:'';
+      const photoBtn=x.billPhoto?`<button class="btn small secondary" style="padding:3px 9px;font-size:11px;margin-top:6px" onclick="showServicePhoto('${esc(x.id)}')">📷 Bill Photo Dekhein</button>`:'';
+      return `<div class="docCard">
+        <div class="dcTop"><span class="dcLabel">${esc(x.vehicle)} — ${esc(x.type||'Service')}</span><b>${fmtAmt(x.amount)}</b></div>
+        <div class="dcMeta">${esc(x.date)}${x.note&&x.note!=='-'?' • '+esc(x.note):''} • ${esc(nameOfUserId(x.by))}</div>
+        ${photoBtn}
+        ${(editBtn||adminBtn||permBtn)?`<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${editBtn} ${adminBtn} ${permBtn}</div>`:''}
+      </div>`;
+    }).join(''):`<div class="emptystate">🔧<p>Koi Service/Repair entry nahi hai.</p></div>`;
+  }
 }
 
 /* ===== Combined Total Vehicle Cost (Fuel + Service/Repair + Documents) ===== */
@@ -1719,6 +1740,27 @@ function renderHistory(){
     tr.id='fuelLoadMoreRow';
     tr.innerHTML=`<td colspan="9" style="text-align:center;padding:14px 0"><button class="btn small secondary" onclick="loadMoreFuel()">Load More (${rows.length} / ${allRows.length})</button></td>`;
     $('historyTable').appendChild(tr);
+  }
+  const cardsWrap=$('fuelHistoryCards');
+  if(cardsWrap){
+    cardsWrap.innerHTML=rows.map(x=>{
+      const cost=entryCostPerUnit(x);
+      const adminBtn=x.deletedAt
+        ?(superAdminUnlocked?`<button class="btn small" onclick="restoreFuelEntry('${esc(x.id)}')">↩ Restore</button>`:'')
+        :(superAdminUnlocked?`<button class="btn small danger" onclick="deleteFuelEntry('${esc(x.id)}')">Disable</button>`:'');
+      const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeleteFuelEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
+      const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditFuelModal('${esc(x.id)}')">✎ Edit</button>`:'';
+      return `<div class="docCard">
+        <div class="dcTop"><span class="dcLabel">${esc(x.vehicle)}</span><b>${fmtAmt(x.amount)}</b></div>
+        <div class="dcMeta">${esc(x.date)}${deletedInfo(x)} • ${x.meterBefore} → ${x.meterAfter} ${esc(x.unit||'KM')}${cost!==null?' • ₹'+cost.toFixed(2)+'/unit':''}</div>
+        <div class="dcMeta">${esc(x.paymentMode||'-')} • ${esc(nameOfUserId(x.by))}</div>
+        <div style="margin-top:6px">${photoThumbs(x)}</div>
+        ${(editBtn||adminBtn||permBtn)?`<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${editBtn} ${adminBtn} ${permBtn}</div>`:''}
+      </div>`;
+    }).join('')||`<div class="emptystate">⛽<p>Koi fuel entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div>`;
+    if(allRows.length>rows.length){
+      cardsWrap.insertAdjacentHTML('beforeend',`<div style="text-align:center;padding:14px 0"><button class="btn small secondary" onclick="loadMoreFuel()">Load More (${rows.length} / ${allRows.length})</button></div>`);
+    }
   }
 }
 
