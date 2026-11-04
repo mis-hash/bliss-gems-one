@@ -102,7 +102,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
     </div>
     <div class="pb" style="padding:0">
       <table>
-        <thead><tr><th>Date</th><th>Sales Person</th><th>Client</th><th>Note</th><th>Recording</th><th>Analysis</th><th>Logged By</th></tr></thead>
+        <thead><tr><th>Date</th><th>Sales Person</th><th>Client</th><th>Note</th><th>Recording</th><th>Logged By</th></tr></thead>
         <tbody id="callHistoryTable"></tbody>
       </table>
     </div>
@@ -121,12 +121,6 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 <div class="modal" id="photoModal"><div class="box" style="width:min(420px,100%);text-align:center">
 <audio id="playRecordingAudio" controls style="width:100%"></audio>
 <div style="margin-top:12px"><button class="btn" onclick="closePlayRecording()">Close</button></div>
-</div></div>
-
-<div class="modal" id="analysisModal"><div class="box" style="width:min(460px,100%);text-align:left">
-<h3>📊 Call Analysis</h3>
-<div id="analysisModalBody" style="font-size:13.5px;line-height:1.6"></div>
-<div style="margin-top:14px;text-align:right"><button class="btn" onclick="closeAnalysisModal()">Close</button></div>
 </div></div>
 
 <script>
@@ -251,13 +245,6 @@ async function logCallRecording(){
     status.textContent='Error aaya: '+(e.message||e);
   }
 }
-const SENTIMENT_COLOR={Positive:'var(--g)',Neutral:'var(--amber)',Negative:'var(--red)'};
-function analysisCellHtml(r){
-  if(analyzingIds.has(r.id))return '<span class="note">Analyze ho raha hai...</span>';
-  if(r.analysis)return `<button type="button" class="btn small" onclick="viewAnalysis('${esc(r.id)}')" style="color:${SENTIMENT_COLOR[r.analysis.sentiment]||'var(--txt)'}">${esc(r.analysis.sentiment||'-')} — ${esc(r.analysis.outcome||'-')}</button>`;
-  if(r.recordingUrl)return `<button type="button" class="btn small primary" onclick="analyzeCallEntry('${esc(r.id)}')">🔍 Analyze</button>`;
-  return '<span class="note">Recording nahi hai</span>';
-}
 function renderCallHistory(){
   const tbody=$('callHistoryTable');
   if(!tbody)return;
@@ -269,60 +256,9 @@ function renderCallHistory(){
     <td>${esc(r.clientName||'-')}</td>
     <td>${esc(r.note||'-')}</td>
     <td>${r.recordingUrl?`<button type="button" class="btn small" onclick="playRecording('${esc(r.id)}')">▶ Play</button>`:'-'}</td>
-    <td>${analysisCellHtml(r)}</td>
     <td>${esc(r.loggedBy||'-')}</td>
-  </tr>`).join(''):`<tr><td colspan="7"><div class="emptystate">📞<p>Koi call log nahi hui hai.</p></div></td></tr>`;
+  </tr>`).join(''):`<tr><td colspan="6"><div class="emptystate">📞<p>Koi call log nahi hui hai.</p></div></td></tr>`;
 }
-
-// Analyze Call: sends the recording to the analyzeCall Cloud Function (Whisper
-// transcription + GPT summary/sentiment/outcome). Needs the Blaze plan + a Cloud Function
-// deploy with an OPENAI_API_KEY secret - see the README/CLAUDE.md for the one-time setup.
-// The API key itself is never present in this file; it's only looked up server-side.
-const ANALYZE_CALL_URL='https://asia-south1-bliss-gems-one.cloudfunctions.net/analyzeCall';
-const analyzingIds=new Set();
-async function analyzeCallEntry(id){
-  const rows=liveCallLog();
-  const row=rows.find(r=>r.id===id);
-  if(!row||!row.recordingUrl)return;
-  analyzingIds.add(id);
-  renderCallHistory();
-  try{
-    const mimeMatch=row.recordingUrl.match(/^data:([^;]+);base64,/);
-    const resp=await fetch(ANALYZE_CALL_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({audioBase64:row.recordingUrl,mimeType:mimeMatch?mimeMatch[1]:'audio/mpeg',fileName:row.fileName,clientName:row.clientName}),
-    });
-    const data=await resp.json();
-    if(!resp.ok)throw new Error(data.error||('Analysis failed ('+resp.status+')'));
-    const freshRows=liveCallLog();
-    const freshRow=freshRows.find(r=>r.id===id);
-    if(freshRow){
-      freshRow.analysis={transcript:data.transcript,summary:data.summary,sentiment:data.sentiment,outcome:data.outcome,followUpNeeded:data.followUpNeeded,analyzedAt:new Date().toISOString()};
-      saveCallLog(freshRows);
-    }
-  }catch(e){
-    console.error('analyzeCallEntry failed:',e);
-    alert('Call analyze karte waqt error aaya: '+(e.message||e));
-  }finally{
-    analyzingIds.delete(id);
-    renderCallHistory();
-  }
-}
-function viewAnalysis(id){
-  const row=liveCallLog().find(r=>r.id===id);
-  if(!row||!row.analysis)return;
-  const a=row.analysis;
-  $('analysisModalBody').innerHTML=`
-    <p><b>Sentiment:</b> <span style="color:${SENTIMENT_COLOR[a.sentiment]||'var(--txt)'}">${esc(a.sentiment||'-')}</span></p>
-    <p><b>Outcome:</b> ${esc(a.outcome||'-')}</p>
-    <p><b>Follow-up chahiye:</b> ${a.followUpNeeded?'Haan':'Nahi'}</p>
-    <p><b>Summary:</b><br>${esc(a.summary||'-')}</p>
-    <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">Full Transcript dekhein</summary><p style="font-size:12.5px;color:var(--muted);white-space:pre-line;margin-top:6px">${esc(a.transcript||'-')}</p></details>
-  `;
-  $('analysisModal').classList.add('show');
-}
-function closeAnalysisModal(){ $('analysisModal').classList.remove('show'); }
 function playRecording(id){
   const row=liveCallLog().find(r=>r.id===id);
   if(!row||!row.recordingUrl)return;
