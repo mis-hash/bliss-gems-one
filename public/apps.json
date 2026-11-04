@@ -34,5 +34,11 @@
     "name": "Purchase Price Estimator",
     "pushedAt": 0,
     "enabled": true
+  },
+  {
+    "slug": "ai-assistant",
+    "name": "AI Business Assistant",
+    "pushedAt": 0,
+    "enabled": true
   }
 ]
