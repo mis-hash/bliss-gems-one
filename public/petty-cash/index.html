@@ -183,6 +183,7 @@ tbody tr:hover td{background:#f7faf8}
     <div class="ph"><span>Quick Actions</span></div>
     <div class="pb" style="display:flex;gap:8px;flex-wrap:wrap">
       <button type="button" class="btn primary" onclick="openEntryModal('in')">➕ Add Fund</button>
+      <button type="button" class="btn" onclick="openPcSpendCategoriesManage()">🧮 Manage Spend Categories</button>
       <button type="button" class="btn danger superAdminStrict hidden" onclick="clearAllPendingHistory()">🗑 Clear Pending/Rejected History</button>
     </div>
   </div>
@@ -386,6 +387,13 @@ tbody tr:hover td{background:#f7faf8}
 <img id="pcSpendProofImg" style="max-width:100%;border-radius:8px">
 </div></div>
 
+<div class="modal" id="pcSpendCategoriesModal"><div class="box" style="width:min(500px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Manage Spend Categories</h3><button class="btn small" onclick="closePcSpendCategoriesManage()">✕</button></div>
+<div class="field"><label>Add New Category</label><div style="display:flex;gap:8px"><input id="pcSpendCatNew" placeholder="e.g. Auto Rickshaw" style="flex:1"><button class="btn" onclick="savePcSpendCategories()">➕ Add &amp; Save</button></div></div>
+<div id="pcSpendCatRows" style="margin-top:10px"></div>
+<div style="margin-top:12px;text-align:right"><button class="btn primary" onclick="savePcSpendCategories()">✓ Save</button></div>
+</div></div>
+
 <datalist id="pcSpendNoteList"></datalist>
 
 <!-- Manage modal -->
@@ -555,6 +563,10 @@ function renderPcSpendCategoryOptions(){
   const list=$('pcSpendNoteList');
   if(list)list.innerHTML=PC_SPEND_CATEGORIES.map(c=>`<option value="${esc(c)}"></option>`).join('');
 }
+// Per-category "Proof Required" override, same pattern as Trip Expense's EXPENSE_PROOF_REQUIRED
+// (synced from the same pc_settings/spendCategories doc, just a different field) - default is
+// optional (not in this map) unless Accounts explicitly turns it on for a category.
+let PC_SPEND_PROOF_REQUIRED={};
 function startPcSpendCategoriesSync(){
   if(pcSpendCategoriesStarted||!db)return;pcSpendCategoriesStarted=true;
   db.collection('pc_settings').doc('spendCategories').onSnapshot(doc=>{
@@ -563,6 +575,7 @@ function startPcSpendCategoriesSync(){
         if(c&&!PC_SPEND_CATEGORIES.some(x=>x.toLowerCase()===String(c).toLowerCase()))PC_SPEND_CATEGORIES.push(c);
       });
     }
+    if(doc.exists&&doc.data().proofRequired)PC_SPEND_PROOF_REQUIRED=Object.assign({},PC_SPEND_PROOF_REQUIRED,doc.data().proofRequired);
     renderPcSpendCategoryOptions();
   },err=>console.error('spendCategories sync error',err));
 }
@@ -573,6 +586,32 @@ async function addPcSpendCategoryIfNew(category){
   renderPcSpendCategoryOptions();
   try{await db.collection('pc_settings').doc('spendCategories').set({list:PC_SPEND_CATEGORIES},{merge:true});}
   catch(e){console.error('addPcSpendCategoryIfNew failed:',e);}
+}
+// Accounts-facing settings modal (mirrors Trip Expense's Ledger Heads modal) - add a new
+// spend category and toggle per-category Proof Required, all saved together.
+function openPcSpendCategoriesManage(){
+  if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye manage kar sakte hain.');return}
+  $('pcSpendCatNew').value='';
+  $('pcSpendCatRows').innerHTML=PC_SPEND_CATEGORIES.map(c=>`<div class="item"><span>${esc(c)}</span><label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:bold;white-space:nowrap"><input type="checkbox" id="pcSpendProof_${esc(c).replace(/\W/g,'_')}" style="width:auto" ${PC_SPEND_PROOF_REQUIRED[c]?'checked':''}> Proof Required</label></div>`).join('');
+  $('pcSpendCategoriesModal').classList.add('show');
+}
+function closePcSpendCategoriesManage(){$('pcSpendCategoriesModal').classList.remove('show');}
+async function savePcSpendCategories(){
+  const newCat=($('pcSpendCatNew').value||'').trim();
+  if(newCat)await addPcSpendCategoryIfNew(newCat);
+  const proofRequired={};
+  PC_SPEND_CATEGORIES.forEach(c=>{
+    const cb=$(`pcSpendProof_${c.replace(/\W/g,'_')}`);
+    if(cb&&cb.checked)proofRequired[c]=true;
+  });
+  // A newly-typed category (added above) has no checkbox row yet at this point, so it starts
+  // optional - Accounts can turn Proof Required on for it next time they reopen this modal.
+  PC_SPEND_PROOF_REQUIRED=proofRequired;
+  try{
+    await db.collection('pc_settings').doc('spendCategories').set({proofRequired},{merge:true});
+    toast('Spend categories save ho gayi');
+    closePcSpendCategoriesManage();
+  }catch(e){console.error('savePcSpendCategories failed:',e);alert('Save karte waqt error aaya: '+(e.message||e));}
 }
 // Same compress-before-storing approach as Trip Expense's expense Bill Photo (Firestore doc
 // 1MB limit) - resize to a 700px-wide JPEG rather than storing the original.
@@ -1602,6 +1641,7 @@ async function addIssueSpend(issueId){
   const amount=parseFloat(amtEl?.value);
   const note=(noteEl?.value||'').trim();
   if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  if(note&&PC_SPEND_PROOF_REQUIRED[note]&&!proofEl?.files[0]){alert('"'+note+'" ke liye photo zaroori hai.');return}
   _issueSpendSubmitting=true;
   try{
     let proofDataUri='';
