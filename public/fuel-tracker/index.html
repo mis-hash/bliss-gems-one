@@ -290,24 +290,33 @@ tbody tr:hover td{background:#f7faf8}
     </div>
     <div class="panel hidden" id="vdFuelPanel">
       <div class="ph"><span>⛽ Fuel Entries</span></div>
-      <div class="pb"><div class="tablewrap"><table>
-        <thead><tr><th>Date</th><th>Meter (Before → After)</th><th class="num">Liters</th><th class="num">Amount</th></tr></thead>
-        <tbody id="vdFuelTable"></tbody>
-      </table></div></div>
+      <div class="pb">
+        <div class="tablewrap desktopTable"><table>
+          <thead><tr><th>Date</th><th>Meter (Before → After)</th><th class="num">Liters</th><th class="num">Amount</th></tr></thead>
+          <tbody id="vdFuelTable"></tbody>
+        </table></div>
+        <div id="vdFuelCards" class="mobileCards"></div>
+      </div>
     </div>
     <div class="panel hidden" id="vdServicePanel">
       <div class="ph"><span>🔧 Service / Repair</span></div>
-      <div class="pb"><div class="tablewrap"><table>
-        <thead><tr><th>Date</th><th>Type</th><th>Note</th><th class="num">Amount</th></tr></thead>
-        <tbody id="vdServiceTable"></tbody>
-      </table></div></div>
+      <div class="pb">
+        <div class="tablewrap desktopTable"><table>
+          <thead><tr><th>Date</th><th>Type</th><th>Note</th><th class="num">Amount</th></tr></thead>
+          <tbody id="vdServiceTable"></tbody>
+        </table></div>
+        <div id="vdServiceCards" class="mobileCards"></div>
+      </div>
     </div>
     <div class="panel hidden" id="vdDocsPanel">
       <div class="ph"><span>📄 Documents</span></div>
-      <div class="pb"><div class="tablewrap"><table>
-        <thead><tr><th>Document</th><th>Start</th><th>Expiry</th><th class="num">Cost</th><th>Status</th></tr></thead>
-        <tbody id="vdDocsTable"></tbody>
-      </table></div></div>
+      <div class="pb">
+        <div class="tablewrap desktopTable"><table>
+          <thead><tr><th>Document</th><th>Start</th><th>Expiry</th><th class="num">Cost</th><th>Status</th></tr></thead>
+          <tbody id="vdDocsTable"></tbody>
+        </table></div>
+        <div id="vdDocsCards" class="mobileCards"></div>
+      </div>
     </div>
   </div>
   </main>
@@ -1510,6 +1519,22 @@ function renderVehicleDetail(){
     const status=days===null?'-':days<0?'Expired':(days+' din baaki');
     return `<tr><td>${esc(r.label)}</td><td>${esc(r.startDate||'-')}</td><td>${esc(r.expiryDate||'-')}</td><td class="num">${fmtAmt(r.cost||0)}</td><td>${esc(status)}</td></tr>`;
   }).join(''):`<tr><td colspan="5"><div class="emptystate">📄<p>Koi document set nahi hua.</p></div></td></tr>`;
+  if($('vdFuelCards'))$('vdFuelCards').innerHTML=fuelRows.length?fuelRows.map(x=>`<div class="docCard">
+    <div class="dcTop"><span class="dcLabel">${esc(x.date)}</span><b>${fmtAmt(x.amount)}</b></div>
+    <div class="dcMeta">${x.meterBefore} → ${x.meterAfter}${x.liters?' • '+x.liters+' L':''}</div>
+  </div>`).join(''):`<div class="emptystate">⛽<p>Koi fuel entry nahi hai.</p></div>`;
+  if($('vdServiceCards'))$('vdServiceCards').innerHTML=serviceRows.length?serviceRows.map(x=>`<div class="docCard">
+    <div class="dcTop"><span class="dcLabel">${esc(x.date)} — ${esc(x.type||'-')}</span><b>${fmtAmt(x.amount)}</b></div>
+    <div class="dcMeta">${x.note&&x.note!=='-'?esc(x.note):''}</div>
+  </div>`).join(''):`<div class="emptystate">🔧<p>Koi service entry nahi hai.</p></div>`;
+  if($('vdDocsCards'))$('vdDocsCards').innerHTML=docRows.length?docRows.map(r=>{
+    const days=r.expiryDate?Math.ceil((new Date(r.expiryDate)-new Date(todayISO()))/86400000):null;
+    const status=days===null?'-':days<0?'Expired':(days+' din baaki');
+    return `<div class="docCard">
+      <div class="dcTop"><span class="dcLabel">${esc(r.label)}</span><b>${fmtAmt(r.cost||0)}</b></div>
+      <div class="dcMeta">${esc(r.startDate||'-')} → ${esc(r.expiryDate||'-')} • ${esc(status)}</div>
+    </div>`;
+  }).join(''):`<div class="emptystate">📄<p>Koi document set nahi hua.</p></div>`;
 }
 function renderVehicleTotalCost(){
   const wrap=$('vehicleTotalCostTable');
@@ -1600,11 +1625,19 @@ async function generateVehicleCostReportPdfBlob(vehicle){
   finally{wrap.remove();}
 }
 async function downloadVehicleCostReportPdf(vehicle){
-  toast('PDF ban raha hai...');
-  const blob=await generateVehicleCostReportPdfBlob(vehicle);
-  if(!blob){alert('PDF banane mein error aaya, dobara try karein.');return}
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download='Vehicle Cost Report - '+vehicle+'.pdf';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  // Wrapped in try/catch so a button click that visibly "does nothing" is never possible
+  // again - any failure (library not loaded, html2canvas error, etc.) now surfaces as a
+  // real alert with the actual error message instead of failing silently in the console.
+  try{
+    toast('PDF ban raha hai...');
+    const blob=await generateVehicleCostReportPdfBlob(vehicle);
+    if(!blob){alert('PDF banane mein error aaya. Internet connection check karein aur dobara try karein.');return}
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download='Vehicle Cost Report - '+vehicle+'.pdf';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  }catch(e){
+    console.error('downloadVehicleCostReportPdf failed:',e);
+    alert('PDF download karte waqt error aaya: '+(e.message||e));
+  }
 }
 
 /* ===== Monthly Spend Trend — single series (overall fuel spend), so one brand hue is
