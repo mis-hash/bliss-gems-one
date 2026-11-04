@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<script>
+/* Crash safety net — same pattern as the other Bliss apps: registered first so a later
+   script error still surfaces as a visible banner instead of a silently dead page. */
+(function(){
+  function showCrashBanner(msg){
+    if(document.getElementById('aiCrashBanner'))return;
+    var b=document.createElement('div');
+    b.id='aiCrashBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#b42318;color:#fff;padding:10px 14px;font:600 13px Arial,sans-serif;text-align:center;box-shadow:0 2px 10px #0004';
+    b.innerHTML='⚠ App me error aa gaya hai. Page reload karein.'
+      +' <button type="button" style="margin-left:10px;padding:4px 10px;border:0;border-radius:6px;background:#fff;color:#b42318;font-weight:700;cursor:pointer" onclick="location.reload()">Reload</button>'
+      +'<div style="font-weight:400;font-size:11px;opacity:.85;margin-top:3px">'+String(msg||'').slice(0,200).replace(/[<>]/g,'')+'</div>';
+    function attach(){document.body&&document.body.prepend(b)}
+    if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach);
+  }
+  window.addEventListener('error',function(e){console.error('Uncaught error:',e.error||e.message);showCrashBanner((e.error&&e.error.message)||e.message);});
+  window.addEventListener('unhandledrejection',function(e){console.error('Unhandled promise rejection:',e.reason);showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));});
+})();
+</script>
+<title>AI Business Assistant</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Same design system as the other Bliss apps, so all apps read as one family. */
+:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
+*{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit}
+h1,h2,h3,.card b,.tabular{font-family:'Manrope',sans-serif}
+.hidden{display:none!important}
+header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.head{height:100%;max-width:1180px;margin:auto;padding:0 18px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:24px;font-weight:900;color:var(--g2)}
+.brand b{color:var(--g);font-size:20px;font-family:'Manrope',sans-serif}
+.brand small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.headRight{display:flex;align-items:center;gap:10px}
+.pillbadge{font-size:13px;font-weight:700;background:var(--mint);color:var(--g);padding:7px 12px;border-radius:999px}
+.btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--g);color:#fff}
+.btn.secondary{background:#eef2f0;color:var(--txt)}
+.btn.small{padding:7px 11px;font-size:12px}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:50}
+.modal.show{display:flex}
+.box{width:min(640px,100%);background:#fff;border-radius:14px;padding:19px;max-height:90vh;overflow:auto}
+.field label{display:block;font-size:11px;font-weight:bold;margin-bottom:5px}
+.field input{width:100%;padding:11px;border:1px solid var(--line);border-radius:7px;font-size:14px;background:#fff;color:var(--txt)}
+.note{font-size:12px;color:var(--muted)}
+.gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px}
+
+.shell{max-width:1180px;margin:auto;padding:20px 18px 60px;display:flex;flex-wrap:wrap;gap:18px}
+.sidebar{flex:1 1 280px;min-width:260px;display:flex;flex-direction:column;gap:14px}
+.sideCard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}
+.sideCard .sTitle{font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--muted);margin-bottom:12px}
+.srcRow{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+.srcDot{width:9px;height:9px;border-radius:50%;margin-top:6px;flex-shrink:0}
+.srcName{font-weight:700;font-size:13.5px}
+.srcMeta{font-size:12px;color:var(--muted)}
+.chip{display:block;width:100%;text-align:left;background:var(--mint);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:12.5px;color:var(--txt);cursor:pointer}
+.chatPanel{flex:2 1 480px;min-width:300px;background:#fff;border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;min-height:560px}
+.msgs{flex:1;padding:22px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;max-height:70vh}
+.msg{max-width:85%;border-radius:14px;padding:12px 16px;font-size:13.5px;line-height:1.6;white-space:pre-line}
+.msg.user{align-self:flex-end;background:var(--g);color:#fff;border-radius:14px 14px 2px 14px}
+.msg.ai{align-self:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:14px 14px 14px 2px}
+.srcTag{display:inline-block;font-size:10.5px;font-weight:700;color:var(--g);background:var(--mint);border-radius:999px;padding:3px 9px;margin:8px 6px 0 0}
+.inputRow{border-top:1px solid var(--line);padding:14px 16px;display:flex;gap:10px;align-items:center}
+.inputRow input{flex:1;border:1px solid var(--line);border-radius:999px;padding:11px 16px;font-size:13.5px;outline:none}
+.sendBtn{background:var(--g);color:#fff;border:none;border-radius:999px;width:40px;height:40px;font-size:15px;cursor:pointer;flex-shrink:0}
+.emptyMsgs{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted);gap:10px;padding:40px 20px}
+</style>
+</head>
+<body>
+
+<div id="gateWrap" style="display:none"><div class="gate" id="gateBox"></div></div>
+
+<div id="appWrap" style="display:none">
+<header><div class="head">
+  <div class="brand"><div class="logo">🤖</div><div><b>AI Business Assistant</b><small>Bliss Gems &amp; Minerals</small></div></div>
+  <div class="headRight">
+    <span class="pillbadge" id="loginBadge">Not Logged In</span>
+    <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
+  </div>
+</div></header>
+
+<div class="shell">
+  <div class="sidebar">
+    <div class="sideCard">
+      <div class="sTitle">CONNECTED SOURCES</div>
+      <div class="srcRow"><span class="srcDot" style="background:var(--g)"></span><div><div class="srcName">Bliss One — 6 Apps</div><div class="srcMeta">Trip, Stationery, Petty Cash, Vehicle • Live</div></div></div>
+      <div class="srcRow"><span class="srcDot" style="background:var(--amber)"></span><div style="flex:1">
+        <div class="srcName">Busy</div>
+        <div class="srcMeta" id="busyStatus">Koi export upload nahi hua abhi tak</div>
+        <input type="file" id="busyFileInput" accept=".csv" style="display:none" onchange="handleBusyFileSelected(event)">
+        <button type="button" class="btn small" style="margin-top:8px" onclick="document.getElementById('busyFileInput').click()">⬆ Upload Busy Export (CSV)</button>
+      </div></div>
+      <div class="srcRow"><span class="srcDot" style="background:#C8C2B4"></span><div><div class="srcName" style="color:var(--muted)">Client/Supplier Portals</div><div class="srcMeta">Not connected — no API access yet</div></div></div>
+    </div>
+    <div class="sideCard">
+      <div class="sTitle">TRY ASKING</div>
+      <button type="button" class="chip" onclick="askSuggested('Konse trips abhi open hain?')">🧳 Konse trips abhi open hain?</button>
+      <button type="button" class="chip" onclick="askSuggested('Stationery ka low stock items kya hain?')">📦 Stationery low-stock items?</button>
+      <button type="button" class="chip" onclick="askSuggested('Petty cash ka current balance kya hai?')">💰 Petty cash balance?</button>
+      <button type="button" class="chip" onclick="askSuggested('Busy ke export ka total kitna hai?')">🧾 Busy export ka total?</button>
+    </div>
+  </div>
+
+  <div class="chatPanel">
+    <div class="msgs" id="msgsWrap">
+      <div class="emptyMsgs" id="emptyMsgs">💬<div style="max-width:320px">Left panel se koi sawaal try karein, ya niche type karein — Hindi ya English dono chalega.</div></div>
+    </div>
+    <div class="inputRow">
+      <input type="text" id="chatInput" placeholder="Apna sawaal type karein..." onkeydown="if(event.key==='Enter')sendChat()">
+      <button type="button" class="sendBtn" onclick="sendChat()">➤</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="modal" id="loginModal"><div class="box" style="width:min(360px,100%)">
+<h3>Login</h3>
+<div class="field"><label>Username</label><input id="loginUsername" autocomplete="off"></div>
+<div class="field" style="margin-top:8px"><label>Password</label><input id="loginPassword" type="password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<p class="note" id="loginMsg" style="margin:8px 0 0"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeLogin()">Cancel</button><button class="btn primary" onclick="doLogin()">Login</button></div>
+</div></div>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyDxcG_Z24Bv3cAP0IJsMxhUSMdh_9TYWEg",authDomain:"bliss-gems-one.firebaseapp.com",projectId:"bliss-gems-one",storageBucket:"bliss-gems-one.firebasestorage.app",messagingSenderId:"702608135517",appId:"1:702608135517:web:d848197040efb3be5f04b4"};
+let db=null;
+try{
+  if(typeof firebase!=='undefined'){
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+  }else{console.error('firebase SDK not loaded — cloud sync unavailable this session');}
+}catch(e){console.error('firebase init failed:',e);}
+try{if(typeof firebase!=='undefined'&&firebase.auth)firebase.auth().signInAnonymously().catch(e=>console.error('anon auth failed:',e));}catch(e){console.error('anon auth failed:',e);}
+
+const APP_SLUG='ai-assistant';
+const UU_COLLECTION='universal_users';
+const SESSION_KEY='pd_logged_user_v1'; // same key as the other Bliss apps - one login everywhere
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+function fmtAmt(n){return '₹'+Math.round(Number(n)||0).toLocaleString('en-IN')}
+
+let users=[],currentUser=null;
+function loggedUser(){return users.find(x=>x.id===currentUser)||null}
+function isAiAdmin(u){return !!(u&&u.appRoles&&(u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director'))}
+
+function openLogin(){$('loginModal').classList.add('show');$('loginMsg').textContent='';}
+function closeLogin(){$('loginModal').classList.remove('show')}
+function doLogin(){
+  const uname=$('loginUsername').value.trim(),pass=$('loginPassword').value;
+  const msg=$('loginMsg');
+  const u=users.find(x=>String(x.username||'').toLowerCase()===uname.toLowerCase()&&x.active!==false);
+  if(!u||pass!==String(u.password||'1234')){msg.style.color='#b43a35';msg.textContent='Invalid Username / Password';return}
+  localStorage.setItem(SESSION_KEY,u.id);
+  currentUser=u.id;
+  closeLogin();
+  renderAll();
+}
+function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
+
+function startUsersSync(){
+  if(!db)return;
+  db.collection(UU_COLLECTION).onSnapshot(snap=>{users=[];snap.forEach(d=>users.push(d.data()));renderAll();},err=>console.error('users sync error',err));
+}
+
+function renderGate(){
+  const gateWrap=$('gateWrap'),appWrap=$('appWrap'),gateBox=$('gateBox');
+  const u=loggedUser();
+  if(!currentUser||!u){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    gateBox.innerHTML=`<h3>Login Required</h3><p class="note">AI Business Assistant dekhne ke liye login karein — wahi username/password jo baaki Bliss apps me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
+    return;
+  }
+  if(!isAiAdmin(u)){
+    gateWrap.style.display='flex';appWrap.style.display='none';
+    gateBox.innerHTML=`<h3>Directors Only</h3><p class="note">Yeh tool sirf Admin/Director access wale log use kar sakte hain. Bliss One hub ke Manage → Universal Users mein "AI Business Assistant" role set karwayein.</p>`;
+    return;
+  }
+  gateWrap.style.display='none';appWrap.style.display='block';
+  $('loginBadge').textContent='👤 '+(u.name||u.username||'User');
+  $('logoutBtn').classList.remove('hidden');
+}
+
+function renderAll(){
+  renderGate();
+}
+
+/* ===== Cross-app read-only queries (same Firestore project, different collections) ===== */
+function liveTeTrips(cb){ return db.collection('te_trips').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}); }
+function liveSiItems(cb){ return db.collection('si_items').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows);}); }
+function livePcLedger(cb){ return db.collection('pc_ledger').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}); }
+function liveBusyImport(cb){ return db.collection('busy_import').doc('latest').get().then(doc=>cb(doc.exists?doc.data():null)); }
+
+async function answerOpenTrips(){
+  const rows=await new Promise(res=>liveTeTrips(res));
+  const open=rows.filter(x=>x.status!=='closed');
+  if(!open.length)return {text:'Koi trip abhi open nahi hai — sab close ho chuke hain.',sources:['Bliss One — Trip Expense App']};
+  const lines=open.map(t=>`• ${t.salesName||'-'} — ${t.location||'Trip'} (status: ${t.status})`);
+  return {text:`${open.length} trip(s) abhi open hain:\n`+lines.join('\n'),sources:['Bliss One — Trip Expense App']};
+}
+async function answerLowStock(){
+  const rows=await new Promise(res=>liveSiItems(res));
+  const low=rows.filter(x=>Number(x.stock||0)<Number(x.min||0));
+  if(!low.length)return {text:'Koi item low-stock mein nahi hai.',sources:['Bliss One — Stationery Inventory']};
+  const lines=low.map(x=>`• ${x.name} — ${x.stock||0} ${x.unit||''} bache (reorder level ${x.min||0})`);
+  return {text:`${low.length} item(s) low-stock mein hain:\n`+lines.join('\n'),sources:['Bliss One — Stationery Inventory']};
+}
+async function answerPettyCashBalance(){
+  const rows=await new Promise(res=>livePcLedger(res));
+  const totalIn=rows.filter(x=>x.type==='in').reduce((s,x)=>s+(x.amount||0),0);
+  const totalOut=rows.filter(x=>x.type==='out').reduce((s,x)=>s+(x.amount||0),0);
+  return {text:`Petty Cash current balance: ${fmtAmt(totalIn-totalOut)}\n(Total Received: ${fmtAmt(totalIn)} • Total Issued: ${fmtAmt(totalOut)})`,sources:['Bliss One — Petty Cash']};
+}
+async function answerBusyTotal(){
+  const data=await new Promise(res=>liveBusyImport(res));
+  if(!data)return {text:'Abhi tak koi Busy export upload nahi hua hai. Left panel se "Upload Busy Export" button se CSV daal dein.',sources:[]};
+  return {text:`Busy export ka total: ${fmtAmt(data.total)}\n(${data.rowCount} rows • upload: ${new Date(data.uploadedAt).toLocaleString('en-IN')})`,sources:['Busy Export ('+new Date(data.uploadedAt).toLocaleDateString('en-IN')+')']};
+}
+
+async function answerQuestion(text){
+  const q=String(text||'').toLowerCase();
+  if(q.includes('trip')) return answerOpenTrips();
+  if(q.includes('stock')||q.includes('stationery')) return answerLowStock();
+  if(q.includes('petty')||q.includes('cash balance')||q.includes('balance')) return answerPettyCashBalance();
+  if(q.includes('busy')||q.includes('sales')) return answerBusyTotal();
+  return {text:'Maaf kijiye, abhi main sirf kuch specific sawaalon ke jawab de sakta hoon — trips, stationery stock, petty cash balance, ya Busy export total. Baaki sawaal aane wale updates mein add honge.',sources:[]};
+}
+
+function askSuggested(text){ $('chatInput').value=text; sendChat(); }
+async function sendChat(){
+  const input=$('chatInput');
+  const text=input.value.trim();
+  if(!text)return;
+  input.value='';
+  appendMsg('user',text);
+  const thinkingId=appendMsg('ai','Soch raha hoon...');
+  try{
+    const res=await answerQuestion(text);
+    updateMsg(thinkingId,res.text,res.sources);
+  }catch(e){
+    console.error('answerQuestion failed:',e);
+    updateMsg(thinkingId,'Error aaya jawab dete waqt: '+(e.message||e),[]);
+  }
+}
+let msgCounter=0;
+function appendMsg(role,text,sources){
+  const wrap=$('msgsWrap');
+  if($('emptyMsgs'))$('emptyMsgs').remove();
+  const id='msg-'+(++msgCounter);
+  const div=document.createElement('div');
+  div.className='msg '+role;
+  div.id=id;
+  div.textContent=text;
+  if(sources&&sources.length){
+    sources.forEach(s=>{const tag=document.createElement('span');tag.className='srcTag';tag.textContent=s;div.appendChild(document.createElement('br'));div.appendChild(tag);});
+  }
+  wrap.appendChild(div);
+  wrap.scrollTop=wrap.scrollHeight;
+  return id;
+}
+function updateMsg(id,text,sources){
+  const div=$(id);
+  if(!div)return;
+  div.textContent=text;
+  if(sources&&sources.length){
+    sources.forEach(s=>{const tag=document.createElement('span');tag.className='srcTag';tag.textContent=s;div.appendChild(tag);});
+  }
+  $('msgsWrap').scrollTop=$('msgsWrap').scrollHeight;
+}
+
+/* ===== Busy CSV upload =====
+   Busy only supports manual CSV/Excel export (no API) - so this is a simple "upload the
+   latest export" flow, not a live connection. Parses the header row to find an
+   amount-like numeric column (by header name, else the first fully-numeric column),
+   sums it, and stores just the summary (not every row) in one small Firestore doc. */
+function parseBusyCsv(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim().length);
+  if(lines.length<2)return null;
+  const header=lines[0].split(',').map(h=>h.trim().toLowerCase());
+  let amountCol=header.findIndex(h=>h.includes('amount')||h.includes('total')||h.includes('value'));
+  const dataRows=lines.slice(1).map(l=>l.split(','));
+  if(amountCol===-1){
+    for(let c=header.length-1;c>=0;c--){
+      if(dataRows.every(r=>r[c]!==undefined&&!isNaN(parseFloat(r[c])))){amountCol=c;break;}
+    }
+  }
+  if(amountCol===-1)return null;
+  let total=0,rowCount=0;
+  dataRows.forEach(r=>{const v=parseFloat(r[amountCol]);if(!isNaN(v)){total+=v;rowCount++;}});
+  return {total,rowCount};
+}
+function handleBusyFileSelected(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async function(){
+    const parsed=parseBusyCsv(String(reader.result||''));
+    if(!parsed){alert('CSV parse nahi ho paya. Ek column amount/total/value naam ka hona chahiye, ya sabse right wali numeric column use hogi.');return}
+    try{
+      await db.collection('busy_import').doc('latest').set({total:parsed.total,rowCount:parsed.rowCount,uploadedAt:new Date().toISOString(),fileName:file.name});
+      $('busyStatus').textContent='Last export: '+file.name+' ('+parsed.rowCount+' rows)';
+      alert('Busy export upload ho gaya: '+parsed.rowCount+' rows, total '+fmtAmt(parsed.total));
+    }catch(err){console.error('busy import save failed',err);alert('Upload save karte waqt error aaya: '+err.message);}
+  };
+  reader.readAsText(file);
+  e.target.value='';
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  currentUser=localStorage.getItem(SESSION_KEY)||null;
+  if(db)startUsersSync();
+  renderAll();
+  if(db)liveBusyImport(data=>{ if(data&&$('busyStatus'))$('busyStatus').textContent='Last export: '+(data.fileName||'-')+' ('+data.rowCount+' rows, '+new Date(data.uploadedAt).toLocaleDateString('en-IN')+')'; });
+});
+window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
+</script>
+</body>
+</html>
