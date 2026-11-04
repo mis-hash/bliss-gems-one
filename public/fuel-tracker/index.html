@@ -1631,38 +1631,28 @@ async function runVehicleCostReportDownload(vehicle,range){
   // again - any failure (library not loaded, html2canvas error, etc.) now surfaces as a
   // real alert with the actual error message instead of failing silently in the console.
   //
-  // The blank tab below is opened SYNCHRONOUSLY, before the "await" on the next line, so
-  // it still counts as a direct result of the button's click (user gesture) for mobile
-  // popup blockers. Opening window.open() only AFTER the async html2canvas/jsPDF render
-  // completes (the first fix attempted here) loses that gesture context by the time it
-  // runs, so strict mobile popup blockers silently swallow it too - same invisible
-  // failure as the original <a download> bug. Pre-opening a blank tab now and only
-  // navigating it to the real blob URL once ready avoids that.
-  const preOpenedWin=window.open('','_blank');
+  // An earlier version of this function pre-opened a BLANK tab synchronously and only
+  // navigated it to the real blob URL once the PDF was ready, to dodge mobile popup
+  // blockers. On real Chrome that backfired differently: navigating an already-open
+  // blank tab via location.href some time after the click (not the click itself) trips
+  // Chrome's "delayed tab-under redirect" abuse heuristic, which silently blocks THAT
+  // navigation - the tab opens and then just sits on about:blank forever, no error, no
+  // console warning. A single window.open(url,'_blank') call made once the real blob URL
+  // already exists does not hit that heuristic, so that's what this does now.
   try{
     toast('PDF ban raha hai...');
     const blob=await generateVehicleCostReportPdfBlob(vehicle,range);
     if(!blob){
-      if(preOpenedWin)preOpenedWin.close();
       alert('PDF banane mein error aaya. Internet connection check karein aur dobara try karein.');
       return;
     }
     const url=URL.createObjectURL(blob);
-    // This app is normally opened inside the Bliss One hub's same-origin iframe
-    // (#appViewerFrame). A programmatic <a download> click can be silently ignored by
-    // some mobile browsers when triggered from inside an iframe - no JS error, no
-    // console warning, the click just does nothing. Navigating the pre-opened tab to the
-    // blob URL avoids that: it opens the PDF in a new top-level tab (browser's own PDF
-    // viewer), where the user can save/share it from there. Falls back to the old
-    // download-link click only if the popup itself got blocked (preOpenedWin is null).
-    if(preOpenedWin){
-      preOpenedWin.location.href=url;
-    }else{
+    const win=window.open(url,'_blank');
+    if(!win){
       const a=document.createElement('a');a.href=url;a.download='Vehicle Cost Report - '+vehicle+'.pdf';document.body.appendChild(a);a.click();document.body.removeChild(a);
     }
     setTimeout(()=>URL.revokeObjectURL(url),60000);
   }catch(e){
-    if(preOpenedWin)preOpenedWin.close();
     console.error('runVehicleCostReportDownload failed:',e);
     alert('PDF download karte waqt error aaya: '+(e.message||e));
   }
