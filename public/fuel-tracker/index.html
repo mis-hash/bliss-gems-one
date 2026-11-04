@@ -237,7 +237,14 @@ tbody tr:hover td{background:#f7faf8}
           <label id="showDeletedWrap" class="hidden" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:400"><input type="checkbox" id="showDeleted" onchange="onFuelFilterChange()" style="width:auto"> 🗑 Show Disabled (<span id="deletedCount">0</span>)</label>
         </div>
       </div>
-      <div class="pb"><div class="tablewrap"><table>
+      <div class="pb">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+          <div class="field" style="width:auto;margin:0"><label>Vehicle</label><select id="fuelFilterVehicle" onchange="onFuelFilterChange()" style="width:auto;padding:10px;border:1px solid var(--line);border-radius:7px"><option value="">Sabhi Vehicles</option></select></div>
+          <div class="field" style="width:auto;margin:0"><label>From</label><input type="date" id="fuelFilterFrom" onchange="onFuelFilterChange()" style="width:auto"></div>
+          <div class="field" style="width:auto;margin:0"><label>To</label><input type="date" id="fuelFilterTo" onchange="onFuelFilterChange()" style="width:auto"></div>
+          <button class="btn small secondary" onclick="clearFuelFilters()" style="margin-top:17px">✕ Clear Filters</button>
+        </div>
+        <div class="tablewrap"><table>
         <thead><tr><th>Date</th><th>Vehicle</th><th>Meter (Before → After)</th><th class="num">Amount</th><th class="num">Cost/Unit</th><th>Payment</th><th>By</th><th>Photos</th><th>Action</th></tr></thead>
         <tbody id="historyTable"></tbody>
       </table></div></div>
@@ -285,9 +292,13 @@ tbody tr:hover td{background:#f7faf8}
   <div class="field"><label>Meter Reading After Fueling <span style="color:var(--red)">*</span></label><input type="number" id="fMeterAfter"></div>
   <div class="field"><label>Fuel Amount (₹) <span style="color:var(--red)">*</span></label><input type="number" id="fAmount"></div>
 </div>
+<div class="grid3" style="margin-top:10px">
+  <div class="field"><label>Fuel Quantity (Liters)</label><input type="number" id="fLiters" placeholder="optional"></div>
+</div>
 <div class="grid" style="margin-top:10px">
-  <div class="field"><label>Vehicle Meter Reading Photo</label><input type="file" id="fPhotoVehicle" accept="image/*" capture="environment"></div>
-  <div class="field"><label>Petrol Pump Meter Photo</label><input type="file" id="fPhotoPump" accept="image/*" capture="environment"></div>
+  <div class="field"><label>Vehicle Meter Photo — Before Fueling</label><input type="file" id="fPhotoVehicleBefore" accept="image/*" capture="environment"></div>
+  <div class="field"><label>Vehicle Meter Photo — After Fueling</label><input type="file" id="fPhotoVehicleAfter" accept="image/*" capture="environment"></div>
+  <div class="field span2"><label>Petrol Pump Meter Photo (After Fueling)</label><input type="file" id="fPhotoPump" accept="image/*" capture="environment"></div>
   <div class="field span2"><label>Payment Mode</label><input id="fPaymentMode" list="paymentModeList" placeholder="Cash / UPI / Card / Company Account"></div>
 </div>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeNewFuelModal()">Cancel</button><button class="btn primary" id="fuelSubmitBtn" onclick="addFuelEntry()">＋ Save Entry</button></div>
@@ -353,7 +364,8 @@ tbody tr:hover td{background:#f7faf8}
 </div>
 <div class="grid" style="margin-top:10px">
   <div class="field"><label>Fuel Amount (₹)</label><input type="number" id="editFAmount"></div>
-  <div class="field"><label>Payment Mode</label><input id="editFPaymentMode"></div>
+  <div class="field"><label>Liters</label><input type="number" id="editFLiters"></div>
+  <div class="field span2"><label>Payment Mode</label><input id="editFPaymentMode"></div>
 </div>
 <p class="note" style="margin-top:8px">Vehicle Number aur Photos yahan se edit nahi ho sakte — galat vehicle hone par entry Disable karke nayi entry banayein.</p>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditFuelModal()">Cancel</button><button class="btn primary" onclick="saveEditFuel()">Save</button></div>
@@ -562,6 +574,7 @@ function applyFeatureVisibility(){
 function renderSelects(){
   if($('vehicleList'))$('vehicleList').innerHTML=(masters.vehicles||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
   if($('paymentModeList'))$('paymentModeList').innerHTML=(masters.paymentModes||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
+  renderFuelFilterVehicleOptions();
   if($('avResponsibleDoer')){
     const cur=$('avResponsibleDoer').value;
     const au=users.filter(u=>u.active!==false);
@@ -603,8 +616,9 @@ async function compressPhoto(file){
 
 /* ===== Entry form ===== */
 function openNewFuelModal(){
-  $('fVehicle').value='';$('fMeterBefore').value='';$('fMeterAfter').value='';$('fAmount').value='';$('fPaymentMode').value='';
-  if($('fPhotoVehicle'))$('fPhotoVehicle').value='';
+  $('fVehicle').value='';$('fMeterBefore').value='';$('fMeterAfter').value='';$('fAmount').value='';$('fLiters').value='';$('fPaymentMode').value='';
+  if($('fPhotoVehicleBefore'))$('fPhotoVehicleBefore').value='';
+  if($('fPhotoVehicleAfter'))$('fPhotoVehicleAfter').value='';
   if($('fPhotoPump'))$('fPhotoPump').value='';
   $('fDate').value=todayISO();
   $('newFuelModal').classList.add('show');
@@ -619,6 +633,8 @@ async function addFuelEntry(){
   const meterBefore=parseFloat($('fMeterBefore').value);
   const meterAfter=parseFloat($('fMeterAfter').value);
   const amount=parseFloat($('fAmount').value);
+  const litersRaw=$('fLiters').value;
+  const liters=litersRaw?parseFloat(litersRaw):null;
   const paymentMode=$('fPaymentMode').value.trim();
   if(!vehicle){alert('Vehicle Number zaroori hai.');return}
   if(isNaN(meterBefore)||isNaN(meterAfter)){alert('Meter Reading Before/After dono zaroori hain.');return}
@@ -627,18 +643,21 @@ async function addFuelEntry(){
   _fuelSubmitting=true;
   const btn=$('fuelSubmitBtn');if(btn)btn.disabled=true;
   try{
-    const vehiclePhotoFile=$('fPhotoVehicle').files[0]||null;
+    const vehiclePhotoBeforeFile=$('fPhotoVehicleBefore').files[0]||null;
+    const vehiclePhotoAfterFile=$('fPhotoVehicleAfter').files[0]||null;
     const pumpPhotoFile=$('fPhotoPump').files[0]||null;
-    const [vehiclePhoto,pumpPhoto]=await Promise.all([compressPhoto(vehiclePhotoFile),compressPhoto(pumpPhotoFile)]);
+    const [vehiclePhotoBefore,vehiclePhotoAfter,pumpPhoto]=await Promise.all([compressPhoto(vehiclePhotoBeforeFile),compressPhoto(vehiclePhotoAfterFile),compressPhoto(pumpPhotoFile)]);
     const actor=loggedUser();
     const payload={vehicle,date,unit,meterBefore,meterAfter,amount,paymentMode,by:actor?actor.id:'',at:new Date().toISOString()};
-    if(vehiclePhoto)payload.vehiclePhoto=vehiclePhoto;
+    if(liters)payload.liters=liters;
+    if(vehiclePhotoBefore)payload.vehiclePhotoBefore=vehiclePhotoBefore;
+    if(vehiclePhotoAfter)payload.vehiclePhotoAfter=vehiclePhotoAfter;
     if(pumpPhoto)payload.pumpPhoto=pumpPhoto;
     await db.collection('fuel_log').add(payload);
     if(vehicle && !masters.vehicles.includes(vehicle)){masters.vehicles.push(vehicle);saveMasters();}
     if(paymentMode && !masters.paymentModes.includes(paymentMode)){masters.paymentModes.push(paymentMode);saveMasters();}
-    $('fVehicle').value='';$('fMeterBefore').value='';$('fMeterAfter').value='';$('fAmount').value='';$('fPaymentMode').value='';
-    $('fPhotoVehicle').value='';$('fPhotoPump').value='';
+    $('fVehicle').value='';$('fMeterBefore').value='';$('fMeterAfter').value='';$('fAmount').value='';$('fLiters').value='';$('fPaymentMode').value='';
+    $('fPhotoVehicleBefore').value='';$('fPhotoVehicleAfter').value='';$('fPhotoPump').value='';
     closeNewFuelModal();
     toast('Fuel entry saved');
   }catch(e){
@@ -684,6 +703,7 @@ function openEditFuelModal(id){
   $('editFMeterBefore').value=x.meterBefore??'';
   $('editFMeterAfter').value=x.meterAfter??'';
   $('editFAmount').value=x.amount||'';
+  $('editFLiters').value=x.liters||'';
   $('editFPaymentMode').value=x.paymentMode||'';
   $('editFuelModal').classList.add('show');
 }
@@ -695,11 +715,15 @@ async function saveEditFuel(){
   const meterBefore=parseFloat($('editFMeterBefore').value);
   const meterAfter=parseFloat($('editFMeterAfter').value);
   const amount=parseFloat($('editFAmount').value);
+  const litersRaw=$('editFLiters').value;
+  const liters=litersRaw?parseFloat(litersRaw):null;
   const paymentMode=$('editFPaymentMode').value.trim();
   if(!date){alert('Date zaroori hai.');return}
   if(isNaN(meterBefore)||isNaN(meterAfter)){alert('Meter Before/After dono zaroori hain.');return}
   if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
-  await db.collection('fuel_log').doc(editFuelTarget).update({date,meterBefore,meterAfter,amount,paymentMode});
+  const update={date,meterBefore,meterAfter,amount,paymentMode};
+  if(liters)update.liters=liters;else update.liters=firebase.firestore.FieldValue.delete();
+  await db.collection('fuel_log').doc(editFuelTarget).update(update);
   closeEditFuelModal();
   toast('Entry update ho gayi');
 }
@@ -1057,7 +1081,7 @@ function renderVehicleDocuments(){
         else{statusText='Valid tak '+esc(rec.expiryDate);}
       }
       const clickable=superAdminUnlocked?` onclick="openEditVehicleDocModal('${esc(v)}','${dt.key}')" style="cursor:pointer"`:'';
-      const photoBtn=rec&&rec.photo?` <button class="btn small secondary" style="padding:2px 6px;font-size:10px" onclick="event.stopPropagation();showDocPhoto('${esc(v)}','${dt.key}')" title="Photo dekhein">📷</button>`:'';
+      const photoBtn=rec&&(rec.photo||rec.hasPhoto)?` <button class="btn small secondary" style="padding:2px 6px;font-size:10px" onclick="event.stopPropagation();showDocPhoto('${esc(v)}','${dt.key}')" title="Photo dekhein">📷</button>`:'';
       return `<span class="pill" style="background:${bg};color:${color}"${clickable}>${dt.icon} ${esc(dt.label)}: ${statusText}</span>${photoBtn}`;
     }).join(' ');
     const doerName=meta.responsibleDoer?nameOfUserId(meta.responsibleDoer):null;
@@ -1084,7 +1108,7 @@ function renderAllDocumentsTable(){
       if(days<0)statusHtml=`<span class="pill" style="background:var(--redbg);color:var(--red)">⛔ Expired</span>`;
       else if(days<=DOC_ALERT_DAYS)statusHtml=`<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ ${days} din baaki</span>`;
       else statusHtml=`<span class="pill" style="background:var(--mint);color:var(--g)">✓ Valid</span>`;
-      rows.push({vehicle:v,docKey:dt.key,label:dt.icon+' '+dt.label,startDate:rec.startDate||'-',expiryDate:rec.expiryDate,cost:rec.cost||0,statusHtml,note:rec.note||'-',days,hasPhoto:!!rec.photo});
+      rows.push({vehicle:v,docKey:dt.key,label:dt.icon+' '+dt.label,startDate:rec.startDate||'-',expiryDate:rec.expiryDate,cost:rec.cost||0,statusHtml,note:rec.note||'-',days,hasPhoto:!!(rec.photo||rec.hasPhoto)});
     });
   });
   rows.sort((a,b)=>a.days-b.days);
@@ -1125,11 +1149,24 @@ function openEditVehicleDocModal(vehicle,docKey){
   $('editDocModal').classList.add('show');
 }
 function closeEditDocModal(){$('editDocModal')?.classList.remove('show');editDocTarget=null;}
-function showDocPhoto(vehicle,docKey){
+// Document photos are NOT stored inline in masters.vehicleDocs (that's a single shared
+// fv_settings/masters document for every vehicle's every document type) - a handful of
+// ~400KB compressed photos piling up in that one doc silently blew past Firestore's 1MB
+// document limit, so saveMasters()'s write failed (only console.error'd, never surfaced)
+// even though the UI had already optimistically shown the photo in that session. Each
+// photo now gets its own small Firestore doc in fv_doc_photos, keyed by vehicle+docKey, so
+// one vehicle's documents can never crowd out another's and the shared masters doc stays tiny.
+function docPhotoId(vehicle,docKey){return String(vehicle).replace(/[^A-Za-z0-9]+/g,'_')+'__'+docKey}
+async function showDocPhoto(vehicle,docKey){
   const rec=(masters.vehicleDocs&&masters.vehicleDocs[vehicle]&&masters.vehicleDocs[vehicle][docKey])||{};
-  if(!rec.photo)return;
-  $('photoModalImg').src=rec.photo;
-  $('photoModal').classList.add('show');
+  if(rec.photo){ $('photoModalImg').src=rec.photo; $('photoModal').classList.add('show'); return; } // legacy inline photo
+  if(!rec.hasPhoto)return;
+  try{
+    const doc=await db.collection('fv_doc_photos').doc(docPhotoId(vehicle,docKey)).get();
+    if(!doc.exists||!doc.data().photo)return;
+    $('photoModalImg').src=doc.data().photo;
+    $('photoModal').classList.add('show');
+  }catch(e){console.error('showDocPhoto fetch failed',e);}
 }
 // Shared by both entry points into document saving: the per-pill Edit modal (Vehicles
 // tab) and the New Document Entry modal (Documents tab). A genuine renewal (expiry
@@ -1139,16 +1176,21 @@ function showDocPhoto(vehicle,docKey){
 async function saveDocRecord(vehicle,docKey,startDate,expiryDate,costRaw,note,photoFile){
   const cost=costRaw?parseFloat(costRaw):null;
   const newPhoto=await compressPhoto(photoFile);
+  if(newPhoto){
+    try{await db.collection('fv_doc_photos').doc(docPhotoId(vehicle,docKey)).set({photo:newPhoto,updatedAt:new Date().toISOString()});}
+    catch(e){console.error('doc photo save failed',e);}
+  }
   if(!masters.vehicleDocs)masters.vehicleDocs={};
   if(!masters.vehicleDocs[vehicle])masters.vehicleDocs[vehicle]={};
   const existing=masters.vehicleDocs[vehicle][docKey]||{};
+  const {photo:_legacyPhoto,...existingLite}=existing;
   const history=(existing.history||[]).slice();
   const renewed=!!(existing.expiryDate && expiryDate && existing.expiryDate!==expiryDate);
   if(renewed){
-    const {history:_old,...prevSnapshot}=existing;
+    const {history:_old,photo:_oldPhoto,...prevSnapshot}=existing;
     history.push({...prevSnapshot,renewedAt:todayISO()});
   }
-  masters.vehicleDocs[vehicle][docKey]=expiryDate?{...existing,startDate,expiryDate,cost,note,...(newPhoto?{photo:newPhoto}:{}),history}:null;
+  masters.vehicleDocs[vehicle][docKey]=expiryDate?{...existingLite,startDate,expiryDate,cost,note,hasPhoto:!!(newPhoto||existing.hasPhoto),history}:null;
   saveMasters();
   return renewed;
 }
@@ -1411,8 +1453,10 @@ function renderMonthlyTrend(){
 function deletedInfo(x){return x.deletedAt?`<br><small style="color:var(--muted)">Disabled by ${esc(nameOfUserId(x.deletedBy))}</small>`:''}
 function photoThumbs(x){
   let html='';
-  if(x.vehiclePhoto)html+=`<img class="thumb" src="${x.vehiclePhoto}" onclick="openPhotoModal('${esc(x.id)}','vehiclePhoto')" title="Vehicle Meter Photo">`;
-  if(x.pumpPhoto)html+=` <img class="thumb" src="${x.pumpPhoto}" onclick="openPhotoModal('${esc(x.id)}','pumpPhoto')" title="Pump Meter Photo">`;
+  if(x.vehiclePhotoBefore)html+=`<img class="thumb" src="${x.vehiclePhotoBefore}" onclick="openPhotoModal('${esc(x.id)}','vehiclePhotoBefore')" title="Vehicle Meter Photo — Before Fueling">`;
+  if(x.vehiclePhotoAfter)html+=` <img class="thumb" src="${x.vehiclePhotoAfter}" onclick="openPhotoModal('${esc(x.id)}','vehiclePhotoAfter')" title="Vehicle Meter Photo — After Fueling">`;
+  if(x.pumpPhoto)html+=` <img class="thumb" src="${x.pumpPhoto}" onclick="openPhotoModal('${esc(x.id)}','pumpPhoto')" title="Petrol Pump Meter Photo (After Fueling)">`;
+  if(!x.vehiclePhotoBefore&&!x.vehiclePhotoAfter&&x.vehiclePhoto)html+=`<img class="thumb" src="${x.vehiclePhoto}" onclick="openPhotoModal('${esc(x.id)}','vehiclePhoto')" title="Vehicle Meter Photo">`;
   return html||'<small class="note">-</small>';
 }
 function openPhotoModal(id,field){
@@ -1424,7 +1468,26 @@ function closePhotoModal(){$('photoModal').classList.remove('show');$('photoModa
 function filteredFuelRows(){
   const showDeleted=$('showDeleted')&&$('showDeleted').checked;
   let rows=showDeleted?fuelLog.filter(x=>x.deletedAt):fuelLog.filter(x=>!x.deletedAt);
+  const vehicle=$('fuelFilterVehicle')&&$('fuelFilterVehicle').value;
+  const from=$('fuelFilterFrom')&&$('fuelFilterFrom').value;
+  const to=$('fuelFilterTo')&&$('fuelFilterTo').value;
+  if(vehicle)rows=rows.filter(x=>x.vehicle===vehicle);
+  if(from)rows=rows.filter(x=>String(x.date||'')>=from);
+  if(to)rows=rows.filter(x=>String(x.date||'')<=to);
   return rows.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at||'').localeCompare(String(a.at||'')));
+}
+function clearFuelFilters(){
+  if($('fuelFilterVehicle'))$('fuelFilterVehicle').value='';
+  if($('fuelFilterFrom'))$('fuelFilterFrom').value='';
+  if($('fuelFilterTo'))$('fuelFilterTo').value='';
+  onFuelFilterChange();
+}
+function renderFuelFilterVehicleOptions(){
+  const sel=$('fuelFilterVehicle');
+  if(!sel)return;
+  const current=sel.value;
+  sel.innerHTML='<option value="">Sabhi Vehicles</option>'+(masters.vehicles||[]).map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  sel.value=current;
 }
 function downloadCSV(filename,rows){
   const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -1433,10 +1496,10 @@ function downloadCSV(filename,rows){
   const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 function exportFuelCSV(){
-  const rows=[['Date','Vehicle','Meter Before','Meter After','Distance','Unit','Amount','Cost/Unit','Payment Mode','By']];
+  const rows=[['Date','Vehicle','Meter Before','Meter After','Distance','Unit','Amount','Liters','Cost/Unit','Payment Mode','By']];
   filteredFuelRows().forEach(x=>{
     const cost=entryCostPerUnit(x);
-    rows.push([x.date,x.vehicle,x.meterBefore,x.meterAfter,entryDistance(x),x.unit||'KM',x.amount,cost!==null?cost.toFixed(2):'',x.paymentMode||'',nameOfUserId(x.by)]);
+    rows.push([x.date,x.vehicle,x.meterBefore,x.meterAfter,entryDistance(x),x.unit||'KM',x.amount,x.liters||'',cost!==null?cost.toFixed(2):'',x.paymentMode||'',nameOfUserId(x.by)]);
   });
   downloadCSV('fuel-tracker-log.csv',rows);
 }
