@@ -103,11 +103,21 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
       <div class="srcRow"><span class="srcDot" style="background:#C8C2B4"></span><div><div class="srcName" style="color:var(--muted)">Client/Supplier Portals</div><div class="srcMeta">Not connected — no API access yet</div></div></div>
     </div>
     <div class="sideCard">
+      <div class="sTitle">📞 CALL LOG (UPLOAD + LOG ONLY)</div>
+      <div class="note" style="margin-bottom:10px">Recording ka content/analysis abhi nahi hota - speech-to-text ke liye paid AI API chahiye, jo abhi approve nahi hai. Sirf kisne, kab, kisko call ki yeh record hota hai.</div>
+      <div class="field" style="margin-bottom:8px"><label>Sales Person</label><select id="callSalesPerson"></select></div>
+      <div class="field" style="margin-bottom:8px"><label>Client/Party (optional)</label><input id="callClientName" type="text"></div>
+      <div class="field" style="margin-bottom:8px"><label>Recording File (optional, chhoti file)</label><input type="file" id="callFileInput" accept="audio/*"></div>
+      <button type="button" class="btn small primary" onclick="logCallRecording()">⬆ Call Log Karein</button>
+      <div class="note" id="callLogStatus" style="margin-top:8px"></div>
+    </div>
+    <div class="sideCard">
       <div class="sTitle">TRY ASKING</div>
       <button type="button" class="chip" onclick="askSuggested('Konse trips abhi open hain?')">🧳 Konse trips abhi open hain?</button>
       <button type="button" class="chip" onclick="askSuggested('Stationery ka low stock items kya hain?')">📦 Stationery low-stock items?</button>
       <button type="button" class="chip" onclick="askSuggested('Petty cash ka current balance kya hai?')">💰 Petty cash balance?</button>
       <button type="button" class="chip" onclick="askSuggested('Busy ke export ka total kitna hai?')">🧾 Busy export ka total?</button>
+      <button type="button" class="chip" onclick="askSuggested('Kitni calls hui hain?')">📞 Kitni calls log hui hain?</button>
     </div>
   </div>
 
@@ -192,6 +202,15 @@ function renderGate(){
 
 function renderAll(){
   renderGate();
+  renderCallSalesPersonOptions();
+}
+function renderCallSalesPersonOptions(){
+  const sel=$('callSalesPerson');
+  if(!sel)return;
+  const cur=sel.value;
+  const active=users.filter(u=>u.active!==false).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+  sel.innerHTML='<option value="">-- Select --</option>'+active.map(u=>`<option value="${esc(u.name||u.username)}">${esc(u.name||u.username)}</option>`).join('');
+  if(cur)sel.value=cur;
 }
 
 /* ===== Cross-app read-only queries (same Firestore project, different collections) ===== */
@@ -210,6 +229,73 @@ const BUSY_IMPORT_KEY='ai_busy_import_latest';
 function liveBusyImport(cb){
   try{ const raw=localStorage.getItem(BUSY_IMPORT_KEY); cb(raw?JSON.parse(raw):null); }
   catch(e){ console.error('liveBusyImport read failed:',e); cb(null); }
+}
+
+// Call log (upload + log only - no AI analysis, since that needs a paid speech-to-text
+// API that is not approved yet). Stored in localStorage for the same reason as Busy
+// import above: a new "call_log" Firestore collection would hit the same permission
+// block. A small recording may be embedded as base64; a larger one is logged without its
+// file (still useful: who called whom, when) rather than failing outright.
+const CALL_LOG_KEY='ai_call_log';
+const CALL_LOG_MAX_FILE_BYTES=1500000; // ~1.5MB cap kept out of localStorage's ~5-10MB quota
+function liveCallLog(){
+  try{ const raw=localStorage.getItem(CALL_LOG_KEY); return raw?JSON.parse(raw):[]; }
+  catch(e){ console.error('liveCallLog read failed:',e); return []; }
+}
+function saveCallLog(rows){
+  try{ localStorage.setItem(CALL_LOG_KEY,JSON.stringify(rows)); }
+  catch(e){ console.error('saveCallLog write failed:',e); throw e; }
+}
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+async function logCallRecording(){
+  const salesPerson=$('callSalesPerson').value;
+  const clientName=$('callClientName').value.trim();
+  const fileInput=$('callFileInput');
+  const file=fileInput.files[0]||null;
+  const status=$('callLogStatus');
+  if(!salesPerson){status.style.color='var(--red)';status.textContent='Sales Person select karein.';return}
+  try{
+    let recordingUrl=null,fileNote='';
+    if(file){
+      if(file.size<=CALL_LOG_MAX_FILE_BYTES){
+        recordingUrl=await fileToDataUrl(file);
+      }else{
+        fileNote=' (file bahut badi thi, sirf log hua, file save nahi hui)';
+      }
+    }
+    const rows=liveCallLog();
+    rows.push({salesPerson,clientName,recordingUrl,fileName:file?file.name:'',loggedAt:new Date().toISOString(),loggedBy:(loggedUser()||{}).name||''});
+    saveCallLog(rows);
+    status.style.color='var(--g)';
+    status.textContent='Call log ho gayi'+fileNote+'.';
+    $('callClientName').value='';
+    fileInput.value='';
+  }catch(e){
+    console.error('logCallRecording failed:',e);
+    status.style.color='var(--red)';
+    status.textContent='Error aaya: '+(e.message||e);
+  }
+}
+async function answerCallLog(text){
+  const rows=liveCallLog();
+  if(!rows.length)return {text:'Abhi tak koi call log nahi hui hai. Left panel se "Call Log Karein" button se entry daal dein.',sources:[]};
+  const q=String(text||'').toLowerCase();
+  const named=rows.filter(r=>r.salesPerson&&q.includes(String(r.salesPerson).toLowerCase()));
+  if(named.length){
+    const sp=named[0].salesPerson;
+    return {text:`${sp} ki ${named.length} call(s) log hui hain.`,sources:['AI Assistant Call Log (is device par)']};
+  }
+  const byPerson={};
+  rows.forEach(r=>{byPerson[r.salesPerson]=(byPerson[r.salesPerson]||0)+1;});
+  const lines=Object.keys(byPerson).map(sp=>`• ${sp} — ${byPerson[sp]} call(s)`);
+  return {text:`Total ${rows.length} call(s) log hui hain:\n`+lines.join('\n')+'\n\n(Sirf log hai - content/analysis abhi nahi hoti, speech-to-text API chahiye hogi.)',sources:['AI Assistant Call Log (is device par)']};
 }
 
 async function answerOpenTrips(){
@@ -243,6 +329,7 @@ async function answerQuestion(text){
   if(q.includes('trip')) return answerOpenTrips();
   if(q.includes('stock')||q.includes('stationery')) return answerLowStock();
   if(q.includes('petty')||q.includes('cash balance')||q.includes('balance')) return answerPettyCashBalance();
+  if(q.includes('call')) return answerCallLog(text);
   if(q.includes('busy')||q.includes('sales')) return answerBusyTotal();
   return {text:'Maaf kijiye, abhi main sirf kuch specific sawaalon ke jawab de sakta hoon — trips, stationery stock, petty cash balance, ya Busy export total. Baaki sawaal aane wale updates mein add honge.',sources:[]};
 }
