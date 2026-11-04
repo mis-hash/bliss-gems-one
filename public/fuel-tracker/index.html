@@ -284,6 +284,7 @@ tbody tr:hover td{background:#f7faf8}
           <div class="field" style="width:auto;margin:0"><label>From</label><input type="date" id="vdFrom" onchange="renderVehicleDetail()" style="width:auto"></div>
           <div class="field" style="width:auto;margin:0"><label>To</label><input type="date" id="vdTo" onchange="renderVehicleDetail()" style="width:auto"></div>
           <button class="btn small secondary" onclick="clearVehicleDetailFilters()" style="margin-top:17px">✕ Clear Filters</button>
+          <button class="btn small secondary" id="vdPdfBtn" onclick="downloadVehicleDetailCostReportPdf()" style="margin-top:17px" disabled>📄 PDF</button>
         </div>
         <div class="cards" id="vdTiles" style="margin-top:14px"></div>
       </div>
@@ -1484,6 +1485,7 @@ function renderVehicleDetail(){
   const vehicle=$('vdVehicle')&&$('vdVehicle').value;
   const tilesWrap=$('vdTiles');
   if(!tilesWrap)return;
+  if($('vdPdfBtn'))$('vdPdfBtn').disabled=!vehicle;
   ['vdFuelPanel','vdServicePanel','vdDocsPanel'].forEach(id=>$(id)&&$(id).classList.add('hidden'));
   if(!vehicle){ tilesWrap.innerHTML=''; vdDetailsShown=false; return; }
   const from=$('vdFrom')&&$('vdFrom').value;
@@ -1556,8 +1558,8 @@ function vehicleCostReportCanvasHasContent(canvas){
     return false;
   }catch(e){ console.error('Vehicle cost report canvas check failed:',e); return false; }
 }
-function buildVehicleCostReportHtml(vehicle){
-  const {from,to}=resolveCostDateRange();
+function buildVehicleCostReportHtml(vehicle,range){
+  const {from,to}=range||resolveCostDateRange();
   const inRange=d=>{ if(!d)return true; if(from&&d<from)return false; if(to&&d>to)return false; return true; };
   const fuelRows=liveFuel().filter(x=>x.vehicle===vehicle&&inRange(x.date)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   const serviceRows=liveService().filter(x=>x.vehicle===vehicle&&inRange(x.date)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
@@ -1603,9 +1605,9 @@ function buildVehicleCostReportHtml(vehicle){
     </div>
   </div>`;
 }
-async function generateVehicleCostReportPdfBlob(vehicle){
+async function generateVehicleCostReportPdfBlob(vehicle,range){
   if(typeof html2canvas==='undefined'||!(window.jspdf&&window.jspdf.jsPDF)){console.warn('PDF libraries not loaded');return null;}
-  const html=buildVehicleCostReportHtml(vehicle);
+  const html=buildVehicleCostReportHtml(vehicle,range);
   const wrap=document.createElement('div');
   wrap.style.cssText='position:absolute;left:-1500px;top:0;width:420px;background:#fff;z-index:-1;padding:16px;box-sizing:border-box';
   wrap.innerHTML=html;
@@ -1624,7 +1626,7 @@ async function generateVehicleCostReportPdfBlob(vehicle){
   }catch(e){console.error('Vehicle cost report PDF generation failed:',e);return null;}
   finally{wrap.remove();}
 }
-async function downloadVehicleCostReportPdf(vehicle){
+async function runVehicleCostReportDownload(vehicle,range){
   // Wrapped in try/catch so a button click that visibly "does nothing" is never possible
   // again - any failure (library not loaded, html2canvas error, etc.) now surfaces as a
   // real alert with the actual error message instead of failing silently in the console.
@@ -1639,7 +1641,7 @@ async function downloadVehicleCostReportPdf(vehicle){
   const preOpenedWin=window.open('','_blank');
   try{
     toast('PDF ban raha hai...');
-    const blob=await generateVehicleCostReportPdfBlob(vehicle);
+    const blob=await generateVehicleCostReportPdfBlob(vehicle,range);
     if(!blob){
       if(preOpenedWin)preOpenedWin.close();
       alert('PDF banane mein error aaya. Internet connection check karein aur dobara try karein.');
@@ -1661,9 +1663,19 @@ async function downloadVehicleCostReportPdf(vehicle){
     setTimeout(()=>URL.revokeObjectURL(url),60000);
   }catch(e){
     if(preOpenedWin)preOpenedWin.close();
-    console.error('downloadVehicleCostReportPdf failed:',e);
+    console.error('runVehicleCostReportDownload failed:',e);
     alert('PDF download karte waqt error aaya: '+(e.message||e));
   }
+}
+async function downloadVehicleCostReportPdf(vehicle){
+  await runVehicleCostReportDownload(vehicle);
+}
+async function downloadVehicleDetailCostReportPdf(){
+  const vehicle=$('vdVehicle')&&$('vdVehicle').value;
+  if(!vehicle)return;
+  const from=$('vdFrom')&&$('vdFrom').value||'';
+  const to=$('vdTo')&&$('vdTo').value||'';
+  await runVehicleCostReportDownload(vehicle,{from,to});
 }
 
 /* ===== Monthly Spend Trend — single series (overall fuel spend), so one brand hue is
