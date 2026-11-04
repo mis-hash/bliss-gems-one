@@ -25,6 +25,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -152,6 +154,7 @@ tbody tr:hover td{background:#f7faf8}
     <button data-page="documents" onclick="goPage('documents')">📄 Documents</button>
     <button data-page="fuel" onclick="goPage('fuel')">⛽ Fuel</button>
     <button data-page="service" onclick="goPage('service')">🔧 Service &amp; Repair</button>
+    <button data-page="detail" onclick="goPage('detail')">🔍 Vehicle Detail</button>
   </nav>
   <main>
 
@@ -188,7 +191,7 @@ tbody tr:hover td{background:#f7faf8}
           <input type="date" id="costRangeTo" onchange="setCostRangeCustom()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px">
         </div>
         <div class="tablewrap"><table>
-          <thead><tr><th>Vehicle</th><th class="num">Fuel</th><th class="num">Service/Repair</th><th class="num">Documents</th><th class="num">Total</th></tr></thead>
+          <thead><tr><th>Vehicle</th><th class="num">Fuel</th><th class="num">Service/Repair</th><th class="num">Documents</th><th class="num">Total</th><th>Report</th></tr></thead>
           <tbody id="vehicleTotalCostTable"></tbody>
         </table></div>
       </div>
@@ -267,6 +270,42 @@ tbody tr:hover td{background:#f7faf8}
       </table></div></div>
     </div>
   </div>
+
+  <div id="page-detail" class="ftPage">
+    <div class="panel">
+      <div class="ph"><span>🔍 Vehicle Detail</span></div>
+      <div class="pb">
+        <div class="field"><label>Vehicle Number</label><select id="vdVehicle" onchange="renderVehicleDetail()"><option value="">-- Select Vehicle --</option></select></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+          <div class="field" style="width:auto;margin:0"><label>From</label><input type="date" id="vdFrom" onchange="renderVehicleDetail()" style="width:auto"></div>
+          <div class="field" style="width:auto;margin:0"><label>To</label><input type="date" id="vdTo" onchange="renderVehicleDetail()" style="width:auto"></div>
+          <button class="btn small secondary" onclick="clearVehicleDetailFilters()" style="margin-top:17px">✕ Clear Filters</button>
+        </div>
+        <div class="cards" id="vdTiles" style="margin-top:14px"></div>
+      </div>
+    </div>
+    <div class="panel hidden" id="vdFuelPanel">
+      <div class="ph"><span>⛽ Fuel Entries</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Date</th><th>Meter (Before → After)</th><th class="num">Liters</th><th class="num">Amount</th></tr></thead>
+        <tbody id="vdFuelTable"></tbody>
+      </table></div></div>
+    </div>
+    <div class="panel hidden" id="vdServicePanel">
+      <div class="ph"><span>🔧 Service / Repair</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Date</th><th>Type</th><th>Note</th><th class="num">Amount</th></tr></thead>
+        <tbody id="vdServiceTable"></tbody>
+      </table></div></div>
+    </div>
+    <div class="panel hidden" id="vdDocsPanel">
+      <div class="ph"><span>📄 Documents</span></div>
+      <div class="pb"><div class="tablewrap"><table>
+        <thead><tr><th>Document</th><th>Start</th><th>Expiry</th><th class="num">Cost</th><th>Status</th></tr></thead>
+        <tbody id="vdDocsTable"></tbody>
+      </table></div></div>
+    </div>
+  </div>
   </main>
 </div>
 </div>
@@ -277,6 +316,7 @@ tbody tr:hover td{background:#f7faf8}
   <button data-page="documents" onclick="goPage('documents')"><span>📄</span>Docs</button>
   <button data-page="fuel" onclick="goPage('fuel')"><span>⛽</span>Fuel</button>
   <button data-page="service" onclick="goPage('service')"><span>🔧</span>Service</button>
+  <button data-page="detail" onclick="goPage('detail')"><span>🔍</span>Detail</button>
 </div>
 
 <!-- New Fuel Entry modal -->
@@ -579,6 +619,7 @@ function renderSelects(){
   if($('vehicleList'))$('vehicleList').innerHTML=(masters.vehicles||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
   if($('paymentModeList'))$('paymentModeList').innerHTML=(masters.paymentModes||[]).map(x=>`<option value="${esc(x)}"></option>`).join('');
   renderFuelFilterVehicleOptions();
+  renderVehicleDetailVehicleOptions();
   if($('avResponsibleDoer')){
     const cur=$('avResponsibleDoer').value;
     const au=users.filter(u=>u.active!==false);
@@ -1391,11 +1432,158 @@ function computeVehicleTotalCost(){
   });
   return Object.entries(byVehicle).map(([v,d])=>({vehicle:v,fuel:d.fuel,service:d.service,docs:d.docs,total:d.fuel+d.service+d.docs})).sort((a,b)=>b.total-a.total);
 }
+/* ===== Vehicle Detail — select one vehicle, see summary tiles for everything (fuel,
+   distance, avg cost/unit, service, documents), with its own date-range filter separate
+   from the Dashboard's cost-range picker. Any tile click reveals the three detail panels
+   (Fuel Entries / Service / Documents) below, all at once. ===== */
+function renderVehicleDetailVehicleOptions(){
+  const sel=$('vdVehicle');
+  if(!sel)return;
+  const current=sel.value;
+  sel.innerHTML='<option value="">-- Select Vehicle --</option>'+(masters.vehicles||[]).map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  sel.value=current;
+}
+function clearVehicleDetailFilters(){
+  if($('vdFrom'))$('vdFrom').value='';
+  if($('vdTo'))$('vdTo').value='';
+  renderVehicleDetail();
+}
+let vdDetailsShown=false;
+function vdShowDetails(){ vdDetailsShown=true; renderVehicleDetail(); }
+function renderVehicleDetail(){
+  const vehicle=$('vdVehicle')&&$('vdVehicle').value;
+  const tilesWrap=$('vdTiles');
+  if(!tilesWrap)return;
+  ['vdFuelPanel','vdServicePanel','vdDocsPanel'].forEach(id=>$(id)&&$(id).classList.add('hidden'));
+  if(!vehicle){ tilesWrap.innerHTML=''; vdDetailsShown=false; return; }
+  const from=$('vdFrom')&&$('vdFrom').value;
+  const to=$('vdTo')&&$('vdTo').value;
+  const inRange=d=>{ if(!d)return true; if(from&&d<from)return false; if(to&&d>to)return false; return true; };
+  const fuelRows=liveFuel().filter(x=>x.vehicle===vehicle&&inRange(x.date)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const serviceRows=liveService().filter(x=>x.vehicle===vehicle&&inRange(x.date)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const vd=(masters.vehicleDocs&&masters.vehicleDocs[vehicle])||{};
+  const docRows=[];
+  DOC_TYPES.forEach(dt=>{ const rec=vd[dt.key]; if(rec)docRows.push({...rec,label:dt.label}); });
+  const fuelSpend=fuelRows.reduce((s,x)=>s+(x.amount||0),0);
+  const distance=fuelRows.reduce((s,x)=>s+entryDistance(x),0);
+  const avgCost=distance>0?fuelSpend/distance:0;
+  const serviceSpend=serviceRows.reduce((s,x)=>s+(x.amount||0),0);
+  const docsSpend=docRows.filter(r=>inRange(r.startDate)).reduce((s,r)=>s+(r.cost||0),0);
+  const tiles=[
+    {label:'FUEL SPEND',val:fmtAmt(fuelSpend),ic:'⛽',accent:'#1B7A63',accentbg:'#E8F8F2'},
+    {label:'TOTAL DISTANCE',val:distance.toLocaleString('en-IN'),ic:'🛣️',accent:'#B4541A',accentbg:'#FFF0E6'},
+    {label:'AVG COST / UNIT',val:avgCost>0?('₹'+avgCost.toFixed(2)):'-',ic:'📊',accent:'#6B2FBD',accentbg:'#F5EEFF'},
+    {label:'SERVICE & REPAIR',val:fmtAmt(serviceSpend),ic:'🔧',accent:'#A6350C',accentbg:'#FDEDE6'},
+    {label:'DOCUMENTS EXPENSE',val:fmtAmt(docsSpend),ic:'📄',accent:'#0F7A8C',accentbg:'#E6F6F9'},
+    {label:'GRAND TOTAL',val:fmtAmt(fuelSpend+serviceSpend+docsSpend),ic:'💰',accent:'#C2255C',accentbg:'#FDE7F0'}
+  ];
+  tilesWrap.innerHTML=tiles.map(t=>`<div class="card" style="--accent:${t.accent};--accentbg:${t.accentbg};cursor:pointer" onclick="vdShowDetails()"><div class="ic">${t.ic}</div><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+  if(!vdDetailsShown)return;
+  $('vdFuelPanel').classList.remove('hidden');
+  $('vdServicePanel').classList.remove('hidden');
+  $('vdDocsPanel').classList.remove('hidden');
+  $('vdFuelTable').innerHTML=fuelRows.length?fuelRows.map(x=>`<tr><td>${esc(x.date)}</td><td>${x.meterBefore} → ${x.meterAfter}</td><td class="num">${x.liters||'-'}</td><td class="num">${fmtAmt(x.amount)}</td></tr>`).join(''):`<tr><td colspan="4"><div class="emptystate">⛽<p>Koi fuel entry nahi hai.</p></div></td></tr>`;
+  $('vdServiceTable').innerHTML=serviceRows.length?serviceRows.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.type||'-')}</td><td>${esc(x.note||'-')}</td><td class="num">${fmtAmt(x.amount)}</td></tr>`).join(''):`<tr><td colspan="4"><div class="emptystate">🔧<p>Koi service entry nahi hai.</p></div></td></tr>`;
+  $('vdDocsTable').innerHTML=docRows.length?docRows.map(r=>{
+    const days=r.expiryDate?Math.ceil((new Date(r.expiryDate)-new Date(todayISO()))/86400000):null;
+    const status=days===null?'-':days<0?'Expired':(days+' din baaki');
+    return `<tr><td>${esc(r.label)}</td><td>${esc(r.startDate||'-')}</td><td>${esc(r.expiryDate||'-')}</td><td class="num">${fmtAmt(r.cost||0)}</td><td>${esc(status)}</td></tr>`;
+  }).join(''):`<tr><td colspan="5"><div class="emptystate">📄<p>Koi document set nahi hua.</p></div></td></tr>`;
+}
 function renderVehicleTotalCost(){
   const wrap=$('vehicleTotalCostTable');
   if(!wrap)return;
   const rows=computeVehicleTotalCost();
-  wrap.innerHTML=rows.length?rows.map(r=>`<tr><td><b>${esc(r.vehicle)}</b></td><td class="num">${fmtAmt(r.fuel)}</td><td class="num">${fmtAmt(r.service)}</td><td class="num">${fmtAmt(r.docs)}</td><td class="num"><b>${fmtAmt(r.total)}</b></td></tr>`).join(''):`<tr><td colspan="5"><div class="emptystate">💰<p>Koi data nahi hai.</p></div></td></tr>`;
+  wrap.innerHTML=rows.length?rows.map(r=>`<tr><td><b>${esc(r.vehicle)}</b></td><td class="num">${fmtAmt(r.fuel)}</td><td class="num">${fmtAmt(r.service)}</td><td class="num">${fmtAmt(r.docs)}</td><td class="num"><b>${fmtAmt(r.total)}</b></td><td><button class="btn small secondary" onclick="downloadVehicleCostReportPdf('${esc(r.vehicle)}')">📄 PDF</button></td></tr>`).join(''):`<tr><td colspan="6"><div class="emptystate">💰<p>Koi data nahi hai.</p></div></td></tr>`;
+}
+/* ===== Vehicle Cost Report PDF — manual download only (no WhatsApp auto-send), same
+   html2canvas+jsPDF-direct pipeline as Trip Expense's Trip Summary / Purchase Price
+   Estimator's Purchase Slip, built from a standalone HTML string since this app has no
+   single on-screen panel to clone for one vehicle. Respects the same date range currently
+   selected on the Total Vehicle Cost panel (All Time / 3mo / 6mo / 12mo / custom). ===== */
+function vehicleCostReportCanvasHasContent(canvas){
+  try{
+    const ctx=canvas.getContext('2d');
+    const sample=ctx.getImageData(0,0,canvas.width,Math.min(canvas.height,400));
+    const data=sample.data;
+    for(let i=0;i<data.length;i+=4*37){ if(data[i]<250||data[i+1]<250||data[i+2]<250)return true; }
+    return false;
+  }catch(e){ console.error('Vehicle cost report canvas check failed:',e); return false; }
+}
+function buildVehicleCostReportHtml(vehicle){
+  const {from,to}=resolveCostDateRange();
+  const inRange=d=>{ if(!d)return true; if(from&&d<from)return false; if(to&&d>to)return false; return true; };
+  const fuelRows=liveFuel().filter(x=>x.vehicle===vehicle&&inRange(x.date)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const serviceRows=liveService().filter(x=>x.vehicle===vehicle&&inRange(x.date)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const vd=(masters.vehicleDocs&&masters.vehicleDocs[vehicle])||{};
+  const docRows=[];
+  DOC_TYPES.forEach(dt=>{
+    const rec=vd[dt.key];
+    if(!rec)return;
+    if(rec.cost&&inRange(rec.startDate))docRows.push({label:dt.label,start:rec.startDate||'-',expiry:rec.expiryDate||'-',cost:rec.cost});
+    (rec.history||[]).forEach(h=>{ if(h.cost&&inRange(h.startDate))docRows.push({label:dt.label+' (renewed)',start:h.startDate||'-',expiry:h.expiryDate||'-',cost:h.cost}); });
+  });
+  const fuelTotal=fuelRows.reduce((s,x)=>s+(x.amount||0),0);
+  const serviceTotal=serviceRows.reduce((s,x)=>s+(x.amount||0),0);
+  const docsTotal=docRows.reduce((s,x)=>s+(x.cost||0),0);
+  const grandTotal=fuelTotal+serviceTotal+docsTotal;
+  const rangeLabel=(from||to)?`${from||'...'} to ${to||'...'}`:'All Time';
+  const tableHtml=(title,rows,cols)=>rows.length?`
+    <div style="margin-top:14px">
+      <div style="font-size:13px;font-weight:800;margin-bottom:6px">${esc(title)}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <thead><tr style="text-align:left;color:#6E7D76;font-size:9.5px;text-transform:uppercase">${cols.map(c=>`<th style="padding:0 6px 6px 0">${esc(c)}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`:'';
+  const fuelTableRows=fuelRows.map(x=>`<tr><td style="padding:4px 6px 4px 0;border-top:1px solid #eee">${esc(x.date)}</td><td style="padding:4px 6px 4px 0;border-top:1px solid #eee">${entryDistance(x)}</td><td style="padding:4px 6px 4px 0;border-top:1px solid #eee">${x.liters||'-'}</td><td style="padding:4px 6px 4px 0;border-top:1px solid #eee;text-align:right;font-weight:700">${fmtAmt(x.amount)}</td></tr>`).join('');
+  const serviceTableRows=serviceRows.map(x=>`<tr><td style="padding:4px 6px 4px 0;border-top:1px solid #eee">${esc(x.date)}</td><td style="padding:4px 6px 4px 0;border-top:1px solid #eee">${esc(x.type||'-')}</td><td style="padding:4px 6px 4px 0;border-top:1px solid #eee">${esc(x.note||'-')}</td><td style="padding:4px 6px 4px 0;border-top:1px solid #eee;text-align:right;font-weight:700">${fmtAmt(x.amount)}</td></tr>`).join('');
+  const docTableRows=docRows.map(x=>`<tr><td style="padding:4px 6px 4px 0;border-top:1px solid #eee">${esc(x.label)}</td><td style="padding:4px 6px 4px 0;border-top:1px solid #eee">${esc(x.start)}</td><td style="padding:4px 6px 4px 0;border-top:1px solid #eee">${esc(x.expiry)}</td><td style="padding:4px 6px 4px 0;border-top:1px solid #eee;text-align:right;font-weight:700">${fmtAmt(x.cost)}</td></tr>`).join('');
+  return `<div style="font-family:Arial,sans-serif;color:#16241F">
+    <div style="font-size:18px;font-weight:800">🚗 Vehicle Cost Report</div>
+    <div style="font-size:12px;color:#6E7D76;margin-top:2px">Bliss Gems &amp; Minerals</div>
+    <div style="margin-top:10px;background:#FBFDFC;border:1px solid #DCEAE4;border-radius:10px;padding:10px 12px">
+      <div style="font-size:9.5px;color:#6E7D76;text-transform:uppercase">Vehicle Number</div>
+      <div style="font-size:14px;font-weight:800">${esc(vehicle)}</div>
+      <div style="font-size:9.5px;color:#6E7D76;text-transform:uppercase;margin-top:8px">Period</div>
+      <div style="font-size:12.5px">${esc(rangeLabel)}</div>
+    </div>
+    ${tableHtml('⛽ Fuel Entries',fuelTableRows,['Date','Distance','Liters','Amount'])}
+    ${tableHtml('🔧 Service / Repair',serviceTableRows,['Date','Type','Note','Amount'])}
+    ${tableHtml('📄 Documents',docTableRows,['Document','Start','Expiry','Cost'])}
+    <div style="margin-top:16px;background:#FFF6DF;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:13px;font-weight:800">GRAND TOTAL</span>
+      <span style="font-size:18px;font-weight:800;color:#A66B08">${fmtAmt(grandTotal)}</span>
+    </div>
+  </div>`;
+}
+async function generateVehicleCostReportPdfBlob(vehicle){
+  if(typeof html2canvas==='undefined'||!(window.jspdf&&window.jspdf.jsPDF)){console.warn('PDF libraries not loaded');return null;}
+  const html=buildVehicleCostReportHtml(vehicle);
+  const wrap=document.createElement('div');
+  wrap.style.cssText='position:absolute;left:-1500px;top:0;width:420px;background:#fff;z-index:-1;padding:16px;box-sizing:border-box';
+  wrap.innerHTML=html;
+  document.body.appendChild(wrap);
+  try{
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    if(wrap.getBoundingClientRect().height<10){console.error('Vehicle cost report PDF export has no height - aborting');return null;}
+    const canvas=await html2canvas(wrap,{scale:2,backgroundColor:'#ffffff',windowWidth:420,scrollX:0,scrollY:0});
+    if(!vehicleCostReportCanvasHasContent(canvas)){console.error('Vehicle cost report canvas has no visible content - aborting');return null;}
+    const imgData=canvas.toDataURL('image/jpeg',0.92);
+    const {jsPDF}=window.jspdf;
+    const margin=10,imgW=150,imgH=canvas.height*(imgW/canvas.width);
+    const pdf=new jsPDF({unit:'mm',format:[imgW+margin*2,imgH+margin*2]});
+    pdf.addImage(imgData,'JPEG',margin,margin,imgW,imgH);
+    return pdf.output('blob');
+  }catch(e){console.error('Vehicle cost report PDF generation failed:',e);return null;}
+  finally{wrap.remove();}
+}
+async function downloadVehicleCostReportPdf(vehicle){
+  toast('PDF ban raha hai...');
+  const blob=await generateVehicleCostReportPdfBlob(vehicle);
+  if(!blob){alert('PDF banane mein error aaya, dobara try karein.');return}
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='Vehicle Cost Report - '+vehicle+'.pdf';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
 /* ===== Monthly Spend Trend — single series (overall fuel spend), so one brand hue is
@@ -1633,6 +1821,7 @@ function renderAll(){
   renderAllDocumentsTable();
   renderVehiclePerformance();
   renderVehicleTotalCost();
+  renderVehicleDetail();
   renderMonthlyTrend();
   renderServiceHistory();
   renderHistory();
