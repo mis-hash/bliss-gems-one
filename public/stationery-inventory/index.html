@@ -386,7 +386,6 @@ const todayISO=()=>new Date().toISOString().slice(0,10);
 let users=[],items=[],inLog=[],outLog=[],requests=[];
 let requestsFilter='PENDING';
 let masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{}};
-let api={};
 let currentUser=null,currentTab='category';
 let usersStarted=false,itemsStarted=false,inStarted=false,outStarted=false,mastersStarted=false;
 
@@ -490,7 +489,6 @@ function startMastersSync(){
   if(mastersStarted||!db)return;mastersStarted=true;
   seedStarterMastersIfEmpty();
   db.collection('si_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{},...doc.data()};renderAll();},err=>console.error('masters sync error',err));
-  db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)api=doc.data()||{};}).catch(e=>console.error('greenapi load failed',e));
 }
 function saveMasters(){ if(db) db.collection('si_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
 
@@ -514,10 +512,25 @@ function isSiNoticeExcluded(phone){
   const p=normalizePhone(phone);
   return users.some(u=>normalizePhone(u.phone)===p && SI_EXCLUDED_NAMES.includes(String(u.name||'').trim().toLowerCase()));
 }
+// Fetches GREEN-API credentials fresh on every send, instead of relying on the `api`
+// global that startMastersSync() populates once at boot via a one-time .get(). That
+// one-time fetch is a race: if a request is submitted before it resolves (e.g. right
+// after the page loads), `api` is still {}, and sendRawWA silently no-ops with only a
+// console.warn - no visible error to the requester or the admin. This matches Trip
+// Expense's getGreenApiCreds() pattern, which doesn't have that race.
+async function getGreenApiCreds(){
+  try{
+    const doc=await db.collection('app_config').doc('greenapi').get();
+    if(doc.exists){const d=doc.data();if(d.idInstance&&d.apiToken)return d;}
+  }catch(e){console.error('getGreenApiCreds failed:',e);}
+  return null;
+}
 async function sendRawWA(phone,message){
   if(!phone||isSiNoticeExcluded(phone))return false;
   if(WA_MUTED){console.warn('Stationery WA muted, not sending:',message);return false}
-  const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  const creds=await getGreenApiCreds();
+  if(!creds){console.warn('GREEN-API settings missing');return false}
+  const id=String(creds.idInstance||'').trim(),token=String(creds.apiToken||'').trim(),base=String(creds.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
   if(!id||!token){console.warn('GREEN-API settings missing');return false}
   const p=normalizePhone(phone);if(p.length<11){console.warn('sendRawWA: phone too short after normalize - raw:',phone,'normalized:',p);return false}
   try{
@@ -558,7 +571,7 @@ function notifyIssue(item,qty,toUserId,byUserId){
 // with a direct link into the Requests review page. If no active user's name matches exactly
 // (typo, rename, deactivated, missing phone), that used to mean the notification silently went
 // to nobody - now falls back to the general Admin/Director list so a Request is never dropped.
-function notifyRequestSubmitted(item,qty,requesterId,purpose){
+async function notifyRequestSubmitted(item,qty,requesterId,purpose){
   const normName=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
   console.log('[request-submitted] total users loaded:',users.length);
   let recipients=users.filter(u=>u.active!==false && u.phone && normName(u.name)==='amit sharma');
@@ -569,14 +582,34 @@ function notifyRequestSubmitted(item,qty,requesterId,purpose){
   }
   if(!recipients.length){
     console.log('[request-submitted] NO RECIPIENTS FOUND - no "Amit Sharma" active user with a phone, and no user has admin/director role for',APP_SLUG,'. Check Universal Users.');
-    return;
+    return {sent:0,failed:0,noRecipients:true};
   }
   const link='https://bliss-gems-one.web.app/stationery-inventory/?page=requests';
   const msg=fillTemplate(templateText('request_submitted'),{ItemName:item.name,Qty:qty,Unit:item.unit||'',RequestedBy:nameOfUserId(requesterId),Purpose:purpose||'-',Link:link});
-  recipients.forEach(u=>{
+  let sent=0,failed=0;
+  for(const u of recipients){
     console.log('[request-submitted] sending to',u.name,u.phone);
-    sendRawWA(u.phone,msg).then(ok=>console.log('[request-submitted] result for',u.phone,':',ok?'SENT':'FAILED (see sendRawWA warning above for why - missing GREEN-API creds, or phone too short after normalizePhone)')).catch(e=>console.error('[request-submitted] WA failed for',u.phone,':',e));
-  });
+    try{
+      const ok=await sendRawWA(u.phone,msg);
+      console.log('[request-submitted] result for',u.phone,':',ok?'SENT':'FAILED (see sendRawWA warning above for why - missing GREEN-API creds, or phone too short after normalizePhone)');
+      if(ok)sent++;else failed++;
+    }catch(e){console.error('[request-submitted] WA failed for',u.phone,':',e);failed++;}
+  }
+  return {sent,failed,noRecipients:false};
+}
+// Admin-triggered manual resend for a request whose original notification may have been
+// silently dropped (e.g. the GREEN-API-credentials boot-time race that sendRawWA/
+// getGreenApiCreds no longer have, but older requests may still have missed it).
+async function resendRequestNotification(id){
+  if(!isAdminRole()){alert('Sirf Admin/Director notification resend kar sakte hain.');return}
+  const r=requests.find(x=>x.id===id);if(!r)return;
+  const it=items.find(x=>x.id===r.item);
+  if(!it){alert('Item nahi mila is request ke liye.');return}
+  toast('Notification bhej rahe hain...');
+  const result=await notifyRequestSubmitted(it,r.qty,r.requestedBy,r.purpose);
+  if(result.noRecipients)alert('Koi recipient nahi mila - "Amit Sharma" active nahi hai ya kisi ke paas Stationery admin/director role nahi hai. Universal Users check karein.');
+  else if(result.sent>0)alert('Notification bhej diya gaya ('+result.sent+' log ko).'+(result.failed?' '+result.failed+' ko nahi ja paya.':''));
+  else alert('Notification bhejne mein error aaya - GREEN-API settings check karein.');
 }
 function notifyRequestIssued(item,qty,requesterId,issuedByUserId){
   const u=users.find(x=>x.id===requesterId);
@@ -855,7 +888,7 @@ function renderRequestsAdmin(){
     const name=it?it.name:(r.itemName||r.item);
     const when=r.requestedAt?new Date(r.requestedAt).toLocaleString('en-IN'):'-';
     const actions=r.status==='PENDING'
-      ?`<button class="btn small primary" onclick="issueRequest('${r.id}')">✓ Issue</button> <button class="btn small danger" onclick="rejectRequest('${r.id}')">✕ Reject</button>`
+      ?`<button class="btn small primary" onclick="issueRequest('${r.id}')">✓ Issue</button> <button class="btn small danger" onclick="rejectRequest('${r.id}')">✕ Reject</button> <button class="btn small" onclick="resendRequestNotification('${r.id}')">🔔 Resend Notification</button>`
       :(r.status==='ISSUED'?`<small style="color:var(--muted)">by ${esc(nameOfUserId(r.issuedBy))}</small>`:`<small style="color:var(--muted)">by ${esc(nameOfUserId(r.rejectedBy))}</small>`);
     return `<div class="itemrow"><div><b>${esc(name)}</b><small>Qty ${r.qty}${r.purpose?' • '+esc(r.purpose):''} • By ${esc(nameOfUserId(r.requestedBy))} • ${esc(when)}</small></div><span style="display:flex;gap:8px;align-items:center">${requestStatusPill(r.status)}${actions}</span></div>`;
   }).join(''):`<div class="emptystate">📋<p>Is filter mein koi request nahi hai.</p></div>`;
