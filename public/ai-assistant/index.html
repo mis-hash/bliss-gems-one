@@ -107,6 +107,7 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
       <button type="button" class="chip" onclick="askSuggested('Konse trips abhi open hain?')">🧳 Konse trips abhi open hain?</button>
       <button type="button" class="chip" onclick="askSuggested('Stationery ka low stock items kya hain?')">📦 Stationery low-stock items?</button>
       <button type="button" class="chip" onclick="askSuggested('Petty cash ka current balance kya hai?')">💰 Petty cash balance?</button>
+      <button type="button" class="chip" onclick="askSuggested('Aaj petrol ka kitna expense hua?')">⛽ Aaj ka petrol expense?</button>
       <button type="button" class="chip" onclick="askSuggested('Busy ke export ka total kitna hai?')">🧾 Busy export ka total?</button>
     </div>
   </div>
@@ -198,6 +199,7 @@ function renderAll(){
 function liveTeTrips(cb){ return db.collection('te_trips').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}).catch(e=>{console.error('liveTeTrips failed:',e);cb([]);}); }
 function liveSiItems(cb){ return db.collection('si_items').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows);}).catch(e=>{console.error('liveSiItems failed:',e);cb([]);}); }
 function livePcLedger(cb){ return db.collection('pc_ledger').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}).catch(e=>{console.error('livePcLedger failed:',e);cb([]);}); }
+function liveFuelLog(cb){ return db.collection('fuel_log').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}).catch(e=>{console.error('liveFuelLog failed:',e);cb([]);}); }
 // Busy import summary is stored in localStorage, not Firestore - "busy_import" is a brand
 // new collection this app introduced, and this project's Firestore security rules only
 // allow the collections that already existed (confirmed: a direct unauthenticated read on
@@ -237,14 +239,24 @@ async function answerBusyTotal(){
   if(!data)return {text:'Abhi tak koi Busy export upload nahi hua hai. Left panel se "Upload Busy Export" button se CSV daal dein.',sources:[]};
   return {text:`Busy export ka total: ${fmtAmt(data.total)}\n(${data.rowCount} rows • upload: ${new Date(data.uploadedAt).toLocaleString('en-IN')})`,sources:['Busy Export ('+new Date(data.uploadedAt).toLocaleDateString('en-IN')+')']};
 }
+async function answerTodayFuelExpense(){
+  const rows=await new Promise(res=>liveFuelLog(res));
+  const today=new Date().toISOString().slice(0,10);
+  const todayRows=rows.filter(x=>x.date===today);
+  if(!todayRows.length)return {text:`Aaj (${today}) koi fuel entry nahi hui hai.`,sources:['Bliss One — Vehicle Tracker']};
+  const total=todayRows.reduce((s,x)=>s+(x.amount||0),0);
+  const lines=todayRows.map(x=>`• ${x.vehicle||'-'} — ${fmtAmt(x.amount)}${x.liters?' ('+x.liters+' L)':''}`);
+  return {text:`Aaj ka total petrol/fuel expense: ${fmtAmt(total)}\n`+lines.join('\n'),sources:['Bliss One — Vehicle Tracker']};
+}
 
 async function answerQuestion(text){
   const q=String(text||'').toLowerCase();
   if(q.includes('trip')) return answerOpenTrips();
   if(q.includes('stock')||q.includes('stationery')) return answerLowStock();
   if(q.includes('petty')||q.includes('cash balance')||q.includes('balance')) return answerPettyCashBalance();
+  if(q.includes('petrol')||q.includes('fuel')||q.includes('diesel')) return answerTodayFuelExpense();
   if(q.includes('busy')||q.includes('sales')) return answerBusyTotal();
-  return {text:'Maaf kijiye, abhi main sirf kuch specific sawaalon ke jawab de sakta hoon — trips, stationery stock, petty cash balance, ya Busy export total. Baaki sawaal aane wale updates mein add honge.',sources:[]};
+  return {text:'Maaf kijiye, abhi main sirf kuch specific sawaalon ke jawab de sakta hoon — trips, stationery stock, petty cash balance, aaj ka fuel expense, ya Busy export total. Baaki sawaal aane wale updates mein add honge.',sources:[]};
 }
 
 function askSuggested(text){ $('chatInput').value=text; sendChat(); }
