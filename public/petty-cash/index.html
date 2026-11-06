@@ -602,7 +602,8 @@ function readPcSpendProofState(){
   return state;
 }
 function pcSpendCatRowHtml(c,proofState){
-  return `<div class="item"><span>${esc(c)}</span><div style="display:flex;align-items:center;gap:10px"><label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:bold;white-space:nowrap"><input type="checkbox" id="${pcSpendCatCheckboxId(c)}" style="width:auto" ${proofState[c]?'checked':''}> Proof Required</label><button type="button" class="btn small" onclick="editPcSpendCategory('${esc(c).replace(/'/g,"\\'")}')">✏ Edit</button></div></div>`;
+  const cSafe=esc(c).replace(/'/g,"\\'");
+  return `<div class="item"><span>${esc(c)}</span><div style="display:flex;align-items:center;gap:10px"><label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:bold;white-space:nowrap"><input type="checkbox" id="${pcSpendCatCheckboxId(c)}" style="width:auto" ${proofState[c]?'checked':''}> Proof Required</label><button type="button" class="btn small" onclick="editPcSpendCategory('${cSafe}')">✏ Edit</button><button type="button" class="btn small danger" onclick="deletePcSpendCategory('${cSafe}')">🗑</button></div></div>`;
 }
 function renderPcSpendCatRows(proofState){
   $('pcSpendCatRows').innerHTML=PC_SPEND_CATEGORIES.map(c=>pcSpendCatRowHtml(c,proofState||PC_SPEND_PROOF_REQUIRED)).join('');
@@ -647,6 +648,24 @@ async function editPcSpendCategory(oldName){
     PC_SPEND_PROOF_REQUIRED=proofRequired;
     toast('Category rename ho gayi.');
   }catch(e){console.error('editPcSpendCategory failed:',e);alert('Rename save karte waqt error aaya: '+(e.message||e));}
+}
+// Removes a category from the dropdown going forward - doesn't touch any already-logged spend
+// entry (that's just free text, same as a rename), it just stops suggesting this one for new ones.
+async function deletePcSpendCategory(name){
+  if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye manage kar sakte hain.');return}
+  if(!confirm(`"${name}" ko category list se hata dein?\n\nPehle se likhi hui entries mein iska naam waisa hi rahega - sirf naye entries ke liye dropdown mein nahi dikhega.`))return;
+  const proofState=readPcSpendProofState();
+  PC_SPEND_CATEGORIES=PC_SPEND_CATEGORIES.filter(c=>c!==name);
+  delete proofState[name];
+  const proofRequired={};
+  Object.keys(proofState).forEach(k=>{if(proofState[k])proofRequired[k]=true;});
+  renderPcSpendCategoryOptions();
+  renderPcSpendCatRows(proofState);
+  try{
+    await db.collection('pc_settings').doc('spendCategories').set({list:PC_SPEND_CATEGORIES,proofRequired},{merge:true});
+    PC_SPEND_PROOF_REQUIRED=proofRequired;
+    toast('Category hata di gayi.');
+  }catch(e){console.error('deletePcSpendCategory failed:',e);alert('Delete karte waqt error aaya: '+(e.message||e));}
 }
 async function savePcSpendCategories(){
   const newCat=($('pcSpendCatNew').value||'').trim();
