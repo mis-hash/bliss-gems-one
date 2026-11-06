@@ -344,18 +344,22 @@ function callAnalysisCardHtml(row){
 // compare team members at a glance (who's getting more resistance, who's closing well)
 // instead of opening each sales person's calls one by one. Only shown in the team-wide view
 // (no sales person filter active) and only when there's more than one person to compare.
-function callAnalysisBySalesPerson(rows,analyses){
+function groupCallAnalysis(rows,analyses,keyFn){
   const by={};
   rows.forEach((r,i)=>{
-    const sp=r.salesPerson||'Unknown';
-    if(!by[sp])by[sp]={total:0,positive:0,neutral:0,negative:0,objCounts:{}};
+    const k=keyFn(r)||'Unknown';
+    if(!by[k])by[k]={total:0,positive:0,neutral:0,negative:0,objCounts:{}};
     const a=analyses[i];
-    by[sp].total++;
-    by[sp][a.sentiment]++;
-    a.negativeHits.forEach(w=>{by[sp].objCounts[w]=(by[sp].objCounts[w]||0)+1});
+    by[k].total++;
+    by[k][a.sentiment]++;
+    a.negativeHits.forEach(w=>{by[k].objCounts[w]=(by[k].objCounts[w]||0)+1});
   });
   return by;
 }
+function callAnalysisBySalesPerson(rows,analyses){ return groupCallAnalysis(rows,analyses,r=>r.salesPerson); }
+// Same breakdown, grouped by client instead - surfaces a client who's had a run of negative
+// calls (worth a Director's attention) the same way the sales-person table surfaces a person.
+function callAnalysisByClient(rows,analyses){ return groupCallAnalysis(rows,analyses,r=>r.clientName); }
 // Shared by the history table, the analysis overview and the CSV export, so all three
 // always agree on which rows are "in view" for the current Sales Person + date filters.
 function callLogRowsInScope(opts){
@@ -387,20 +391,24 @@ function renderCallAnalysisOverview(){
   analyses.forEach(a=>a.negativeHits.forEach(w=>{objCounts[w]=(objCounts[w]||0)+1}));
   const topObjection=Object.keys(objCounts).sort((a,b)=>objCounts[b]-objCounts[a])[0];
   const tile=(label,val)=>`<div style="background:var(--mint);border-radius:10px;padding:10px 12px;min-width:110px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">${esc(label)}</div><div style="font-size:18px;font-weight:800;color:var(--g)">${esc(String(val))}</div></div>`;
-  const bySalesPerson=callAnalysisBySalesPerson(rows,analyses);
-  const spNames=Object.keys(bySalesPerson).sort((a,b)=>bySalesPerson[b].total-bySalesPerson[a].total);
-  const breakdownHtml=(!filter&&spNames.length>1)?`
+  const breakdownTableHtml=(title,icon,byMap,colLabel)=>{
+    const names=Object.keys(byMap).sort((a,b)=>byMap[b].total-byMap[a].total);
+    if(filter||names.length<2)return '';
+    return `
     <div style="margin-top:14px">
-      <b style="font-size:12px">👤 Sales Person-wise Breakdown</b>
+      <b style="font-size:12px">${icon} ${esc(title)}</b>
       <table style="margin-top:6px">
-        <thead><tr><th>Sales Person</th><th>Calls</th><th>🙂</th><th>😐</th><th>🙁</th><th>Top Objection</th></tr></thead>
-        <tbody>${spNames.map(sp=>{
-          const d=bySalesPerson[sp];
+        <thead><tr><th>${esc(colLabel)}</th><th>Calls</th><th>🙂</th><th>😐</th><th>🙁</th><th>Top Objection</th></tr></thead>
+        <tbody>${names.map(n=>{
+          const d=byMap[n];
           const topObj=Object.keys(d.objCounts).sort((a,b)=>d.objCounts[b]-d.objCounts[a])[0]||'-';
-          return `<tr><td>${esc(sp)}</td><td>${d.total}</td><td>${d.positive}</td><td>${d.neutral}</td><td>${d.negative}</td><td>${esc(topObj)}</td></tr>`;
+          return `<tr><td>${esc(n)}</td><td>${d.total}</td><td>${d.positive}</td><td>${d.neutral}</td><td>${d.negative}</td><td>${esc(topObj)}</td></tr>`;
         }).join('')}</tbody>
       </table>
-    </div>`:'';
+    </div>`;
+  };
+  const spBreakdownHtml=breakdownTableHtml('Sales Person-wise Breakdown','👤',callAnalysisBySalesPerson(rows,analyses),'Sales Person');
+  const clientBreakdownHtml=breakdownTableHtml('Client-wise Breakdown','🏢',callAnalysisByClient(rows,analyses),'Client');
   wrap.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap">
     ${tile('Total Analyzed',rows.length)}
     ${tile('🙂 Positive',counts.positive)}
@@ -408,7 +416,7 @@ function renderCallAnalysisOverview(){
     ${tile('🙁 Negative',counts.negative)}
     ${tile('Top Topic',topTopic||'-')}
     ${tile('Top Objection',topObjection||'-')}
-  </div>${breakdownHtml}`;
+  </div>${spBreakdownHtml}${clientBreakdownHtml}`;
 }
 function downloadCSV(filename,rows){
   const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
