@@ -390,7 +390,7 @@ tbody tr:hover td{background:#f7faf8}
 
 <div class="modal" id="pcSpendCategoriesModal"><div class="box" style="width:min(500px,100%)">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Manage Spend Categories</h3><button class="btn small" onclick="closePcSpendCategoriesManage()">✕</button></div>
-<div class="field"><label>Add New Category</label><div style="display:flex;gap:8px"><input id="pcSpendCatNew" placeholder="e.g. Auto Rickshaw" style="flex:1"><button class="btn" onclick="savePcSpendCategories()">➕ Add &amp; Save</button></div></div>
+<div class="field"><label>Add New Category</label><div style="display:flex;gap:8px"><input id="pcSpendCatNew" placeholder="e.g. Auto Rickshaw" style="flex:1"><button class="btn" onclick="quickAddPcSpendCategory()">➕ Add</button></div></div>
 <div id="pcSpendCatRows" style="margin-top:10px"></div>
 <div style="margin-top:12px;text-align:right"><button class="btn primary" onclick="savePcSpendCategories()">✓ Save</button></div>
 </div></div>
@@ -588,23 +588,75 @@ async function addPcSpendCategoryIfNew(category){
   try{await db.collection('pc_settings').doc('spendCategories').set({list:PC_SPEND_CATEGORIES},{merge:true});}
   catch(e){console.error('addPcSpendCategoryIfNew failed:',e);}
 }
-// Accounts-facing settings modal (mirrors Trip Expense's Ledger Heads modal) - add a new
-// spend category and toggle per-category Proof Required, all saved together.
+// Accounts-facing settings modal (mirrors Trip Expense's Ledger Heads modal) - add new
+// spend categories, rename a misspelled one, and toggle per-category Proof Required.
+function pcSpendCatCheckboxId(c){return 'pcSpendProof_'+c.replace(/\W/g,'_')}
+// Reads whatever's currently ticked in the open modal (including a just-checked box that
+// hasn't been saved yet) so a quick-add or rename never silently discards it.
+function readPcSpendProofState(){
+  const state={};
+  PC_SPEND_CATEGORIES.forEach(c=>{
+    const cb=$(pcSpendCatCheckboxId(c));
+    state[c]=cb?cb.checked:!!PC_SPEND_PROOF_REQUIRED[c];
+  });
+  return state;
+}
+function pcSpendCatRowHtml(c,proofState){
+  return `<div class="item"><span>${esc(c)}</span><div style="display:flex;align-items:center;gap:10px"><label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:bold;white-space:nowrap"><input type="checkbox" id="${pcSpendCatCheckboxId(c)}" style="width:auto" ${proofState[c]?'checked':''}> Proof Required</label><button type="button" class="btn small" onclick="editPcSpendCategory('${esc(c).replace(/'/g,"\\'")}')">✏ Edit</button></div></div>`;
+}
+function renderPcSpendCatRows(proofState){
+  $('pcSpendCatRows').innerHTML=PC_SPEND_CATEGORIES.map(c=>pcSpendCatRowHtml(c,proofState||PC_SPEND_PROOF_REQUIRED)).join('');
+}
 function openPcSpendCategoriesManage(){
   if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye manage kar sakte hain.');return}
   $('pcSpendCatNew').value='';
-  $('pcSpendCatRows').innerHTML=PC_SPEND_CATEGORIES.map(c=>`<div class="item"><span>${esc(c)}</span><label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:bold;white-space:nowrap"><input type="checkbox" id="pcSpendProof_${esc(c).replace(/\W/g,'_')}" style="width:auto" ${PC_SPEND_PROOF_REQUIRED[c]?'checked':''}> Proof Required</label></div>`).join('');
+  renderPcSpendCatRows();
   $('pcSpendCategoriesModal').classList.add('show');
 }
 function closePcSpendCategoriesManage(){$('pcSpendCategoriesModal').classList.remove('show');}
+// Adds one category and keeps the modal open - the old behavior closed the whole modal on
+// every add, forcing Accounts to reopen it just to add a second category in the same sitting.
+async function quickAddPcSpendCategory(){
+  const newCat=($('pcSpendCatNew').value||'').trim();
+  if(!newCat){alert('Category name likhein.');return}
+  if(PC_SPEND_CATEGORIES.some(x=>x.toLowerCase()===newCat.toLowerCase())){alert('Yeh category pehle se hai.');$('pcSpendCatNew').value='';return}
+  const proofState=readPcSpendProofState();
+  await addPcSpendCategoryIfNew(newCat);
+  $('pcSpendCatNew').value='';
+  renderPcSpendCatRows(proofState);
+}
+// Rename a misspelled category (e.g. typo fix) - carries its Proof Required setting over to
+// the new name and re-points the saved list/settings doc, same place a brand-new category is saved.
+async function editPcSpendCategory(oldName){
+  if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye manage kar sakte hain.');return}
+  const newName=(prompt('Category ka sahi naam likhein:',oldName)||'').trim();
+  if(!newName||newName===oldName)return;
+  if(PC_SPEND_CATEGORIES.some(x=>x.toLowerCase()===newName.toLowerCase())){alert('Yeh naam pehle se kisi aur category ka hai.');return}
+  const idx=PC_SPEND_CATEGORIES.findIndex(x=>x===oldName);
+  if(idx===-1)return;
+  const proofState=readPcSpendProofState();
+  PC_SPEND_CATEGORIES[idx]=newName;
+  proofState[newName]=proofState[oldName];
+  delete proofState[oldName];
+  const proofRequired={};
+  Object.keys(proofState).forEach(k=>{if(proofState[k])proofRequired[k]=true;});
+  renderPcSpendCategoryOptions();
+  renderPcSpendCatRows(proofState);
+  try{
+    await db.collection('pc_settings').doc('spendCategories').set({list:PC_SPEND_CATEGORIES,proofRequired},{merge:true});
+    PC_SPEND_PROOF_REQUIRED=proofRequired;
+    toast('Category rename ho gayi.');
+  }catch(e){console.error('editPcSpendCategory failed:',e);alert('Rename save karte waqt error aaya: '+(e.message||e));}
+}
 async function savePcSpendCategories(){
   const newCat=($('pcSpendCatNew').value||'').trim();
-  if(newCat)await addPcSpendCategoryIfNew(newCat);
+  if(newCat&&!PC_SPEND_CATEGORIES.some(x=>x.toLowerCase()===newCat.toLowerCase())){
+    await addPcSpendCategoryIfNew(newCat);
+    renderPcSpendCatRows();
+  }
   const proofRequired={};
-  PC_SPEND_CATEGORIES.forEach(c=>{
-    const cb=$(`pcSpendProof_${c.replace(/\W/g,'_')}`);
-    if(cb&&cb.checked)proofRequired[c]=true;
-  });
+  const proofState=readPcSpendProofState();
+  Object.keys(proofState).forEach(c=>{if(proofState[c])proofRequired[c]=true;});
   // A newly-typed category (added above) has no checkbox row yet at this point, so it starts
   // optional - Accounts can turn Proof Required on for it next time they reopen this modal.
   PC_SPEND_PROOF_REQUIRED=proofRequired;
