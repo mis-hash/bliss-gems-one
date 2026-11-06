@@ -608,10 +608,17 @@ function pcSpendCategoryUsageCount(c){
   const needle=String(c||'').trim().toLowerCase();
   return issueSpends.filter(s=>!s.deletedAt&&String(s.note||'').trim().toLowerCase()===needle).length;
 }
+// Total rupees spent under this category so far - Accounts cares about the money, not just
+// how many times a category was picked, when deciding whether a category is worth keeping.
+function pcSpendCategoryUsageTotal(c){
+  const needle=String(c||'').trim().toLowerCase();
+  return issueSpends.filter(s=>!s.deletedAt&&String(s.note||'').trim().toLowerCase()===needle).reduce((sum,x)=>sum+(x.amount||0),0);
+}
 function pcSpendCatRowHtml(c,proofState){
   const cSafe=esc(c).replace(/'/g,"\\'");
   const used=pcSpendCategoryUsageCount(c);
-  return `<div class="item"><span>${esc(c)} <small style="color:var(--muted);font-weight:400">(${used} baar use hui)</small></span><div style="display:flex;align-items:center;gap:10px"><label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:bold;white-space:nowrap"><input type="checkbox" id="${pcSpendCatCheckboxId(c)}" style="width:auto" ${proofState[c]?'checked':''}> Proof Required</label><button type="button" class="btn small" onclick="editPcSpendCategory('${cSafe}')">✏ Edit</button><button type="button" class="btn small danger" onclick="deletePcSpendCategory('${cSafe}')">🗑</button></div></div>`;
+  const total=pcSpendCategoryUsageTotal(c);
+  return `<div class="item"><span>${esc(c)} <small style="color:var(--muted);font-weight:400">(${used} baar use hui${used?', '+fmtAmt(total):''})</small></span><div style="display:flex;align-items:center;gap:10px"><label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:bold;white-space:nowrap"><input type="checkbox" id="${pcSpendCatCheckboxId(c)}" style="width:auto" ${proofState[c]?'checked':''}> Proof Required</label><button type="button" class="btn small" onclick="editPcSpendCategory('${cSafe}')">✏ Edit</button><button type="button" class="btn small danger" onclick="deletePcSpendCategory('${cSafe}')">🗑</button></div></div>`;
 }
 function renderPcSpendCatRows(proofState){
   $('pcSpendCatRows').innerHTML=PC_SPEND_CATEGORIES.map(c=>pcSpendCatRowHtml(c,proofState||PC_SPEND_PROOF_REQUIRED)).join('');
@@ -662,7 +669,8 @@ async function editPcSpendCategory(oldName){
 async function deletePcSpendCategory(name){
   if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye manage kar sakte hain.');return}
   const used=pcSpendCategoryUsageCount(name);
-  if(!confirm(`"${name}" ko category list se hata dein? (Yeh ab tak ${used} baar use ho chuki hai)\n\nPehle se likhi hui entries mein iska naam waisa hi rahega - sirf naye entries ke liye dropdown mein nahi dikhega.`))return;
+  const total=pcSpendCategoryUsageTotal(name);
+  if(!confirm(`"${name}" ko category list se hata dein? (Yeh ab tak ${used} baar use ho chuki hai${used?', total '+fmtAmt(total):''})\n\nPehle se likhi hui entries mein iska naam waisa hi rahega - sirf naye entries ke liye dropdown mein nahi dikhega.`))return;
   const proofState=readPcSpendProofState();
   PC_SPEND_CATEGORIES=PC_SPEND_CATEGORIES.filter(c=>c!==name);
   delete proofState[name];
