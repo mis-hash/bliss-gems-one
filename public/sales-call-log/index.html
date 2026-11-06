@@ -81,7 +81,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
   <div class="panel">
     <div class="ph">➕ Call Log Karein</div>
     <div class="pb">
-      <div class="note" style="margin-bottom:12px">Yeh sirf log/record karta hai - call ka content ya outcome AI se analyze nahi hota (uske liye paid speech-to-text API chahiye, jo abhi approve nahi hai).</div>
+      <div class="note" style="margin-bottom:12px">Recording log karne ke saath ek free Call Analysis card bhi milega (note ke keywords + call duration se) - asli AI transcript/understanding ke liye paid speech-to-text API chahiye hoga, jo abhi approve nahi hai.</div>
       <div class="grid">
         <div class="field"><label>Sales Person</label><select id="callSalesPerson"></select></div>
         <div class="field"><label>Client/Party (optional)</label><input id="callClientName" type="text"></div>
@@ -96,9 +96,14 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
   </div>
 
   <div class="panel">
+    <div class="ph">🧠 Call Analysis Overview</div>
+    <div class="pb" id="callAnalysisOverview"></div>
+  </div>
+
+  <div class="panel">
     <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <span>📋 Call History</span>
-      <select id="callFilterSalesPerson" onchange="renderCallHistory()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
+      <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
     </div>
     <div class="pb" style="padding:0">
       <table>
@@ -187,6 +192,7 @@ function renderAll(){
   renderGate();
   renderSalesPersonOptions();
   renderCallHistory();
+  renderCallAnalysisOverview();
 }
 
 // Stored in localStorage, not Firestore: a brand new Firestore collection for this would
@@ -213,6 +219,21 @@ function fileToDataUrl(file){
     reader.readAsDataURL(file);
   });
 }
+// Free, no-API way to get a recording's length: load it into an <audio> element and read
+// its decoded duration. Capped with a timeout since a malformed/truncated data URL can leave
+// loadedmetadata never firing - better to show no duration than to hang the save.
+function getAudioDuration(dataUrl){
+  return new Promise(resolve=>{
+    try{
+      const a=new Audio();
+      const done=v=>{clearTimeout(timer);resolve(v)};
+      const timer=setTimeout(()=>done(null),4000);
+      a.addEventListener('loadedmetadata',()=>done(Number.isFinite(a.duration)?a.duration:null));
+      a.addEventListener('error',()=>done(null));
+      a.src=dataUrl;
+    }catch(e){resolve(null)}
+  });
+}
 async function logCallRecording(){
   const salesPerson=$('callSalesPerson').value;
   const clientName=$('callClientName').value.trim();
@@ -222,16 +243,17 @@ async function logCallRecording(){
   const status=$('callLogStatus');
   if(!salesPerson){status.style.color='var(--red)';status.textContent='Sales Person select karein.';return}
   try{
-    let recordingUrl=null,fileNote='';
+    let recordingUrl=null,fileNote='',durationSeconds=null;
     if(file){
       if(file.size<=CALL_LOG_MAX_FILE_BYTES){
         recordingUrl=await fileToDataUrl(file);
+        durationSeconds=await getAudioDuration(recordingUrl);
       }else{
         fileNote=' (file bahut badi thi, sirf log hua, file save nahi hui)';
       }
     }
     const rows=liveCallLog();
-    rows.push({id:'CL-'+Date.now()+'-'+Math.random().toString(36).slice(2),salesPerson,clientName,note,recordingUrl,fileName:file?file.name:'',loggedAt:new Date().toISOString(),loggedBy:(loggedUser()||{}).name||''});
+    rows.push({id:'CL-'+Date.now()+'-'+Math.random().toString(36).slice(2),salesPerson,clientName,note,recordingUrl,durationSeconds,fileName:file?file.name:'',loggedAt:new Date().toISOString(),loggedBy:(loggedUser()||{}).name||''});
     saveCallLog(rows);
     status.style.color='var(--g)';
     status.textContent='Call log ho gayi'+fileNote+'.';
@@ -239,25 +261,123 @@ async function logCallRecording(){
     $('callNote').value='';
     fileInput.value='';
     renderCallHistory();
+    renderCallAnalysisOverview();
   }catch(e){
     console.error('logCallRecording failed:',e);
     status.style.color='var(--red)';
     status.textContent='Error aaya: '+(e.message||e);
   }
 }
+/* ===== Free, rule-based Call Analysis (no paid speech-to-text) =====
+   There's no API to turn the audio into a real transcript for free, so this analyzes the
+   note text the sales person typed (keyword-matched, Hindi/Hinglish + English) plus the
+   recording's own duration. Honest about what it is: a keyword signal, not true call
+   understanding - the UI labels it "Note-Based" for that reason. */
+const CALL_POSITIVE_WORDS=['ready','confirm','confirmed','done','yes','haan','ok','okay','theek','thik','sahi','achha','acha','good','happy','khush','satisfied','deal','order','payment','paid','approved','interested'];
+const CALL_NEGATIVE_WORDS=['nahi','no','mehenga','expensive','high','late','delay','problem','issue','complaint','cancel','wait','sochunga','soch','busy','ignore','angry','gussa','refuse','reject','dispute','return','complain','slow','deny'];
+// Topic categories - what the call was actually about, so a Director skimming many calls
+// can see patterns ("most calls this week were stuck on Pricing") not just a bare sentiment.
+const CALL_TOPIC_WORDS={
+  'Pricing':['price','rate','rates','mehenga','expensive','discount','cheap','sasta','bhav','costly'],
+  'Delivery':['delivery','delay','late','shipment','courier','dispatch','transport'],
+  'Payment':['payment','paid','advance','due','balance','cheque','upi','credit'],
+  'Competitor':['competitor','market','doosri','dusri','elsewhere','another'],
+  'Decision':['confirm','confirmed','order','deal','ready','cancel','reject','approved']
+};
+function analyzeCallNote(note){
+  const text=String(note||'').toLowerCase();
+  const words=text.split(/[^a-zऀ-ॿ]+/).filter(Boolean);
+  const positiveHits=[...new Set(words.filter(w=>CALL_POSITIVE_WORDS.includes(w)))];
+  const negativeHits=[...new Set(words.filter(w=>CALL_NEGATIVE_WORDS.includes(w)))];
+  const topics=Object.keys(CALL_TOPIC_WORDS).filter(t=>CALL_TOPIC_WORDS[t].some(w=>words.includes(w)));
+  const sentiment=negativeHits.length>positiveHits.length?'negative':positiveHits.length>negativeHits.length?'positive':'neutral';
+  const coachingTips=[];
+  if(!text)coachingTips.push('Call ke baad thoda detailed note likhein (price, delivery, next step) - jitna behtar note, utna behtar analysis milega.');
+  if(negativeHits.length)coachingTips.push(`Customer ne resistance dikhaya (${negativeHits.join(', ')}) - agli baar unka concern pehle sunein, phir solution/value samjhayein.`);
+  if(positiveHits.length&&!negativeHits.length)coachingTips.push('Customer positive lag raha hai - jaldi follow-up karke deal/order close karne ki koshish karein.');
+  if(topics.includes('Pricing'))coachingTips.push('Pricing discuss hua - rate justify karne ke liye quality/value ki baat pehle karein, discount seedha na dein.');
+  if(topics.includes('Delivery'))coachingTips.push('Delivery/timing ka zikr hua - ek clear delivery date commit karein taaki customer ko confidence mile.');
+  const suggestion=negativeHits.length?'Pricing/delay jaisi concern resolve karke dobara contact karein.':(positiveHits.length?'Order/confirmation ke liye follow-up karein.':'Next call schedule karein aur outcome ko specific note mein likhein.');
+  return {sentiment,positiveHits,negativeHits,topics,coachingTips,suggestion};
+}
+function fmtDuration(sec){
+  if(!Number.isFinite(sec)||sec<=0)return null;
+  const m=Math.floor(sec/60),s=Math.round(sec%60);
+  return m+'m '+String(s).padStart(2,'0')+'s';
+}
+function sentimentPillHtmlDark(sentiment){
+  const map={positive:{label:'🙂 Positive',color:'#8FE388',bg:'#2E3A21'},neutral:{label:'😐 Neutral',color:'#A8B4E8',bg:'#262F4A'},negative:{label:'🙁 Negative',color:'#F2A8B8',bg:'#3A2130'}};
+  const s=map[sentiment]||map.neutral;
+  return `<span style="font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:99px;background:${s.bg};color:${s.color}">${s.label}</span>`;
+}
+function callSummarySentence(row,a){
+  const who=row.clientName?`${row.clientName}`:'client';
+  const topicsPart=a.topics.length?` Topics: ${a.topics.join(', ')}.`:'';
+  return `${row.salesPerson} ki ${who} ke saath call - sentiment ${a.sentiment}.${topicsPart}`;
+}
+function callAnalysisCardHtml(row){
+  const a=analyzeCallNote(row.note);
+  const dur=fmtDuration(row.durationSeconds);
+  return `<div style="background:linear-gradient(160deg,#151B2E,#1E2640);border-radius:14px;padding:16px 18px;margin-top:4px;color:#fff;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 26px rgba(10,14,30,.25)">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+      <b style="font-size:13px">🧠 Call Analysis (Note-Based)</b>
+      ${sentimentPillHtmlDark(a.sentiment)}
+    </div>
+    ${dur?`<div style="font-size:12px;color:#8891B5">⏱ Call Duration: ${dur}</div>`:''}
+    <div style="font-size:12.5px;color:#C9D0E8;line-height:1.6">${esc(callSummarySentence(row,a))}</div>
+    ${row.note?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#2A3356;display:grid;place-items:center;font-size:12px;flex:none">🔑</div><div style="font-size:12px;color:#C9D0E8;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Note</b>${esc(row.note)}</div></div>`:''}
+    ${a.negativeHits.length?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#2A3356;display:grid;place-items:center;font-size:12px;flex:none">⚠</div><div style="font-size:12px;color:#C9D0E8;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Objections/Signals</b>${a.negativeHits.map(esc).join(', ')}</div></div>`:''}
+    ${a.coachingTips.length?`<div style="background:linear-gradient(135deg,#3A2E10,#2A2108);border:1px solid #5C4A1A;border-radius:10px;padding:10px 12px;font-size:12px;color:#E8C97A"><b style="display:block;margin-bottom:5px">🎯 Sales Person ke liye Guidance</b><ul style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:4px">${a.coachingTips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`:''}
+    <div style="background:linear-gradient(135deg,#1F3B2E,#15291F);border:1px solid #2E5940;border-radius:10px;padding:10px 12px;font-size:12px;color:#8FE388">💡 Next Step: ${esc(a.suggestion)}</div>
+  </div>`;
+}
+// Aggregate view over every analyzable (has a recording) call in the current filter - lets a
+// Director skim the team's call patterns at a glance instead of opening each call one by one.
+function renderCallAnalysisOverview(){
+  const wrap=$('callAnalysisOverview');
+  if(!wrap)return;
+  const filter=$('callFilterSalesPerson')?$('callFilterSalesPerson').value:'';
+  const rows=liveCallLog().filter(r=>r.recordingUrl&&(!filter||r.salesPerson===filter));
+  if(!rows.length){wrap.innerHTML=`<div class="emptystate">🧠<p>Abhi koi recording analyze karne layak nahi hai.</p></div>`;return}
+  const analyses=rows.map(r=>analyzeCallNote(r.note));
+  const counts={positive:0,neutral:0,negative:0};
+  analyses.forEach(a=>counts[a.sentiment]++);
+  const topicCounts={};
+  analyses.forEach(a=>a.topics.forEach(t=>{topicCounts[t]=(topicCounts[t]||0)+1}));
+  const topTopic=Object.keys(topicCounts).sort((a,b)=>topicCounts[b]-topicCounts[a])[0];
+  const objCounts={};
+  analyses.forEach(a=>a.negativeHits.forEach(w=>{objCounts[w]=(objCounts[w]||0)+1}));
+  const topObjection=Object.keys(objCounts).sort((a,b)=>objCounts[b]-objCounts[a])[0];
+  const tile=(label,val)=>`<div style="background:var(--mint);border-radius:10px;padding:10px 12px;min-width:110px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">${esc(label)}</div><div style="font-size:18px;font-weight:800;color:var(--g)">${esc(String(val))}</div></div>`;
+  wrap.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap">
+    ${tile('Total Analyzed',rows.length)}
+    ${tile('🙂 Positive',counts.positive)}
+    ${tile('😐 Neutral',counts.neutral)}
+    ${tile('🙁 Negative',counts.negative)}
+    ${tile('Top Topic',topTopic||'-')}
+    ${tile('Top Objection',topObjection||'-')}
+  </div>`;
+}
+let callsExpanded={};
+function toggleCallExpand(id){callsExpanded[id]=!callsExpanded[id];renderCallHistory();}
 function renderCallHistory(){
   const tbody=$('callHistoryTable');
   if(!tbody)return;
   const filter=$('callFilterSalesPerson')?$('callFilterSalesPerson').value:'';
   const rows=liveCallLog().filter(r=>!filter||r.salesPerson===filter).sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt)));
-  tbody.innerHTML=rows.length?rows.map(r=>`<tr>
+  tbody.innerHTML=rows.length?rows.map(r=>{
+    const open=!!callsExpanded[r.id];
+    const mainRow=`<tr>
     <td>${esc(new Date(r.loggedAt).toLocaleString('en-IN'))}</td>
     <td>${esc(r.salesPerson)}</td>
     <td>${esc(r.clientName||'-')}</td>
     <td>${esc(r.note||'-')}</td>
     <td>${r.recordingUrl?`<button type="button" class="btn small" onclick="playRecording('${esc(r.id)}')">▶ Play</button>`:'-'}</td>
-    <td>${esc(r.loggedBy||'-')}</td>
-  </tr>`).join(''):`<tr><td colspan="6"><div class="emptystate">📞<p>Koi call log nahi hui hai.</p></div></td></tr>`;
+    <td>${esc(r.loggedBy||'-')}${r.recordingUrl?` <button type="button" class="btn small" onclick="toggleCallExpand('${esc(r.id)}')">${open?'🔽':'🧠'} Analysis</button>`:''}</td>
+  </tr>`;
+    const analysisRow=(r.recordingUrl&&open)?`<tr><td colspan="6" style="background:var(--bg)">${callAnalysisCardHtml(r)}</td></tr>`:'';
+    return mainRow+analysisRow;
+  }).join(''):`<tr><td colspan="6"><div class="emptystate">📞<p>Koi call log nahi hui hai.</p></div></td></tr>`;
 }
 function playRecording(id){
   const row=liveCallLog().find(r=>r.id===id);
