@@ -333,6 +333,22 @@ function callAnalysisCardHtml(row){
 }
 // Aggregate view over every analyzable (has a recording) call in the current filter - lets a
 // Director skim the team's call patterns at a glance instead of opening each call one by one.
+// Per-sales-person breakdown of the same signals the team-wide tiles show - lets a Director
+// compare team members at a glance (who's getting more resistance, who's closing well)
+// instead of opening each sales person's calls one by one. Only shown in the team-wide view
+// (no sales person filter active) and only when there's more than one person to compare.
+function callAnalysisBySalesPerson(rows,analyses){
+  const by={};
+  rows.forEach((r,i)=>{
+    const sp=r.salesPerson||'Unknown';
+    if(!by[sp])by[sp]={total:0,positive:0,neutral:0,negative:0,objCounts:{}};
+    const a=analyses[i];
+    by[sp].total++;
+    by[sp][a.sentiment]++;
+    a.negativeHits.forEach(w=>{by[sp].objCounts[w]=(by[sp].objCounts[w]||0)+1});
+  });
+  return by;
+}
 function renderCallAnalysisOverview(){
   const wrap=$('callAnalysisOverview');
   if(!wrap)return;
@@ -349,6 +365,20 @@ function renderCallAnalysisOverview(){
   analyses.forEach(a=>a.negativeHits.forEach(w=>{objCounts[w]=(objCounts[w]||0)+1}));
   const topObjection=Object.keys(objCounts).sort((a,b)=>objCounts[b]-objCounts[a])[0];
   const tile=(label,val)=>`<div style="background:var(--mint);border-radius:10px;padding:10px 12px;min-width:110px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">${esc(label)}</div><div style="font-size:18px;font-weight:800;color:var(--g)">${esc(String(val))}</div></div>`;
+  const bySalesPerson=callAnalysisBySalesPerson(rows,analyses);
+  const spNames=Object.keys(bySalesPerson).sort((a,b)=>bySalesPerson[b].total-bySalesPerson[a].total);
+  const breakdownHtml=(!filter&&spNames.length>1)?`
+    <div style="margin-top:14px">
+      <b style="font-size:12px">👤 Sales Person-wise Breakdown</b>
+      <table style="margin-top:6px">
+        <thead><tr><th>Sales Person</th><th>Calls</th><th>🙂</th><th>😐</th><th>🙁</th><th>Top Objection</th></tr></thead>
+        <tbody>${spNames.map(sp=>{
+          const d=bySalesPerson[sp];
+          const topObj=Object.keys(d.objCounts).sort((a,b)=>d.objCounts[b]-d.objCounts[a])[0]||'-';
+          return `<tr><td>${esc(sp)}</td><td>${d.total}</td><td>${d.positive}</td><td>${d.neutral}</td><td>${d.negative}</td><td>${esc(topObj)}</td></tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`:'';
   wrap.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap">
     ${tile('Total Analyzed',rows.length)}
     ${tile('🙂 Positive',counts.positive)}
@@ -356,7 +386,7 @@ function renderCallAnalysisOverview(){
     ${tile('🙁 Negative',counts.negative)}
     ${tile('Top Topic',topTopic||'-')}
     ${tile('Top Objection',topObjection||'-')}
-  </div>`;
+  </div>${breakdownHtml}`;
 }
 let callsExpanded={};
 function toggleCallExpand(id){callsExpanded[id]=!callsExpanded[id];renderCallHistory();}
