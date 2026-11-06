@@ -103,7 +103,10 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
   <div class="panel">
     <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <span>📋 Call History</span>
-      <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
+      <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
+        <button type="button" class="btn small" onclick="exportCallLogCSV()">⬇ Export CSV</button>
+      </span>
     </div>
     <div class="pb" style="padding:0">
       <table>
@@ -387,6 +390,36 @@ function renderCallAnalysisOverview(){
     ${tile('Top Topic',topTopic||'-')}
     ${tile('Top Objection',topObjection||'-')}
   </div>${breakdownHtml}`;
+}
+function downloadCSV(filename,rows){
+  const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+// Exports the same rows currently shown in Call History (respects the Sales Person filter),
+// with the free analysis signals alongside the raw log - so Accounts/Director can take this
+// outside the app (Excel, email) instead of reading it off the screen.
+function exportCallLogCSV(){
+  const filter=$('callFilterSalesPerson')?$('callFilterSalesPerson').value:'';
+  const rows=liveCallLog().filter(r=>!filter||r.salesPerson===filter).sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt)));
+  const out=[['Date','Sales Person','Client','Note','Has Recording','Duration','Sentiment','Topics','Objections','Logged By']];
+  rows.forEach(r=>{
+    const a=analyzeCallNote(r.note);
+    out.push([
+      new Date(r.loggedAt).toLocaleString('en-IN'),
+      r.salesPerson||'',
+      r.clientName||'',
+      r.note||'',
+      r.recordingUrl?'Yes':'No',
+      fmtDuration(r.durationSeconds)||'',
+      r.recordingUrl?a.sentiment:'',
+      r.recordingUrl?a.topics.join('; '):'',
+      r.recordingUrl?a.negativeHits.join('; '):'',
+      r.loggedBy||''
+    ]);
+  });
+  downloadCSV('sales-call-log'+(filter?'-'+filter.replace(/\W+/g,'-'):'')+'.csv',out);
 }
 let callsExpanded={};
 function toggleCallExpand(id){callsExpanded[id]=!callsExpanded[id];renderCallHistory();}
