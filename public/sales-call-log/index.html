@@ -105,6 +105,10 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
       <span>📋 Call History</span>
       <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
+        <input type="date" id="callFilterFrom" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+        <span style="font-size:12px;color:var(--muted)">se</span>
+        <input type="date" id="callFilterTo" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+        <button type="button" class="btn small" onclick="$('callFilterFrom').value='';$('callFilterTo').value='';renderCallHistory();renderCallAnalysisOverview()">✕ Date Clear</button>
         <button type="button" class="btn small" onclick="exportCallLogCSV()">⬇ Export CSV</button>
       </span>
     </div>
@@ -352,11 +356,26 @@ function callAnalysisBySalesPerson(rows,analyses){
   });
   return by;
 }
+// Shared by the history table, the analysis overview and the CSV export, so all three
+// always agree on which rows are "in view" for the current Sales Person + date filters.
+function callLogRowsInScope(opts){
+  const filter=$('callFilterSalesPerson')?$('callFilterSalesPerson').value:'';
+  const from=$('callFilterFrom')?$('callFilterFrom').value:'';
+  const to=$('callFilterTo')?$('callFilterTo').value:'';
+  return liveCallLog().filter(r=>{
+    if(filter&&r.salesPerson!==filter)return false;
+    const d=String(r.loggedAt||'').slice(0,10);
+    if(from&&d<from)return false;
+    if(to&&d>to)return false;
+    if(opts&&opts.onlyWithRecording&&!r.recordingUrl)return false;
+    return true;
+  });
+}
 function renderCallAnalysisOverview(){
   const wrap=$('callAnalysisOverview');
   if(!wrap)return;
   const filter=$('callFilterSalesPerson')?$('callFilterSalesPerson').value:'';
-  const rows=liveCallLog().filter(r=>r.recordingUrl&&(!filter||r.salesPerson===filter));
+  const rows=callLogRowsInScope({onlyWithRecording:true});
   if(!rows.length){wrap.innerHTML=`<div class="emptystate">🧠<p>Abhi koi recording analyze karne layak nahi hai.</p></div>`;return}
   const analyses=rows.map(r=>analyzeCallNote(r.note));
   const counts={positive:0,neutral:0,negative:0};
@@ -402,7 +421,7 @@ function downloadCSV(filename,rows){
 // outside the app (Excel, email) instead of reading it off the screen.
 function exportCallLogCSV(){
   const filter=$('callFilterSalesPerson')?$('callFilterSalesPerson').value:'';
-  const rows=liveCallLog().filter(r=>!filter||r.salesPerson===filter).sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt)));
+  const rows=callLogRowsInScope().sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt)));
   const out=[['Date','Sales Person','Client','Note','Has Recording','Duration','Sentiment','Topics','Objections','Logged By']];
   rows.forEach(r=>{
     const a=analyzeCallNote(r.note);
@@ -426,8 +445,7 @@ function toggleCallExpand(id){callsExpanded[id]=!callsExpanded[id];renderCallHis
 function renderCallHistory(){
   const tbody=$('callHistoryTable');
   if(!tbody)return;
-  const filter=$('callFilterSalesPerson')?$('callFilterSalesPerson').value:'';
-  const rows=liveCallLog().filter(r=>!filter||r.salesPerson===filter).sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt)));
+  const rows=callLogRowsInScope().sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt)));
   tbody.innerHTML=rows.length?rows.map(r=>{
     const open=!!callsExpanded[r.id];
     const mainRow=`<tr>
