@@ -165,6 +165,7 @@ tbody tr:hover td{background:#f7faf8}
     <button class="adminOnly hidden" data-page="admin" onclick="goPage('admin')">⚙ Admin</button>
     <div class="grouplabel">Operations</div>
     <button class="on staffHidden" data-page="ledger" onclick="goPage('ledger')">📊 Accounts</button>
+    <button class="staffHidden" data-page="directors" onclick="goPage('directors')">👔 Directors</button>
     <button data-page="my" id="myPageTabBtn" onclick="goPage('my')">👤 My Petty Cash</button>
     <div class="grouplabel">Insights</div>
     <button class="staffHidden" data-page="reports" onclick="goPage('reports')">📈 Team &amp; Reports</button>
@@ -235,6 +236,18 @@ tbody tr:hover td{background:#f7faf8}
       <div id="ledgerTable"></div>
     </div>
   </div>
+  </div>
+
+  <div id="page-directors" class="pcPage">
+  <div class="hero" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
+    <div>
+      <h1>Directors' Personal Spend</h1>
+      <p>Employees ne Directors ke liye petty cash se jo kharch kiya, uska running hisaab — WhatsApp pe manually bhejne ki zaroorat nahi.</p>
+    </div>
+    <button class="btn secondary" onclick="openDirectorPhonesModal()">⚙ Director Numbers</button>
+  </div>
+  <div id="directorsCardsWrap"></div>
+  <div id="directorsDetailWrap"></div>
   </div>
 
   <div id="page-my" class="pcPage">
@@ -320,6 +333,7 @@ tbody tr:hover td{background:#f7faf8}
 <div class="bottomNav" id="bottomNav">
   <button class="adminOnly hidden" data-page="admin" onclick="goPage('admin')"><span>⚙</span>Admin</button>
   <button class="on staffHidden" data-page="ledger" onclick="goPage('ledger')"><span>📊</span>Accounts</button>
+  <button class="staffHidden" data-page="directors" onclick="goPage('directors')"><span>👔</span>Directors</button>
   <button data-page="my" onclick="goPage('my')"><span>👤</span>My Cash</button>
   <button class="staffHidden" data-page="reports" onclick="goPage('reports')"><span>📈</span>Reports</button>
 </div>
@@ -393,6 +407,15 @@ tbody tr:hover td{background:#f7faf8}
 <div class="field"><label>Add New Category</label><div style="display:flex;gap:8px"><input id="pcSpendCatNew" placeholder="e.g. Auto Rickshaw" style="flex:1"><button class="btn" onclick="quickAddPcSpendCategory()">➕ Add</button></div></div>
 <div id="pcSpendCatRows" style="margin-top:10px"></div>
 <div style="margin-top:12px;text-align:right"><button class="btn primary" onclick="savePcSpendCategories()">✓ Save</button></div>
+</div></div>
+
+<div class="modal" id="pcDirectorPhonesModal"><div class="box" style="width:min(420px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3 style="margin:0">⚙ Settings — Director Phone Numbers</h3><button class="btn small" onclick="closeDirectorPhonesModal()">✕</button></div>
+<p class="note" style="margin:0 0 14px">In numbers par Directors' Personal Spend ke WhatsApp message jaayenge (jab yeh feature on ho). Khaali rehne par us Director ko kuch nahi jaayega.</p>
+<div class="field" style="margin-bottom:10px"><label>Hitesh Dusad</label><input id="dirPhone_Hitesh_Dusad" placeholder="10-digit mobile number"></div>
+<div class="field" style="margin-bottom:10px"><label>Nitesh Dusad</label><input id="dirPhone_Nitesh_Dusad" placeholder="10-digit mobile number"></div>
+<div class="field" style="margin-bottom:10px"><label>Ankur Khandelwal</label><input id="dirPhone_Ankur_Khandelwal" placeholder="10-digit mobile number"></div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeDirectorPhonesModal()">Cancel</button><button class="btn primary" onclick="saveDirectorPhones()">Save</button></div>
 </div></div>
 
 <datalist id="pcSpendNoteList"></datalist>
@@ -1280,11 +1303,12 @@ function renderMyIssuedCash(){
         <span>${open?'🔽':'▶'} <b>${fmtAmt(x.amount)}</b> issued on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>
         ${x.verified?'<span class="pill repaid">✓ Verified &amp; Settled</span>':`<span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>`}
       </div>
-      ${open?`${mySpends.map(s=>`<div style="font-size:12px;color:var(--muted);padding-left:4px">— ${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''} (${esc(s.date)})${s.proofDataUri?` <button class="btn small secondary" style="padding:2px 7px;font-size:10px" onclick="viewPcSpendProof('${esc(s.id)}')">📷 Photo</button>`:''}${superAdminUnlocked?` <button class="btn small danger" style="padding:2px 7px;font-size:10px" onclick="permanentlyDeleteIssueSpend('${esc(s.id)}')">✕</button>`:''}</div>`).join('')||'<div class="note" style="padding-left:4px">Abhi tak koi spending entry nahi daali gayi.</div>'}
+      ${open?`${mySpends.map(s=>`<div style="font-size:12px;color:var(--muted);padding-left:4px">— ${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''} (${esc(s.date)})${s.directorName?` <b style="color:var(--amber)">· ${esc(s.directorName)}</b>`:''}${s.proofDataUri?` <button class="btn small secondary" style="padding:2px 7px;font-size:10px" onclick="viewPcSpendProof('${esc(s.id)}')">📷 Photo</button>`:''}${superAdminUnlocked?` <button class="btn small danger" style="padding:2px 7px;font-size:10px" onclick="permanentlyDeleteIssueSpend('${esc(s.id)}')">✕</button>`:''}</div>`).join('')||'<div class="note" style="padding-left:4px">Abhi tak koi spending entry nahi daali gayi.</div>'}
       ${x.verified?`<div style="font-size:12px;color:var(--muted);padding-left:4px;margin-top:2px">Verified by ${esc(nameOfUserId(x.settledBy))} on ${esc((x.settledAt||'').slice(0,10))}${x.returnedAmount?' — '+fmtAmt(x.returnedAmount)+' cash received back.':''}</div>`:''}`:''}
       ${x.verified?'':`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
         <input type="number" id="issueSpendAmt_${esc(x.id)}" placeholder="Amount spent" style="width:120px;padding:7px;border:1px solid var(--line);border-radius:7px">
         <input id="issueSpendNote_${esc(x.id)}" list="pcSpendNoteList" autocomplete="off" placeholder="Spent on what?" style="flex:1;min-width:140px;padding:7px;border:1px solid var(--line);border-radius:7px">
+        <select id="issueSpendDirector_${esc(x.id)}" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">— Office Expense —</option>${PC_DIRECTOR_NAMES.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>
         <input type="file" accept="image/*" capture="environment" id="issueSpendProof_${esc(x.id)}" style="width:150px;font-size:11px">
         <button class="btn small primary" onclick="addIssueSpend('${esc(x.id)}')">＋ Add Spend</button>
       </div>`}
@@ -1726,9 +1750,10 @@ async function addIssueSpend(issueId){
   if(_issueSpendSubmitting)return;
   const issue=ledger.find(x=>x.id===issueId);
   if(issue&&issue.verified){alert('Yeh entry Accounts ne already verify/settle kar di hai, ab aur spend add nahi ho sakta.');return}
-  const amtEl=$('issueSpendAmt_'+issueId),noteEl=$('issueSpendNote_'+issueId),proofEl=$('issueSpendProof_'+issueId);
+  const amtEl=$('issueSpendAmt_'+issueId),noteEl=$('issueSpendNote_'+issueId),proofEl=$('issueSpendProof_'+issueId),directorEl=$('issueSpendDirector_'+issueId);
   const amount=parseFloat(amtEl?.value);
   const note=(noteEl?.value||'').trim();
+  const directorName=directorEl?directorEl.value:'';
   if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
   if(note&&PC_SPEND_PROOF_REQUIRED[note]&&!proofEl?.files[0]){alert('"'+note+'" ke liye photo zaroori hai.');return}
   _issueSpendSubmitting=true;
@@ -1740,7 +1765,9 @@ async function addIssueSpend(issueId){
     }
     if(note)await addPcSpendCategoryIfNew(note);
     const actor=loggedUser();
-    await db.collection('pc_issue_spends').add({issueId,amount,note,proofDataUri,date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString()});
+    const payload={issueId,amount,note,proofDataUri,date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString()};
+    if(directorName)payload.directorName=directorName;
+    await db.collection('pc_issue_spends').add(payload);
     toast('Spend entry added');
   }finally{
     _issueSpendSubmitting=false;
@@ -1759,12 +1786,16 @@ function computeBalance(){
   // money in the box - it stays inside totalIn/balance below - but it isn't a fresh Fund Add,
   // so it's split out separately here purely for the dashboard tiles to report on its own.
   const verifyReceiveTotal=live.filter(x=>x.type==='in'&&x.source==='verify_settle').reduce((s,x)=>s+(x.amount||0),0);
-  const fundAdded=totalIn-verifyReceiveTotal;
+  // A Director paying back their personal-spend balance is real cash entering the box (stays
+  // inside totalIn/balance below) but it isn't a fresh Admin Fund Add either - split out
+  // separately, same pattern as verify_settle above, so it doesn't inflate that tile.
+  const directorPaymentTotal=live.filter(x=>x.type==='in'&&x.source==='director_payment').reduce((s,x)=>s+(x.amount||0),0);
+  const fundAdded=totalIn-verifyReceiveTotal-directorPaymentTotal;
   const totalOut=live.filter(x=>x.type==='out').reduce((s,x)=>s+(x.amount||0),0);
   const outstandingLoans=live.filter(x=>x.type==='loan'&&!x.repaid).reduce((s,x)=>s+(x.amount||0),0);
   const outstandingCount=live.filter(x=>x.type==='loan'&&!x.repaid).length;
   const balance=totalIn-totalOut-outstandingLoans;
-  return {totalIn,fundAdded,verifyReceiveTotal,totalOut,outstandingLoans,outstandingCount,balance};
+  return {totalIn,fundAdded,verifyReceiveTotal,directorPaymentTotal,totalOut,outstandingLoans,outstandingCount,balance};
 }
 function renderDash(){
   const {fundAdded,verifyReceiveTotal,totalOut,balance}=computeBalance();
@@ -1777,6 +1808,7 @@ function renderDash(){
   const totalSpent=issueSpends.filter(s=>!s.deletedAt&&liveIssueIds.has(s.issueId)).reduce((s,x)=>s+(x.amount||0),0);
   const pendingHisaab=computeAllPersonPendingTotals().reduce((s,r)=>s+r.issuedPending,0);
   const pendingAccept=pendingAcceptSummary();
+  const directorsPending=PC_DIRECTOR_NAMES.reduce((s,n)=>s+directorBalance(n),0);
   // Loan Given is retired (see addLedgerEntry()/openEntryModal()) - no Loan tile here anymore,
   // even though existing loan entries still count toward balance via computeBalance().
   const tiles=[
@@ -1784,9 +1816,10 @@ function renderDash(){
     {label:'TOTAL ISSUE',val:fmtAmt(totalOut)},
     {label:'TOTAL SPENT',val:fmtAmt(totalSpent)},
     {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
-    {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
+    {label:'PENDING HISAAB (EMPLOYEES)',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
     {label:'PENDING ACCEPT',val:fmtAmt(pendingAccept.amount)+' ('+pendingAccept.count+')',warn:pendingAccept.count>0},
-    {label:'CURRENT BALANCE',val:fmtAmt(balance)}
+    {label:'CURRENT BALANCE',val:fmtAmt(balance)},
+    {label:'PENDING HISAAB (DIRECTORS)',val:fmtAmt(directorsPending),warn:directorsPending>0}
   ];
   $('statTiles').innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
   renderSpendAudit();
@@ -2216,18 +2249,184 @@ function renderAdminPanel(){
   const pendingAcceptEmployee=pendingAcceptByEmployeeSummary();
   const rejectedAccounts=rejectedByAccountsSummary();
   const rejectedEmployee=rejectedByEmployeeSummary();
+  const directorsPendingAdmin=PC_DIRECTOR_NAMES.reduce((s,n)=>s+directorBalance(n),0);
   // Loan Given is retired - no Outstanding Loans tile here anymore (matches the Ledger page).
   const tiles=[
     {label:'TOTAL FUND ADDED',val:fmtAmt(fundAdded)},
     {label:'VERIFY & RECEIVE',val:fmtAmt(verifyReceiveTotal)},
     {label:'TOTAL ISSUED (OUT)',val:fmtAmt(totalOut)},
-    {label:'PENDING HISAAB',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
+    {label:'PENDING HISAAB (EMPLOYEES)',val:fmtAmt(pendingHisaab),warn:pendingHisaab>0},
     {label:'PENDING ACCEPT (ACCOUNTS)',val:fmtAmt(pendingAcceptAccounts.amount)+' ('+pendingAcceptAccounts.count+')',warn:pendingAcceptAccounts.count>0},
     {label:'PENDING ACCEPT (EMPLOYEE)',val:fmtAmt(pendingAcceptEmployee.amount)+' ('+pendingAcceptEmployee.count+')',warn:pendingAcceptEmployee.count>0},
     {label:'REJECTED (ACCOUNTS)',val:fmtAmt(rejectedAccounts.amount)+' ('+rejectedAccounts.count+')'},
-    {label:'REJECTED (EMPLOYEE)',val:fmtAmt(rejectedEmployee.amount)+' ('+rejectedEmployee.count+')'}
+    {label:'REJECTED (EMPLOYEE)',val:fmtAmt(rejectedEmployee.amount)+' ('+rejectedEmployee.count+')'},
+    {label:'PENDING HISAAB (DIRECTORS)',val:fmtAmt(directorsPendingAdmin),warn:directorsPendingAdmin>0}
   ];
   wrap.innerHTML=tiles.map(t=>`<div class="card${t.warn?' warn':''}"><small>${esc(t.label)}</small><b>${t.val}</b></div>`).join('');
+}
+/* ===== Directors' Personal Spend =====
+   3 fixed Directors - Employees tag a spend to one of them (via the new dropdown on their own
+   "Cash Issued to Me" Add Spend row) when a Director calls mid-day asking for something to be
+   paid for from petty cash; Accounts can also add an entry directly here for cases where a
+   Director tells Accounts about an expense that wasn't paid from any specific Employee's
+   issued cash. Both live in pc_issue_spends (no new Firestore collection/rules needed) -
+   employee-tagged entries keep a real issueId (so they still correctly reduce the shared
+   company balance, same as any other spend); Accounts-direct entries have no issueId (so they
+   don't touch the shared balance - no petty cash physically left the box for those).
+   A Director settling up is recorded as a normal pc_ledger Cash In entry
+   (source:'director_payment'), same mechanism as any other Fund Received, just tagged with
+   which Director it came from - computeBalance() keeps it out of the "Fund Added" tile but it
+   still counts toward the real Current Balance, because the cash genuinely came back in.
+   WhatsApp notifications to Directors are deliberately NOT wired up yet - Petty Cash has an
+   existing, deliberate rule (see isPettyCashNoticeExcluded) blocking these exact 3 names from
+   ANY Petty Cash WhatsApp message; the user asked to hold that override for a later session. */
+const PC_DIRECTOR_NAMES=['Hitesh Dusad','Nitesh Dusad','Ankur Khandelwal'];
+let pcSelectedDirector=PC_DIRECTOR_NAMES[0];
+function dirId(name){return String(name||'').replace(/\W+/g,'_')}
+// Dedicated phone numbers for this feature's future WhatsApp use - deliberately separate from
+// the Universal Users record (same pattern as Purchase Price Estimator's Director Phone
+// Numbers setting), so a number here is never affected by isPettyCashNoticeExcluded's
+// name-matched block on the other Petty Cash notifications. Not used to send anything yet
+// (see the note above PC_DIRECTOR_NAMES) - just stored and ready for when that's wired up.
+let pcDirectorPhones={};
+let pcDirectorPhonesStarted=false;
+function startDirectorPhonesSync(){
+  if(pcDirectorPhonesStarted||!db)return;pcDirectorPhonesStarted=true;
+  db.collection('pc_settings').doc('directorPhones').onSnapshot(doc=>{
+    pcDirectorPhones=doc.exists?(doc.data()||{}):{};
+  },err=>console.error('directorPhones sync error',err));
+}
+function openDirectorPhonesModal(){
+  if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye manage kar sakte hain.');return}
+  PC_DIRECTOR_NAMES.forEach(n=>{const el=$('dirPhone_'+dirId(n));if(el)el.value=pcDirectorPhones[dirId(n)]||''});
+  $('pcDirectorPhonesModal').classList.add('show');
+}
+function closeDirectorPhonesModal(){$('pcDirectorPhonesModal')?.classList.remove('show')}
+async function saveDirectorPhones(){
+  const patch={};
+  PC_DIRECTOR_NAMES.forEach(n=>{patch[dirId(n)]=($('dirPhone_'+dirId(n))?.value||'').trim()});
+  try{
+    await db.collection('pc_settings').doc('directorPhones').set(patch,{merge:true});
+    pcDirectorPhones=Object.assign({},pcDirectorPhones,patch);
+    toast('Director numbers save ho gaye');
+    closeDirectorPhonesModal();
+  }catch(e){console.error('saveDirectorPhones failed:',e);alert('Save karte waqt error aaya: '+(e.message||e));}
+}
+function directorSpendEntries(name){
+  return issueSpends.filter(s=>!s.deletedAt&&s.directorName===name);
+}
+function directorPaymentEntries(name){
+  return ledger.filter(x=>!x.deletedAt&&x.type==='in'&&x.source==='director_payment'&&x.directorPayment===name);
+}
+function directorBalance(name){
+  const spent=directorSpendEntries(name).reduce((s,x)=>s+(x.amount||0),0);
+  const paid=directorPaymentEntries(name).reduce((s,x)=>s+(x.amount||0),0);
+  return spent-paid;
+}
+function selectDirector(name){pcSelectedDirector=name;renderDirectorsPage();}
+function pcDirFilteredEntries(name){
+  const from=$('dirFilterFrom')?.value||'',to=$('dirFilterTo')?.value||'',emp=$('dirFilterEmployee')?.value||'';
+  return directorSpendEntries(name).filter(s=>{
+    if(from&&s.date<from)return false;
+    if(to&&s.date>to)return false;
+    if(emp&&s.by!==emp)return false;
+    return true;
+  }).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+}
+function renderDirectorsPage(){
+  const cardsWrap=$('directorsCardsWrap');
+  if(!cardsWrap||!canCloseLoan())return;
+  cardsWrap.innerHTML=`<div class="cards" style="grid-template-columns:repeat(3,1fr)">${PC_DIRECTOR_NAMES.map(n=>{
+    const bal=directorBalance(n);
+    const active=pcSelectedDirector===n;
+    return `<div class="card" style="cursor:pointer;${active?'border-color:var(--g);box-shadow:0 0 0 2px var(--mint)':''}" onclick="selectDirector('${esc(n).replace(/'/g,"\\'")}')"><small>${esc(n)}</small><b style="color:${bal>0?'var(--red)':'var(--g)'}">${fmtAmt(bal)}</b></div>`;
+  }).join('')}</div>`;
+  renderDirectorDetail();
+}
+function renderDirectorDetail(){
+  const wrap=$('directorsDetailWrap');
+  if(!wrap||!canCloseLoan())return;
+  const name=pcSelectedDirector,id=dirId(name);
+  const entries=pcDirFilteredEntries(name);
+  const total=entries.reduce((s,x)=>s+(x.amount||0),0);
+  const byType={};
+  entries.forEach(x=>{const k=x.note||'Other';byType[k]=(byType[k]||0)+(x.amount||0)});
+  const typeRows=Object.keys(byType).sort((a,b)=>byType[b]-byType[a]).slice(0,8);
+  const maxAmt=Math.max(1,...typeRows.map(k=>byType[k]));
+  const empOptions=users.filter(u=>u.active!==false).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+  const payments=directorPaymentEntries(name).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const nSafe=esc(name).replace(/'/g,"\\'");
+  wrap.innerHTML=`<div class="panel">
+    <div class="ph">
+      <span>${esc(name)} — Detail</span>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+        <input type="date" id="dirFilterFrom" onchange="renderDirectorDetail()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+        <span class="note">se</span>
+        <input type="date" id="dirFilterTo" onchange="renderDirectorDetail()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+        <select id="dirFilterEmployee" onchange="renderDirectorDetail()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+          <option value="">Sab Employees</option>
+          ${empOptions.map(u=>`<option value="${esc(u.id)}">${esc(u.name||u.username)}</option>`).join('')}
+        </select>
+        <button class="btn small secondary" onclick="$('dirFilterFrom').value='';$('dirFilterTo').value='';$('dirFilterEmployee').value='';renderDirectorDetail()">✕ Clear</button>
+        <button class="btn small secondary" onclick="exportDirectorCSV('${nSafe}')">⬇ CSV</button>
+      </div>
+    </div>
+    ${typeRows.length?`<div class="pb" style="border-bottom:1px solid var(--line)">
+      <div class="note" style="font-weight:800;text-transform:uppercase;font-size:11px;margin-bottom:8px">Expense-Type Breakdown</div>
+      ${typeRows.map(k=>`<div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px"><span style="width:120px;flex:0 0 120px;font-weight:700">${esc(k)}</span><div style="flex:1;background:#eef2f0;border-radius:99px;height:9px;overflow:hidden"><div style="height:100%;background:var(--g2);border-radius:99px;width:${Math.round(byType[k]/maxAmt*100)}%"></div></div><span style="width:70px;flex:0 0 70px;text-align:right;font-weight:700;color:var(--muted)">${fmtAmt(byType[k])}</span></div>`).join('')}
+    </div>`:''}
+    <div class="pb">
+      ${entries.length?entries.map(x=>`<div class="item"><span>${esc(x.note||'(no note)')}<small style="display:block;color:var(--muted)">${esc(x.date)} · ${x.issueId?esc(nameOfUserId(x.by))+' ne issue kiya':esc(nameOfUserId(x.by))+' ne khud add kiya'}</small></span><span style="font-weight:700">${fmtAmt(x.amount)}</span></div>`).join(''):`<div class="emptystate">👔<p>Is filter mein koi entry nahi hai.</p></div>`}
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:14px 16px;background:var(--mint);font-weight:800;font-size:15px;color:var(--g)"><span>Total Baaki (is filter mein)</span><span>${fmtAmt(total)}</span></div>
+    <div class="pb" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;border-top:1px dashed var(--line)">
+      <div style="flex:1;min-width:140px"><label style="display:block;font-size:11px;font-weight:bold;margin-bottom:5px">Expense Type (Director ne khud bataya)</label><input id="dirDirectNote_${id}" list="pcSpendNoteList" placeholder="e.g. Grocery" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:7px"></div>
+      <div style="flex:0 0 110px"><label style="display:block;font-size:11px;font-weight:bold;margin-bottom:5px">Amount</label><input type="number" id="dirDirectAmt_${id}" placeholder="₹" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:7px"></div>
+      <div style="flex:0 0 150px"><button class="btn primary" style="width:100%" onclick="addDirectorDirectSpend('${nSafe}')">➕ Add Expense</button></div>
+    </div>
+    <div class="pb" style="background:var(--mint);border-top:1px solid var(--line)">
+      <label style="display:block;font-size:11px;font-weight:bold;margin-bottom:5px;color:var(--g)">💰 ${esc(name)} se Amount Received</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input type="number" id="dirReceivedAmt_${id}" placeholder="₹ (poora ya partial)" style="flex:1;min-width:140px;padding:9px;border:1px solid #cfe9df;border-radius:7px">
+        <button class="btn primary" onclick="recordDirectorPayment('${nSafe}')">💰 Received Mark Karein</button>
+      </div>
+      <div class="note" style="margin-top:6px">Yeh amount Director ka balance kam karega aur Petty Cash ledger mein Fund Received entry bhi ban jayegi.</div>
+    </div>
+    ${payments.length?`<div class="pb">
+      <div class="note" style="font-weight:800;text-transform:uppercase;font-size:11px;margin-bottom:6px">Payment History</div>
+      ${payments.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid #f0f3f1;color:var(--muted)"><span>${esc(p.date)} — ${esc(nameOfUserId(p.by))} ne receive mark kiya</span><b style="color:var(--g)">${fmtAmt(p.amount)} received</b></div>`).join('')}
+    </div>`:''}
+  </div>`;
+}
+async function addDirectorDirectSpend(name){
+  if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye add kar sakte hain.');return}
+  const id=dirId(name);
+  const noteEl=$('dirDirectNote_'+id),amtEl=$('dirDirectAmt_'+id);
+  const note=(noteEl?.value||'').trim();
+  const amount=parseFloat(amtEl?.value);
+  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  if(note)await addPcSpendCategoryIfNew(note);
+  const actor=loggedUser();
+  await db.collection('pc_issue_spends').add({issueId:null,amount,note,directorName:name,date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString()});
+  if(noteEl)noteEl.value='';if(amtEl)amtEl.value='';
+  toast(name+' ke liye expense add ho gaya');
+}
+async function recordDirectorPayment(name){
+  if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye add kar sakte hain.');return}
+  const id=dirId(name);
+  const amtEl=$('dirReceivedAmt_'+id);
+  const amount=parseFloat(amtEl?.value);
+  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
+  const actor=loggedUser();
+  await db.collection('pc_ledger').add({type:'in',amount,note:'Fund Received from '+name,source:'director_payment',directorPayment:name,date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString()});
+  if(amtEl)amtEl.value='';
+  toast(name+' se payment record ho gaya');
+}
+function exportDirectorCSV(name){
+  const entries=pcDirFilteredEntries(name);
+  const rows=[['Date','Expense','Amount','Added By','Source']];
+  entries.forEach(x=>rows.push([x.date,x.note||'',x.amount,nameOfUserId(x.by),x.issueId?'Employee Issue':'Direct']));
+  downloadCSV('director-'+name.replace(/\W+/g,'-')+'.csv',rows);
 }
 function renderAll(){
   renderGate();
@@ -2236,6 +2435,7 @@ function renderAll(){
   renderEntryPersonSelect();
   renderDash();
   renderAdminPanel();
+  renderDirectorsPage();
   renderHighAmountAlerts();
   renderPendingAcceptPanel();
   renderMyPage();
@@ -2255,6 +2455,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   startIssueSpendsSync();
   startPendingEntriesSync();
   startPcSpendCategoriesSync();
+  startDirectorPhonesSync();
   renderPcSpendCategoryOptions();
   renderAll();
 });
