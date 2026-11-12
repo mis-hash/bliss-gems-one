@@ -25,6 +25,12 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<!-- Director Hisaab Due PDF - html2canvas + jsPDF driven directly (not via the html2pdf.js
+     convenience chain - see Purchase Price Estimator's generateSlipPdfBlob/Trip Expense's
+     generateTripSummaryPdfBlob for why: that chain produced a correctly-sized but completely
+     content-free PDF, with no error to catch). Same pipeline, same library versions. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -2369,6 +2375,7 @@ function renderDirectorDetail(){
         </select>
         <button class="btn small secondary" onclick="$('dirFilterFrom').value='';$('dirFilterTo').value='';$('dirFilterEmployee').value='';renderDirectorDetail()">✕ Clear</button>
         <button class="btn small secondary" onclick="exportDirectorCSV('${nSafe}')">⬇ CSV</button>
+        <button class="btn small secondary" id="dirPdfBtn_${id}" onclick="downloadDirectorHisaabPdf('${nSafe}')">📄 Hisaab PDF</button>
       </div>
     </div>
     ${typeRows.length?`<div class="pb" style="border-bottom:1px solid var(--line)">
@@ -2427,6 +2434,118 @@ function exportDirectorCSV(name){
   const rows=[['Date','Expense','Amount','Added By','Source']];
   entries.forEach(x=>rows.push([x.date,x.note||'',x.amount,nameOfUserId(x.by),x.issueId?'Employee Issue':'Direct']));
   downloadCSV('director-'+name.replace(/\W+/g,'-')+'.csv',rows);
+}
+/* ===== Director Hisaab Due PDF (manual download only - not auto-sent on WhatsApp yet) =====
+   Shows the OVERALL amount due (every un-settled entry, not just a recent window) - the
+   employee/date filters on screen don't apply here, this is the full running account.
+   Royal Blue theme, deliberately different from Trip Expense's green Trip Summary PDF and
+   Purchase Price Estimator's Slate Gray Purchase Slip PDF, so the three stay visually
+   distinct at a glance. Once WhatsApp sending to these 3 Directors is unblocked (currently
+   held - see isPettyCashNoticeExcluded), this same builder is what a 3-day auto-send would
+   reuse; for now it's a manual "📄 Hisaab PDF" button so Accounts can generate/share it by
+   hand (download, then share however they like) while that decision is pending. */
+function fmtDirPdfDateTime(atIso){
+  const d=new Date(atIso);
+  if(isNaN(d))return '-';
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})+', '+d.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true});
+}
+function buildDirectorHisaabPdfHtml(name){
+  const entries=directorSpendEntries(name).slice().sort((a,b)=>String(a.at||a.date).localeCompare(String(b.at||b.date)));
+  const total=directorBalance(name);
+  const now=new Date();
+  const rows=entries.map(x=>`<tr>
+      <td style="padding:8px 16px;font-size:12.5px;border-bottom:1px solid #f0f3f1">${esc(x.note||'(no note)')}</td>
+      <td style="padding:8px 16px;font-size:12.5px;border-bottom:1px solid #f0f3f1">${esc(x.issueId?nameOfUserId(x.by):nameOfUserId(x.by)+' (Direct)')}</td>
+      <td style="padding:8px 16px;font-size:12.5px;border-bottom:1px solid #f0f3f1">${esc(fmtDirPdfDateTime(x.at||x.date))}</td>
+      <td style="padding:8px 16px;font-size:12.5px;border-bottom:1px solid #f0f3f1;text-align:right;font-weight:700">${fmtAmt(x.amount)}</td>
+    </tr>`).join('');
+  return `<div style="width:580px;background:#fff;border-radius:14px;overflow:hidden;font-family:Arial,sans-serif;color:#16241F">
+    <div style="background:linear-gradient(135deg,#17487E,#4A8FD6);color:#fff;padding:22px 24px;display:flex;gap:14px;align-items:center">
+      <div style="width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:22px;font-weight:900;flex:none">B</div>
+      <div>
+        <div style="font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.04em">Bliss Gems &amp; Minerals</div>
+        <h1 style="font-size:21px;margin:2px 0 2px">${esc(name)}</h1>
+        <p style="font-size:12px;margin:0;opacity:.9">Petty Cash — Amount Due as of ${esc(now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}))}</p>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px 24px;border-bottom:1px solid #DCE6F0">
+      <div><div style="font-size:10px;color:#6E7D76;text-transform:uppercase;font-weight:700">Report Date</div><div style="font-size:13.5px;font-weight:700">${esc(fmtDirPdfDateTime(now.toISOString()))}</div></div>
+      <div><div style="font-size:10px;color:#6E7D76;text-transform:uppercase;font-weight:700">Total Entries</div><div style="font-size:13.5px;font-weight:700">${entries.length}</div></div>
+    </div>
+    <div style="font-size:12px;font-weight:800;color:#6E7D76;text-transform:uppercase;letter-spacing:.03em;padding:14px 24px 4px">Total Amount Due</div>
+    <div style="margin:0 24px 14px;background:#E8F1FC;border-radius:12px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:11px;font-weight:800;color:#1D5FA6;text-transform:uppercase">Payable to Accounts</span>
+      <span style="font-size:26px;font-weight:900;color:#1D5FA6">${fmtAmt(total)}</span>
+    </div>
+    <div style="font-size:12px;font-weight:800;color:#6E7D76;text-transform:uppercase;letter-spacing:.03em;padding:14px 24px 4px">Expense Detail</div>
+    <table style="width:100%;border-collapse:collapse;margin:0 0 10px">
+      <thead><tr>
+        <th style="text-align:left;font-size:10px;text-transform:uppercase;color:#6E7D76;padding:6px 16px;border-bottom:1px solid #DCE6F0">Expense</th>
+        <th style="text-align:left;font-size:10px;text-transform:uppercase;color:#6E7D76;padding:6px 16px;border-bottom:1px solid #DCE6F0">By</th>
+        <th style="text-align:left;font-size:10px;text-transform:uppercase;color:#6E7D76;padding:6px 16px;border-bottom:1px solid #DCE6F0">Date</th>
+        <th style="text-align:right;font-size:10px;text-transform:uppercase;color:#6E7D76;padding:6px 16px;border-bottom:1px solid #DCE6F0">Amount</th>
+      </tr></thead>
+      <tbody>${rows||'<tr><td colspan="4" style="padding:14px 16px;font-size:12.5px;color:#6E7D76">Koi pending entry nahi hai.</td></tr>'}</tbody>
+    </table>
+    <div style="padding:14px 24px;text-align:center;font-size:10.5px;color:#6E7D76;background:#FBFDFC">Bliss Gems &amp; Minerals — Petty Cash App</div>
+  </div>`;
+}
+function pcPdfCanvasHasContent(canvas){
+  try{
+    const ctx=canvas.getContext('2d');
+    const w=canvas.width,h=canvas.height;
+    const sample=ctx.getImageData(0,0,w,Math.min(h,400));
+    const data=sample.data;
+    for(let i=0;i<data.length;i+=4*37){
+      if(data[i]<250||data[i+1]<250||data[i+2]<250)return true;
+    }
+    return false;
+  }catch(e){console.error('Director Hisaab PDF canvas content check failed:',e);return false;}
+}
+async function generateDirectorHisaabPdfBlob(name){
+  if(typeof html2canvas==='undefined'||!(window.jspdf&&window.jspdf.jsPDF)){console.warn('PDF libraries not loaded');return null;}
+  const html=buildDirectorHisaabPdfHtml(name);
+  const wrap=document.createElement('div');
+  wrap.style.cssText='position:absolute;left:-1500px;top:0;width:580px;background:#fff;z-index:-1';
+  wrap.innerHTML=html;
+  document.body.appendChild(wrap);
+  try{
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    if(wrap.getBoundingClientRect().height<10){
+      console.error('Director Hisaab PDF export has no height - aborting instead of sending a blank PDF');
+      return null;
+    }
+    const canvas=await html2canvas(wrap,{scale:2,backgroundColor:'#ffffff',windowWidth:580,scrollX:0,scrollY:0});
+    if(!pcPdfCanvasHasContent(canvas)){
+      console.error('Director Hisaab PDF canvas has no visible content - aborting instead of sending a blank PDF');
+      return null;
+    }
+    const imgData=canvas.toDataURL('image/jpeg',0.92);
+    const {jsPDF}=window.jspdf;
+    const margin=10;
+    const imgW=170;
+    const imgH=canvas.height*(imgW/canvas.width);
+    const pdf=new jsPDF({unit:'mm',format:[imgW+margin*2,imgH+margin*2]});
+    pdf.addImage(imgData,'JPEG',margin,margin,imgW,imgH);
+    return pdf.output('blob');
+  }catch(e){console.error('Director Hisaab PDF generation failed:',e);return null;}
+  finally{wrap.remove();}
+}
+async function downloadDirectorHisaabPdf(name){
+  if(directorBalance(name)<=0){alert('Abhi '+name+' ka koi pending amount nahi hai, Hisaab PDF nahi banegi.');return}
+  const btn=$('dirPdfBtn_'+dirId(name));
+  if(btn){btn.disabled=true;btn.textContent='⏳ Generating...';}
+  try{
+    const blob=await generateDirectorHisaabPdfBlob(name);
+    if(!blob){alert('PDF banane mein error aaya. Dubara try karein.');return}
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='Hisaab Due - '+name+'.pdf';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='📄 Hisaab PDF';}
+  }
 }
 function renderAll(){
   renderGate();
