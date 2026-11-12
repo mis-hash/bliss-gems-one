@@ -252,6 +252,7 @@ tbody tr:hover td{background:#f7faf8}
       <p>Employees ne Directors ke liye petty cash se jo kharch kiya, uska running hisaab — WhatsApp pe manually bhejne ki zaroorat nahi.</p>
     </div>
   </div>
+  <div id="directorsOverviewWrap"></div>
   <div id="directorsCardsWrap"></div>
   <div id="directorsDetailWrap"></div>
   </div>
@@ -2339,9 +2340,31 @@ function pcDirFilteredEntries(name){
     return true;
   }).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
 }
+function renderDirectorsOverview(){
+  const wrap=$('directorsOverviewWrap');
+  if(!wrap)return;
+  const rows=PC_DIRECTOR_NAMES.map(n=>({name:n,bal:directorBalance(n),count:directorSpendEntries(n).length}));
+  const grandTotal=rows.reduce((s,r)=>s+r.bal,0);
+  wrap.innerHTML=`<div class="panel" style="margin-bottom:14px">
+    <div class="ph" style="background:var(--mint)"><span>Total Pending — All Directors</span><span style="font-size:19px;font-weight:900;color:var(--g)">${fmtAmt(grandTotal)}</span></div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--muted);padding:9px 16px;border-bottom:1px solid var(--line)">Director</th>
+        <th style="text-align:center;font-size:10.5px;text-transform:uppercase;color:var(--muted);padding:9px 16px;border-bottom:1px solid var(--line)">Entries</th>
+        <th style="text-align:right;font-size:10.5px;text-transform:uppercase;color:var(--muted);padding:9px 16px;border-bottom:1px solid var(--line)">Pending</th>
+      </tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td style="font-size:13px;font-weight:700;padding:11px 16px;border-bottom:1px solid #f0f3f1"><span style="display:inline-block;width:8px;height:8px;border-radius:99px;background:${r.bal>0?'var(--red)':'var(--g)'};margin-right:8px"></span>${esc(r.name)}</td>
+        <td style="text-align:center;font-size:13px;color:var(--muted);padding:11px 16px;border-bottom:1px solid #f0f3f1">${r.count}</td>
+        <td style="text-align:right;font-size:13px;font-weight:800;padding:11px 16px;border-bottom:1px solid #f0f3f1;color:${r.bal>0?'var(--red)':'var(--g)'}">${fmtAmt(r.bal)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
 function renderDirectorsPage(){
   const cardsWrap=$('directorsCardsWrap');
   if(!cardsWrap||!canCloseLoan())return;
+  renderDirectorsOverview();
   cardsWrap.innerHTML=`<div class="cards" style="grid-template-columns:repeat(3,1fr)">${PC_DIRECTOR_NAMES.map(n=>{
     const bal=directorBalance(n);
     const active=pcSelectedDirector===n;
