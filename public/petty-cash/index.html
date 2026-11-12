@@ -2343,8 +2343,16 @@ function pcDirFilteredEntries(name){
 function renderDirectorsOverview(){
   const wrap=$('directorsOverviewWrap');
   if(!wrap)return;
-  const rows=PC_DIRECTOR_NAMES.map(n=>({name:n,bal:directorBalance(n),count:directorSpendEntries(n).length}));
-  const grandTotal=rows.reduce((s,r)=>s+r.bal,0);
+  const allRows=PC_DIRECTOR_NAMES.map(n=>({name:n,bal:directorBalance(n),count:directorSpendEntries(n).length}));
+  const rows=allRows.filter(r=>r.bal>0);
+  const grandTotal=allRows.reduce((s,r)=>s+r.bal,0);
+  if(!rows.length){
+    wrap.innerHTML=`<div class="panel" style="margin-bottom:14px">
+      <div class="ph" style="background:var(--mint)"><span>Total Pending — All Directors</span><span style="font-size:19px;font-weight:900;color:var(--g)">${fmtAmt(grandTotal)}</span></div>
+      <div class="emptystate" style="padding:16px">✅<p>Koi Director ka pending hisaab nahi hai.</p></div>
+    </div>`;
+    return;
+  }
   wrap.innerHTML=`<div class="panel" style="margin-bottom:14px">
     <div class="ph" style="background:var(--mint)"><span>Total Pending — All Directors</span><span style="font-size:19px;font-weight:900;color:var(--g)">${fmtAmt(grandTotal)}</span></div>
     <table style="width:100%;border-collapse:collapse">
@@ -2354,9 +2362,9 @@ function renderDirectorsOverview(){
         <th style="text-align:right;font-size:10.5px;text-transform:uppercase;color:var(--muted);padding:9px 16px;border-bottom:1px solid var(--line)">Pending</th>
       </tr></thead>
       <tbody>${rows.map(r=>`<tr>
-        <td style="font-size:13px;font-weight:700;padding:11px 16px;border-bottom:1px solid #f0f3f1"><span style="display:inline-block;width:8px;height:8px;border-radius:99px;background:${r.bal>0?'var(--red)':'var(--g)'};margin-right:8px"></span>${esc(r.name)}</td>
+        <td style="font-size:13px;font-weight:700;padding:11px 16px;border-bottom:1px solid #f0f3f1"><span style="display:inline-block;width:8px;height:8px;border-radius:99px;background:var(--red);margin-right:8px"></span>${esc(r.name)}</td>
         <td style="text-align:center;font-size:13px;color:var(--muted);padding:11px 16px;border-bottom:1px solid #f0f3f1">${r.count}</td>
-        <td style="text-align:right;font-size:13px;font-weight:800;padding:11px 16px;border-bottom:1px solid #f0f3f1;color:${r.bal>0?'var(--red)':'var(--g)'}">${fmtAmt(r.bal)}</td>
+        <td style="text-align:right;font-size:13px;font-weight:800;padding:11px 16px;border-bottom:1px solid #f0f3f1;color:var(--red)">${fmtAmt(r.bal)}</td>
       </tr>`).join('')}</tbody>
     </table>
   </div>`;
