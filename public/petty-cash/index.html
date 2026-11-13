@@ -249,7 +249,6 @@ tbody tr:hover td{background:#f7faf8}
   <div class="hero" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
     <div>
       <h1>Directors' Personal Spend</h1>
-      <p>Employees ne Directors ke liye petty cash se jo kharch kiya, uska running hisaab — WhatsApp pe manually bhejne ki zaroorat nahi.</p>
     </div>
   </div>
   <div id="directorsOverviewWrap"></div>
@@ -2392,7 +2391,7 @@ function renderDirectorDetail(){
   const typeRows=Object.keys(byType).sort((a,b)=>byType[b]-byType[a]).slice(0,8);
   const maxAmt=Math.max(1,...typeRows.map(k=>byType[k]));
   const empOptions=users.filter(u=>u.active!==false).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
-  const payments=directorPaymentEntries(name).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const payments=directorPaymentEntries(name).sort((a,b)=>String(b.at||b.date||'').localeCompare(String(a.at||a.date||'')));
   const nSafe=esc(name).replace(/'/g,"\\'");
   wrap.innerHTML=`<div class="panel">
     <div class="ph">
@@ -2430,11 +2429,10 @@ function renderDirectorDetail(){
         <input type="number" id="dirReceivedAmt_${id}" placeholder="₹ (full or partial)" style="flex:1;min-width:140px;padding:9px;border:1px solid #cfe9df;border-radius:7px">
         <button class="btn primary" onclick="recordDirectorPayment('${nSafe}')">💰 Mark as Received</button>
       </div>
-      <div class="note" style="margin-top:6px">This amount will reduce the Director's balance and also create a Fund Received entry in the Petty Cash ledger.</div>
     </div>
     ${payments.length?`<div class="pb">
       <div class="note" style="font-weight:800;text-transform:uppercase;font-size:11px;margin-bottom:6px">Payment History</div>
-      ${payments.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid #f0f3f1;color:var(--muted)"><span>${esc(p.date)} — marked received by ${esc(nameOfUserId(p.by))}</span><b style="color:var(--g)">${fmtAmt(p.amount)} received</b></div>`).join('')}
+      ${payments.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid #f0f3f1;color:var(--muted)"><span>${esc(fmtDirPdfDateTime(p.at))} — marked received by ${esc(nameOfUserId(p.by))}</span><b style="color:var(--g)">${fmtAmt(p.amount)} received</b></div>`).join('')}
     </div>`:''}
   </div>`;
 }
