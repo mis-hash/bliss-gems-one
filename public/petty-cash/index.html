@@ -249,7 +249,6 @@ tbody tr:hover td{background:#f7faf8}
   <div class="hero" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
     <div>
       <h1>Directors' Personal Spend</h1>
-      <p>Employees ne Directors ke liye petty cash se jo kharch kiya, uska running hisaab — WhatsApp pe manually bhejne ki zaroorat nahi.</p>
     </div>
   </div>
   <div id="directorsOverviewWrap"></div>
@@ -1240,7 +1239,7 @@ function openSpendingDetailModal(issueId){
       <span><b>${fmtAmt(x.amount)}</b> issued to <b>${esc(x.person||'-')}</b> on ${esc(x.date)}${x.note?' — '+esc(x.note):''}</span>
       ${verifiedBadge||`<span class="pill" style="background:${remaining>0?'var(--amberbg)':'var(--mint)'};color:${remaining>0?'var(--amber)':'var(--g)'}">Remaining: ${fmtAmt(remaining)}</span>`}
     </div>
-    ${mySpends.length?mySpends.map(s=>`<div class="item"><span>${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''}<br><small style="color:var(--muted)">${esc(s.date)} • by ${esc(nameOfUserId(s.by))}</small></span></div>`).join(''):'<div class="note" style="padding:10px 0">Abhi tak koi spending entry nahi daali gayi.</div>'}
+    ${mySpends.length?mySpends.map(s=>`<div class="item"><span>${fmtAmt(s.amount)}${s.note?' • '+esc(s.note):''}${s.directorName?' <b style="color:var(--amber)">· Director Exp ('+esc(s.directorName)+')</b>':''}<br><small style="color:var(--muted)">${esc(s.date)} • by ${esc(nameOfUserId(s.by))}</small></span></div>`).join(''):'<div class="note" style="padding:10px 0">Abhi tak koi spending entry nahi daali gayi.</div>'}
     ${x.verified?`<p class="note" style="margin-top:10px">Verified by ${esc(nameOfUserId(x.settledBy))} on ${esc((x.settledAt||'').slice(0,10))}${x.returnedAmount?' — '+fmtAmt(x.returnedAmount)+' cash received back.':''}</p>`:''}
     ${verifyBtn?`<div style="margin-top:12px;text-align:right">${verifyBtn}</div>`:''}
   `;
@@ -1776,6 +1775,7 @@ async function addIssueSpend(issueId){
     if(directorName)payload.directorName=directorName;
     await db.collection('pc_issue_spends').add(payload);
     toast('Spend entry added');
+    if(directorName)notifyDirectorSpend(directorName,amount,note,actor?actor.id:'',payload.at);
   }finally{
     _issueSpendSubmitting=false;
   }
@@ -1977,8 +1977,8 @@ function pcSpendBreakdownRowHtml(x){
     : '';
   const spendRows=mySpends.length
     ? `<table style="width:100%;border-collapse:collapse;font-size:12.5px">
-        <thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase"><th style="padding:0 6px 6px 0">Date</th><th style="padding:6px;background:var(--bluebg)">Amount</th><th style="padding:0 6px 6px 0">Note</th><th style="padding:0 6px 6px 0">Entry By</th></tr></thead>
-        <tbody>${mySpends.map(s=>`<tr><td>${esc(s.date)}</td><td class="num" style="background:var(--bluebg);color:var(--blue);font-weight:700">${fmtAmt(s.amount)}</td><td>${s.note?esc(s.note):'-'}</td><td>${esc(nameOfUserId(s.by))}</td></tr>`).join('')}</tbody>
+        <thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase"><th style="padding:0 6px 6px 0">Date</th><th style="padding:6px;background:var(--bluebg)">Amount</th><th style="padding:0 6px 6px 0">Note</th><th style="padding:0 6px 6px 0">Expense Type</th><th style="padding:0 6px 6px 0">Entry By</th></tr></thead>
+        <tbody>${mySpends.map(s=>`<tr><td>${esc(s.date)}</td><td class="num" style="background:var(--bluebg);color:var(--blue);font-weight:700">${fmtAmt(s.amount)}</td><td>${s.note?esc(s.note):'-'}</td><td>${s.directorName?'<span style="color:var(--amber);font-weight:700">Director Exp ('+esc(s.directorName)+')</span>':'Office Expense'}</td><td>${esc(nameOfUserId(s.by))}</td></tr>`).join('')}</tbody>
       </table>`
     : '<div class="note" style="padding:6px 0">Abhi tak koi spending entry nahi daali gayi.</div>';
   return `<div style="border:1px solid var(--line);border-left:4px solid var(--g2);border-radius:11px;padding:10px 13px;margin:-4px 0 10px;background:var(--mint)">
@@ -2284,9 +2284,13 @@ function renderAdminPanel(){
    (source:'director_payment'), same mechanism as any other Fund Received, just tagged with
    which Director it came from - computeBalance() keeps it out of the "Fund Added" tile but it
    still counts toward the real Current Balance, because the cash genuinely came back in.
-   WhatsApp notifications to Directors are deliberately NOT wired up yet - Petty Cash has an
-   existing, deliberate rule (see isPettyCashNoticeExcluded) blocking these exact 3 names from
-   ANY Petty Cash WhatsApp message; the user asked to hold that override for a later session. */
+   Petty Cash has an existing, deliberate rule (see isPettyCashNoticeExcluded) blocking these
+   exact 3 names from ANY Petty Cash WhatsApp message sent via the normal sendRawWA() path.
+   The user explicitly asked (2026-11-13) to enable WhatsApp notices specifically for Director
+   spend entries, sent to the dedicated numbers in pc_settings/directorPhones ("⚙ Setting")
+   rather than any Universal Users phone - see sendDirectorPhoneWA()/notifyDirectorSpend(),
+   which deliberately do NOT go through isPettyCashNoticeExcluded(). The general Petty Cash
+   notice exclusion for these 3 names elsewhere in the app is untouched. */
 const PC_DIRECTOR_NAMES=['Hitesh Dusad','Nitesh Dusad','Ankur Khandelwal'];
 let pcSelectedDirector=PC_DIRECTOR_NAMES[0];
 function dirId(name){return String(name||'').replace(/\W+/g,'_')}
@@ -2343,8 +2347,16 @@ function pcDirFilteredEntries(name){
 function renderDirectorsOverview(){
   const wrap=$('directorsOverviewWrap');
   if(!wrap)return;
-  const rows=PC_DIRECTOR_NAMES.map(n=>({name:n,bal:directorBalance(n),count:directorSpendEntries(n).length}));
-  const grandTotal=rows.reduce((s,r)=>s+r.bal,0);
+  const allRows=PC_DIRECTOR_NAMES.map(n=>({name:n,bal:directorBalance(n),count:directorSpendEntries(n).length}));
+  const rows=allRows.filter(r=>r.bal>0);
+  const grandTotal=allRows.reduce((s,r)=>s+r.bal,0);
+  if(!rows.length){
+    wrap.innerHTML=`<div class="panel" style="margin-bottom:14px">
+      <div class="ph" style="background:var(--mint)"><span>Total Pending — All Directors</span><span style="font-size:19px;font-weight:900;color:var(--g)">${fmtAmt(grandTotal)}</span></div>
+      <div class="emptystate" style="padding:16px">✅<p>Koi Director ka pending hisaab nahi hai.</p></div>
+    </div>`;
+    return;
+  }
   wrap.innerHTML=`<div class="panel" style="margin-bottom:14px">
     <div class="ph" style="background:var(--mint)"><span>Total Pending — All Directors</span><span style="font-size:19px;font-weight:900;color:var(--g)">${fmtAmt(grandTotal)}</span></div>
     <table style="width:100%;border-collapse:collapse">
@@ -2354,9 +2366,9 @@ function renderDirectorsOverview(){
         <th style="text-align:right;font-size:10.5px;text-transform:uppercase;color:var(--muted);padding:9px 16px;border-bottom:1px solid var(--line)">Pending</th>
       </tr></thead>
       <tbody>${rows.map(r=>`<tr>
-        <td style="font-size:13px;font-weight:700;padding:11px 16px;border-bottom:1px solid #f0f3f1"><span style="display:inline-block;width:8px;height:8px;border-radius:99px;background:${r.bal>0?'var(--red)':'var(--g)'};margin-right:8px"></span>${esc(r.name)}</td>
+        <td style="font-size:13px;font-weight:700;padding:11px 16px;border-bottom:1px solid #f0f3f1"><span style="display:inline-block;width:8px;height:8px;border-radius:99px;background:var(--red);margin-right:8px"></span>${esc(r.name)}</td>
         <td style="text-align:center;font-size:13px;color:var(--muted);padding:11px 16px;border-bottom:1px solid #f0f3f1">${r.count}</td>
-        <td style="text-align:right;font-size:13px;font-weight:800;padding:11px 16px;border-bottom:1px solid #f0f3f1;color:${r.bal>0?'var(--red)':'var(--g)'}">${fmtAmt(r.bal)}</td>
+        <td style="text-align:right;font-size:13px;font-weight:800;padding:11px 16px;border-bottom:1px solid #f0f3f1;color:var(--red)">${fmtAmt(r.bal)}</td>
       </tr>`).join('')}</tbody>
     </table>
   </div>`;
@@ -2384,7 +2396,7 @@ function renderDirectorDetail(){
   const typeRows=Object.keys(byType).sort((a,b)=>byType[b]-byType[a]).slice(0,8);
   const maxAmt=Math.max(1,...typeRows.map(k=>byType[k]));
   const empOptions=users.filter(u=>u.active!==false).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
-  const payments=directorPaymentEntries(name).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const payments=directorPaymentEntries(name).sort((a,b)=>String(b.at||b.date||'').localeCompare(String(a.at||a.date||'')));
   const nSafe=esc(name).replace(/'/g,"\\'");
   wrap.innerHTML=`<div class="panel">
     <div class="ph">
@@ -2422,13 +2434,36 @@ function renderDirectorDetail(){
         <input type="number" id="dirReceivedAmt_${id}" placeholder="₹ (full or partial)" style="flex:1;min-width:140px;padding:9px;border:1px solid #cfe9df;border-radius:7px">
         <button class="btn primary" onclick="recordDirectorPayment('${nSafe}')">💰 Mark as Received</button>
       </div>
-      <div class="note" style="margin-top:6px">This amount will reduce the Director's balance and also create a Fund Received entry in the Petty Cash ledger.</div>
     </div>
     ${payments.length?`<div class="pb">
       <div class="note" style="font-weight:800;text-transform:uppercase;font-size:11px;margin-bottom:6px">Payment History</div>
-      ${payments.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid #f0f3f1;color:var(--muted)"><span>${esc(p.date)} — marked received by ${esc(nameOfUserId(p.by))}</span><b style="color:var(--g)">${fmtAmt(p.amount)} received</b></div>`).join('')}
+      ${payments.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid #f0f3f1;color:var(--muted)"><span>${esc(fmtDirPdfDateTime(p.at))} — marked received by ${esc(nameOfUserId(p.by))}</span><b style="color:var(--g)">${fmtAmt(p.amount)} received</b></div>`).join('')}
     </div>`:''}
   </div>`;
+}
+/* ===== Director Personal Spend - WhatsApp notice (explicitly enabled by the user, see
+   pc_settings/directorPhones above) =====
+   Uses ONLY the dedicated Director Phone Numbers set in Settings - a deliberately separate
+   channel from the rest of Petty Cash's WhatsApp notices, which stay blocked for these 3
+   names via isPettyCashNoticeExcluded(). sendDirectorPhoneWA() intentionally does NOT go
+   through that check: the user explicitly asked, twice, for this exact number to be
+   messaged whenever a spend is tagged to that Director. */
+async function sendDirectorPhoneWA(phone,message){
+  if(!phone)return false;
+  const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token){console.warn('GREEN-API settings missing');return false}
+  const p=normalizePhone(phone);if(p.length<11)return false;
+  try{
+    const r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
+    return r.ok;
+  }catch(e){console.error('Director spend WA send failed:',e);return false}
+}
+async function notifyDirectorSpend(name,amount,note,actorId,atIso){
+  const phone=pcDirectorPhones[dirId(name)];
+  if(!phone)return;
+  const balance=directorBalance(name);
+  const message='🔔 *Bliss Gems & Minerals — Petty Cash*\n\n'+name+', aapke liye ek expense record hua hai:\n\n📝 '+(note||'(no note)')+'\n💰 '+fmtAmt(amount)+'\n👤 Added by: '+esc(nameOfUserId(actorId))+'\n📅 '+fmtDirPdfDateTime(atIso)+'\n\n*Total Pending: '+fmtAmt(balance)+'*';
+  await sendDirectorPhoneWA(phone,message);
 }
 async function addDirectorDirectSpend(name){
   if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye add kar sakte hain.');return}
@@ -2439,9 +2474,11 @@ async function addDirectorDirectSpend(name){
   if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
   if(note)await addPcSpendCategoryIfNew(note);
   const actor=loggedUser();
-  await db.collection('pc_issue_spends').add({issueId:null,amount,note,directorName:name,date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString()});
+  const at=new Date().toISOString();
+  await db.collection('pc_issue_spends').add({issueId:null,amount,note,directorName:name,date:todayISO(),by:actor?actor.id:'',at});
   if(noteEl)noteEl.value='';if(amtEl)amtEl.value='';
   toast(name+' ke liye expense add ho gaya');
+  notifyDirectorSpend(name,amount,note,actor?actor.id:'',at);
 }
 async function recordDirectorPayment(name){
   if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye add kar sakte hain.');return}
