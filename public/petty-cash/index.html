@@ -761,7 +761,7 @@ function viewPcSpendProof(id){
 function closePcSpendProofView(){$('pcSpendProofModal').classList.remove('show');}
 
 /* ===== WhatsApp (shared GREEN-API credentials, same pattern as Stationery Inventory) ===== */
-function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===10)p='91'+p;return p;}
+function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===11&&p[0]==='0')p=p.slice(1);if(p.length===10)p='91'+p;return p;}
 // Hitesh Dusad, Nitesh Dusad and Ankur Khandelwal (Doer) must never get ANY Petty Cash
 // WhatsApp message, whatever the notification type - matched by name (case-insensitive)
 // against the Universal Users list rather than a hardcoded number, since their phone isn't
@@ -2449,21 +2449,27 @@ function renderDirectorDetail(){
    through that check: the user explicitly asked, twice, for this exact number to be
    messaged whenever a spend is tagged to that Director. */
 async function sendDirectorPhoneWA(phone,message){
-  if(!phone)return false;
+  if(!phone)return 'no-phone';
   const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
-  if(!id||!token){console.warn('GREEN-API settings missing');return false}
-  const p=normalizePhone(phone);if(p.length<11)return false;
+  if(!id||!token){console.warn('GREEN-API settings missing');return 'no-credentials'}
+  const p=normalizePhone(phone);if(p.length<11)return 'invalid-phone';
   try{
     const r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
-    return r.ok;
-  }catch(e){console.error('Director spend WA send failed:',e);return false}
+    return r.ok?'sent':'api-error';
+  }catch(e){console.error('Director spend WA send failed:',e);return 'network-error'}
 }
+// Surfaces WHY a Director spend notice did/didn't go as a toast - this used to fail silently
+// (console-only), which made a real misconfiguration (missing GREEN-API creds, bad phone
+// number) indistinguishable from "working as intended, nothing to send" from the UI.
 async function notifyDirectorSpend(name,amount,note,actorId,atIso){
   const phone=pcDirectorPhones[dirId(name)];
   if(!phone)return;
   const balance=directorBalance(name);
   const message='🔔 *Bliss Gems & Minerals — Petty Cash*\n\n'+name+', aapke liye ek expense record hua hai:\n\n📝 '+(note||'(no note)')+'\n💰 '+fmtAmt(amount)+'\n👤 Added by: '+esc(nameOfUserId(actorId))+'\n📅 '+fmtDirPdfDateTime(atIso)+'\n\n*Total Pending: '+fmtAmt(balance)+'*';
-  await sendDirectorPhoneWA(phone,message);
+  const result=await sendDirectorPhoneWA(phone,message);
+  const reasons={'no-credentials':'WhatsApp nahi bheja: GREEN-API settings missing hain','invalid-phone':'WhatsApp nahi bheja: '+name+' ka number galat/incomplete hai','api-error':'WhatsApp nahi bheja: GREEN-API ne error diya','network-error':'WhatsApp nahi bheja: network error aaya'};
+  if(result==='sent')toast(name+' ko WhatsApp message bhej diya');
+  else if(reasons[result])toast(reasons[result]);
 }
 async function addDirectorDirectSpend(name){
   if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye add kar sakte hain.');return}
