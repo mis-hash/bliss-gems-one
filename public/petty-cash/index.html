@@ -201,7 +201,6 @@ tbody tr:hover td{background:#f7faf8}
   <div id="page-ledger" class="pcPage on">
   <div class="hero">
     <h1>Company Petty Cash</h1>
-    <p>Ek hi shared cash-box — In / Out / Loan entries, sabko live dikhti hain.</p>
   </div>
   <div class="cards" id="statTiles"></div>
 
@@ -427,7 +426,7 @@ tbody tr:hover td{background:#f7faf8}
 <div class="modal" id="pcRejectReasonModal"><div class="box" style="width:min(420px,100%)">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3 style="margin:0">✕ Reject Entry</h3><button class="btn small" onclick="closePcRejectReasonModal()">✕</button></div>
 <p class="note" style="margin:0 0 10px">Reject karne ki wajah batana zaroori hai — bina reason ke reject nahi ho sakta.</p>
-<div class="field"><label>Reason</label><textarea id="pcRejectReasonInput" rows="3" placeholder="e.g. Amount galat hai, dobara sahi se daalein" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:7px;font-family:inherit"></textarea></div>
+<div class="field"><label>Reason</label><textarea id="pcRejectReasonInput" rows="3" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:7px;font-family:inherit"></textarea></div>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closePcRejectReasonModal()">↩ Wapas Jaayein</button><button class="btn danger" onclick="confirmPcRejectWithReason()">✕ Reject Karein</button></div>
 </div></div>
 
@@ -2602,7 +2601,7 @@ async function sendDirectorHisaabPdfWA(name,isAuto){
   if(directorBalance(name)<=0){if(!isAuto)toast('Abhi '+name+' ka koi pending amount nahi hai.');return}
   const blob=await generateDirectorHisaabPdfBlob(name);
   if(!blob){if(!isAuto)toast('PDF banane mein error aaya. Dubara try karein.');return}
-  const result=await sendDirectorFileWA(phone,blob,'Hisaab Due - '+name+'.pdf');
+  const result=await sendDirectorFileWA(phone,blob,'Petty Cash - Hisaab Due - '+name+'.pdf');
   const reasons={'no-credentials':'WhatsApp nahi bheja: GREEN-API settings missing hain','invalid-phone':'WhatsApp nahi bheja: '+name+' ka number galat/incomplete hai','api-error':'WhatsApp nahi bheja: GREEN-API ne error diya','network-error':'WhatsApp nahi bheja: network error aaya'};
   if(result==='sent'){
     toast(name+' ko Hisaab PDF WhatsApp par bhej diya');
@@ -2788,7 +2787,7 @@ async function downloadDirectorHisaabPdf(name){
     if(!blob){alert('PDF banane mein error aaya. Dubara try karein.');return}
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
-    a.href=url;a.download='Hisaab Due - '+name+'.pdf';
+    a.href=url;a.download='Petty Cash - Hisaab Due - '+name+'.pdf';
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }finally{
