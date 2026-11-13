@@ -1699,6 +1699,12 @@ function shareReportsOnWhatsApp(){
    and marked "sent", wait PENDING_REMINDER_GAP_DAYS before flagging the same person again
    (so it isn't re-sent every single day). ===== */
 const PENDING_REMINDER_GAP_DAYS=2;
+// Once a hisaab crosses PENDING_REMINDER_GAP_DAYS pending, the repeat reminder no longer
+// waits another PENDING_REMINDER_GAP_DAYS - it repeats every REMINDER_REPEAT_HOURS instead
+// (checked in hours against the full lastReminder timestamp, not the whole-day daysSinceDate
+// helper, since 2 hours wouldn't move the needle there). Still Spark-plan best-effort: this
+// only fires the moment someone actually has the app open with Auto-Send on.
+const REMINDER_REPEAT_HOURS=2;
 // After 3 days pending, the Accountant gets shown the same item too (not just the Doer
 // themselves) - escalation, not a separate automated channel: Spark (free) plan has no
 // background job, so this only fires the moment someone actually opens Reports.
@@ -1733,8 +1739,8 @@ function computePendingReminders(){
     const oldest=oldestPendingDate(r.pid);
     const daysPending=oldest?daysSinceDate(oldest):0;
     const lastReminder=(masters.pendingReminders||{})[r.pid]||null;
-    const daysSinceReminder=lastReminder?daysSinceDate(lastReminder.slice(0,10)):Infinity;
-    const due=daysPending>=PENDING_REMINDER_GAP_DAYS && daysSinceReminder>=PENDING_REMINDER_GAP_DAYS;
+    const hoursSinceReminder=lastReminder?(Date.now()-new Date(lastReminder).getTime())/3600000:Infinity;
+    const due=daysPending>=PENDING_REMINDER_GAP_DAYS && hoursSinceReminder>=REMINDER_REPEAT_HOURS;
     const escalated=daysPending>=ESCALATE_TO_ACCOUNTANT_DAYS;
     return {...r,daysPending,due,escalated,lastReminder};
   }).sort((a,b)=>b.daysPending-a.daysPending);
