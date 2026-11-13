@@ -2433,6 +2433,7 @@ function renderDirectorsOverview(){
 function renderDirectorsPage(){
   const cardsWrap=$('directorsCardsWrap');
   if(!cardsWrap||!canCloseLoan())return;
+  checkDirectorHisaabAutoSend();
   renderDirectorsOverview();
   cardsWrap.innerHTML=`<div class="cards" style="grid-template-columns:repeat(3,1fr)">${PC_DIRECTOR_NAMES.map(n=>{
     const bal=directorBalance(n);
@@ -2469,6 +2470,7 @@ function renderDirectorDetail(){
         <button class="btn small secondary" onclick="$('dirFilterFrom').value='';$('dirFilterTo').value='';$('dirFilterEmployee').value='';renderDirectorDetail()">✕ Clear</button>
         <button class="btn small secondary" onclick="exportDirectorCSV('${nSafe}')">⬇ CSV</button>
         <button class="btn small secondary" id="dirPdfBtn_${id}" onclick="downloadDirectorHisaabPdf('${nSafe}')">📄 Hisaab PDF</button>
+        <button class="btn small secondary" id="dirPdfSendBtn_${id}" onclick="forceSendDirectorHisaabPdf('${nSafe}')">📤 Send via WhatsApp</button>
       </div>
     </div>
     ${typeRows.length?`<div class="pb" style="border-bottom:1px solid var(--line)">
@@ -2527,6 +2529,62 @@ async function notifyDirectorSpend(name,amount,note,actorId,atIso){
   const reasons={'no-credentials':'WhatsApp nahi bheja: GREEN-API settings missing hain','invalid-phone':'WhatsApp nahi bheja: '+name+' ka number galat/incomplete hai','api-error':'WhatsApp nahi bheja: GREEN-API ne error diya','network-error':'WhatsApp nahi bheja: network error aaya'};
   if(result==='sent')toast(name+' ko WhatsApp message bhej diya');
   else if(reasons[result])toast(reasons[result]);
+}
+/* ===== Director Hisaab PDF - WhatsApp file send =====
+   Same dedicated Director Phone Numbers channel as notifyDirectorSpend (never
+   isPettyCashNoticeExcluded). Two ways this fires:
+   1. Manually - the "📤 Send via WhatsApp" button next to the download button, for whenever
+      Accounts wants to send it right now.
+   2. Automatically - checkDirectorHisaabAutoSend(), a client-side best-effort check (this app
+      has no server/cron - Spark plan has no Cloud Functions/Scheduler) that runs once per app
+      session, for any Director with a phone number set, a pending balance, and whose last auto
+      -send was 3+ days ago (or never). It only fires when an Accountant/Admin/Super Admin
+      actually has the app open - there is no guarantee it fires exactly every 3 days if nobody
+      opens the app, only that it catches up the next time someone does. */
+async function sendDirectorFileWA(phone,blob,fileName){
+  const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token){console.warn('GREEN-API settings missing');return 'no-credentials'}
+  const p=normalizePhone(phone);if(p.length<11)return 'invalid-phone';
+  try{
+    const form=new FormData();
+    form.append('chatId',p+'@c.us');
+    form.append('file',blob,fileName);
+    form.append('fileName',fileName);
+    const r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendFileByUpload/${encodeURIComponent(token)}`,{method:'POST',body:form});
+    return r.ok?'sent':'api-error';
+  }catch(e){console.error('Director Hisaab PDF WA file send failed:',e);return 'network-error'}
+}
+async function sendDirectorHisaabPdfWA(name,isAuto){
+  const phone=pcDirectorPhones[dirId(name)];
+  if(!phone){if(!isAuto)toast('Pehle "⚙ Setting" mein '+name+' ka number daalein.');return}
+  if(directorBalance(name)<=0){if(!isAuto)toast('Abhi '+name+' ka koi pending amount nahi hai.');return}
+  const blob=await generateDirectorHisaabPdfBlob(name);
+  if(!blob){if(!isAuto)toast('PDF banane mein error aaya. Dubara try karein.');return}
+  const result=await sendDirectorFileWA(phone,blob,'Hisaab Due - '+name+'.pdf');
+  const reasons={'no-credentials':'WhatsApp nahi bheja: GREEN-API settings missing hain','invalid-phone':'WhatsApp nahi bheja: '+name+' ka number galat/incomplete hai','api-error':'WhatsApp nahi bheja: GREEN-API ne error diya','network-error':'WhatsApp nahi bheja: network error aaya'};
+  if(result==='sent'){
+    toast(name+' ko Hisaab PDF WhatsApp par bhej diya');
+    try{await db.collection('pc_settings').doc('directorPhones').set({lastHisaabSentAt:{[dirId(name)]:new Date().toISOString()}},{merge:true});}
+    catch(e){console.error('lastHisaabSentAt save failed:',e);}
+  }else if(reasons[result]){
+    toast(reasons[result]);
+  }
+}
+let pcHisaabAutoSendChecked=false;
+const PC_HISAAB_AUTO_SEND_DAYS=3;
+function checkDirectorHisaabAutoSend(){
+  if(pcHisaabAutoSendChecked||!canCloseLoan())return;
+  pcHisaabAutoSendChecked=true;
+  const now=Date.now();
+  PC_DIRECTOR_NAMES.forEach(name=>{
+    const phone=pcDirectorPhones[dirId(name)];
+    if(!phone)return;
+    if(directorBalance(name)<=0)return;
+    const lastSent=(pcDirectorPhones.lastHisaabSentAt||{})[dirId(name)];
+    const ageMs=lastSent?now-new Date(lastSent).getTime():Infinity;
+    if(ageMs<PC_HISAAB_AUTO_SEND_DAYS*24*60*60*1000)return;
+    sendDirectorHisaabPdfWA(name,true);
+  });
 }
 async function addDirectorDirectSpend(name){
   if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye add kar sakte hain.');return}
@@ -2693,6 +2751,15 @@ async function downloadDirectorHisaabPdf(name){
     URL.revokeObjectURL(url);
   }finally{
     if(btn){btn.disabled=false;btn.textContent='📄 Hisaab PDF';}
+  }
+}
+async function forceSendDirectorHisaabPdf(name){
+  const btn=$('dirPdfSendBtn_'+dirId(name));
+  if(btn){btn.disabled=true;btn.textContent='⏳ Sending...';}
+  try{
+    await sendDirectorHisaabPdfWA(name,false);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='📤 Send via WhatsApp';}
   }
 }
 function renderAll(){
