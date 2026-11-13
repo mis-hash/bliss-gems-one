@@ -1775,6 +1775,7 @@ async function addIssueSpend(issueId){
     if(directorName)payload.directorName=directorName;
     await db.collection('pc_issue_spends').add(payload);
     toast('Spend entry added');
+    if(directorName)notifyDirectorSpend(directorName,amount,note,actor?actor.id:'',payload.at);
   }finally{
     _issueSpendSubmitting=false;
   }
@@ -2283,9 +2284,13 @@ function renderAdminPanel(){
    (source:'director_payment'), same mechanism as any other Fund Received, just tagged with
    which Director it came from - computeBalance() keeps it out of the "Fund Added" tile but it
    still counts toward the real Current Balance, because the cash genuinely came back in.
-   WhatsApp notifications to Directors are deliberately NOT wired up yet - Petty Cash has an
-   existing, deliberate rule (see isPettyCashNoticeExcluded) blocking these exact 3 names from
-   ANY Petty Cash WhatsApp message; the user asked to hold that override for a later session. */
+   Petty Cash has an existing, deliberate rule (see isPettyCashNoticeExcluded) blocking these
+   exact 3 names from ANY Petty Cash WhatsApp message sent via the normal sendRawWA() path.
+   The user explicitly asked (2026-11-13) to enable WhatsApp notices specifically for Director
+   spend entries, sent to the dedicated numbers in pc_settings/directorPhones ("⚙ Setting")
+   rather than any Universal Users phone - see sendDirectorPhoneWA()/notifyDirectorSpend(),
+   which deliberately do NOT go through isPettyCashNoticeExcluded(). The general Petty Cash
+   notice exclusion for these 3 names elsewhere in the app is untouched. */
 const PC_DIRECTOR_NAMES=['Hitesh Dusad','Nitesh Dusad','Ankur Khandelwal'];
 let pcSelectedDirector=PC_DIRECTOR_NAMES[0];
 function dirId(name){return String(name||'').replace(/\W+/g,'_')}
@@ -2436,6 +2441,30 @@ function renderDirectorDetail(){
     </div>`:''}
   </div>`;
 }
+/* ===== Director Personal Spend - WhatsApp notice (explicitly enabled by the user, see
+   pc_settings/directorPhones above) =====
+   Uses ONLY the dedicated Director Phone Numbers set in Settings - a deliberately separate
+   channel from the rest of Petty Cash's WhatsApp notices, which stay blocked for these 3
+   names via isPettyCashNoticeExcluded(). sendDirectorPhoneWA() intentionally does NOT go
+   through that check: the user explicitly asked, twice, for this exact number to be
+   messaged whenever a spend is tagged to that Director. */
+async function sendDirectorPhoneWA(phone,message){
+  if(!phone)return false;
+  const id=String(api.idInstance||'').trim(),token=String(api.apiToken||'').trim(),base=String(api.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token){console.warn('GREEN-API settings missing');return false}
+  const p=normalizePhone(phone);if(p.length<11)return false;
+  try{
+    const r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
+    return r.ok;
+  }catch(e){console.error('Director spend WA send failed:',e);return false}
+}
+async function notifyDirectorSpend(name,amount,note,actorId,atIso){
+  const phone=pcDirectorPhones[dirId(name)];
+  if(!phone)return;
+  const balance=directorBalance(name);
+  const message='🔔 *Bliss Gems & Minerals — Petty Cash*\n\n'+name+', aapke liye ek expense record hua hai:\n\n📝 '+(note||'(no note)')+'\n💰 '+fmtAmt(amount)+'\n👤 Added by: '+esc(nameOfUserId(actorId))+'\n📅 '+fmtDirPdfDateTime(atIso)+'\n\n*Total Pending: '+fmtAmt(balance)+'*';
+  await sendDirectorPhoneWA(phone,message);
+}
 async function addDirectorDirectSpend(name){
   if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye add kar sakte hain.');return}
   const id=dirId(name);
@@ -2445,9 +2474,11 @@ async function addDirectorDirectSpend(name){
   if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
   if(note)await addPcSpendCategoryIfNew(note);
   const actor=loggedUser();
-  await db.collection('pc_issue_spends').add({issueId:null,amount,note,directorName:name,date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString()});
+  const at=new Date().toISOString();
+  await db.collection('pc_issue_spends').add({issueId:null,amount,note,directorName:name,date:todayISO(),by:actor?actor.id:'',at});
   if(noteEl)noteEl.value='';if(amtEl)amtEl.value='';
   toast(name+' ke liye expense add ho gaya');
+  notifyDirectorSpend(name,amount,note,actor?actor.id:'',at);
 }
 async function recordDirectorPayment(name){
   if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye add kar sakte hain.');return}
