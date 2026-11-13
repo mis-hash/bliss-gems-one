@@ -2441,7 +2441,7 @@ function directorBalance(name){
 function selectDirector(name){pcSelectedDirector=name;renderDirectorsPage();}
 function pcDirFilteredEntries(name){
   const from=$('dirFilterFrom')?.value||'',to=$('dirFilterTo')?.value||'',emp=$('dirFilterEmployee')?.value||'';
-  return directorSpendEntries(name).filter(s=>{
+  return directorPendingEntries(name).filter(s=>{
     if(from&&s.date<from)return false;
     if(to&&s.date>to)return false;
     if(emp&&s.by!==emp)return false;
@@ -2686,13 +2686,16 @@ function dirHisaabRefNo(name,now){
   const ymd=now.toISOString().slice(0,10).replace(/-/g,'');
   return 'PC-'+initials+'-'+ymd;
 }
-// FIFO-settles the oldest spend entries first against total payments received, so the
-// itemized list this returns always sums to exactly directorBalance() (the "Total Amount
-// Due" shown above it) - a fully-paid-off entry is dropped, a partially-paid one shows only
-// its still-unpaid remainder. Payments aren't tied to a specific entry anywhere else in this
-// app either, so "oldest first" is the one assumption that keeps the statement's numbers
-// internally consistent rather than listing entries that add up to more than what's due.
-function directorPendingEntriesForPdf(name){
+// FIFO-settles the oldest spend entries first against total payments received, so any
+// itemized list built from this always sums to exactly directorBalance() ("Total Due") - a
+// fully-paid-off entry is dropped, a partially-paid one shows only its still-unpaid
+// remainder. Payments aren't tied to a specific entry anywhere else in this app either, so
+// "oldest first" is the one assumption that keeps the numbers internally consistent rather
+// than listing entries that add up to more than what's actually due. Used by both the
+// Hisaab PDF and the Director Detail panel's own Expense Detail list/breakdown - a
+// Director should never see an already-settled entry show up as if it's still pending,
+// anywhere in the app.
+function directorPendingEntries(name){
   const entries=directorSpendEntries(name).slice().sort((a,b)=>String(a.at||a.date).localeCompare(String(b.at||b.date)));
   let remainingPaid=directorPaymentEntries(name).reduce((s,x)=>s+(x.amount||0),0);
   const pending=[];
@@ -2705,7 +2708,7 @@ function directorPendingEntriesForPdf(name){
   return pending;
 }
 function buildDirectorHisaabPdfHtml(name){
-  const entries=directorPendingEntriesForPdf(name);
+  const entries=directorPendingEntries(name);
   const total=directorBalance(name);
   const now=new Date();
   const rows=entries.map((x,i)=>{
