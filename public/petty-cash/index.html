@@ -2601,7 +2601,7 @@ async function sendDirectorHisaabPdfWA(name,isAuto){
   if(directorBalance(name)<=0){if(!isAuto)toast('Abhi '+name+' ka koi pending amount nahi hai.');return}
   const blob=await generateDirectorHisaabPdfBlob(name);
   if(!blob){if(!isAuto)toast('PDF banane mein error aaya. Dubara try karein.');return}
-  const result=await sendDirectorFileWA(phone,blob,'Hisaab Due - '+name+'.pdf');
+  const result=await sendDirectorFileWA(phone,blob,'Petty Cash - Hisaab Due - '+name+'.pdf');
   const reasons={'no-credentials':'WhatsApp nahi bheja: GREEN-API settings missing hain','invalid-phone':'WhatsApp nahi bheja: '+name+' ka number galat/incomplete hai','api-error':'WhatsApp nahi bheja: GREEN-API ne error diya','network-error':'WhatsApp nahi bheja: network error aaya'};
   if(result==='sent'){
     toast(name+' ko Hisaab PDF WhatsApp par bhej diya');
@@ -2787,7 +2787,7 @@ async function downloadDirectorHisaabPdf(name){
     if(!blob){alert('PDF banane mein error aaya. Dubara try karein.');return}
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
-    a.href=url;a.download='Hisaab Due - '+name+'.pdf';
+    a.href=url;a.download='Petty Cash - Hisaab Due - '+name+'.pdf';
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }finally{
