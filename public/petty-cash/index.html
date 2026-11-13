@@ -2111,6 +2111,7 @@ function renderLedgerHistTabs(){
   const wrap=$('ledgerHistTabs');
   if(!wrap)return;
   const acceptN=pendingEntries.filter(p=>p.status==='pending').length;
+  const rejectedN=pendingEntries.filter(p=>p.status==='rejected').length;
   const activeN=ledger.filter(isAwaitingVerify).length;
   const overdueN=ledger.filter(isOverdueVerify).length;
   const issuedN=ledger.filter(isIssuedByAccounts).length;
@@ -2118,6 +2119,7 @@ function renderLedgerHistTabs(){
   const receivedN=ledger.filter(isReceivedFund).length;
   wrap.innerHTML=`
     <button class="tab${pcLedgerHistTab==='accept'?' on':''}" onclick="setPcLedgerHistTab('accept')">🆕 Pending Accept (${acceptN})</button>
+    <button class="tab${pcLedgerHistTab==='rejected'?' on':''}" onclick="setPcLedgerHistTab('rejected')">❌ Rejected (${rejectedN})</button>
     <button class="tab${pcLedgerHistTab==='active'?' on':''}" onclick="setPcLedgerHistTab('active')">🟢 Active (${activeN})</button>
     <button class="tab${pcLedgerHistTab==='overdue'?' on':''}" onclick="setPcLedgerHistTab('overdue')" style="${pcLedgerHistTab==='overdue'?'background:var(--red);border-color:var(--red)':''}">🔴 Overdue (${overdueN})</button>
     <button class="tab${pcLedgerHistTab==='issued'?' on':''}" onclick="setPcLedgerHistTab('issued')">📤 Issued by Accounts (${issuedN})</button>
@@ -2173,6 +2175,19 @@ function renderAcceptQueueList(){
   }).join('')||`<div class="emptystate">✅<p>Koi Accept pending nahi hai.</p></div>`;
   if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
 }
+function renderRejectedQueueList(){
+  const rejected=pendingEntries.filter(p=>p.status==='rejected').sort((a,b)=>String(b.resolvedAt||'').localeCompare(String(a.resolvedAt||'')));
+  $('ledgerTable').innerHTML=rejected.map(p=>{
+    const label=p.type==='in'?'Fund Add':'Cash Out';
+    return `<div class="item">
+      <span><b>${esc(label)} — ${fmtAmt(p.amount)}</b><br><small style="color:var(--muted)">By: ${esc(p.byName||nameOfUserId(p.by))}${p.note?' · '+esc(p.note):''} (${esc(p.date)})</small>
+        <div style="margin-top:6px;background:var(--redbg);color:var(--red);border-radius:7px;padding:7px 10px;font-size:12.5px"><b>Reason:</b> ${esc(p.rejectReason||'-')}</div>
+        <small style="color:var(--muted);display:block;margin-top:4px">Rejected by ${esc(p.resolvedByName||nameOfUserId(p.resolvedBy))}${p.resolvedAt?' · '+esc(fmtDirPdfDateTime(p.resolvedAt)):''}</small>
+      </span>
+    </div>`;
+  }).join('')||`<div class="emptystate">✅<p>Koi rejected entry nahi hai.</p></div>`;
+  if($('ledgerLoadMoreRow'))$('ledgerLoadMoreRow').remove();
+}
 function renderLedgerCardList(rows,emptyMsg){
   const anyLedgerSpendOpen=Object.values(pcLedgerExpanded).some(Boolean);
   $('ledgerTable').innerHTML=rows.map(x=>ledgerCardHtml(x,anyLedgerSpendOpen)).join('')||`<div class="emptystate">✅<p>${emptyMsg}</p></div>`;
@@ -2181,6 +2196,7 @@ function renderLedgerCardList(rows,emptyMsg){
 function renderLedger(){
   renderLedgerHistTabs();
   if(pcLedgerHistTab==='accept'){renderAcceptQueueList();return;}
+  if(pcLedgerHistTab==='rejected'){renderRejectedQueueList();return;}
   if(pcLedgerHistTab==='active'){renderLedgerCardList(ledger.filter(isAwaitingVerify).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Hisaab verify pending nahi hai.');return;}
   if(pcLedgerHistTab==='overdue'){renderLedgerCardList(ledger.filter(isOverdueVerify).sort((a,b)=>daysPendingVerify(b)-daysPendingVerify(a)),'Koi overdue Hisaab nahi hai.');return;}
   if(pcLedgerHistTab==='issued'){renderLedgerCardList(ledger.filter(isIssuedByAccounts).sort((a,b)=>String(b.date).localeCompare(String(a.date))),'Koi Cash Out abhi tak issue nahi hui hai.');return;}
@@ -2509,7 +2525,7 @@ function renderDirectorDetail(){
     <div style="display:flex;justify-content:space-between;padding:10px 16px;background:#f5f8f6;font-weight:700;font-size:13px;color:var(--muted)"><span>Total Expense (in this filter)</span><span>${fmtAmt(total)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:14px 16px;background:var(--mint);font-weight:800;font-size:15px;color:${overallDue>0?'var(--red)':'var(--g)'}"><span>Total Due (Overall)</span><span>${fmtAmt(overallDue)}</span></div>
     <div class="pb" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;border-top:1px dashed var(--line)">
-      <div style="flex:1;min-width:140px"><label style="display:block;font-size:11px;font-weight:bold;margin-bottom:5px">Expense Type (entered by Director)</label><input id="dirDirectNote_${id}" autocomplete="off" oninput="pcFilterSpendSuggestions(this)" onfocus="pcFilterSpendSuggestions(this)" onblur="pcHideSpendSuggestions(this)" placeholder="e.g. Grocery" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:7px"></div>
+      <div style="flex:1;min-width:140px"><label style="display:block;font-size:11px;font-weight:bold;margin-bottom:5px">Expense Type</label><input id="dirDirectNote_${id}" autocomplete="off" oninput="pcFilterSpendSuggestions(this)" onfocus="pcFilterSpendSuggestions(this)" onblur="pcHideSpendSuggestions(this)" placeholder="e.g. Grocery" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:7px"></div>
       <div style="flex:0 0 110px"><label style="display:block;font-size:11px;font-weight:bold;margin-bottom:5px">Amount</label><input type="number" id="dirDirectAmt_${id}" placeholder="₹" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:7px"></div>
       <div style="flex:0 0 150px"><button class="btn primary" style="width:100%" onclick="addDirectorDirectSpend('${nSafe}')">➕ Add Expense</button></div>
     </div>
