@@ -424,6 +424,13 @@ tbody tr:hover td{background:#f7faf8}
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeDirectorPhonesModal()">Cancel</button><button class="btn primary" onclick="saveDirectorPhones()">Save</button></div>
 </div></div>
 
+<div class="modal" id="pcRejectReasonModal"><div class="box" style="width:min(420px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3 style="margin:0">✕ Reject Entry</h3><button class="btn small" onclick="closePcRejectReasonModal()">✕</button></div>
+<p class="note" style="margin:0 0 10px">Reject karne ki wajah batana zaroori hai — bina reason ke reject nahi ho sakta.</p>
+<div class="field"><label>Reason</label><textarea id="pcRejectReasonInput" rows="3" placeholder="e.g. Amount galat hai, dobara sahi se daalein" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:7px;font-family:inherit"></textarea></div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closePcRejectReasonModal()">↩ Wapas Jaayein</button><button class="btn danger" onclick="confirmPcRejectWithReason()">✕ Reject Karein</button></div>
+</div></div>
+
 <datalist id="pcSpendNoteList"></datalist>
 
 <!-- Manage modal -->
@@ -1155,20 +1162,39 @@ async function pcAcceptPending(id){
     toast('Accept ho gaya');
   }finally{_pcResolving=false;}
 }
-async function pcRejectPending(id){
+// Reject now requires a reason (previously a bare confirm() with no way to record why) - a
+// small modal instead of a window.confirm() also gives a clear "wapas jaayein" way out if
+// Reject was clicked by mistake, same as any other modal's Cancel button in this app.
+let pcRejectTargetId=null;
+function pcRejectPending(id){
   if(_pcResolving)return;
   const p=pendingEntries.find(x=>x.id===id);
   if(!p)return;
   const authorized=p.type==='in'?canCloseLoan():(p.personId===currentUser);
   if(!authorized){alert('Aapko is entry ko Reject karne ka access nahi hai.');return}
-  if(!confirm('Ye entry reject karni hai? Ye kabhi bhi ledger/balance mein add nahi hogi.'))return;
+  pcRejectTargetId=id;
+  if($('pcRejectReasonInput'))$('pcRejectReasonInput').value='';
+  $('pcRejectReasonModal').classList.add('show');
+}
+function closePcRejectReasonModal(){
+  $('pcRejectReasonModal')?.classList.remove('show');
+  pcRejectTargetId=null;
+}
+async function confirmPcRejectWithReason(){
+  if(_pcResolving)return;
+  const id=pcRejectTargetId;
+  const p=id?pendingEntries.find(x=>x.id===id):null;
+  if(!p){closePcRejectReasonModal();return}
+  const reason=($('pcRejectReasonInput')?.value||'').trim();
+  if(!reason){alert('Reject karne ki wajah likhna zaroori hai.');return}
   _pcResolving=true;
   try{
     const actor=loggedUser();
-    await db.collection('pc_pending_entries').doc(id).update({status:'rejected',resolvedBy:currentUser,resolvedByName:actor?actor.name:currentUser,resolvedAt:new Date().toISOString()});
+    await db.collection('pc_pending_entries').doc(id).update({status:'rejected',rejectReason:reason,resolvedBy:currentUser,resolvedByName:actor?actor.name:currentUser,resolvedAt:new Date().toISOString()});
     const creator=users.find(u=>u.id===p.by);
-    if(creator&&creator.phone)sendRawWA(creator.phone,`❌ Petty Cash ${p.type==='in'?'Fund Add':'Cash Out'} ${fmtAmt(p.amount)} reject kar diya gaya (${actor?actor.name:'-'}).\n\n${APP_URL}`);
+    if(creator&&creator.phone)sendRawWA(creator.phone,`❌ Petty Cash ${p.type==='in'?'Fund Add':'Cash Out'} ${fmtAmt(p.amount)} reject kar diya gaya (${actor?actor.name:'-'}).\n\nWajah: ${reason}\n\n${APP_URL}`);
     toast('Reject kar diya');
+    closePcRejectReasonModal();
   }finally{_pcResolving=false;}
 }
 let pendingEntries=[],pendingEntriesStarted=false;
