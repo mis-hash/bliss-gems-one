@@ -472,7 +472,28 @@ let usersStarted=false,ledgerStarted=false,mastersStarted=false,issueSpendsStart
 // same pattern as Trip Expense's expense categories: starts with a small generic seed, and
 // typing a brand-new one on Add Spend auto-syncs it to pc_settings/spendCategories so every
 // other Doer's dropdown gets it as a suggestion too.
-let PC_SPEND_CATEGORIES=['Food','Tea / Snacks','Conveyance','Fuel','Stationery','Courier','Labour','Misc','Other'];
+// Extra ~100 common household/grocery/personal-spend suggestions (Dal, Sugar, Sabji etc.) added
+// per the user's request, for Director Personal Spend entries especially (Directors commonly ask
+// for exactly this kind of item to be paid for from petty cash) - plain names, no parenthetical
+// English/Hindi pairing (e.g. just "Aata", not "Atta (Flour)"), matching how people actually type.
+let PC_SPEND_CATEGORIES=['Food','Tea / Snacks','Conveyance','Fuel','Stationery','Courier','Labour','Misc','Other',
+  'Dal','Chawal','Aata','Sugar','Tel','Namak','Besan','Suji','Maida','Poha','Sabudana',
+  'Chana','Rajma','Moong Dal','Toor Dal','Chana Dal','Urad Dal','Basmati Rice','Ghee','Gud',
+  'Sabji','Fruits','Pyaz','Aalu','Tamatar','Lahsun','Adrak','Hari Mirch','Nimbu','Nariyal',
+  'Milk','Dahi','Paneer','Butter','Juice','Cold Drink','Mineral Water','Chai Patti','Coffee','Lassi',
+  'Namkeen','Biscuit','Chips','Chocolate','Ice Cream','Mithai','Cake','Bakery Items','Matari',
+  'Masala','Haldi','Mirch Powder','Dhaniya Powder','Jeera','Garam Masala',
+  'Achaar','Papad','Sauce','Ketchup','Jam','Honey',
+  'Dry Fruits','Kaju','Badam','Kishmish','Chuara','Anjeer',
+  'Soap','Shampoo','Toothpaste','Detergent','Hair Oil','Sanitary Pad','Diaper','Cotton','Bandage',
+  'Medicine','Doctor Fee','Hospital','Clinic',
+  'Phenyl','Dishwash','Matchbox','Candle','Agarbatti','Puja Samagri','Flowers','Newspaper','Magazine',
+  'Cigarette','Paan','Gutka',
+  'Eggs','Chicken','Mutton','Fish',
+  'Vehicle Repair','Vehicle Service','Petrol','Diesel','Parking','Toll',
+  'Gift','Sweet Box',
+  'Keyboard','Mouse','Charger','Battery','Bulb',
+  'Clothes','Shoes','Tailoring'];
 
 function loggedUser(){return users.find(x=>x.id===currentUser)||null}
 function myRole(){const u=loggedUser();return (u&&u.appRoles&&u.appRoles[APP_SLUG])||''}
@@ -592,6 +613,42 @@ function saveMasters(){ if(db) db.collection('pc_settings').doc('masters').set(m
 function renderPcSpendCategoryOptions(){
   const list=$('pcSpendNoteList');
   if(list)list.innerHTML=PC_SPEND_CATEGORIES.map(c=>`<option value="${esc(c)}"></option>`).join('');
+}
+/* ===== Custom searchable "Spent on what?" suggestion box =====
+   Native <input list=datalist> doesn't reliably filter-as-you-type on every mobile browser
+   (some just show the full list, unfiltered, which is what prompted this) - this is a small
+   JS-driven combobox instead: a floating suggestion box positioned under the input, filtered
+   on every keystroke, that works the same everywhere. */
+function pcSpendSuggestBoxId(inputId){return 'pcSpendSuggestBox_'+inputId}
+function pcFilterSpendSuggestions(inputEl){
+  if(!inputEl)return;
+  let box=document.getElementById(pcSpendSuggestBoxId(inputEl.id));
+  if(!box){
+    box=document.createElement('div');
+    box.id=pcSpendSuggestBoxId(inputEl.id);
+    box.style.cssText='position:absolute;z-index:500;background:#fff;border:1px solid var(--line);border-radius:7px;box-shadow:0 6px 18px rgba(20,40,30,.14);max-height:220px;overflow:auto;display:none';
+    document.body.appendChild(box);
+  }
+  const q=(inputEl.value||'').trim().toLowerCase();
+  const matches=PC_SPEND_CATEGORIES.filter(c=>c.toLowerCase().includes(q));
+  if(!matches.length){box.style.display='none';return}
+  const rect=inputEl.getBoundingClientRect();
+  box.style.left=(rect.left+window.scrollX)+'px';
+  box.style.top=(rect.bottom+window.scrollY+2)+'px';
+  box.style.width=rect.width+'px';
+  box.innerHTML=matches.map(c=>`<div style="padding:8px 12px;font-size:13px;cursor:pointer" onmousedown="event.preventDefault();pcPickSpendSuggestion('${inputEl.id}','${esc(c).replace(/'/g,"\\'")}')">${esc(c)}</div>`).join('');
+  box.style.display='block';
+}
+function pcPickSpendSuggestion(inputId,value){
+  const el=document.getElementById(inputId);
+  if(el)el.value=value;
+  const box=document.getElementById(pcSpendSuggestBoxId(inputId));
+  if(box)box.style.display='none';
+}
+function pcHideSpendSuggestions(inputEl){
+  if(!inputEl)return;
+  const id=inputEl.id;
+  setTimeout(()=>{const box=document.getElementById(pcSpendSuggestBoxId(id));if(box)box.style.display='none';},150);
 }
 // Per-category "Proof Required" override, same pattern as Trip Expense's EXPENSE_PROOF_REQUIRED
 // (synced from the same pc_settings/spendCategories doc, just a different field) - default is
@@ -1313,7 +1370,7 @@ function renderMyIssuedCash(){
       ${x.verified?`<div style="font-size:12px;color:var(--muted);padding-left:4px;margin-top:2px">Verified by ${esc(nameOfUserId(x.settledBy))} on ${esc((x.settledAt||'').slice(0,10))}${x.returnedAmount?' — '+fmtAmt(x.returnedAmount)+' cash received back.':''}</div>`:''}`:''}
       ${x.verified?'':`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
         <input type="number" id="issueSpendAmt_${esc(x.id)}" placeholder="Amount spent" style="width:120px;padding:7px;border:1px solid var(--line);border-radius:7px">
-        <input id="issueSpendNote_${esc(x.id)}" list="pcSpendNoteList" autocomplete="off" placeholder="Spent on what?" style="flex:1;min-width:140px;padding:7px;border:1px solid var(--line);border-radius:7px">
+        <input id="issueSpendNote_${esc(x.id)}" autocomplete="off" oninput="pcFilterSpendSuggestions(this)" onfocus="pcFilterSpendSuggestions(this)" onblur="pcHideSpendSuggestions(this)" placeholder="Spent on what?" style="flex:1;min-width:140px;padding:7px;border:1px solid var(--line);border-radius:7px">
         <select id="issueSpendDirector_${esc(x.id)}" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">— Office Expense —</option>${PC_DIRECTOR_NAMES.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>
         <input type="file" accept="image/*" capture="environment" id="issueSpendProof_${esc(x.id)}" style="width:150px;font-size:11px">
         <button class="btn small primary" onclick="addIssueSpend('${esc(x.id)}')">＋ Add Spend</button>
@@ -2424,7 +2481,7 @@ function renderDirectorDetail(){
     <div style="display:flex;justify-content:space-between;padding:10px 16px;background:#f5f8f6;font-weight:700;font-size:13px;color:var(--muted)"><span>Total Expense (in this filter)</span><span>${fmtAmt(total)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:14px 16px;background:var(--mint);font-weight:800;font-size:15px;color:${overallDue>0?'var(--red)':'var(--g)'}"><span>Total Due (Overall)</span><span>${fmtAmt(overallDue)}</span></div>
     <div class="pb" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;border-top:1px dashed var(--line)">
-      <div style="flex:1;min-width:140px"><label style="display:block;font-size:11px;font-weight:bold;margin-bottom:5px">Expense Type (entered by Director)</label><input id="dirDirectNote_${id}" list="pcSpendNoteList" placeholder="e.g. Grocery" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:7px"></div>
+      <div style="flex:1;min-width:140px"><label style="display:block;font-size:11px;font-weight:bold;margin-bottom:5px">Expense Type (entered by Director)</label><input id="dirDirectNote_${id}" autocomplete="off" oninput="pcFilterSpendSuggestions(this)" onfocus="pcFilterSpendSuggestions(this)" onblur="pcHideSpendSuggestions(this)" placeholder="e.g. Grocery" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:7px"></div>
       <div style="flex:0 0 110px"><label style="display:block;font-size:11px;font-weight:bold;margin-bottom:5px">Amount</label><input type="number" id="dirDirectAmt_${id}" placeholder="₹" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:7px"></div>
       <div style="flex:0 0 150px"><button class="btn primary" style="width:100%" onclick="addDirectorDirectSpend('${nSafe}')">➕ Add Expense</button></div>
     </div>
@@ -2519,45 +2576,66 @@ function fmtDirPdfDateTime(atIso){
   if(isNaN(d))return '-';
   return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})+', '+d.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true});
 }
+function dirHisaabRefNo(name,now){
+  const initials=String(name||'').split(/\s+/).filter(Boolean).map(w=>w[0]).join('').toUpperCase();
+  const ymd=now.toISOString().slice(0,10).replace(/-/g,'');
+  return 'PC-'+initials+'-'+ymd;
+}
 function buildDirectorHisaabPdfHtml(name){
   const entries=directorSpendEntries(name).slice().sort((a,b)=>String(a.at||a.date).localeCompare(String(b.at||b.date)));
   const total=directorBalance(name);
   const now=new Date();
-  const rows=entries.map(x=>`<tr>
-      <td style="padding:8px 16px;font-size:12.5px;border-bottom:1px solid #f0f3f1">${esc(x.note||'(no note)')}</td>
-      <td style="padding:8px 16px;font-size:12.5px;border-bottom:1px solid #f0f3f1">${esc(x.issueId?nameOfUserId(x.by):nameOfUserId(x.by)+' (Direct)')}</td>
-      <td style="padding:8px 16px;font-size:12.5px;border-bottom:1px solid #f0f3f1">${esc(fmtDirPdfDateTime(x.at||x.date))}</td>
-      <td style="padding:8px 16px;font-size:12.5px;border-bottom:1px solid #f0f3f1;text-align:right;font-weight:700">${fmtAmt(x.amount)}</td>
-    </tr>`).join('');
-  return `<div style="width:580px;background:#fff;border-radius:14px;overflow:hidden;font-family:Arial,sans-serif;color:#16241F">
-    <div style="background:linear-gradient(135deg,#17487E,#4A8FD6);color:#fff;padding:22px 24px;display:flex;gap:14px;align-items:center">
-      <div style="width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:22px;font-weight:900;flex:none">B</div>
+  const rows=entries.map((x,i)=>{
+    const bg=i%2===1?'#FAFCFE':'#fff';
+    return `<tr style="background:${bg}">
+      <td style="padding:10px 16px;font-size:12.5px;border-bottom:1px solid #EEF2F5;color:#6E7D76;width:26px">${i+1}</td>
+      <td style="padding:10px 16px;font-size:12.5px;border-bottom:1px solid #EEF2F5">${esc(x.note||'(no note)')}</td>
+      <td style="padding:10px 16px;font-size:12.5px;border-bottom:1px solid #EEF2F5">${esc(x.issueId?nameOfUserId(x.by):nameOfUserId(x.by)+' (Direct)')}</td>
+      <td style="padding:10px 16px;font-size:12.5px;border-bottom:1px solid #EEF2F5">${esc(fmtDirPdfDateTime(x.at||x.date))}</td>
+      <td style="padding:10px 16px;font-size:12.5px;border-bottom:1px solid #EEF2F5;text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${fmtAmt(x.amount)}</td>
+    </tr>`;
+  }).join('');
+  return `<div style="width:580px;background:#fff;border-radius:10px;overflow:hidden;font-family:Arial,sans-serif;color:#16241F;border:1px solid #E2E8EE">
+    <div style="background:linear-gradient(135deg,#153C66,#2D6CB0 55%,#4A8FD6);color:#fff;padding:24px 26px;display:flex;gap:14px;align-items:center;position:relative">
+      <div style="width:46px;height:46px;border-radius:10px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);display:grid;place-items:center;font-size:22px;font-weight:900;flex:none">B</div>
       <div>
-        <div style="font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.04em">Bliss Gems &amp; Minerals</div>
-        <h1 style="font-size:21px;margin:2px 0 2px">${esc(name)}</h1>
-        <p style="font-size:12px;margin:0;opacity:.9">Petty Cash — Amount Due as of ${esc(now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}))}</p>
+        <div style="font-size:10px;opacity:.85;text-transform:uppercase;letter-spacing:.07em;font-weight:700">Bliss Gems &amp; Minerals</div>
+        <h1 style="font-size:21px;margin:3px 0 3px;font-weight:800">${esc(name)}</h1>
+        <p style="font-size:12px;margin:0;opacity:.92">Petty Cash — Statement of Amount Due</p>
       </div>
+      <div style="position:absolute;right:26px;top:24px;text-align:right;font-size:9.5px;opacity:.85">Ref No<b style="display:block;font-size:12px;font-weight:800;letter-spacing:.02em">${esc(dirHisaabRefNo(name,now))}</b></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px 24px;border-bottom:1px solid #DCE6F0">
-      <div><div style="font-size:10px;color:#6E7D76;text-transform:uppercase;font-weight:700">Report Date</div><div style="font-size:13.5px;font-weight:700">${esc(fmtDirPdfDateTime(now.toISOString()))}</div></div>
-      <div><div style="font-size:10px;color:#6E7D76;text-transform:uppercase;font-weight:700">Total Entries</div><div style="font-size:13.5px;font-weight:700">${entries.length}</div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:16px 26px;border-bottom:1px solid #DCE6F0;background:#FAFCFE">
+      <div><div style="font-size:9.5px;color:#6E7D76;text-transform:uppercase;font-weight:700;letter-spacing:.02em">Statement Date</div><div style="font-size:13px;font-weight:700;margin-top:2px">${esc(fmtDirPdfDateTime(now.toISOString()))}</div></div>
+      <div><div style="font-size:9.5px;color:#6E7D76;text-transform:uppercase;font-weight:700;letter-spacing:.02em">Total Entries</div><div style="font-size:13px;font-weight:700;margin-top:2px">${entries.length}</div></div>
+      <div><div style="font-size:9.5px;color:#6E7D76;text-transform:uppercase;font-weight:700;letter-spacing:.02em">Period Covered</div><div style="font-size:13px;font-weight:700;margin-top:2px">All-time (Overall)</div></div>
     </div>
-    <div style="font-size:12px;font-weight:800;color:#6E7D76;text-transform:uppercase;letter-spacing:.03em;padding:14px 24px 4px">Total Amount Due</div>
-    <div style="margin:0 24px 14px;background:#E8F1FC;border-radius:12px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:11px;font-weight:800;color:#1D5FA6;text-transform:uppercase">Payable to Accounts</span>
-      <span style="font-size:26px;font-weight:900;color:#1D5FA6">${fmtAmt(total)}</span>
+    <div style="font-size:11.5px;font-weight:800;color:#6E7D76;text-transform:uppercase;letter-spacing:.04em;padding:18px 26px 6px;display:flex;align-items:center;gap:8px"><span>Amount Due</span><span style="flex:1;height:1px;background:#DCE6F0"></span></div>
+    <div style="margin:0 26px 6px;background:#E8F1FC;border:1px solid #CFE0F3;border-radius:8px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center">
+      <div><div style="font-size:11px;font-weight:800;color:#1D5FA6;text-transform:uppercase;letter-spacing:.02em">Payable to Accounts</div><div style="font-size:10px;color:#6E7D76;margin-top:2px">Pending settlement</div></div>
+      <span style="font-size:28px;font-weight:900;color:#1D5FA6">${fmtAmt(total)}</span>
     </div>
-    <div style="font-size:12px;font-weight:800;color:#6E7D76;text-transform:uppercase;letter-spacing:.03em;padding:14px 24px 4px">Expense Detail</div>
-    <table style="width:100%;border-collapse:collapse;margin:0 0 10px">
+    <div style="font-size:11.5px;font-weight:800;color:#6E7D76;text-transform:uppercase;letter-spacing:.04em;padding:18px 26px 6px;display:flex;align-items:center;gap:8px"><span>Expense Detail</span><span style="flex:1;height:1px;background:#DCE6F0"></span></div>
+    <table style="width:100%;border-collapse:collapse;margin:4px 0 0">
       <thead><tr>
-        <th style="text-align:left;font-size:10px;text-transform:uppercase;color:#6E7D76;padding:6px 16px;border-bottom:1px solid #DCE6F0">Expense</th>
-        <th style="text-align:left;font-size:10px;text-transform:uppercase;color:#6E7D76;padding:6px 16px;border-bottom:1px solid #DCE6F0">By</th>
-        <th style="text-align:left;font-size:10px;text-transform:uppercase;color:#6E7D76;padding:6px 16px;border-bottom:1px solid #DCE6F0">Date</th>
-        <th style="text-align:right;font-size:10px;text-transform:uppercase;color:#6E7D76;padding:6px 16px;border-bottom:1px solid #DCE6F0">Amount</th>
+        <th style="text-align:left;font-size:9.5px;text-transform:uppercase;color:#6E7D76;padding:8px 16px;border-bottom:1.5px solid #DCE6F0;font-weight:800;letter-spacing:.02em">#</th>
+        <th style="text-align:left;font-size:9.5px;text-transform:uppercase;color:#6E7D76;padding:8px 16px;border-bottom:1.5px solid #DCE6F0;font-weight:800;letter-spacing:.02em">Expense</th>
+        <th style="text-align:left;font-size:9.5px;text-transform:uppercase;color:#6E7D76;padding:8px 16px;border-bottom:1.5px solid #DCE6F0;font-weight:800;letter-spacing:.02em">Entered By</th>
+        <th style="text-align:left;font-size:9.5px;text-transform:uppercase;color:#6E7D76;padding:8px 16px;border-bottom:1.5px solid #DCE6F0;font-weight:800;letter-spacing:.02em">Date &amp; Time</th>
+        <th style="text-align:right;font-size:9.5px;text-transform:uppercase;color:#6E7D76;padding:8px 16px;border-bottom:1.5px solid #DCE6F0;font-weight:800;letter-spacing:.02em">Amount</th>
       </tr></thead>
-      <tbody>${rows||'<tr><td colspan="4" style="padding:14px 16px;font-size:12.5px;color:#6E7D76">Koi pending entry nahi hai.</td></tr>'}</tbody>
+      <tbody>${rows||'<tr><td colspan="5" style="padding:14px 16px;font-size:12.5px;color:#6E7D76">Koi pending entry nahi hai.</td></tr>'}${rows?`<tr>
+        <td colspan="4" style="padding:12px 16px 10px;text-align:right;font-weight:800;font-size:12.5px;border-top:2px solid #DCE6F0">Total Amount Due</td>
+        <td style="padding:12px 16px 10px;text-align:right;font-weight:800;font-size:12.5px;border-top:2px solid #DCE6F0;font-variant-numeric:tabular-nums">${fmtAmt(total)}</td>
+      </tr>`:''}</tbody>
     </table>
-    <div style="padding:14px 24px;text-align:center;font-size:10.5px;color:#6E7D76;background:#FBFDFC">Bliss Gems &amp; Minerals — Petty Cash App</div>
+    <div style="padding:16px 26px 20px;border-top:1px solid #DCE6F0">
+      <div style="display:flex;justify-content:space-between;margin-bottom:16px;padding-top:6px">
+        <div style="font-size:10px;color:#6E7D76"><div style="width:150px;border-bottom:1px solid #B9C4CD;height:28px"></div><b style="display:block;margin-top:4px;color:#16241F;font-size:11px">Accounts Department</b>Prepared by</div>
+        <div style="font-size:10px;color:#6E7D76;text-align:right"><div style="width:150px;margin-left:auto;border-bottom:1px solid #B9C4CD;height:28px"></div><b style="display:block;margin-top:4px;color:#16241F;font-size:11px">${esc(name)}</b>Acknowledged by</div>
+      </div>
+      <div style="text-align:center;font-size:9.5px;color:#9AA6AC;line-height:1.5">Bliss Gems &amp; Minerals — Petty Cash App · This is a system-generated statement · Downloaded on ${esc(now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}))}</div>
+    </div>
   </div>`;
 }
 function pcPdfCanvasHasContent(canvas){
