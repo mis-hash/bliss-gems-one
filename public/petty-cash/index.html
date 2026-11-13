@@ -2534,13 +2534,14 @@ function renderDirectorDetail(){
       <div style="flex:0 0 110px"><label style="display:block;font-size:11px;font-weight:bold;margin-bottom:5px">Amount</label><input type="number" id="dirDirectAmt_${id}" placeholder="₹" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:7px"></div>
       <div style="flex:0 0 150px"><button class="btn primary" style="width:100%" onclick="addDirectorDirectSpend('${nSafe}')">➕ Add Expense</button></div>
     </div>
-    <div class="pb" style="background:var(--mint);border-top:1px solid var(--line)">
+    ${overallDue>0?`<div class="pb" style="background:var(--mint);border-top:1px solid var(--line)">
       <label style="display:block;font-size:11px;font-weight:bold;margin-bottom:5px;color:var(--g)">💰 Amount Received from ${esc(name)}</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <input type="number" id="dirReceivedAmt_${id}" placeholder="₹ (full or partial)" style="flex:1;min-width:140px;padding:9px;border:1px solid #cfe9df;border-radius:7px">
-        <button class="btn primary" onclick="recordDirectorPayment('${nSafe}')">💰 Mark as Received</button>
+        <input type="number" id="dirReceivedAmt_${id}" value="${overallDue}" readonly style="flex:1;min-width:140px;padding:9px;border:1px solid #cfe9df;border-radius:7px;background:#F3F8F6;color:var(--muted);font-weight:700">
+        <button class="btn primary" onclick="recordDirectorPayment('${nSafe}')">✓ Mark as Fully Received</button>
       </div>
-    </div>
+      <div class="note" style="margin-top:6px">Sirf poora pending amount (${fmtAmt(overallDue)}) hi settle ho sakta hai - partial payment allowed nahi hai.</div>
+    </div>`:''}
     ${payments.length?`<div class="pb">
       <div class="note" style="font-weight:800;text-transform:uppercase;font-size:11px;margin-bottom:6px">Payment History</div>
       ${payments.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid #f0f3f1;color:var(--muted)"><span>${esc(fmtDirPdfDateTime(p.at))} — marked received by ${esc(nameOfUserId(p.by))}</span><b style="color:var(--g)">${fmtAmt(p.amount)} received</b></div>`).join('')}
@@ -2648,18 +2649,17 @@ async function addDirectorDirectSpend(name){
   toast(name+' ke liye expense add ho gaya');
   notifyDirectorSpend(name,amount,note,actor?actor.id:'',at);
 }
+// Full settlement only - partial Director payments are deliberately no longer allowed. The
+// amount field is auto-filled (and locked) to the exact current pending balance in the
+// markup below, but this function re-checks that invariant itself rather than trusting the
+// UI, same as every other write path in this app.
 async function recordDirectorPayment(name){
   if(!canCloseLoan()){alert('Sirf Accountant/Admin ya Super Admin ye add kar sakte hain.');return}
-  const id=dirId(name);
-  const amtEl=$('dirReceivedAmt_'+id);
-  const amount=parseFloat(amtEl?.value);
-  if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
   const pending=directorBalance(name);
-  if(amount>pending){alert('Amount pending se zyada nahi ho sakta. '+name+' ka pending abhi '+fmtAmt(pending)+' hai.');return}
+  if(!pending||pending<=0){alert('Abhi '+name+' ka koi pending amount nahi hai.');return}
   const actor=loggedUser();
-  await db.collection('pc_ledger').add({type:'in',amount,note:'Fund Received from '+name,source:'director_payment',directorPayment:name,date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString()});
-  if(amtEl)amtEl.value='';
-  toast(name+' se payment record ho gaya');
+  await db.collection('pc_ledger').add({type:'in',amount:pending,note:'Fund Received from '+name,source:'director_payment',directorPayment:name,date:todayISO(),by:actor?actor.id:'',at:new Date().toISOString()});
+  toast(name+' ka poora hisaab settle ho gaya');
 }
 function exportDirectorCSV(name){
   const entries=pcDirFilteredEntries(name);
