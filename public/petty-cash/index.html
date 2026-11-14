@@ -2518,6 +2518,7 @@ function renderDirectorDetail(){
         <button class="btn small secondary" onclick="exportDirectorCSV('${nSafe}')">⬇ CSV</button>
         <button class="btn small secondary" id="dirPdfBtn_${id}" onclick="downloadDirectorHisaabPdf('${nSafe}')">📄 Hisaab PDF</button>
         <button class="btn small secondary" id="dirPdfSendBtn_${id}" onclick="forceSendDirectorHisaabPdf('${nSafe}')">📤 Send via WhatsApp</button>
+        ${superAdminUnlocked?`<button class="btn small danger" onclick="clearDirectorPendingPermanently('${nSafe}')">🗑 Clear Permanently</button>`:''}
       </div>
     </div>
     ${typeRows.length?`<div class="pb" style="border-bottom:1px solid var(--line)">
@@ -2666,6 +2667,26 @@ function exportDirectorCSV(name){
   const rows=[['Date','Expense','Amount','Added By','Source']];
   entries.forEach(x=>rows.push([x.date,x.note||'',x.amount,nameOfUserId(x.by),x.issueId?'Employee Issue':'Direct']));
   downloadCSV('director-'+name.replace(/\W+/g,'-')+'.csv',rows);
+}
+// Permanently wipes this Director's ENTIRE spend + payment history (every pc_issue_spends
+// entry with directorName===name, plus every pc_ledger director_payment entry for them) -
+// not just the pending ones. Super Admin only, same typed-"DELETE" confirmation as
+// bulkPermanentlyDeleteRecords() since this is real, unrecoverable data loss. Deliberately
+// scoped to ONLY this one Director's data - never touches pc_ledger's normal fund/issue/spend
+// entries, Universal Users, or any other Director.
+async function clearDirectorPendingPermanently(name){
+  if(!superAdminUnlocked){alert('Sirf Super Admin yeh kar sakta hai.');return}
+  const spendEntries=directorSpendEntries(name);
+  const paymentEntries=directorPaymentEntries(name);
+  const total=spendEntries.length+paymentEntries.length;
+  if(!total){alert(name+' ka koi data hai hi nahi.');return}
+  const typed=prompt(name+' ki '+spendEntries.length+' expense entries aur '+paymentEntries.length+' payment entries Firestore se HAMESHA KE LIYE delete ho jaayengi — wapas NAHI aayengi.\n\nConfirm karne ke liye "DELETE" type karein:');
+  if(typed!=='DELETE'){toast('Clear cancel ho gaya');return}
+  const batch=db.batch();
+  spendEntries.forEach(x=>batch.delete(db.collection('pc_issue_spends').doc(x.id)));
+  paymentEntries.forEach(x=>batch.delete(db.collection('pc_ledger').doc(x.id)));
+  await batch.commit();
+  toast(name+' ka poora data permanently clear ho gaya');
 }
 /* ===== Director Hisaab Due PDF (manual download only - not auto-sent on WhatsApp yet) =====
    Shows the OVERALL amount due (every un-settled entry, not just a recent window) - the
