@@ -405,6 +405,7 @@ tbody tr:hover td{background:#f7faf8}
 <div class="modal" id="pcSpendProofModal"><div class="box" style="width:min(420px,100%)">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Spend Proof</h3><button class="btn small" onclick="closePcSpendProofView()">✕</button></div>
 <img id="pcSpendProofImg" style="max-width:100%;border-radius:8px">
+<div style="margin-top:10px;text-align:right"><button class="btn small secondary" onclick="downloadPcSpendProof()">⬇ Download</button></div>
 </div></div>
 
 <div class="modal" id="pcSpendCategoriesModal"><div class="box" style="width:min(500px,100%)">
@@ -815,13 +816,23 @@ function fileToCompressedDataUri(file){
     reader.readAsDataURL(file);
   });
 }
+let _pcSpendProofCurrent=null;
 function viewPcSpendProof(id){
   const s=issueSpends.find(x=>x.id===id);
   if(!s||!s.proofDataUri)return;
+  _pcSpendProofCurrent=s;
   $('pcSpendProofImg').src=s.proofDataUri;
   $('pcSpendProofModal').classList.add('show');
 }
 function closePcSpendProofView(){$('pcSpendProofModal').classList.remove('show');}
+function downloadPcSpendProof(){
+  if(!_pcSpendProofCurrent||!_pcSpendProofCurrent.proofDataUri)return;
+  const date=(_pcSpendProofCurrent.at||_pcSpendProofCurrent.date||'').slice(0,10)||todayISO();
+  const a=document.createElement('a');
+  a.href=_pcSpendProofCurrent.proofDataUri;
+  a.download='Petty Cash - Proof - '+date+'.jpg';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
 
 /* ===== WhatsApp (shared GREEN-API credentials, same pattern as Stationery Inventory) ===== */
 function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===11&&p[0]==='0')p=p.slice(1);if(p.length===10)p='91'+p;return p;}

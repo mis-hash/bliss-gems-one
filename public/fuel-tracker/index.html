@@ -482,7 +482,7 @@ tbody tr:hover td{background:#f7faf8}
 </div></div>
 
 <!-- Photo lightbox -->
-<div class="modal" id="photoModal" onclick="closePhotoModal()"><div class="box lightboxBox"><img id="photoModalImg" src=""></div></div>
+<div class="modal" id="photoModal" onclick="closePhotoModal()"><div class="box lightboxBox"><img id="photoModalImg" src=""><div style="text-align:center;margin-top:10px"><button class="btn small secondary" onclick="event.stopPropagation();downloadPhotoModalImg()">⬇ Download</button></div></div></div>
 
 <button type="button" id="secretAdminIcon" onclick="secretAdminTap()" style="position:fixed;bottom:14px;right:14px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;font-size:13px;line-height:26px;cursor:default;z-index:999999;transition:background .15s">•</button>
 
@@ -1737,6 +1737,14 @@ function openPhotoModal(id,field){
   $('photoModal').classList.add('show');
 }
 function closePhotoModal(){$('photoModal').classList.remove('show');$('photoModalImg').src='';}
+function downloadPhotoModalImg(){
+  const src=$('photoModalImg').src;
+  if(!src||!src.startsWith('data:'))return;
+  const a=document.createElement('a');
+  a.href=src;
+  a.download='Fuel Tracker - Photo - '+todayISO()+'.jpg';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
 function filteredFuelRows(){
   const showDeleted=$('showDeleted')&&$('showDeleted').checked;
   let rows=showDeleted?fuelLog.filter(x=>x.deletedAt):fuelLog.filter(x=>!x.deletedAt);
