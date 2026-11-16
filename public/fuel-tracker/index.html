@@ -113,6 +113,17 @@ tbody tr:hover td{background:#f7faf8}
 .docCard .dcTop{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
 .docCard .dcLabel{font-weight:700;font-size:13.5px}
 .docCard .dcMeta{font-size:12px;color:var(--muted)}
+.docVehicleGroup{margin-bottom:18px}
+.docVehicleGroup h3{font-size:13.5px;font-weight:800;margin:0 0 8px;display:flex;align-items:center;gap:6px;color:var(--g)}
+.docVehicleGroup h3 .docCountTag{background:var(--mint);color:var(--g);padding:2px 9px;border-radius:99px;font-size:10.5px;font-weight:700}
+.docGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.docTile{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;position:relative}
+.docTile .dtTop{font-size:19px;margin-bottom:6px}
+.docTile .dtLabel{font-weight:800;font-size:13px}
+.docTile .dtMeta{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+.docTile .dtActions{display:flex;gap:6px;margin-top:10px}
+.docTile .dtActions .btn{flex:1;padding:6px 8px;font-size:11px}
+.docLatestBadge{position:absolute;top:10px;right:10px;background:var(--mint);color:var(--g);font-size:9px;font-weight:800;padding:2px 7px;border-radius:99px;letter-spacing:.02em}
 @media(max-width:720px){
   header{height:60px}.head{padding:0 11px}.logo{width:38px;height:38px;font-size:20px}.brand b{font-size:16px}.brand small{display:none}
   .shell{display:block;padding:11px 10px 76px}
@@ -216,14 +227,8 @@ tbody tr:hover td{background:#f7faf8}
       <div class="pb"><button class="btn primary" style="width:100%" onclick="openNewDocumentModal()">📄 ＋ Document Renew / Update</button></div>
     </div>
     <div class="panel">
-      <div class="ph"><span>📋 All Documents (Insurance / PUC / Permit / RC / Parking)</span></div>
-      <div class="pb">
-        <div class="tablewrap desktopTable"><table>
-          <thead><tr><th>Vehicle</th><th>Document</th><th>Start</th><th>Expiry</th><th class="num">Cost</th><th>Status</th><th>Soft Copy</th><th>Note</th></tr></thead>
-          <tbody id="allDocumentsTable"></tbody>
-        </table></div>
-        <div id="allDocumentsCards" class="mobileCards"></div>
-      </div>
+      <div class="ph"><span>📋 All Documents (Insurance / PUC / Permit / RC / License / Parking)</span></div>
+      <div class="pb"><div id="allDocumentsWrap"></div></div>
     </div>
   </div>
 
@@ -1035,7 +1040,7 @@ function renderMileageAlerts(){
    the Spark plan, so "alert" here means: show a banner the moment anyone
    opens the app while a document is within 15 days of (or past) expiry —
    not a true scheduled push. */
-const DOC_TYPES=[{key:'insurance',label:'Insurance',icon:'🛡'},{key:'puc',label:'PUC',icon:'🌫'},{key:'permit',label:'Permit',icon:'📄'},{key:'rc',label:'RC / Road Tax',icon:'🪪'},{key:'parking',label:'Parking Pass',icon:'🅿️'}];
+const DOC_TYPES=[{key:'insurance',label:'Insurance',icon:'🛡'},{key:'puc',label:'PUC',icon:'🌫'},{key:'permit',label:'Permit',icon:'📄'},{key:'rc',label:'RC / Road Tax',icon:'🪪'},{key:'license',label:'Driving License',icon:'🆔'},{key:'parking',label:'Parking Pass',icon:'🅿️'}];
 const CATEGORY_ICONS={Car:'🚗',Bike:'🏍',Scooter:'🛵',Van:'🚐',Truck:'🚚',Other:'🚗'};
 function openAddVehicleModal(){
   $('avNumber').value='';$('avMeter').value='';$('avLastService').value='';
@@ -1155,11 +1160,12 @@ function renderVehicleDocuments(){
   }).join('');
 }
 function renderAllDocumentsTable(){
-  const wrap=$('allDocumentsTable');
+  const wrap=$('allDocumentsWrap');
   if(!wrap)return;
-  const rows=[];
+  const groups=[];
   (masters.vehicles||[]).forEach(v=>{
     const vd=(masters.vehicleDocs&&masters.vehicleDocs[v])||{};
+    const docs=[];
     DOC_TYPES.forEach(dt=>{
       const rec=vd[dt.key];
       if(!rec||!rec.expiryDate)return;
@@ -1168,25 +1174,28 @@ function renderAllDocumentsTable(){
       if(days<0)statusHtml=`<span class="pill" style="background:var(--redbg);color:var(--red)">⛔ Expired</span>`;
       else if(days<=DOC_ALERT_DAYS)statusHtml=`<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ ${days} din baaki</span>`;
       else statusHtml=`<span class="pill" style="background:var(--mint);color:var(--g)">✓ Valid</span>`;
-      rows.push({vehicle:v,docKey:dt.key,label:dt.icon+' '+dt.label,startDate:rec.startDate||'-',expiryDate:rec.expiryDate,cost:rec.cost||0,statusHtml,note:rec.note||'-',days,hasPhoto:!!(rec.photo||rec.hasPhoto)});
+      docs.push({vehicle:v,docKey:dt.key,icon:dt.icon,label:dt.label,startDate:rec.startDate||'-',expiryDate:rec.expiryDate,cost:rec.cost||0,statusHtml,note:rec.note||'-',hasPhoto:!!(rec.photo||rec.hasPhoto)});
     });
+    if(docs.length)groups.push({vehicle:v,docs});
   });
-  rows.sort((a,b)=>a.days-b.days);
-  wrap.innerHTML=rows.length?rows.map(r=>{
-    const photoHtml=r.hasPhoto?`<button class="btn small secondary" style="padding:2px 8px;font-size:11px" onclick="showDocPhoto('${esc(r.vehicle)}','${r.docKey}')">📷 View</button>`:'<small class="note">-</small>';
-    return `<tr><td><b>${esc(r.vehicle)}</b></td><td>${esc(r.label)}</td><td>${esc(r.startDate)}</td><td>${esc(r.expiryDate)}</td><td class="num">${r.cost?fmtAmt(r.cost):'-'}</td><td>${r.statusHtml}</td><td>${photoHtml}</td><td>${esc(r.note)}</td></tr>`;
-  }).join(''):`<tr><td colspan="8"><div class="emptystate">📋<p>Abhi koi document set nahi hua.</p><small>Upar se "Document Renew / Update" se pehla document set karein.</small></div></td></tr>`;
-  const cardsWrap=$('allDocumentsCards');
-  if(cardsWrap){
-    cardsWrap.innerHTML=rows.length?rows.map(r=>{
-      const photoBtn=r.hasPhoto?`<button class="btn small secondary" style="padding:3px 9px;font-size:11px;margin-top:6px" onclick="showDocPhoto('${esc(r.vehicle)}','${r.docKey}')">📷 Soft Copy Dekhein</button>`:'';
-      return `<div class="docCard">
-        <div class="dcTop"><span class="dcLabel">${esc(r.vehicle)} — ${esc(r.label)}</span>${r.statusHtml}</div>
-        <div class="dcMeta">${esc(r.startDate)} → ${esc(r.expiryDate)}${r.cost?' • '+fmtAmt(r.cost):''}${r.note!=='-'?' • '+esc(r.note):''}</div>
-        ${photoBtn}
+  wrap.innerHTML=groups.length?groups.map(g=>{
+    const tiles=g.docs.map(r=>{
+      const vSafe=esc(r.vehicle).replace(/'/g,"\\'");
+      const actions=r.hasPhoto?`<button class="btn secondary" onclick="showDocPhoto('${vSafe}','${r.docKey}')">📷 View</button><button class="btn primary" onclick="downloadDocPhotoDirect('${vSafe}','${r.docKey}','${esc(r.label).replace(/'/g,"\\'")}')">⬇ Download</button>`:'<span class="note">Soft copy nahi hai</span>';
+      return `<div class="docTile">
+        <span class="docLatestBadge">🟢 LATEST</span>
+        <div class="dtTop">${r.icon}</div>
+        <div class="dtLabel">${esc(r.label)}</div>
+        ${r.statusHtml}
+        <div class="dtMeta">${esc(r.startDate)} → ${esc(r.expiryDate)}${r.cost?'<br>'+fmtAmt(r.cost):''}${r.note!=='-'?'<br>'+esc(r.note):''}</div>
+        <div class="dtActions">${actions}</div>
       </div>`;
-    }).join(''):`<div class="emptystate">📋<p>Abhi koi document set nahi hua.</p><small>Upar se "Document Renew / Update" se pehla document set karein.</small></div>`;
-  }
+    }).join('');
+    return `<div class="docVehicleGroup">
+      <h3>🚗 ${esc(g.vehicle)} <span class="docCountTag">${g.docs.length} document${g.docs.length>1?'s':''}</span></h3>
+      <div class="docGrid">${tiles}</div>
+    </div>`;
+  }).join(''):`<div class="emptystate">📋<p>Abhi koi document set nahi hua.</p><small>Upar se "Document Renew / Update" se pehla document set karein.</small></div>`;
 }
 let editDocTarget=null;
 function openEditVehicleDocModal(vehicle,docKey){
@@ -1217,16 +1226,31 @@ function closeEditDocModal(){$('editDocModal')?.classList.remove('show');editDoc
 // photo now gets its own small Firestore doc in fv_doc_photos, keyed by vehicle+docKey, so
 // one vehicle's documents can never crowd out another's and the shared masters doc stays tiny.
 function docPhotoId(vehicle,docKey){return String(vehicle).replace(/[^A-Za-z0-9]+/g,'_')+'__'+docKey}
-async function showDocPhoto(vehicle,docKey){
+async function fetchDocPhoto(vehicle,docKey){
   const rec=(masters.vehicleDocs&&masters.vehicleDocs[vehicle]&&masters.vehicleDocs[vehicle][docKey])||{};
-  if(rec.photo){ $('photoModalImg').src=rec.photo; $('photoModal').classList.add('show'); return; } // legacy inline photo
-  if(!rec.hasPhoto)return;
+  if(rec.photo)return rec.photo; // legacy inline photo
+  if(!rec.hasPhoto)return null;
   try{
     const doc=await db.collection('fv_doc_photos').doc(docPhotoId(vehicle,docKey)).get();
-    if(!doc.exists||!doc.data().photo)return;
-    $('photoModalImg').src=doc.data().photo;
-    $('photoModal').classList.add('show');
-  }catch(e){console.error('showDocPhoto fetch failed',e);}
+    if(!doc.exists||!doc.data().photo)return null;
+    return doc.data().photo;
+  }catch(e){console.error('fetchDocPhoto failed',e);return null;}
+}
+async function showDocPhoto(vehicle,docKey){
+  const photo=await fetchDocPhoto(vehicle,docKey);
+  if(!photo)return;
+  $('photoModalImg').src=photo;
+  $('photoModal').classList.add('show');
+}
+// Direct one-click download from the All Documents list, without first opening the
+// view modal - same data-URI <a download> pattern as downloadPhotoModalImg().
+async function downloadDocPhotoDirect(vehicle,docKey,label){
+  const photo=await fetchDocPhoto(vehicle,docKey);
+  if(!photo)return;
+  const a=document.createElement('a');
+  a.href=photo;
+  a.download=vehicle+' - '+(label||docKey)+'.jpg';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 // Shared by both entry points into document saving: the per-pill Edit modal (Vehicles
 // tab) and the New Document Entry modal (Documents tab). A genuine renewal (expiry
