@@ -344,7 +344,6 @@ tbody tr:hover td{background:#f7faf8}
 <div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.4px;margin:14px 0 6px">🚗 VEHICLE METER</div>
 <div class="grid" style="margin-top:4px">
   <div class="field"><label>Vehicle Meter Reading — Before Fueling <span style="color:var(--red)">*</span></label><input type="number" id="fMeterBefore"></div>
-  <div class="field"><label>Vehicle Meter Reading — After Fueling <span style="color:var(--red)">*</span></label><input type="number" id="fMeterAfter"></div>
 </div>
 <div class="grid" style="margin-top:10px">
   <div class="field"><label>Vehicle Meter Photo — Before Fueling</label><input type="file" id="fPhotoVehicleBefore" accept="image/*" capture="environment"></div>
@@ -675,7 +674,7 @@ async function compressPhoto(file){
 
 /* ===== Entry form ===== */
 function openNewFuelModal(){
-  $('fVehicle').value='';$('fMeterBefore').value='';$('fMeterAfter').value='';$('fAmount').value='';$('fLiters').value='';$('fPaymentMode').value='';
+  $('fVehicle').value='';$('fMeterBefore').value='';$('fAmount').value='';$('fLiters').value='';$('fPaymentMode').value='';
   if($('fPhotoVehicleBefore'))$('fPhotoVehicleBefore').value='';
   if($('fPhotoVehicleAfter'))$('fPhotoVehicleAfter').value='';
   if($('fPhotoPump'))$('fPhotoPump').value='';
@@ -690,15 +689,13 @@ async function addFuelEntry(){
   const date=$('fDate').value||todayISO();
   const unit=$('fUnit').value||'KM';
   const meterBefore=parseFloat($('fMeterBefore').value);
-  const meterAfter=parseFloat($('fMeterAfter').value);
   const amount=parseFloat($('fAmount').value);
   const litersRaw=$('fLiters').value;
   const liters=litersRaw?parseFloat(litersRaw):null;
   const paymentMode=$('fPaymentMode').value.trim();
   if(!vehicle){alert('Vehicle Number zaroori hai.');return}
-  if(isNaN(meterBefore)||isNaN(meterAfter)){alert('Meter Reading Before/After dono zaroori hain.');return}
+  if(isNaN(meterBefore)){alert('Vehicle Meter Reading zaroori hai.');return}
   if(!amount||amount<=0){alert('Fuel Amount sahi se bharein.');return}
-  if(meterAfter<meterBefore){ if(!confirm('After Fueling reading Before Fueling se kam hai. Phir bhi save karein?'))return; }
   _fuelSubmitting=true;
   const btn=$('fuelSubmitBtn');if(btn)btn.disabled=true;
   try{
@@ -707,7 +704,7 @@ async function addFuelEntry(){
     const pumpPhotoFile=$('fPhotoPump').files[0]||null;
     const [vehiclePhotoBefore,vehiclePhotoAfter,pumpPhoto]=await Promise.all([compressPhoto(vehiclePhotoBeforeFile),compressPhoto(vehiclePhotoAfterFile),compressPhoto(pumpPhotoFile)]);
     const actor=loggedUser();
-    const payload={vehicle,date,unit,meterBefore,meterAfter,amount,paymentMode,by:actor?actor.id:'',at:new Date().toISOString()};
+    const payload={vehicle,date,unit,meterBefore,amount,paymentMode,by:actor?actor.id:'',at:new Date().toISOString()};
     if(liters)payload.liters=liters;
     if(vehiclePhotoBefore)payload.vehiclePhotoBefore=vehiclePhotoBefore;
     if(vehiclePhotoAfter)payload.vehiclePhotoAfter=vehiclePhotoAfter;
@@ -715,7 +712,7 @@ async function addFuelEntry(){
     await db.collection('fuel_log').add(payload);
     if(vehicle && !masters.vehicles.includes(vehicle)){masters.vehicles.push(vehicle);saveMasters();}
     if(paymentMode && !masters.paymentModes.includes(paymentMode)){masters.paymentModes.push(paymentMode);saveMasters();}
-    $('fVehicle').value='';$('fMeterBefore').value='';$('fMeterAfter').value='';$('fAmount').value='';$('fLiters').value='';$('fPaymentMode').value='';
+    $('fVehicle').value='';$('fMeterBefore').value='';$('fAmount').value='';$('fLiters').value='';$('fPaymentMode').value='';
     $('fPhotoVehicleBefore').value='';$('fPhotoVehicleAfter').value='';$('fPhotoPump').value='';
     closeNewFuelModal();
     toast('Fuel entry saved');
@@ -778,9 +775,10 @@ async function saveEditFuel(){
   const liters=litersRaw?parseFloat(litersRaw):null;
   const paymentMode=$('editFPaymentMode').value.trim();
   if(!date){alert('Date zaroori hai.');return}
-  if(isNaN(meterBefore)||isNaN(meterAfter)){alert('Meter Before/After dono zaroori hain.');return}
+  if(isNaN(meterBefore)){alert('Meter Before zaroori hai.');return}
   if(!amount||amount<=0){alert('Amount sahi se bharein.');return}
-  const update={date,meterBefore,meterAfter,amount,paymentMode};
+  const update={date,meterBefore,amount,paymentMode};
+  if(!isNaN(meterAfter))update.meterAfter=meterAfter;
   if(liters)update.liters=liters;else update.liters=firebase.firestore.FieldValue.delete();
   await db.collection('fuel_log').doc(editFuelTarget).update(update);
   closeEditFuelModal();
@@ -792,6 +790,9 @@ function nameOfUserId(id){return (users.find(x=>x.id===id)||{}).name||id||'-'}
 function liveFuel(){return fuelLog.filter(x=>!x.deletedAt)}
 function entryDistance(x){ const d=(x.meterAfter||0)-(x.meterBefore||0); return d>0?d:0; }
 function entryCostPerUnit(x){ const d=entryDistance(x); return d>0?(x.amount||0)/d:null; }
+// After Fueling reading is no longer collected on new entries - show just the single
+// reading instead of a misleading "15000 → undefined" when meterAfter is absent.
+function entryMeterText(x){ return x.meterAfter!=null?x.meterBefore+' → '+x.meterAfter:String(x.meterBefore); }
 // All-time totals (no date filter) - deliberately independent of the Total Vehicle Cost
 // panel's own quick-range picker below, same as every other Dashboard tile.
 function totalServiceSpendAllTime(){ return liveService().reduce((s,x)=>s+(x.amount||0),0); }
@@ -913,7 +914,7 @@ function latestMeterByVehicle(){
   const map={};
   liveFuel().forEach(x=>{
     const cur=map[x.vehicle];
-    if(!cur||String(x.date)>String(cur.date)||(x.date===cur.date&&String(x.at||'')>String(cur.at||'')))map[x.vehicle]={date:x.date,at:x.at,meter:x.meterAfter};
+    if(!cur||String(x.date)>String(cur.date)||(x.date===cur.date&&String(x.at||'')>String(cur.at||'')))map[x.vehicle]={date:x.date,at:x.at,meter:x.meterAfter??x.meterBefore};
   });
   // No fuel entries yet for a freshly-onboarded vehicle - fall back to the meter reading
   // captured at onboarding time, so Service Due / current-meter display isn't just blank.
@@ -1514,7 +1515,7 @@ function renderVehicleDetail(){
   $('vdFuelPanel').classList.remove('hidden');
   $('vdServicePanel').classList.remove('hidden');
   $('vdDocsPanel').classList.remove('hidden');
-  $('vdFuelTable').innerHTML=fuelRows.length?fuelRows.map(x=>`<tr><td>${esc(x.date)}</td><td>${x.meterBefore} → ${x.meterAfter}</td><td class="num">${x.liters||'-'}</td><td class="num">${fmtAmt(x.amount)}</td></tr>`).join(''):`<tr><td colspan="4"><div class="emptystate">⛽<p>Koi fuel entry nahi hai.</p></div></td></tr>`;
+  $('vdFuelTable').innerHTML=fuelRows.length?fuelRows.map(x=>`<tr><td>${esc(x.date)}</td><td>${entryMeterText(x)}</td><td class="num">${x.liters||'-'}</td><td class="num">${fmtAmt(x.amount)}</td></tr>`).join(''):`<tr><td colspan="4"><div class="emptystate">⛽<p>Koi fuel entry nahi hai.</p></div></td></tr>`;
   $('vdServiceTable').innerHTML=serviceRows.length?serviceRows.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.type||'-')}</td><td>${esc(x.note||'-')}</td><td class="num">${fmtAmt(x.amount)}</td></tr>`).join(''):`<tr><td colspan="4"><div class="emptystate">🔧<p>Koi service entry nahi hai.</p></div></td></tr>`;
   $('vdDocsTable').innerHTML=docRows.length?docRows.map(r=>{
     const days=r.expiryDate?Math.ceil((new Date(r.expiryDate)-new Date(todayISO()))/86400000):null;
@@ -1523,7 +1524,7 @@ function renderVehicleDetail(){
   }).join(''):`<tr><td colspan="5"><div class="emptystate">📄<p>Koi document set nahi hua.</p></div></td></tr>`;
   if($('vdFuelCards'))$('vdFuelCards').innerHTML=fuelRows.length?fuelRows.map(x=>`<div class="docCard">
     <div class="dcTop"><span class="dcLabel">${esc(x.date)}</span><b>${fmtAmt(x.amount)}</b></div>
-    <div class="dcMeta">${x.meterBefore} → ${x.meterAfter}${x.liters?' • '+x.liters+' L':''}</div>
+    <div class="dcMeta">${entryMeterText(x)}${x.liters?' • '+x.liters+' L':''}</div>
   </div>`).join(''):`<div class="emptystate">⛽<p>Koi fuel entry nahi hai.</p></div>`;
   if($('vdServiceCards'))$('vdServiceCards').innerHTML=serviceRows.length?serviceRows.map(x=>`<div class="docCard">
     <div class="dcTop"><span class="dcLabel">${esc(x.date)} — ${esc(x.type||'-')}</span><b>${fmtAmt(x.amount)}</b></div>
@@ -1779,7 +1780,7 @@ function exportFuelCSV(){
   const rows=[['Date','Vehicle','Meter Before','Meter After','Distance','Unit','Amount','Liters','Cost/Unit','Payment Mode','By']];
   filteredFuelRows().forEach(x=>{
     const cost=entryCostPerUnit(x);
-    rows.push([x.date,x.vehicle,x.meterBefore,x.meterAfter,entryDistance(x),x.unit||'KM',x.amount,x.liters||'',cost!==null?cost.toFixed(2):'',x.paymentMode||'',nameOfUserId(x.by)]);
+    rows.push([x.date,x.vehicle,x.meterBefore,x.meterAfter??'',entryDistance(x),x.unit||'KM',x.amount,x.liters||'',cost!==null?cost.toFixed(2):'',x.paymentMode||'',nameOfUserId(x.by)]);
   });
   downloadCSV('fuel-tracker-log.csv',rows);
 }
@@ -1799,7 +1800,7 @@ function renderHistory(){
       :(superAdminUnlocked?`<button class="btn small danger" onclick="deleteFuelEntry('${esc(x.id)}')">Disable</button>`:'');
     const permBtn=superAdminUnlocked?`<button class="btn small danger" onclick="permanentlyDeleteFuelEntry('${esc(x.id)}')">🗑 Delete Permanently</button>`:'';
     const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditFuelModal('${esc(x.id)}')">✎ Edit</button>`:'';
-    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td>${esc(x.vehicle)}</td><td>${x.meterBefore} → ${x.meterAfter} ${esc(x.unit||'KM')}</td><td class="num">${fmtAmt(x.amount)}</td><td class="num">${cost!==null?'₹'+cost.toFixed(2):'-'}</td><td>${esc(x.paymentMode||'-')}</td><td>${esc(nameOfUserId(x.by))}</td><td>${photoThumbs(x)}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
+    return `<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td>${esc(x.vehicle)}</td><td>${entryMeterText(x)} ${esc(x.unit||'KM')}</td><td class="num">${fmtAmt(x.amount)}</td><td class="num">${cost!==null?'₹'+cost.toFixed(2):'-'}</td><td>${esc(x.paymentMode||'-')}</td><td>${esc(nameOfUserId(x.by))}</td><td>${photoThumbs(x)}</td><td style="display:flex;gap:6px;flex-wrap:wrap">${editBtn} ${adminBtn} ${permBtn}</td></tr>`;
   }).join('')||`<tr><td colspan="9"><div class="emptystate">⛽<p>Koi fuel entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
   if($('fuelLoadMoreRow'))$('fuelLoadMoreRow').remove();
   if(allRows.length>rows.length){
@@ -1819,7 +1820,7 @@ function renderHistory(){
       const editBtn=(superAdminUnlocked&&!x.deletedAt)?`<button class="btn small secondary" onclick="openEditFuelModal('${esc(x.id)}')">✎ Edit</button>`:'';
       return `<div class="docCard">
         <div class="dcTop"><span class="dcLabel">${esc(x.vehicle)}</span><b>${fmtAmt(x.amount)}</b></div>
-        <div class="dcMeta">${esc(x.date)}${deletedInfo(x)} • ${x.meterBefore} → ${x.meterAfter} ${esc(x.unit||'KM')}${cost!==null?' • ₹'+cost.toFixed(2)+'/unit':''}</div>
+        <div class="dcMeta">${esc(x.date)}${deletedInfo(x)} • ${entryMeterText(x)} ${esc(x.unit||'KM')}${cost!==null?' • ₹'+cost.toFixed(2)+'/unit':''}</div>
         <div class="dcMeta">${esc(x.paymentMode||'-')} • ${esc(nameOfUserId(x.by))}</div>
         <div style="margin-top:6px">${photoThumbs(x)}</div>
         ${(editBtn||adminBtn||permBtn)?`<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${editBtn} ${adminBtn} ${permBtn}</div>`:''}
