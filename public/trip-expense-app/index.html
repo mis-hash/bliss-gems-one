@@ -337,7 +337,7 @@ if(window.self!==window.top){
 <div class="field span2"><label>Remark / No Bill Reason</label><textarea id="expRemark"></textarea></div>
 </div><div class="actions"><button class="btn" onclick="hide('expense')">Cancel</button><button class="btn primary" id="expSubmitBtn" onclick="submitExpense()">Save Expense</button></div><div class="msg" id="expMsg"></div></div></div>
 
-<div class="modal" id="proofView"><div class="box"><h3>Bill / Proof</h3><img id="proofImg" style="max-width:100%;border-radius:8px"><div class="actions"><button class="btn" onclick="closeProofView()">Close</button></div></div></div>
+<div class="modal" id="proofView"><div class="box"><h3>Bill / Proof</h3><img id="proofImg" style="max-width:100%;border-radius:8px"><div class="actions"><button class="btn" onclick="downloadProofImage()">⬇ Download</button><button class="btn" onclick="closeProofView()">Close</button></div></div></div>
 
 <div class="modal" id="closeTripModal"><div class="box" style="width:min(460px,100%)">
 <h3>Verify &amp; Close</h3>
@@ -1640,11 +1640,21 @@ function renderLedgerPage(){
 // bottom instead of staying where you were - save/restore its scroll position around
 // the nested overlay's open/close instead of relying on the browser to preserve it.
 let _proofViewReturnScrollTop=null;
+let _proofViewCurrent=null;
 function viewProof(ledgerId){
   const l=ledger.find(x=>x.id===ledgerId);if(!l||!l.proofDataUri)return;
   const tdm=$('tripDetailModal');
   _proofViewReturnScrollTop=(tdm&&tdm.classList.contains('show'))?tdm.querySelector('.box').scrollTop:null;
+  _proofViewCurrent=l;
   $('proofImg').src=l.proofDataUri;show('proofView');
+}
+function downloadProofImage(){
+  if(!_proofViewCurrent||!_proofViewCurrent.proofDataUri)return;
+  const date=(_proofViewCurrent.at||'').slice(0,10)||todayISO();
+  const a=document.createElement('a');
+  a.href=_proofViewCurrent.proofDataUri;
+  a.download='Bill-Proof-'+date+'.jpg';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 function closeProofView(){
   hide('proofView');
