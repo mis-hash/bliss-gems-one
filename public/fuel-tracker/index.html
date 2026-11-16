@@ -356,7 +356,7 @@ tbody tr:hover td{background:#f7faf8}
   <div class="field"><label>Fuel Quantity (Liters)</label><input type="number" id="fLiters" placeholder="optional"></div>
 </div>
 <div class="grid" style="margin-top:10px">
-  <div class="field"><label>Petrol Pump Meter Photo (After Fueling)</label><input type="file" id="fPhotoPump" accept="image/*" capture="environment"></div>
+  <div class="field"><label>Petrol Pump Slip Photo (After Fueling)</label><input type="file" id="fPhotoPump" accept="image/*" capture="environment"></div>
   <div class="field"><label>Payment Mode</label><input id="fPaymentMode" list="paymentModeList" placeholder="Cash / UPI / Card / Company Account"></div>
 </div>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeNewFuelModal()">Cancel</button><button class="btn primary" id="fuelSubmitBtn" onclick="addFuelEntry()">＋ Save Entry</button></div>
@@ -1727,7 +1727,7 @@ function photoThumbs(x){
   let html='';
   if(x.vehiclePhotoBefore)html+=`<img class="thumb" src="${x.vehiclePhotoBefore}" onclick="openPhotoModal('${esc(x.id)}','vehiclePhotoBefore')" title="Vehicle Meter Photo — Before Fueling">`;
   if(x.vehiclePhotoAfter)html+=`<img class="thumb" src="${x.vehiclePhotoAfter}" onclick="openPhotoModal('${esc(x.id)}','vehiclePhotoAfter')" title="Vehicle Meter Photo — After Fueling">`;
-  if(x.pumpPhoto)html+=`<img class="thumb" src="${x.pumpPhoto}" onclick="openPhotoModal('${esc(x.id)}','pumpPhoto')" title="Petrol Pump Meter Photo (After Fueling)">`;
+  if(x.pumpPhoto)html+=`<img class="thumb" src="${x.pumpPhoto}" onclick="openPhotoModal('${esc(x.id)}','pumpPhoto')" title="Petrol Pump Slip Photo (After Fueling)">`;
   if(!x.vehiclePhotoBefore&&!x.vehiclePhotoAfter&&x.vehiclePhoto)html+=`<img class="thumb" src="${x.vehiclePhoto}" onclick="openPhotoModal('${esc(x.id)}','vehiclePhoto')" title="Vehicle Meter Photo">`;
   return html?`<div style="display:flex;flex-wrap:wrap;gap:5px">${html}</div>`:'<small class="note">-</small>';
 }
