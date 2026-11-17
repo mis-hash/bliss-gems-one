@@ -62,6 +62,12 @@ table{width:100%;border-collapse:collapse;font-size:13.5px}
 th{text-align:left;padding:10px;background:var(--bg);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;border-bottom:1px solid var(--line)}
 td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 .emptystate{text-align:center;padding:30px;color:var(--muted);font-size:13px}
+.navBar{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:68px;z-index:19}
+.navInner{max-width:980px;margin:auto;padding:0 18px;display:flex;gap:6px}
+.navBtn{border:0;background:transparent;padding:14px 16px;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;font-family:'Manrope',sans-serif}
+.navBtn.on{color:var(--g);border-bottom-color:var(--g)}
+.sclPage{display:none}
+.sclPage.on{display:block}
 </style>
 </head>
 <body>
@@ -77,46 +83,61 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
   </div>
 </div></header>
 
+<div class="navBar"><div class="navInner">
+  <button class="navBtn on" data-page="log" onclick="goPage('log')">📞 Call Log</button>
+  <button class="navBtn" data-page="analysis" onclick="goPage('analysis')">🧠 Call Analysis</button>
+</div></div>
+
 <div class="shell">
   <div class="panel">
-    <div class="ph">➕ Call Log Karein</div>
-    <div class="pb">
-      <div class="note" style="margin-bottom:12px">Recording log karne ke saath ek free Call Analysis card bhi milega (note ke keywords + call duration se) - asli AI transcript/understanding ke liye paid speech-to-text API chahiye hoga, jo abhi approve nahi hai.</div>
-      <div class="grid">
-        <div class="field"><label>Sales Person</label><select id="callSalesPerson"></select></div>
-        <div class="field"><label>Client/Party (optional)</label><input id="callClientName" type="text"></div>
-      </div>
-      <div class="grid" style="margin-top:10px">
-        <div class="field"><label>Recording File (optional, chhoti file)</label><input type="file" id="callFileInput" accept="audio/*"></div>
-        <div class="field"><label>Note (optional)</label><input id="callNote" type="text"></div>
-      </div>
-      <button type="button" class="btn primary" style="margin-top:14px" onclick="logCallRecording()">⬆ Call Log Karein</button>
-      <div class="note" id="callLogStatus" style="margin-top:8px"></div>
-    </div>
-  </div>
-
-  <div class="panel">
-    <div class="ph">🧠 Call Analysis Overview</div>
-    <div class="pb" id="callAnalysisOverview"></div>
-  </div>
-
-  <div class="panel">
     <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <span>📋 Call History</span>
+      <span>🔎 Filter (Call Log aur Analysis dono pe lagta hai)</span>
       <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
         <input type="date" id="callFilterFrom" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
         <span style="font-size:12px;color:var(--muted)">se</span>
         <input type="date" id="callFilterTo" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
         <button type="button" class="btn small" onclick="$('callFilterFrom').value='';$('callFilterTo').value='';renderCallHistory();renderCallAnalysisOverview()">✕ Date Clear</button>
-        <button type="button" class="btn small" onclick="exportCallLogCSV()">⬇ Export CSV</button>
       </span>
     </div>
-    <div class="pb" style="padding:0">
-      <table>
-        <thead><tr><th>Date</th><th>Sales Person</th><th>Client</th><th>Note</th><th>Recording</th><th>Logged By</th></tr></thead>
-        <tbody id="callHistoryTable"></tbody>
-      </table>
+  </div>
+
+  <div id="page-log" class="sclPage on">
+    <div class="panel">
+      <div class="ph">➕ Call Log Karein</div>
+      <div class="pb">
+        <div class="note" style="margin-bottom:12px">Recording log karne ke saath ek free Call Analysis card bhi milega (note ke keywords + call duration se) - asli AI transcript/understanding ke liye paid speech-to-text API chahiye hoga, jo abhi approve nahi hai.</div>
+        <div class="grid">
+          <div class="field"><label>Sales Person</label><select id="callSalesPerson"></select></div>
+          <div class="field"><label>Client/Party (optional)</label><input id="callClientName" type="text"></div>
+        </div>
+        <div class="grid" style="margin-top:10px">
+          <div class="field"><label>Recording File (optional, chhoti file)</label><input type="file" id="callFileInput" accept="audio/*"></div>
+          <div class="field"><label>Note (optional)</label><input id="callNote" type="text"></div>
+        </div>
+        <button type="button" class="btn primary" style="margin-top:14px" onclick="logCallRecording()">⬆ Call Log Karein</button>
+        <div class="note" id="callLogStatus" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <span>📋 Call History</span>
+        <button type="button" class="btn small" onclick="exportCallLogCSV()">⬇ Export CSV</button>
+      </div>
+      <div class="pb" style="padding:0">
+        <table>
+          <thead><tr><th>Date</th><th>Sales Person</th><th>Client</th><th>Note</th><th>Recording</th><th>Logged By</th></tr></thead>
+          <tbody id="callHistoryTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-analysis" class="sclPage">
+    <div class="panel">
+      <div class="ph">🧠 Call Analysis Overview</div>
+      <div class="pb" id="callAnalysisOverview"></div>
     </div>
   </div>
 </div>
@@ -193,6 +214,11 @@ function renderSalesPersonOptions(){
   if(sel){const cur=sel.value;sel.innerHTML='<option value="">-- Select --</option>'+opts;if(cur)sel.value=cur;}
   const filterSel=$('callFilterSalesPerson');
   if(filterSel){const cur=filterSel.value;filterSel.innerHTML='<option value="">Sab Sales Persons</option>'+opts;if(cur)filterSel.value=cur;}
+}
+
+function goPage(id){
+  document.querySelectorAll('.sclPage').forEach(p=>p.classList.toggle('on',p.id==='page-'+id));
+  document.querySelectorAll('.navBtn[data-page]').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
 }
 
 function renderAll(){
