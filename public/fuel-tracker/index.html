@@ -1174,16 +1174,28 @@ function renderAllDocumentsTable(){
       if(days<0)statusHtml=`<span class="pill" style="background:var(--redbg);color:var(--red)">⛔ Expired</span>`;
       else if(days<=DOC_ALERT_DAYS)statusHtml=`<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ ${days} din baaki</span>`;
       else statusHtml=`<span class="pill" style="background:var(--mint);color:var(--g)">✓ Valid</span>`;
-      docs.push({vehicle:v,docKey:dt.key,icon:dt.icon,label:dt.label,startDate:rec.startDate||'-',expiryDate:rec.expiryDate,cost:rec.cost||0,statusHtml,note:rec.note||'-',hasPhoto:!!(rec.photo||rec.hasPhoto)});
+      docs.push({vehicle:v,docKey:dt.key,icon:dt.icon,label:dt.label,startDate:rec.startDate||'-',expiryDate:rec.expiryDate,cost:rec.cost||0,statusHtml,note:rec.note||'-',hasPhoto:!!(rec.photo||rec.hasPhoto),isLatest:true});
+      // Past renewals of this same document type, newest first, right after the latest
+      // tile. Only renewals made after the history-photo-archiving feature shipped have
+      // a histPhotoId (older ones never had their old photo preserved - see saveDocRecord).
+      (rec.history||[]).slice().reverse().forEach(h=>{
+        docs.push({vehicle:v,docKey:dt.key,icon:dt.icon,label:dt.label,startDate:h.startDate||'-',expiryDate:h.expiryDate||'-',cost:h.cost||0,statusHtml:`<span class="pill" style="background:#eef2f0;color:var(--muted)">📁 History${h.renewedAt?' • '+esc(h.renewedAt):''}</span>`,note:h.note||'-',hasPhoto:!!h.histPhotoId,isLatest:false,histPhotoId:h.histPhotoId});
+      });
     });
     if(docs.length)groups.push({vehicle:v,docs});
   });
   wrap.innerHTML=groups.length?groups.map(g=>{
     const tiles=g.docs.map(r=>{
       const vSafe=esc(r.vehicle).replace(/'/g,"\\'");
-      const actions=r.hasPhoto?`<button class="btn secondary" onclick="showDocPhoto('${vSafe}','${r.docKey}')">📷 View</button><button class="btn primary" onclick="downloadDocPhotoDirect('${vSafe}','${r.docKey}','${esc(r.label).replace(/'/g,"\\'")}')">⬇ Download</button>`:'<span class="note">Soft copy nahi hai</span>';
+      const labelSafe=esc(r.label).replace(/'/g,"\\'");
+      let actions;
+      if(r.isLatest){
+        actions=r.hasPhoto?`<button class="btn secondary" onclick="showDocPhoto('${vSafe}','${r.docKey}')">📷 View</button><button class="btn primary" onclick="downloadDocPhotoDirect('${vSafe}','${r.docKey}','${labelSafe}')">⬇ Download</button>`:'<span class="note">Soft copy nahi hai</span>';
+      }else{
+        actions=r.hasPhoto?`<button class="btn secondary" onclick="showDocHistoryPhoto('${r.histPhotoId}')">📷 View</button><button class="btn primary" onclick="downloadDocHistoryPhotoDirect('${r.histPhotoId}','${labelSafe}')">⬇ Download</button>`:'<span class="note">Soft copy save nahi hui thi</span>';
+      }
       return `<div class="docTile">
-        <span class="docLatestBadge">🟢 LATEST</span>
+        ${r.isLatest?'<span class="docLatestBadge">🟢 LATEST</span>':''}
         <div class="dtTop">${r.icon}</div>
         <div class="dtLabel">${esc(r.label)}</div>
         ${r.statusHtml}
@@ -1226,15 +1238,18 @@ function closeEditDocModal(){$('editDocModal')?.classList.remove('show');editDoc
 // photo now gets its own small Firestore doc in fv_doc_photos, keyed by vehicle+docKey, so
 // one vehicle's documents can never crowd out another's and the shared masters doc stays tiny.
 function docPhotoId(vehicle,docKey){return String(vehicle).replace(/[^A-Za-z0-9]+/g,'_')+'__'+docKey}
+async function fetchDocPhotoById(photoId){
+  try{
+    const doc=await db.collection('fv_doc_photos').doc(photoId).get();
+    if(!doc.exists||!doc.data().photo)return null;
+    return doc.data().photo;
+  }catch(e){console.error('fetchDocPhotoById failed',e);return null;}
+}
 async function fetchDocPhoto(vehicle,docKey){
   const rec=(masters.vehicleDocs&&masters.vehicleDocs[vehicle]&&masters.vehicleDocs[vehicle][docKey])||{};
   if(rec.photo)return rec.photo; // legacy inline photo
   if(!rec.hasPhoto)return null;
-  try{
-    const doc=await db.collection('fv_doc_photos').doc(docPhotoId(vehicle,docKey)).get();
-    if(!doc.exists||!doc.data().photo)return null;
-    return doc.data().photo;
-  }catch(e){console.error('fetchDocPhoto failed',e);return null;}
+  return fetchDocPhotoById(docPhotoId(vehicle,docKey));
 }
 async function showDocPhoto(vehicle,docKey){
   const photo=await fetchDocPhoto(vehicle,docKey);
@@ -1252,18 +1267,34 @@ async function downloadDocPhotoDirect(vehicle,docKey,label){
   a.download=vehicle+' - '+(label||docKey)+'.jpg';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
+// Same as showDocPhoto/downloadDocPhotoDirect, but for an archived past-renewal photo
+// (addressed directly by its fv_doc_photos doc id, not by the live vehicle+docKey slot).
+async function showDocHistoryPhoto(photoId){
+  const photo=await fetchDocPhotoById(photoId);
+  if(!photo)return;
+  $('photoModalImg').src=photo;
+  $('photoModal').classList.add('show');
+}
+async function downloadDocHistoryPhotoDirect(photoId,label){
+  const photo=await fetchDocPhotoById(photoId);
+  if(!photo)return;
+  const a=document.createElement('a');
+  a.href=photo;
+  a.download=(label||'Document')+'.jpg';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
 // Shared by both entry points into document saving: the per-pill Edit modal (Vehicles
 // tab) and the New Document Entry modal (Documents tab). A genuine renewal (expiry
 // actually changing from a previously-set one) archives the old record instead of
-// silently overwriting it, so past renewals stay visible. Returns true if a renewal
-// was archived, so callers can tailor their toast message.
+// silently overwriting it, so past renewals stay visible. The old record's photo (if
+// any) is also archived into its own fv_doc_photos doc BEFORE the live doc gets
+// overwritten below - renewals made before this existed never had their old photo
+// preserved, so those history entries simply have no histPhotoId (shown as "no soft
+// copy" rather than a broken download). Returns true if a renewal was archived, so
+// callers can tailor their toast message.
 async function saveDocRecord(vehicle,docKey,startDate,expiryDate,costRaw,note,photoFile){
   const cost=costRaw?parseFloat(costRaw):null;
   const newPhoto=await compressPhoto(photoFile);
-  if(newPhoto){
-    try{await db.collection('fv_doc_photos').doc(docPhotoId(vehicle,docKey)).set({photo:newPhoto,updatedAt:new Date().toISOString()});}
-    catch(e){console.error('doc photo save failed',e);}
-  }
   if(!masters.vehicleDocs)masters.vehicleDocs={};
   if(!masters.vehicleDocs[vehicle])masters.vehicleDocs[vehicle]={};
   const existing=masters.vehicleDocs[vehicle][docKey]||{};
@@ -1272,7 +1303,21 @@ async function saveDocRecord(vehicle,docKey,startDate,expiryDate,costRaw,note,ph
   const renewed=!!(existing.expiryDate && expiryDate && existing.expiryDate!==expiryDate);
   if(renewed){
     const {history:_old,photo:_oldPhoto,...prevSnapshot}=existing;
-    history.push({...prevSnapshot,renewedAt:todayISO()});
+    let histPhotoId=null;
+    if(existing.hasPhoto){
+      try{
+        const oldPhoto=await fetchDocPhoto(vehicle,docKey);
+        if(oldPhoto){
+          histPhotoId=docPhotoId(vehicle,docKey)+'__hist'+history.length;
+          await db.collection('fv_doc_photos').doc(histPhotoId).set({photo:oldPhoto,updatedAt:new Date().toISOString()});
+        }
+      }catch(e){console.error('archiving old doc photo failed',e);}
+    }
+    history.push(histPhotoId?{...prevSnapshot,renewedAt:todayISO(),histPhotoId}:{...prevSnapshot,renewedAt:todayISO()});
+  }
+  if(newPhoto){
+    try{await db.collection('fv_doc_photos').doc(docPhotoId(vehicle,docKey)).set({photo:newPhoto,updatedAt:new Date().toISOString()});}
+    catch(e){console.error('doc photo save failed',e);}
   }
   masters.vehicleDocs[vehicle][docKey]=expiryDate?{...existingLite,startDate,expiryDate,cost,note,hasPhoto:!!(newPhoto||existing.hasPhoto),history}:null;
   saveMasters();
