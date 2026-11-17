@@ -68,6 +68,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 .navBtn.on{color:var(--g);border-bottom-color:var(--g)}
 .sclPage{display:none}
 .sclPage.on{display:block}
+.pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:10.5px;font-weight:700;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -112,6 +113,16 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
           <div class="field"><label>Client/Party (optional)</label><input id="callClientName" type="text"></div>
         </div>
         <div class="grid" style="margin-top:10px">
+          <div class="field"><label>Call Outcome</label><select id="callOutcome">
+            <option value="">-- Select --</option>
+            <option value="converted">✅ Converted / Order Mila</option>
+            <option value="interested">🟢 Interested</option>
+            <option value="followup">🔁 Follow-up Chahiye</option>
+            <option value="not_interested">❌ Not Interested</option>
+          </select></div>
+          <div class="field"><label>Estimated Deal Value (₹, optional)</label><input type="number" id="callDealValue" placeholder="e.g. 50000"></div>
+        </div>
+        <div class="grid" style="margin-top:10px">
           <div class="field"><label>Recording File (optional, chhoti file)</label><input type="file" id="callFileInput" accept="audio/*"></div>
           <div class="field"><label>Note (optional)</label><input id="callNote" type="text"></div>
         </div>
@@ -127,7 +138,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
       </div>
       <div class="pb" style="padding:0">
         <table>
-          <thead><tr><th>Date</th><th>Sales Person</th><th>Client</th><th>Note</th><th>Recording</th><th>Logged By</th></tr></thead>
+          <thead><tr><th>Date</th><th>Sales Person</th><th>Client</th><th>Outcome</th><th>Note</th><th>Recording</th><th>Logged By</th></tr></thead>
           <tbody id="callHistoryTable"></tbody>
         </table>
       </div>
@@ -271,6 +282,9 @@ async function logCallRecording(){
   const salesPerson=$('callSalesPerson').value;
   const clientName=$('callClientName').value.trim();
   const note=$('callNote').value.trim();
+  const outcome=$('callOutcome').value;
+  const dealValueRaw=$('callDealValue').value;
+  const dealValue=dealValueRaw?parseFloat(dealValueRaw):null;
   const fileInput=$('callFileInput');
   const file=fileInput.files[0]||null;
   const status=$('callLogStatus');
@@ -286,12 +300,14 @@ async function logCallRecording(){
       }
     }
     const rows=liveCallLog();
-    rows.push({id:'CL-'+Date.now()+'-'+Math.random().toString(36).slice(2),salesPerson,clientName,note,recordingUrl,durationSeconds,fileName:file?file.name:'',loggedAt:new Date().toISOString(),loggedBy:(loggedUser()||{}).name||''});
+    rows.push({id:'CL-'+Date.now()+'-'+Math.random().toString(36).slice(2),salesPerson,clientName,note,outcome,dealValue,recordingUrl,durationSeconds,fileName:file?file.name:'',loggedAt:new Date().toISOString(),loggedBy:(loggedUser()||{}).name||''});
     saveCallLog(rows);
     status.style.color='var(--g)';
     status.textContent='Call log ho gayi'+fileNote+'.';
     $('callClientName').value='';
     $('callNote').value='';
+    $('callOutcome').value='';
+    $('callDealValue').value='';
     fileInput.value='';
     renderCallHistory();
     renderCallAnalysisOverview();
@@ -300,6 +316,17 @@ async function logCallRecording(){
     status.style.color='var(--red)';
     status.textContent='Error aaya: '+(e.message||e);
   }
+}
+const CALL_OUTCOMES={
+  converted:{label:'✅ Converted',bg:'var(--mint)',color:'var(--g)'},
+  interested:{label:'🟢 Interested',bg:'var(--mint)',color:'var(--g)'},
+  followup:{label:'🔁 Follow-up',bg:'var(--amberbg)',color:'var(--amber)'},
+  not_interested:{label:'❌ Not Interested',bg:'var(--redbg)',color:'var(--red)'}
+};
+function outcomeLabelHtml(o){
+  const d=CALL_OUTCOMES[o];
+  if(!d)return '<span class="note">-</span>';
+  return `<span class="pill" style="background:${d.bg};color:${d.color}">${esc(d.label)}</span>`;
 }
 /* ===== Free, rule-based Call Analysis (no paid speech-to-text) =====
    There's no API to turn the audio into a real transcript for free, so this analyzes the
@@ -386,6 +413,137 @@ function callAnalysisBySalesPerson(rows,analyses){ return groupCallAnalysis(rows
 // Same breakdown, grouped by client instead - surfaces a client who's had a run of negative
 // calls (worth a Director's attention) the same way the sales-person table surfaces a person.
 function callAnalysisByClient(rows,analyses){ return groupCallAnalysis(rows,analyses,r=>r.clientName); }
+/* ===== Sales Insights - built on the real "Call Outcome" the sales person picks, not
+   keyword-guessed sentiment, so Conversion Rate/Leaderboard/Stuck Leads are accurate. =====
+   NOTE: this is per-device data only (see CALL_LOG_KEY above) - a Director viewing this on a
+   different device from the sales team will only see what was logged on THIS device, until
+   the call log moves to Firestore. */
+const CONVERTED_OUTCOMES=['converted'];
+function computeOutcomeLeaderboard(rows){
+  const now=Date.now();
+  const by={};
+  rows.forEach(r=>{
+    const k=r.salesPerson||'Unknown';
+    if(!by[k])by[k]={total:0,converted:0};
+    by[k].total++;
+    if(CONVERTED_OUTCOMES.includes(r.outcome))by[k].converted++;
+  });
+  Object.keys(by).forEach(k=>{
+    const personRows=rows.filter(r=>(r.salesPerson||'Unknown')===k);
+    const ageDays=r=>(now-new Date(r.loggedAt).getTime())/86400000;
+    const recent=personRows.filter(r=>ageDays(r)<=7);
+    const prior=personRows.filter(r=>{const a=ageDays(r);return a>7&&a<=14;});
+    const rate=rs=>rs.length?rs.filter(r=>CONVERTED_OUTCOMES.includes(r.outcome)).length/rs.length:null;
+    const recentRate=rate(recent),priorRate=rate(prior);
+    by[k].trend=(recentRate==null||priorRate==null)?'flat':(recentRate>priorRate?'up':recentRate<priorRate?'down':'flat');
+  });
+  return by;
+}
+const STUCK_LEAD_DAYS=5;
+// Latest call PER CLIENT, independent of the date-range filter (a live snapshot - a lead
+// stuck since before the filter's "from" date is still stuck), same pattern Parcel
+// Dispatch's Stage-wise Pending Breakdown uses for the same reason.
+function computeStuckLeads(){
+  const spFilter=$('callFilterSalesPerson')?$('callFilterSalesPerson').value:'';
+  const rows=liveCallLog().filter(r=>!spFilter||r.salesPerson===spFilter);
+  const latestByClient={};
+  rows.forEach(r=>{
+    const k=String(r.clientName||'').trim();
+    if(!k)return;
+    const cur=latestByClient[k];
+    if(!cur||new Date(r.loggedAt)>new Date(cur.loggedAt))latestByClient[k]=r;
+  });
+  const now=Date.now();
+  return Object.values(latestByClient).filter(r=>{
+    if(r.outcome!=='interested'&&r.outcome!=='followup')return false;
+    return (now-new Date(r.loggedAt).getTime())/86400000>=STUCK_LEAD_DAYS;
+  }).map(r=>({...r,daysPending:Math.floor((now-new Date(r.loggedAt).getTime())/86400000)}))
+    .sort((a,b)=>b.daysPending-a.daysPending);
+}
+// For a client with 2+ calls, the average gap between consecutive calls vs. whether the
+// most recent call ended Converted - a genuinely data-driven signal (from the team's own
+// history), not a guess, on whether faster follow-up actually correlates with winning deals.
+function computeFollowupSpeedInsight(rows){
+  const byClient={};
+  rows.forEach(r=>{
+    const k=String(r.clientName||'').trim();
+    if(!k)return;
+    (byClient[k]=byClient[k]||[]).push(r);
+  });
+  const fast={total:0,converted:0},slow={total:0,converted:0};
+  Object.values(byClient).forEach(calls=>{
+    if(calls.length<2)return;
+    calls=calls.slice().sort((a,b)=>new Date(a.loggedAt)-new Date(b.loggedAt));
+    let gapSum=0;
+    for(let i=1;i<calls.length;i++)gapSum+=(new Date(calls[i].loggedAt)-new Date(calls[i-1].loggedAt))/86400000;
+    const avgGap=gapSum/(calls.length-1);
+    const finalOutcome=calls[calls.length-1].outcome;
+    const bucket=avgGap<=2?fast:slow;
+    bucket.total++;
+    if(CONVERTED_OUTCOMES.includes(finalOutcome))bucket.converted++;
+  });
+  return {
+    fastRate:fast.total?Math.round(fast.converted/fast.total*100):null,fastCount:fast.total,
+    slowRate:slow.total?Math.round(slow.converted/slow.total*100):null,slowCount:slow.total
+  };
+}
+const CALL_TARGETS_KEY='scl_call_targets';
+function getCallTargets(){ try{const raw=localStorage.getItem(CALL_TARGETS_KEY);return raw?JSON.parse(raw):{};}catch(e){return {};} }
+function setCallTarget(salesPerson,target){
+  const t=getCallTargets();
+  if(target)t[salesPerson]=target;else delete t[salesPerson];
+  try{localStorage.setItem(CALL_TARGETS_KEY,JSON.stringify(t));}catch(e){console.error('setCallTarget failed:',e);}
+  renderCallAnalysisOverview();
+}
+function renderSalesInsightsHtml(scopeRows){
+  const leaderboard=computeOutcomeLeaderboard(scopeRows);
+  const names=Object.keys(leaderboard).sort((a,b)=>leaderboard[b].total-leaderboard[a].total);
+  const targets=getCallTargets();
+  const trendHtml={up:'<span style="color:var(--g);font-weight:800">↑ Improving</span>',down:'<span style="color:var(--red);font-weight:800">↓ Declining</span>',flat:'<span class="note">Flat</span>'};
+  const now=Date.now();
+  const leaderboardRows=names.map(n=>{
+    const d=leaderboard[n];
+    const winRate=d.total?Math.round(d.converted/d.total*100):0;
+    const callsThisWeek=scopeRows.filter(r=>(r.salesPerson||'Unknown')===n&&(now-new Date(r.loggedAt).getTime())/86400000<=7).length;
+    const target=targets[n]||'';
+    const behind=target&&callsThisWeek<target;
+    const nSafe=esc(n).replace(/'/g,"\\'");
+    return `<tr><td><b>${esc(n)}</b></td><td>${d.total}</td><td>${d.converted}</td><td>${winRate}%</td><td>${trendHtml[d.trend]}</td>
+      <td>${callsThisWeek}/<input type="number" value="${esc(target)}" placeholder="target" style="width:56px;padding:4px;border:1px solid var(--line);border-radius:5px;font-size:12px" onchange="setCallTarget('${nSafe}',parseInt(this.value)||0)">${behind?' <span class="pill" style="background:var(--redbg);color:var(--red)">Peeche</span>':''}</td></tr>`;
+  }).join('');
+  const leaderboardHtml=names.length?`<div style="margin-top:14px">
+    <b style="font-size:12px">🏆 Sales Person Leaderboard</b>
+    <table style="margin-top:6px">
+      <thead><tr><th>Sales Person</th><th>Calls</th><th>Converted</th><th>Win Rate</th><th>Trend</th><th>Weekly Target</th></tr></thead>
+      <tbody>${leaderboardRows}</tbody>
+    </table>
+  </div>`:'';
+
+  const stuckLeads=computeStuckLeads();
+  const pipelineAtRisk=stuckLeads.reduce((s,r)=>s+(r.dealValue||0),0);
+  const stuckRows=stuckLeads.map(r=>`<tr><td>${esc(r.clientName)}</td><td>${esc(r.salesPerson)}</td><td>${esc(new Date(r.loggedAt).toLocaleDateString('en-IN'))}</td><td>${outcomeLabelHtml(r.outcome)}</td><td style="color:var(--red);font-weight:700">${r.daysPending} din</td><td>${r.dealValue?fmtCallMoney(r.dealValue):'-'}</td></tr>`).join('');
+  const stuckLeadsHtml=stuckLeads.length?`<div style="margin-top:14px">
+    <b style="font-size:12px">⚠ Stuck Leads — Follow-up Zaroori (${STUCK_LEAD_DAYS}+ din se)</b>
+    <table style="margin-top:6px">
+      <thead><tr><th>Client</th><th>Sales Person</th><th>Last Call</th><th>Status</th><th>Pending</th><th>Deal Value</th></tr></thead>
+      <tbody>${stuckRows}</tbody>
+    </table>
+    ${pipelineAtRisk?`<div class="note" style="margin-top:6px">💰 Pipeline at Risk: <b style="color:var(--red)">${fmtCallMoney(pipelineAtRisk)}</b></div>`:''}
+  </div>`:'';
+
+  const fsi=computeFollowupSpeedInsight(scopeRows);
+  const fsiHtml=(fsi.fastCount||fsi.slowCount)?`<div style="margin-top:14px">
+    <b style="font-size:12px">⚡ Follow-up Speed vs Win Rate</b>
+    <div class="note" style="margin-top:6px">
+      ${fsi.fastCount?`2 din ya usse jaldi follow-up hui ${fsi.fastCount} leads ka win rate: <b style="color:var(--g)">${fsi.fastRate}%</b>. `:''}
+      ${fsi.slowCount?`2 din se der follow-up hui ${fsi.slowCount} leads ka win rate: <b style="color:var(--red)">${fsi.slowRate}%</b>.`:''}
+      ${(fsi.fastCount&&fsi.slowCount&&fsi.fastRate>fsi.slowRate)?' Jaldi follow-up karna deals close karne mein madad kar raha hai.':''}
+    </div>
+  </div>`:'';
+
+  return leaderboardHtml+stuckLeadsHtml+fsiHtml;
+}
+function fmtCallMoney(n){ return '₹'+Math.round(n).toLocaleString('en-IN'); }
 // Shared by the history table, the analysis overview and the CSV export, so all three
 // always agree on which rows are "in view" for the current Sales Person + date filters.
 function callLogRowsInScope(opts){
@@ -405,8 +563,12 @@ function renderCallAnalysisOverview(){
   const wrap=$('callAnalysisOverview');
   if(!wrap)return;
   const filter=$('callFilterSalesPerson')?$('callFilterSalesPerson').value:'';
-  const rows=callLogRowsInScope({onlyWithRecording:true});
-  if(!rows.length){wrap.innerHTML=`<div class="emptystate">🧠<p>Abhi koi recording analyze karne layak nahi hai.</p></div>`;return}
+  // Analysis reads the call's NOTE text, not its recording - a text-only logged call (no
+  // audio file) is just as analyzable as one with a recording, so this used to wrongly
+  // exclude it (onlyWithRecording). Only a call with neither a note nor a recording has
+  // nothing to show here.
+  const rows=callLogRowsInScope().filter(r=>r.note||r.recordingUrl);
+  if(!rows.length){wrap.innerHTML=`<div class="emptystate">🧠<p>Abhi koi call analyze karne layak nahi hai.</p></div>`;return}
   const analyses=rows.map(r=>analyzeCallNote(r.note));
   const counts={positive:0,neutral:0,negative:0};
   analyses.forEach(a=>counts[a.sentiment]++);
@@ -435,14 +597,16 @@ function renderCallAnalysisOverview(){
   };
   const spBreakdownHtml=breakdownTableHtml('Sales Person-wise Breakdown','👤',callAnalysisBySalesPerson(rows,analyses),'Sales Person');
   const clientBreakdownHtml=breakdownTableHtml('Client-wise Breakdown','🏢',callAnalysisByClient(rows,analyses),'Client');
-  wrap.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap">
+  const salesInsightsHtml=renderSalesInsightsHtml(rows);
+  wrap.innerHTML=`<div class="note" style="margin-bottom:12px">📱 Ye data sirf is device se hai — dusre device pe log hui calls yahan abhi nahi dikhengi (Firestore sync hone tak).</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
     ${tile('Total Analyzed',rows.length)}
     ${tile('🙂 Positive',counts.positive)}
     ${tile('😐 Neutral',counts.neutral)}
     ${tile('🙁 Negative',counts.negative)}
     ${tile('Top Topic',topTopic||'-')}
     ${tile('Top Objection',topObjection||'-')}
-  </div>${spBreakdownHtml}${clientBreakdownHtml}`;
+  </div>${salesInsightsHtml}${spBreakdownHtml}${clientBreakdownHtml}`;
 }
 function downloadCSV(filename,rows){
   const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -456,19 +620,22 @@ function downloadCSV(filename,rows){
 function exportCallLogCSV(){
   const filter=$('callFilterSalesPerson')?$('callFilterSalesPerson').value:'';
   const rows=callLogRowsInScope().sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt)));
-  const out=[['Date','Sales Person','Client','Note','Has Recording','Duration','Sentiment','Topics','Objections','Logged By']];
+  const out=[['Date','Sales Person','Client','Outcome','Deal Value','Note','Has Recording','Duration','Sentiment','Topics','Objections','Logged By']];
   rows.forEach(r=>{
     const a=analyzeCallNote(r.note);
+    const analyzable=r.note||r.recordingUrl;
     out.push([
       new Date(r.loggedAt).toLocaleString('en-IN'),
       r.salesPerson||'',
       r.clientName||'',
+      (CALL_OUTCOMES[r.outcome]||{}).label||'',
+      r.dealValue||'',
       r.note||'',
       r.recordingUrl?'Yes':'No',
       fmtDuration(r.durationSeconds)||'',
-      r.recordingUrl?a.sentiment:'',
-      r.recordingUrl?a.topics.join('; '):'',
-      r.recordingUrl?a.negativeHits.join('; '):'',
+      analyzable?a.sentiment:'',
+      analyzable?a.topics.join('; '):'',
+      analyzable?a.negativeHits.join('; '):'',
       r.loggedBy||''
     ]);
   });
@@ -486,13 +653,14 @@ function renderCallHistory(){
     <td>${esc(new Date(r.loggedAt).toLocaleString('en-IN'))}</td>
     <td>${esc(r.salesPerson)}</td>
     <td>${esc(r.clientName||'-')}</td>
+    <td>${outcomeLabelHtml(r.outcome)}</td>
     <td>${esc(r.note||'-')}</td>
     <td>${r.recordingUrl?`<button type="button" class="btn small" onclick="playRecording('${esc(r.id)}')">▶ Play</button>`:'-'}</td>
-    <td>${esc(r.loggedBy||'-')}${r.recordingUrl?` <button type="button" class="btn small" onclick="toggleCallExpand('${esc(r.id)}')">${open?'🔽':'🧠'} Analysis</button>`:''}</td>
+    <td>${esc(r.loggedBy||'-')}${r.note?` <button type="button" class="btn small" onclick="toggleCallExpand('${esc(r.id)}')">${open?'🔽':'🧠'} Analysis</button>`:''}</td>
   </tr>`;
-    const analysisRow=(r.recordingUrl&&open)?`<tr><td colspan="6" style="background:var(--bg)">${callAnalysisCardHtml(r)}</td></tr>`:'';
+    const analysisRow=(r.note&&open)?`<tr><td colspan="7" style="background:var(--bg)">${callAnalysisCardHtml(r)}</td></tr>`:'';
     return mainRow+analysisRow;
-  }).join(''):`<tr><td colspan="6"><div class="emptystate">📞<p>Koi call log nahi hui hai.</p></div></td></tr>`;
+  }).join(''):`<tr><td colspan="7"><div class="emptystate">📞<p>Koi call log nahi hui hai.</p></div></td></tr>`;
 }
 function playRecording(id){
   const row=liveCallLog().find(r=>r.id===id);
