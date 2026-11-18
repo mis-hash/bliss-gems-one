@@ -110,7 +110,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
         <div class="note" style="margin-bottom:12px">Recording log karne ke saath ek free Call Analysis card bhi milega (note ke keywords + call duration se) - asli AI transcript/understanding ke liye paid speech-to-text API chahiye hoga, jo abhi approve nahi hai.</div>
         <div class="grid">
           <div class="field"><label>Sales Person</label><select id="callSalesPerson"></select></div>
-          <div class="field"><label>Client/Party (optional)</label><input id="callClientName" type="text"></div>
+          <div class="field"><label>Client/Party (optional)</label><input id="callClientName" type="text" autocomplete="off" oninput="sclFilterClientSuggestions(this)" onfocus="sclFilterClientSuggestions(this)" onblur="sclHideClientSuggestions(this)"></div>
         </div>
         <div class="grid" style="margin-top:10px">
           <div class="field"><label>Call Outcome</label><select id="callOutcome">
@@ -254,6 +254,49 @@ function liveCallLog(){
 function saveCallLog(rows){
   try{ localStorage.setItem(CALL_LOG_KEY,JSON.stringify(rows)); }
   catch(e){ console.error('saveCallLog write failed:',e); throw e; }
+}
+/* ===== Client/Party searchable combobox =====
+   Self-growing from this device's own call history (no separate list to maintain) - a
+   JS-driven floating suggestion box, same proven pattern as Petty Cash's spend-category
+   combobox, since native <input list=datalist> doesn't reliably filter-as-you-type on every
+   mobile browser. Still a free-text field underneath - typing a brand new client name is
+   always allowed, this just helps a Sales Person pick an existing one instead of retyping a
+   slightly different spelling each time. */
+function sclKnownClients(){
+  const names=new Set();
+  liveCallLog().forEach(r=>{ if(r.clientName)names.add(String(r.clientName).trim()); });
+  return [...names].sort((a,b)=>a.localeCompare(b));
+}
+function sclClientSuggestBoxId(inputId){return 'sclClientSuggestBox_'+inputId}
+function sclFilterClientSuggestions(inputEl){
+  if(!inputEl)return;
+  let box=document.getElementById(sclClientSuggestBoxId(inputEl.id));
+  if(!box){
+    box=document.createElement('div');
+    box.id=sclClientSuggestBoxId(inputEl.id);
+    box.style.cssText='position:absolute;z-index:500;background:#fff;border:1px solid var(--line);border-radius:7px;box-shadow:0 6px 18px rgba(22,36,31,.14);max-height:220px;overflow:auto;display:none';
+    document.body.appendChild(box);
+  }
+  const q=(inputEl.value||'').trim().toLowerCase();
+  const matches=sclKnownClients().filter(c=>c.toLowerCase().includes(q));
+  if(!matches.length){box.style.display='none';return}
+  const rect=inputEl.getBoundingClientRect();
+  box.style.left=(rect.left+window.scrollX)+'px';
+  box.style.top=(rect.bottom+window.scrollY+2)+'px';
+  box.style.width=rect.width+'px';
+  box.innerHTML=matches.map(c=>`<div style="padding:8px 12px;font-size:13px;cursor:pointer" onmousedown="event.preventDefault();sclPickClientSuggestion('${inputEl.id}','${esc(c).replace(/'/g,"\\'")}')">${esc(c)}</div>`).join('');
+  box.style.display='block';
+}
+function sclPickClientSuggestion(inputId,value){
+  const el=document.getElementById(inputId);
+  if(el)el.value=value;
+  const box=document.getElementById(sclClientSuggestBoxId(inputId));
+  if(box)box.style.display='none';
+}
+function sclHideClientSuggestions(inputEl){
+  if(!inputEl)return;
+  const id=inputEl.id;
+  setTimeout(()=>{const box=document.getElementById(sclClientSuggestBoxId(id));if(box)box.style.display='none';},150);
 }
 function fileToDataUrl(file){
   return new Promise((resolve,reject)=>{
