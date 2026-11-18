@@ -699,6 +699,63 @@ function computeFollowupSpeedInsight(rows){
     slowRate:slow.total?Math.round(slow.converted/slow.total*100):null,slowCount:slow.total
   };
 }
+// Average days from a client's FIRST call to the call where they Converted - tells the
+// team how long it realistically takes to close a lead, not just whether it closed.
+function computeAvgTurnaroundTime(rows){
+  const byClient={};
+  rows.forEach(r=>{
+    const k=String(r.clientName||'').trim();
+    if(!k)return;
+    (byClient[k]=byClient[k]||[]).push(r);
+  });
+  const spans=[];
+  Object.values(byClient).forEach(calls=>{
+    calls=calls.slice().sort((a,b)=>new Date(a.loggedAt)-new Date(b.loggedAt));
+    const won=calls.find(r=>CONVERTED_OUTCOMES.includes(r.outcome));
+    if(!won)return;
+    spans.push((new Date(won.loggedAt)-new Date(calls[0].loggedAt))/86400000);
+  });
+  return {avgDays:spans.length?spans.reduce((s,d)=>s+d,0)/spans.length:null,count:spans.length};
+}
+// Last 6 calendar months of call volume + win rate - the real growth/decline trend over
+// time, not just a recent-vs-prior-week snapshot.
+function computeMonthlyTrend(rows){
+  const byMonth={};
+  rows.forEach(r=>{
+    const m=String(r.loggedAt||'').slice(0,7);
+    if(!m)return;
+    if(!byMonth[m])byMonth[m]={total:0,converted:0};
+    byMonth[m].total++;
+    if(CONVERTED_OUTCOMES.includes(r.outcome))byMonth[m].converted++;
+  });
+  return Object.keys(byMonth).sort().slice(-6).map(m=>({month:m,total:byMonth[m].total,converted:byMonth[m].converted,winRate:byMonth[m].total?Math.round(byMonth[m].converted/byMonth[m].total*100):0}));
+}
+// Lost-lead rate (Not Interested) - recent 7 days vs prior 7 - an early-warning signal if
+// more leads are slipping away, same recent-vs-prior pattern as Deal Size Trend above.
+function computeLostRateTrend(rows){
+  const now=Date.now();
+  const ageDays=r=>(now-new Date(r.loggedAt).getTime())/86400000;
+  const rate=rs=>rs.length?Math.round(rs.filter(r=>r.outcome==='not_interested').length/rs.length*100):null;
+  const recent=rows.filter(r=>ageDays(r)<=7);
+  const prior=rows.filter(r=>{const a=ageDays(r);return a>7&&a<=14;});
+  const recentRate=rate(recent),priorRate=rate(prior);
+  return {recentRate,priorRate,recentCount:recent.length,
+    trend:(recentRate==null||priorRate==null)?'flat':(recentRate>priorRate?'up':recentRate<priorRate?'down':'flat')};
+}
+// Top 5 clients by call volume - who is actually getting the team's attention, and
+// whether that attention is converting.
+function computeTopPartiesByVolume(rows){
+  const byClient={};
+  rows.forEach(r=>{
+    const k=String(r.clientName||'').trim();
+    if(!k)return;
+    if(!byClient[k])byClient[k]={total:0,converted:0};
+    byClient[k].total++;
+    if(CONVERTED_OUTCOMES.includes(r.outcome))byClient[k].converted++;
+  });
+  return Object.keys(byClient).sort((a,b)=>byClient[b].total-byClient[a].total).slice(0,5)
+    .map(k=>({name:k,total:byClient[k].total,converted:byClient[k].converted}));
+}
 const CALL_TARGETS_KEY='scl_call_targets';
 function getCallTargets(){ try{const raw=localStorage.getItem(CALL_TARGETS_KEY);return raw?JSON.parse(raw):{};}catch(e){return {};} }
 function setCallTarget(salesPerson,target){
@@ -776,7 +833,40 @@ function renderSalesInsightsHtml(scopeRows,analyses){
     </div>
   </div>`:'';
 
-  return leaderboardHtml+dealTrendHtml+objectionHtml+stuckLeadsHtml+fsiHtml;
+  const turnaround=computeAvgTurnaroundTime(scopeRows);
+  const turnaroundHtml=turnaround.avgDays!=null?`<div style="margin-top:14px">
+    <b style="font-size:12px">⏱ Average Conversion Turnaround Time</b>
+    <div class="note" style="margin-top:6px">Pehli call se deal Convert hone tak average <b style="color:var(--g)">${Math.round(turnaround.avgDays)} din</b> lagte hain (${turnaround.count} converted lead${turnaround.count===1?'':'s'} ka data).</div>
+  </div>`:'';
+
+  const monthly=computeMonthlyTrend(scopeRows);
+  const monthlyRows=monthly.map(m=>`<tr><td>${esc(m.month)}</td><td>${m.total}</td><td>${m.converted}</td><td>${m.winRate}%</td></tr>`).join('');
+  const monthlyHtml=monthly.length>1?`<div style="margin-top:14px">
+    <b style="font-size:12px">📈 Month-over-Month Trend</b>
+    <table style="margin-top:6px">
+      <thead><tr><th>Month</th><th>Calls</th><th>Converted</th><th>Win Rate</th></tr></thead>
+      <tbody>${monthlyRows}</tbody>
+    </table>
+  </div>`:'';
+
+  const lostTrend=computeLostRateTrend(scopeRows);
+  const lostTrendIconHtml=lostTrend.trend==='up'?'<span style="color:var(--red);font-weight:800">↑ Badh raha hai</span>':lostTrend.trend==='down'?'<span style="color:var(--g);font-weight:800">↓ Ghat raha hai</span>':'<span class="note">Flat</span>';
+  const lostTrendHtml=lostTrend.recentRate!=null?`<div style="margin-top:14px">
+    <b style="font-size:12px">📉 Lost-Lead Rate (Not Interested)</b>
+    <div class="note" style="margin-top:6px">Pichle 7 din mein <b style="color:var(--red)">${lostTrend.recentRate}%</b> calls "Not Interested" mein gayi (${lostTrend.recentCount} calls)${lostTrend.priorRate!=null?` — uske pichle 7 din se ${lostTrendIconHtml}.`:' — compare karne ke liye aur purana data chahiye.'}</div>
+  </div>`:'';
+
+  const topParties=computeTopPartiesByVolume(scopeRows);
+  const topPartiesRows=topParties.map(p=>`<tr><td>${esc(p.name)}</td><td>${p.total}</td><td>${p.converted}</td></tr>`).join('');
+  const topPartiesHtml=topParties.length?`<div style="margin-top:14px">
+    <b style="font-size:12px">🏢 Top Parties by Call Volume</b>
+    <table style="margin-top:6px">
+      <thead><tr><th>Client</th><th>Calls</th><th>Converted</th></tr></thead>
+      <tbody>${topPartiesRows}</tbody>
+    </table>
+  </div>`:'';
+
+  return leaderboardHtml+dealTrendHtml+turnaroundHtml+monthlyHtml+objectionHtml+stuckLeadsHtml+lostTrendHtml+fsiHtml+topPartiesHtml;
 }
 function fmtCallMoney(n){ return '₹'+Math.round(n).toLocaleString('en-IN'); }
 // Shared by the history table, the analysis overview and the CSV export, so all three
