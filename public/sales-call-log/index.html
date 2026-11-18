@@ -98,6 +98,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 <div class="navBar"><div class="navInner">
   <button class="navBtn on" data-page="log" onclick="goPage('log')">📞 Call Log</button>
   <button class="navBtn" data-page="pipeline" onclick="goPage('pipeline')">📈 Pipeline</button>
+  <button class="navBtn" data-page="followups" onclick="goPage('followups')">⏰ Follow-ups</button>
   <button class="navBtn" data-page="myperf" onclick="goPage('myperf')">📊 My Performance</button>
   <button class="navBtn hidden" id="directorsNavBtn" data-page="analysis" onclick="goPage('analysis')">👑 Directors</button>
 </div></div>
@@ -108,7 +109,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
     <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <span>🔎 Filter (Call Log aur Directors dono pe lagta hai)</span>
       <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview();renderPipelineOverview()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
+        <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview();renderPipelineOverview();renderFollowupsOverview()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
         <input type="date" id="callFilterFrom" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
         <span style="font-size:12px;color:var(--muted)">se</span>
         <input type="date" id="callFilterTo" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
@@ -163,6 +164,13 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
     <div class="panel">
       <div class="ph">📈 Lead Pipeline</div>
       <div class="pb" id="pipelineOverview"></div>
+    </div>
+  </div>
+
+  <div id="page-followups" class="sclPage">
+    <div class="panel">
+      <div class="ph">⏰ Follow-up Reminders</div>
+      <div class="pb" id="followupsOverview"></div>
     </div>
   </div>
 
@@ -323,6 +331,7 @@ function renderAll(){
   renderSalesPersonOptions();
   renderCallHistory();
   renderPipelineOverview();
+  renderFollowupsOverview();
   renderMyPerformance();
   renderCallAnalysisOverview();
   renderDemoDataActions();
@@ -551,6 +560,7 @@ async function logCallRecording(){
     renderCallHistory();
     renderCallAnalysisOverview();
     renderPipelineOverview();
+    renderFollowupsOverview();
   }catch(e){
     console.error('logCallRecording failed:',e);
     status.style.color='var(--red)';
@@ -617,15 +627,33 @@ function computePipelineLeads(){
     return {client,stage,latest,callCount:calls.length,salesPerson:latest.salesPerson,isOverridden:!!overrides[client]};
   }).sort((a,b)=>new Date(b.latest.loggedAt)-new Date(a.latest.loggedAt));
 }
+// A lead's own "next follow-up" date - separate from the Pipeline stage above, since a
+// lead can sit in the same stage for a while but still need a reminder of WHEN to call
+// next. Stored the same simple way (per-device localStorage, same constraint as the rest
+// of this app's data).
+const FOLLOWUP_KEY='scl_followup_reminders';
+function getFollowupReminders(){ try{const raw=localStorage.getItem(FOLLOWUP_KEY);return raw?JSON.parse(raw):{};}catch(e){return {};} }
+function setFollowupReminder(clientName,dateStr){
+  const m=getFollowupReminders();
+  if(dateStr)m[clientName]=dateStr;else delete m[clientName];
+  try{localStorage.setItem(FOLLOWUP_KEY,JSON.stringify(m));}catch(e){console.error('setFollowupReminder failed:',e);}
+  renderPipelineOverview();
+  renderFollowupsOverview();
+}
 function pipelineCardHtml(lead){
   const nSafe=esc(lead.client).replace(/'/g,"\\'");
   const stageOptions=PIPELINE_STAGES.map(s=>`<option value="${s.key}"${s.key===lead.stage?' selected':''}>${s.icon} ${s.label}</option>`).join('');
+  const reminders=getFollowupReminders();
+  const reminderDate=reminders[lead.client]||'';
   return `<div style="background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <div>
       <b style="font-size:13px">${esc(lead.client)}</b>
       <div class="note" style="margin-top:2px">${esc(lead.salesPerson)} • ${lead.callCount} call${lead.callCount===1?'':'s'} • Last: ${esc(new Date(lead.latest.loggedAt).toLocaleDateString('en-IN'))}${lead.latest.dealValue?' • '+fmtCallMoney(lead.latest.dealValue):''}</div>
     </div>
-    <select onchange="setPipelineStage('${nSafe}',this.value)" style="padding:6px;border:1px solid var(--line);border-radius:6px;font-size:12px">${stageOptions}</select>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <span style="display:flex;align-items:center;gap:4px" title="Follow-up Reminder">⏰<input type="date" value="${esc(reminderDate)}" onchange="setFollowupReminder('${nSafe}',this.value)" style="padding:5px;border:1px solid var(--line);border-radius:6px;font-size:11px"></span>
+      <select onchange="setPipelineStage('${nSafe}',this.value)" style="padding:6px;border:1px solid var(--line);border-radius:6px;font-size:12px">${stageOptions}</select>
+    </div>
   </div>`;
 }
 function renderPipelineOverview(){
@@ -635,13 +663,56 @@ function renderPipelineOverview(){
   if(!leads.length){wrap.innerHTML=`<div class="emptystate">📈<p>Abhi koi lead nahi hai — call log karein to yahan pipeline dikhega.</p></div>`;return}
   const byStage={};
   leads.forEach(l=>{ (byStage[l.stage]=byStage[l.stage]||[]).push(l); });
-  wrap.innerHTML=`<div class="note" style="margin-bottom:12px">Har stage automatically aapke latest Call Outcome se set hota hai (Converted→Won, Not Interested→Lost, Interested→Qualified, Follow-up→Contacted) - aap kabhi bhi dropdown se manually move kar sakte hain (jaise "Proposal" bhej diya hai).</div>`
+  wrap.innerHTML=`<div class="note" style="margin-bottom:12px">Har stage automatically aapke latest Call Outcome se set hota hai (Converted→Won, Not Interested→Lost, Interested→Qualified, Follow-up→Contacted) - aap kabhi bhi dropdown se manually move kar sakte hain (jaise "Proposal" bhej diya hai). ⏰ se ek follow-up reminder date bhi set kar sakte hain.</div>`
     +PIPELINE_STAGES.map(s=>{
       const stageLeads=byStage[s.key]||[];
       if(!stageLeads.length)return '';
       return insightSectionHtml(s.icon,s.accent,s.accentbg,`${s.label} (${stageLeads.length})`,
         `<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">${stageLeads.map(pipelineCardHtml).join('')}</div>`);
     }).join('');
+}
+// Follow-ups tab - only leads that have a reminder date set (skips the rest, no noise),
+// and skips Won/Lost leads since there's nothing left to follow up on there even if an
+// old reminder date is still sitting on them. Overdue/Today/Upcoming grouping is a live
+// "now" comparison, same reasoning as the Pipeline tab's live-snapshot stages.
+function computeFollowups(){
+  const reminders=getFollowupReminders();
+  const todayStr=new Date().toISOString().slice(0,10);
+  return computePipelineLeads()
+    .filter(l=>reminders[l.client]&&l.stage!=='Won'&&l.stage!=='Lost')
+    .map(l=>{
+      const date=reminders[l.client];
+      const bucket=date<todayStr?'Overdue':(date===todayStr?'Today':'Upcoming');
+      return {...l,reminderDate:date,bucket};
+    })
+    .sort((a,b)=>a.reminderDate.localeCompare(b.reminderDate));
+}
+function followupCardHtml(lead){
+  const nSafe=esc(lead.client).replace(/'/g,"\\'");
+  return `<div style="background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <div>
+      <b style="font-size:13px">${esc(lead.client)}</b>
+      <div class="note" style="margin-top:2px">${esc(lead.salesPerson)} • ${esc(new Date(lead.reminderDate).toLocaleDateString('en-IN'))} ko follow-up • Stage: ${esc(lead.stage)}</div>
+    </div>
+    <button type="button" class="btn small" onclick="setFollowupReminder('${nSafe}','')">✓ Done</button>
+  </div>`;
+}
+function renderFollowupsOverview(){
+  const wrap=$('followupsOverview');
+  if(!wrap)return;
+  const followups=computeFollowups();
+  if(!followups.length){wrap.innerHTML=`<div class="emptystate">⏰<p>Koi follow-up reminder set nahi hai — Pipeline tab mein ⏰ se kisi lead pe reminder date laga sakte hain.</p></div>`;return}
+  const buckets=[
+    {key:'Overdue',label:'Overdue',icon:'⚠',accent:'#b43a35',accentbg:'#fff0ef'},
+    {key:'Today',label:'Aaj',icon:'📅',accent:'#a66b08',accentbg:'#fff6df'},
+    {key:'Upcoming',label:'Upcoming',icon:'🔜',accent:'#2A6DB0',accentbg:'#E9F2FB'}
+  ];
+  wrap.innerHTML=buckets.map(b=>{
+    const rows=followups.filter(f=>f.bucket===b.key);
+    if(!rows.length)return '';
+    return insightSectionHtml(b.icon,b.accent,b.accentbg,`${b.label} (${rows.length})`,
+      `<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">${rows.map(followupCardHtml).join('')}</div>`);
+  }).join('');
 }
 /* ===== Free, rule-based Call Analysis (no paid speech-to-text) =====
    There's no API to turn the audio into a real transcript for free, so this analyzes the
