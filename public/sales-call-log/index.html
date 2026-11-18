@@ -79,6 +79,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 <header><div class="head">
   <div class="brand"><div class="logo">📞</div><div><b>Sales Call Log</b><small>Bliss Gems &amp; Minerals</small></div></div>
   <div class="headRight">
+    <span id="sclPreviewToggleWrap"></span>
     <span class="pillbadge" id="loginBadge">Not Logged In</span>
     <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
   </div>
@@ -230,9 +231,20 @@ function renderGate(){
 // Admin/Director (appRoles['sales-call-log'], set from Bliss One hub's Universal Users
 // table) see every Sales Person's data in Call Analysis - a normal Sales Person is locked
 // to their own name only, so they never see a colleague's calls/numbers.
+// SCL_PREVIEW_KEY is a separate, local-only escape hatch for showing the full view to a
+// Director during a demo without first setting up the real appRoles/hub access - it never
+// touches Universal Users, only this one device's localStorage, and is clearly labeled
+// "Preview" wherever it's used so it's never mistaken for a real role grant.
+const SCL_PREVIEW_KEY='scl_preview_as_director';
+function sclPreviewAsDirector(){ return localStorage.getItem(SCL_PREVIEW_KEY)==='1'; }
+function sclTogglePreviewAsDirector(){
+  if(sclPreviewAsDirector())localStorage.removeItem(SCL_PREVIEW_KEY);
+  else localStorage.setItem(SCL_PREVIEW_KEY,'1');
+  renderAll();
+}
 function canViewAllSales(){
   const u=loggedUser();
-  return !!(u&&u.appRoles&&['admin','director'].includes(u.appRoles['sales-call-log']));
+  return !!(u&&u.appRoles&&['admin','director'].includes(u.appRoles['sales-call-log']))||sclPreviewAsDirector();
 }
 function renderSalesPersonOptions(){
   const active=users.filter(u=>u.active!==false).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
@@ -280,6 +292,17 @@ function renderAll(){
   renderCallHistory();
   renderCallAnalysisOverview();
   renderDemoDataActions();
+  renderPreviewToggle();
+}
+// Visible to everyone (unlike the real appRoles-based gating) so a person can flip this on
+// themselves to demo the full Director view - clearly labeled "Preview", never silently
+// granted, and always a one-click toggle back off.
+function renderPreviewToggle(){
+  const wrap=$('sclPreviewToggleWrap');
+  if(!wrap)return;
+  if(!loggedUser()){wrap.innerHTML='';return}
+  const on=sclPreviewAsDirector();
+  wrap.innerHTML=`<button class="btn small" style="${on?'background:var(--g);color:#fff':''}" onclick="sclTogglePreviewAsDirector()">${on?'👁 Preview: Director (ON)':'👁 Preview as Director'}</button>`;
 }
 // Admin/Director only - a quick way to populate realistic sample calls on THIS device so
 // Sales Insights (Leaderboard/Objection Impact/Stuck Leads/etc) has something to show when
