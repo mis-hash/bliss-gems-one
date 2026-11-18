@@ -147,7 +147,10 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 
   <div id="page-analysis" class="sclPage">
     <div class="panel">
-      <div class="ph">🧠 Call Analysis Overview</div>
+      <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <span>🧠 Call Analysis Overview</span>
+        <span id="sclDemoDataActions"></span>
+      </div>
       <div class="pb" id="callAnalysisOverview"></div>
     </div>
   </div>
@@ -262,6 +265,55 @@ function renderAll(){
   renderSalesPersonOptions();
   renderCallHistory();
   renderCallAnalysisOverview();
+  renderDemoDataActions();
+}
+// Admin/Director only - a quick way to populate realistic sample calls on THIS device so
+// Sales Insights (Leaderboard/Objection Impact/Stuck Leads/etc) has something to show when
+// demoing the feature to a Director, without needing real calls logged first. Appends
+// (never overwrites) real data, tagged isDemo:true so it can be removed cleanly afterward.
+function renderDemoDataActions(){
+  const wrap=$('sclDemoDataActions');
+  if(!wrap)return;
+  if(!canViewAllSales()){wrap.innerHTML='';return}
+  const hasDemo=liveCallLog().some(r=>r.isDemo);
+  wrap.innerHTML=`<button type="button" class="btn small" onclick="sclLoadDemoData()">🎬 Load Demo Data</button>${hasDemo?' <button type="button" class="btn small" onclick="sclClearDemoData()">🗑 Clear Demo Data</button>':''}`;
+}
+async function sclLoadDemoData(){
+  if(!canViewAllSales()){alert('Sirf Admin/Director demo data load kar sakta hai.');return}
+  if(!confirm('Demo dikhane ke liye kuch sample calls add ki jayengi (aapka real data delete nahi hoga). Confirm karein?'))return;
+  const activeUsers=users.filter(u=>u.active!==false).map(u=>u.name||u.username).filter(Boolean);
+  const salesPersons=activeUsers.length?activeUsers:['Rakesh Kumar','Suresh Sharma'];
+  const clients=['Hitesh Jewels','Jain Traders','Agarwal Gems','Shah Gems','Mehta Traders','Patel Jewels','Bansal Gems'];
+  const scenarios=[
+    {note:'Price confirm ho gaya, order ready hai',outcome:'converted',dealRange:[20000,80000]},
+    {note:'Rate mehenga bola, soch ke batayenge',outcome:'followup',dealRange:[15000,50000]},
+    {note:'Purity ka sawaal utha, certificate maanga',outcome:'interested',dealRange:[10000,40000]},
+    {note:'Stock available nahi hai abhi, wait karna padega',outcome:'followup',dealRange:[5000,30000]},
+    {note:'Delivery mein delay hua, cancel karne ki baat ki',outcome:'not_interested',dealRange:null},
+    {note:'Meeting fix kar li kal ke liye',outcome:'interested',dealRange:[10000,45000]},
+    {note:'Order confirm, payment bhi ho gaya',outcome:'converted',dealRange:[25000,90000]},
+    {note:'Competitor se sasta mil raha bola, cancel kar diya',outcome:'not_interested',dealRange:null},
+    {note:'Packaging mein damage tha, replace maanga',outcome:'followup',dealRange:[8000,25000]}
+  ];
+  const now=Date.now();
+  const demoRows=[];
+  for(let i=0;i<18;i++){
+    const sp=salesPersons[i%salesPersons.length];
+    const client=clients[Math.floor(Math.random()*clients.length)];
+    const sc=scenarios[Math.floor(Math.random()*scenarios.length)];
+    const daysAgo=Math.floor(Math.random()*13);
+    const dealValue=sc.dealRange?Math.round((sc.dealRange[0]+Math.random()*(sc.dealRange[1]-sc.dealRange[0]))/1000)*1000:null;
+    demoRows.push({id:'DEMO-'+now+'-'+i,salesPerson:sp,clientName:client,note:sc.note,outcome:sc.outcome,dealValue,loggedAt:new Date(now-daysAgo*86400000-Math.floor(Math.random()*86400000)).toISOString(),loggedBy:sp,isDemo:true});
+  }
+  saveCallLog(liveCallLog().concat(demoRows));
+  renderAll();
+  alert(demoRows.length+' demo calls add ho gayi.');
+}
+function sclClearDemoData(){
+  if(!canViewAllSales()){alert('Sirf Admin/Director demo data clear kar sakta hai.');return}
+  if(!confirm('Saari demo calls hata dein? Real data touch nahi hoga.'))return;
+  saveCallLog(liveCallLog().filter(r=>!r.isDemo));
+  renderAll();
 }
 
 // Stored in localStorage, not Firestore: a brand new Firestore collection for this would
@@ -401,16 +453,27 @@ function outcomeLabelHtml(o){
    note text the sales person typed (keyword-matched, Hindi/Hinglish + English) plus the
    recording's own duration. Honest about what it is: a keyword signal, not true call
    understanding - the UI labels it "Note-Based" for that reason. */
-const CALL_POSITIVE_WORDS=['ready','confirm','confirmed','done','yes','haan','ok','okay','theek','thik','sahi','achha','acha','good','happy','khush','satisfied','deal','order','payment','paid','approved','interested'];
-const CALL_NEGATIVE_WORDS=['nahi','no','mehenga','expensive','high','late','delay','problem','issue','complaint','cancel','wait','sochunga','soch','busy','ignore','angry','gussa','refuse','reject','dispute','return','complain','slow','deny'];
+const CALL_POSITIVE_WORDS=['ready','confirm','confirmed','done','yes','haan','ok','okay','theek','thik','sahi','achha','acha','good','happy','khush','satisfied','deal','order','payment','paid','approved','interested','genuine','pure','certified','available','asli'];
+const CALL_NEGATIVE_WORDS=['nahi','no','mehenga','expensive','high','late','delay','problem','issue','complaint','cancel','wait','sochunga','soch','busy','ignore','angry','gussa','refuse','reject','dispute','return','complain','slow','deny','fake','nakli','damage','tuta','tutaa','shortage','kami'];
 // Topic categories - what the call was actually about, so a Director skimming many calls
 // can see patterns ("most calls this week were stuck on Pricing") not just a bare sentiment.
+// Still just keyword-matching (no paid speech-to-text), so it can only recognize a call as
+// being about one of THESE specific categories - a real conversation can be about anything,
+// this just widens how much of "anything" it can actually catch, for a gems/minerals trade
+// specifically (quality/purity, stock, scheduling, returns, paperwork, packaging on top of
+// the original price/delivery/payment/competitor/decision set).
 const CALL_TOPIC_WORDS={
   'Pricing':['price','rate','rates','mehenga','expensive','discount','cheap','sasta','bhav','costly'],
   'Delivery':['delivery','delay','late','shipment','courier','dispatch','transport'],
   'Payment':['payment','paid','advance','due','balance','cheque','upi','credit'],
   'Competitor':['competitor','market','doosri','dusri','elsewhere','another'],
-  'Decision':['confirm','confirmed','order','deal','ready','cancel','reject','approved']
+  'Decision':['confirm','confirmed','order','deal','ready','cancel','reject','approved'],
+  'Quality':['quality','purity','pure','karat','carat','mix','mixed','grade','certified','certificate','genuine','asli','nakli','fake','original'],
+  'Stock':['stock','available','availability','inventory','supply','shortage','kami','khatam'],
+  'Scheduling':['meeting','milna','mulakat','visit','aayenge','aaunga','kal','parso','schedule','appointment'],
+  'ReturnExchange':['return','exchange','replace','wapas','vapis','refund','swap'],
+  'Documentation':['bill','invoice','gst','document','paperwork','receipt','challan'],
+  'Packaging':['packing','packaging','box','parcel','wrap','damage','tuta','tutaa']
 };
 function analyzeCallNote(note){
   const text=String(note||'').toLowerCase();
@@ -425,6 +488,12 @@ function analyzeCallNote(note){
   if(positiveHits.length&&!negativeHits.length)coachingTips.push('Customer positive lag raha hai - jaldi follow-up karke deal/order close karne ki koshish karein.');
   if(topics.includes('Pricing'))coachingTips.push('Pricing discuss hua - rate justify karne ke liye quality/value ki baat pehle karein, discount seedha na dein.');
   if(topics.includes('Delivery'))coachingTips.push('Delivery/timing ka zikr hua - ek clear delivery date commit karein taaki customer ko confidence mile.');
+  if(topics.includes('Quality'))coachingTips.push('Quality/purity ka sawaal utha - certificate/proof dikhane se customer ka trust badhega.');
+  if(topics.includes('Stock'))coachingTips.push('Stock/availability discuss hui - agar kami hai to alternative ya expected date clearly batayein, customer ko lambe wait mein na rakhein.');
+  if(topics.includes('Scheduling'))coachingTips.push('Meeting/visit ki baat hui - ek specific date/time confirm karke calendar mein note kar lein, vague "jald hi" na chhodein.');
+  if(topics.includes('ReturnExchange'))coachingTips.push('Return/exchange ka zikr hua - wajah samajh kar jaldi resolve karein, customer relationship lambe time ke liye zaroori hai.');
+  if(topics.includes('Documentation'))coachingTips.push('Bill/invoice ka sawaal utha - paperwork turant clear karein, isse payment bhi jaldi aata hai.');
+  if(topics.includes('Packaging'))coachingTips.push('Packaging/damage ka zikr hua - agar damage hui hai to turant replacement/compensation ki baat karein.');
   const suggestion=negativeHits.length?'Pricing/delay jaisi concern resolve karke dobara contact karein.':(positiveHits.length?'Order/confirmation ke liye follow-up karein.':'Next call schedule karein aur outcome ko specific note mein likhein.');
   return {sentiment,positiveHits,negativeHits,topics,coachingTips,suggestion};
 }
@@ -797,8 +866,8 @@ function renderCallHistory(){
   const rows=callLogRowsInScope().sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt)));
   tbody.innerHTML=rows.length?rows.map(r=>{
     const open=!!callsExpanded[r.id];
-    const mainRow=`<tr>
-    <td>${esc(new Date(r.loggedAt).toLocaleString('en-IN'))}</td>
+    const mainRow=`<tr${r.isDemo?' style="background:var(--amberbg)"':''}>
+    <td>${esc(new Date(r.loggedAt).toLocaleString('en-IN'))}${r.isDemo?' <span class="pill" style="background:var(--amber);color:#fff">DEMO</span>':''}</td>
     <td>${esc(r.salesPerson)}</td>
     <td>${esc(r.clientName||'-')}</td>
     <td>${outcomeLabelHtml(r.outcome)}</td>
