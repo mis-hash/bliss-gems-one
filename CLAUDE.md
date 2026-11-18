@@ -485,6 +485,25 @@ One more exists in `public/` but isn't part of the ten above:
   call-log rows for trying out the Insights sections before real data exists — make sure
   any new Insights section is exercised against this demo data path too, not just live
   rows, since that's how it'll first get reviewed.
+- **Mobile header overlap bug (fixed)**: the header's `<b>Sales Call Log</b>` brand title
+  wrapped to 2 lines on narrow phones, and the header-right button group (Preview toggle +
+  user badge + Logout) couldn't fit alongside it in the header's old *fixed* 68px height —
+  both visually overflowed and collided with the nav bar underneath. Fixed by giving
+  `header`/`.head` an automatic height (`flex-wrap` instead of a fixed `height:68px`) and
+  wrapping `<header>` + `.navBar` together in one `#topBar` sticky container, so the nav
+  bar no longer depends on a hardcoded `top: 68px` offset that assumed a single-line
+  header. If a future header/nav addition looks cramped or overlapping on a narrow
+  screen, check for this same pattern again (a fixed-height sticky element whose content
+  can wrap).
+- **Enterprise-readiness gap analysis** (discussed when asked what a multinational
+  company would find missing): the Pipeline and Follow-ups tabs above were built in
+  direct response to two of the gaps raised. Still **not** built (raised but not asked
+  for yet — confirm before building): an Admin/Settings tab (targets/categories/outcomes
+  in one place), a team-wide Call Recording Library, phone/WhatsApp/email/calendar
+  integrations, and an audit/edit-history log. The bigger structural gaps (localStorage-
+  only data per device, keyword-only "AI" analysis, Spark-plan scale limits, weak auth)
+  are architectural and were explained to the user as honest trade-offs, not something to
+  silently start fixing.
 
 ## Sales Panel — specifics
 
@@ -557,7 +576,12 @@ One more exists in `public/` but isn't part of the ten above:
    specific Doers) — a concrete proposal was given once but the user moved on to other
    requests without confirming. Do not build without re-confirming scope first.
 3. Hitesh Dusad's email was requested at one point (to set up his `appRoles['bliss-one']`
-   access) — check whether it was ever provided/added before asking again.
+   access) — **found**: `hitesh.dusad@gmail.com` (confirmed via an old task-assignment
+   email, searched because the user asked to add it without re-supplying it). The user
+   was given manual steps (Manage → Universal Users → set Email + Bliss One Role, since
+   there's no Firestore-admin tool in this session to do it directly) but completion was
+   never explicitly confirmed back — check whether it's actually set on his Universal
+   User record before doing this lookup again.
 4. **Trip Expense App has no way to backdate an expense** — `submitExpense()` always
    stamps `at:new Date().toISOString()` and the Add Expense modal has no date field
    (Category/Amount/Paid To/Bill/Remark only). A date-picker fix was proposed to the user
