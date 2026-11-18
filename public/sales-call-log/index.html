@@ -97,6 +97,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 
 <div class="navBar"><div class="navInner">
   <button class="navBtn on" data-page="log" onclick="goPage('log')">📞 Call Log</button>
+  <button class="navBtn" data-page="pipeline" onclick="goPage('pipeline')">📈 Pipeline</button>
   <button class="navBtn" data-page="myperf" onclick="goPage('myperf')">📊 My Performance</button>
   <button class="navBtn hidden" id="directorsNavBtn" data-page="analysis" onclick="goPage('analysis')">👑 Directors</button>
 </div></div>
@@ -107,7 +108,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
     <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <span>🔎 Filter (Call Log aur Directors dono pe lagta hai)</span>
       <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
+        <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview();renderPipelineOverview()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
         <input type="date" id="callFilterFrom" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
         <span style="font-size:12px;color:var(--muted)">se</span>
         <input type="date" id="callFilterTo" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
@@ -155,6 +156,13 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
           <tbody id="callHistoryTable"></tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <div id="page-pipeline" class="sclPage">
+    <div class="panel">
+      <div class="ph">📈 Lead Pipeline</div>
+      <div class="pb" id="pipelineOverview"></div>
     </div>
   </div>
 
@@ -314,6 +322,7 @@ function renderAll(){
   renderGate();
   renderSalesPersonOptions();
   renderCallHistory();
+  renderPipelineOverview();
   renderMyPerformance();
   renderCallAnalysisOverview();
   renderDemoDataActions();
@@ -541,6 +550,7 @@ async function logCallRecording(){
     fileInput.value='';
     renderCallHistory();
     renderCallAnalysisOverview();
+    renderPipelineOverview();
   }catch(e){
     console.error('logCallRecording failed:',e);
     status.style.color='var(--red)';
@@ -557,6 +567,81 @@ function outcomeLabelHtml(o){
   const d=CALL_OUTCOMES[o];
   if(!d)return '<span class="note">-</span>';
   return `<span class="pill" style="background:${d.bg};color:${d.color}">${esc(d.label)}</span>`;
+}
+
+/* ===== Lead Pipeline =====
+   A "lead" here = one Client/Party, grouped from the calls already being logged (no new
+   entity to create/maintain separately). Each lead's stage defaults from its MOST RECENT
+   call's Outcome (Converted->Won, Not Interested->Lost, Interested->Qualified,
+   Follow-up->Contacted) but can be moved independently at any time - e.g. a sales person
+   can mark a lead "Proposal" even though the simple 4-option Outcome dropdown has no
+   "Proposal" value. A manual move always wins over the auto-default from then on, until
+   cleared. Per-device only, same as the rest of this app's data (see CALL_LOG_KEY above). */
+const PIPELINE_STAGES=[
+  {key:'New',label:'New',icon:'🆕',accent:'#6E7D76',accentbg:'#EEF2F0'},
+  {key:'Contacted',label:'Contacted',icon:'📞',accent:'#2A6DB0',accentbg:'#E9F2FB'},
+  {key:'Qualified',label:'Qualified',icon:'✅',accent:'#8A3FFC',accentbg:'#F3ECFF'},
+  {key:'Proposal',label:'Proposal',icon:'📄',accent:'#a66b08',accentbg:'#fff6df'},
+  {key:'Won',label:'Won',icon:'🏆',accent:'#268F76',accentbg:'#E8F8F2'},
+  {key:'Lost',label:'Lost',icon:'❌',accent:'#b43a35',accentbg:'#fff0ef'}
+];
+const PIPELINE_STAGE_KEYS=PIPELINE_STAGES.map(s=>s.key);
+const PIPELINE_OVERRIDE_KEY='scl_pipeline_stages';
+function getPipelineOverrides(){ try{const raw=localStorage.getItem(PIPELINE_OVERRIDE_KEY);return raw?JSON.parse(raw):{};}catch(e){return {};} }
+function setPipelineStage(clientName,stage){
+  const m=getPipelineOverrides();
+  if(PIPELINE_STAGE_KEYS.includes(stage))m[clientName]=stage;else delete m[clientName];
+  try{localStorage.setItem(PIPELINE_OVERRIDE_KEY,JSON.stringify(m));}catch(e){console.error('setPipelineStage failed:',e);}
+  renderPipelineOverview();
+}
+function defaultStageForOutcome(outcome){
+  return {converted:'Won',not_interested:'Lost',interested:'Qualified',followup:'Contacted'}[outcome]||'New';
+}
+// Live snapshot (ignores the date-range filter, same reasoning as Stuck Leads above - a
+// lead's current pipeline stage is a "now" fact, not something a date range should hide),
+// but still respects the Sales Person filter so a Director can view one person's pipeline.
+function computePipelineLeads(){
+  const spFilter=$('callFilterSalesPerson')?$('callFilterSalesPerson').value:'';
+  const rows=liveCallLog().filter(r=>!spFilter||r.salesPerson===spFilter);
+  const overrides=getPipelineOverrides();
+  const byClient={};
+  rows.forEach(r=>{
+    const k=String(r.clientName||'').trim();
+    if(!k)return;
+    (byClient[k]=byClient[k]||[]).push(r);
+  });
+  return Object.keys(byClient).map(client=>{
+    const calls=byClient[client].slice().sort((a,b)=>new Date(b.loggedAt)-new Date(a.loggedAt));
+    const latest=calls[0];
+    const stage=overrides[client]||defaultStageForOutcome(latest.outcome);
+    return {client,stage,latest,callCount:calls.length,salesPerson:latest.salesPerson,isOverridden:!!overrides[client]};
+  }).sort((a,b)=>new Date(b.latest.loggedAt)-new Date(a.latest.loggedAt));
+}
+function pipelineCardHtml(lead){
+  const nSafe=esc(lead.client).replace(/'/g,"\\'");
+  const stageOptions=PIPELINE_STAGES.map(s=>`<option value="${s.key}"${s.key===lead.stage?' selected':''}>${s.icon} ${s.label}</option>`).join('');
+  return `<div style="background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <div>
+      <b style="font-size:13px">${esc(lead.client)}</b>
+      <div class="note" style="margin-top:2px">${esc(lead.salesPerson)} • ${lead.callCount} call${lead.callCount===1?'':'s'} • Last: ${esc(new Date(lead.latest.loggedAt).toLocaleDateString('en-IN'))}${lead.latest.dealValue?' • '+fmtCallMoney(lead.latest.dealValue):''}</div>
+    </div>
+    <select onchange="setPipelineStage('${nSafe}',this.value)" style="padding:6px;border:1px solid var(--line);border-radius:6px;font-size:12px">${stageOptions}</select>
+  </div>`;
+}
+function renderPipelineOverview(){
+  const wrap=$('pipelineOverview');
+  if(!wrap)return;
+  const leads=computePipelineLeads();
+  if(!leads.length){wrap.innerHTML=`<div class="emptystate">📈<p>Abhi koi lead nahi hai — call log karein to yahan pipeline dikhega.</p></div>`;return}
+  const byStage={};
+  leads.forEach(l=>{ (byStage[l.stage]=byStage[l.stage]||[]).push(l); });
+  wrap.innerHTML=`<div class="note" style="margin-bottom:12px">Har stage automatically aapke latest Call Outcome se set hota hai (Converted→Won, Not Interested→Lost, Interested→Qualified, Follow-up→Contacted) - aap kabhi bhi dropdown se manually move kar sakte hain (jaise "Proposal" bhej diya hai).</div>`
+    +PIPELINE_STAGES.map(s=>{
+      const stageLeads=byStage[s.key]||[];
+      if(!stageLeads.length)return '';
+      return insightSectionHtml(s.icon,s.accent,s.accentbg,`${s.label} (${stageLeads.length})`,
+        `<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">${stageLeads.map(pipelineCardHtml).join('')}</div>`);
+    }).join('');
 }
 /* ===== Free, rule-based Call Analysis (no paid speech-to-text) =====
    There's no API to turn the audio into a real transcript for free, so this analyzes the
