@@ -63,7 +63,18 @@ lost) can pick up exactly where the previous session left off. Read this first.
   local `python3 -m http.server` serving `public/` + Playwright screenshots, (c) GitHub
   Actions deploy status as the source of truth for "is it actually live".
 
-## The five apps (all in `public/`, all on one Firebase Hosting site)
+## The ten apps (all in `public/`, all on one Firebase Hosting site)
+
+The hub's "Live Apps" card grid does **not** come from this file or any hardcoded list — it's
+read at runtime from `public/apps.json` (`loadLiveAppsRegistry()` in the hub), a shared
+registry every browser fetches. An app only shows up there, and gets its own sidebar entry,
+once something pushes it into that JSON (via the hub's own GitHub-push-to-deploy flow, or a
+manual edit). **As of this file's last update, `public/apps.json` lists 8 apps** — everything
+below except Purchase Slip and Sales Panel, which exist in `public/` and are reachable by
+direct URL but are not yet in the registry (Purchase Slip is explicitly labelled
+"Not live yet — testing only" in its own header; Sales Panel's absence looks like an
+oversight rather than a deliberate choice — confirm with the user before adding it, in case
+there's a reason it was left out).
 
 1. **Bliss One hub** — `public/index.html` — https://bliss-gems-one.web.app/
    App launcher/dashboard; embeds the other apps in an iframe when opened inline.
@@ -78,6 +89,35 @@ lost) can pick up exactly where the previous session left off. Read this first.
    https://bliss-gems-one.web.app/purchase-price-estimator/ — Director-rate deal entry
    (per-lot, per-director ₹/ct pricing) with an auto-WhatsApp-sent Purchase Slip PDF once
    the Due Date is filled.
+6. **Petty Cash** — `public/petty-cash/index.html` —
+   https://bliss-gems-one.web.app/petty-cash/ — Issue/receive/spend ledger with an
+   accept-or-reject approval queue, Directors' Personal Spend tracking, and auto-WhatsApp
+   Director Hisaab PDFs.
+7. **Fuel Tracker** — `public/fuel-tracker/index.html` —
+   https://bliss-gems-one.web.app/fuel-tracker/ — Still named "Vehicle Tracker" in
+   `public/apps.json`/the hub's sidebar — a rename that's only half done (see its own
+   section below for the renamed-vs-not detail). Fuel log with mileage/cost-per-km,
+   service log, document (RC/insurance/license) expiry alerts.
+8. **AI Business Assistant** — `public/ai-assistant/index.html` —
+   https://bliss-gems-one.web.app/ai-assistant/ — Admin/Director-only chat tool that
+   answers a small fixed set of keyword-matched questions (open trips, low stock, petty
+   cash balance, today's fuel spend, Busy export total) by reading other apps' Firestore
+   collections read-only. Not a real LLM integration — see its own section below.
+9. **Sales Call Log** — `public/sales-call-log/index.html` —
+   https://bliss-gems-one.web.app/sales-call-log/ — Sales call logging (with audio
+   recording) plus a Pipeline/Leads tab and a Directors-only Sales Insights/Call Analysis
+   tab. The call log itself is **localStorage-only, not synced** — see Shared architecture.
+10. **Sales Panel** — `public/sales-panel/index.html` —
+    https://bliss-gems-one.web.app/sales-panel/ — Customers/Orders/Calls mini-CRM. **Not
+    in the live apps registry** (see the note above this list) — reachable by direct URL
+    but has no hub card or sidebar entry.
+
+One more exists in `public/` but isn't part of the ten above:
+- **Purchase Slip** (`public/purchase-slip/index.html`) — an explicitly-labelled
+  demo/testing app (violet theme, "Not live yet"): item → piece weights → 3 directors'
+  rates → adjustment % → final price. Looks like an earlier prototype of Purchase Price
+  Estimator's core idea, built standalone rather than extending it — confirm with the user
+  before assuming it should be merged into or replaced by Purchase Price Estimator.
 
 ## Shared architecture
 
@@ -136,6 +176,20 @@ lost) can pick up exactly where the previous session left off. Read this first.
   context; a Firebase Auth stub's `currentUser` must be a getter, not a plain property,
   to reflect later mutations; `indexedDB` must be stubbed for anything touching the hub's
   saved-apps list.
+- **New Firestore collections may not actually be reachable** — this project's Firestore
+  security rules only grant access to the collections that already existed when they were
+  last written, and a session working from inside one of these apps has no way to open the
+  Firebase Console itself to add a new one. Confirmed real for two collections so far: AI
+  Business Assistant's Busy-import summary (`busy_import` — a direct unauthenticated read
+  returns 403 `PERMISSION_DENIED`) and Sales Call Log's own call log. Both fall back to
+  **localStorage instead of Firestore** for that one piece of data as a result — it works,
+  but it's per-device, not synced across everyone's browsers, until a human adds the rule
+  in the Console. Collections already covered by the existing rules (`te_ledger`,
+  `pc_ledger`, `fuel_log`, `sp_customers`/`sp_orders`/`sp_calls`, etc.) sync via Firestore
+  normally. **If a new feature needs a brand-new collection, try it, and if reads/writes
+  silently fail (no visible error, just nothing happening) or return 403, assume this is
+  the cause before anything else** — fall back to localStorage the same way, and tell the
+  user a rules change would let it sync properly.
 
 ## Parcel Dispatch & Return — specifics
 
@@ -308,6 +362,158 @@ lost) can pick up exactly where the previous session left off. Read this first.
     approval. This was asked for and reinforced repeatedly — don't skip it even for a
     "small" tweak.
 
+## Petty Cash — specifics
+
+- **Three roles** (`appRoles['petty-cash']`): `accountant` / `admin` / `director`. An
+  ordinary employee has no role entry at all — they can only submit a spend as a
+  **pending entry**, never post directly to the ledger.
+- **Two-step spend flow**: an employee's "Add Spend" writes to `pc_pending_entries`, not
+  `pc_ledger`, with `status` left unset; `pcAccountantLikeUsers()` (accountant/admin/
+  director with a phone number) get notified. One of them Accepts (copies it into
+  `pc_ledger` as a normal `out` entry, marks the pending doc `status:'accepted'`) or
+  Rejects (`pcRejectPending()`, requires a reason, `status:'rejected'`). `canAddFund()`
+  (admin/director) and `canCloseLoan()` (accountant/admin/director) gate the other direct
+  actions.
+- **Spend categories** (`pc_settings/spendCategories`, `PC_SPEND_CATEGORIES`): each one has
+  its own `proofRequired` toggle, editable from the Manage panel — some categories can be
+  configured to not need a bill photo at all, others always require one.
+- **Notifications** (`notifyHighAmount`, `notifyLowBalance`, `notifyRecipientOfNewEntry`):
+  WhatsApp alerts to `masters.alertRecipients` for a high-value entry or the balance
+  dropping below a threshold — same GREEN-API pattern as the other apps'
+  WhatsApp-sending code. `isPettyCashNoticeExcluded(phone)` lets specific numbers opt out.
+- **Directors' Personal Spend** (`directorSpendEntries`/`directorPaymentEntries`/
+  `directorBalance`, keyed by director **name**, not a user id — `dirId(name)` just
+  slugifies the name) tracks each of the 3 directors' own running balance separately from
+  the main ledger, with its own auto-sent (every 3 days) + manual "Director Hisaab PDF"
+  (`buildDirectorHisaabPdfHtml`), sent via the same direct html2canvas+jsPDF pipeline
+  described under Purchase Price Estimator (`pcPdfCanvasHasContent` is that app's
+  `canvasHasContent` guard, same purpose).
+- **`isAwaitingVerify`/`isOverdueVerify`**: a ledger `out` entry issued to a specific person
+  (`personId` set) is "pending verification" until reconciled; `PENDING_REMINDER_GAP_DAYS`
+  controls when it's flagged overdue and eligible for the auto-reminder
+  (`maybeAutoSendReminders`, `toggleAutoReminder` for the on/off switch).
+
+## Fuel Tracker — specifics
+
+- **Folder renamed from `vehicle-tracker` to `fuel-tracker`, but the user-facing name is
+  only half-migrated**: `public/apps.json` and the hub's sidebar still list it as
+  "Vehicle Tracker" (see "Fuel Tracker label rename" in git history for what was and
+  wasn't changed) — don't assume the display name matches the folder/slug.
+- Two logs, both regular Firestore collections (not the localStorage-fallback pattern):
+  `fuel_log` (fill-ups, `meterBefore`/`meterAfter` → `entryDistance`/`entryCostPerUnit` for
+  a per-fill cost-per-km) and `vehicle_service_log` (servicing). Settings doc
+  `fv_settings/masters` holds the vehicle list, payment modes, and per-vehicle service/
+  cleaning/document metadata.
+- **Documents tab** (`renderVehicleDocuments`/`renderAllDocumentsTable`): per-vehicle RC,
+  insurance, and **driving license** photos with expiry dates; `computeDocAlerts`/
+  `docDaysLeft` surface what's expiring soon. Redesigned with Download buttons on photo/
+  proof viewers — same small UX addition made across Trip Expense and Petty Cash's proof
+  viewers at the same time (see git history around that commit if touching any of the
+  three apps' photo-viewer modals).
+- **Reminders**: `computeServiceReminders`/`renderServiceReminders` (service due) and
+  `computeCleaningReminders`/`renderCleaningReminders` (weekly, anchored to
+  `mostRecentMonday()`) are independent of the mileage alerts
+  (`computeMileageAlerts`/`renderMileageAlerts`, flags a vehicle whose cost-per-km has
+  drifted up).
+- **Vehicle Cost Report** (`buildVehicleCostReportHtml`, `vehicleCostReportCanvasHasContent`):
+  a per-vehicle PDF over a custom date range (`resolveCostDateRange`/`setCostRangeQuick`/
+  `setCostRangeCustom`), same direct html2canvas+jsPDF pattern as Purchase Price
+  Estimator/Petty Cash's PDFs.
+- **Monthly Trend chart** (`renderMonthlyTrend`, `lastNMonthKeys`/`monthLabel`) is a
+  hand-rolled chart (no library) with its own hover tooltip (`showTrendTip`/`hideTrendTip`)
+  — follow this same approach rather than introducing a charting library if another app
+  ever needs a similar trend view.
+
+## AI Business Assistant — specifics
+
+- **Not a real LLM / no AI API call anywhere** — despite the name, `answerQuestion()` is a
+  plain `if(q.includes(...))` keyword router over ~5 hardcoded intents (open trips,
+  stationery low stock, petty cash balance, today's fuel expense, Busy export total). A
+  question outside those 5 gets a fixed "I can only answer these for now" reply. If the
+  user asks for it to "understand more" or "answer anything", that means adding more
+  keyword branches to `answerQuestion()`, not integrating a real model, unless they
+  explicitly ask for the latter (which would need its own API key/billing decision — this
+  project must stay on Firebase's free Spark plan, see above, but a separate LLM API is a
+  different billing surface entirely and would need explicit sign-off).
+- **Read-only cross-app queries** (`liveTeTrips`/`liveSiItems`/`livePcLedger`/
+  `liveFuelLog`): plain `.get()` reads (not `.onSnapshot()`) against other apps'
+  collections (`te_trips`, `si_items`, `pc_ledger`, `fuel_log`) — this app never writes to
+  any of them.
+- **Busy accounting software export**: Busy only supports a manual CSV/Excel export, no
+  API, so this is upload-the-latest-file, not a live connection. `parseBusyCsv` finds an
+  amount-like column by header name (falls back to the last fully-numeric column) and
+  stores only the **summary** (total + row count), not the raw rows — in localStorage
+  (`busy_import` collection isn't rules-covered; see the Shared architecture note above).
+- **Gated to Admin/Director only** (`isAiAdmin`) — a logged-in user with no
+  `appRoles['ai-assistant']` of admin/director sees a "Directors Only" gate screen, not
+  the chat.
+
+## Sales Call Log — specifics
+
+- **The call log itself is localStorage-only** (`CALL_LOG_KEY='scl_call_log'`, per-device,
+  not synced) — see the Shared architecture note above for why. Everything else UI-visible
+  (pipeline stage overrides, call targets) is also localStorage
+  (`PIPELINE_OVERRIDE_KEY`/`CALL_TARGETS_KEY`) by the same constraint, not just the call
+  log.
+- **Three tabs**: 📞 Call Log (entry form + history, with audio recording +
+  `getAudioDuration`), 📈 Pipeline (`computePipelineLeads`/`pipelineCardHtml`, a lead's
+  stage defaults from its last call's outcome via `defaultStageForOutcome` but can be
+  manually overridden), and a Directors-only 👑 Directors tab
+  (`refreshDirectorsTabVisibility`, same `appRoles['sales-call-log']` admin/director gate
+  pattern as the other role-gated apps) holding Call Analysis Overview + a large set of
+  Sales Insights sections (`renderSalesInsightsHtml`): outcome leaderboard, objection→
+  outcome correlation, deal-size trend, stuck leads, follow-up speed, monthly/lost-rate
+  trends, top parties by volume, client-wise and per-sales-person breakdowns. Each
+  Insights section is colour-coded independently (see "color-code each Director Insights
+  section" in git history if adding another section — match that pattern, don't
+  reintroduce a single flat colour).
+- **`analyzeCallNote(note)`** is simple keyword/sentiment heuristics on the free-text call
+  note (not a real NLP/LLM call, same caveat as AI Business Assistant above) — drives the
+  sentiment pill and the objection-outcome insight.
+- **"Preview as Director" toggle** (`sclPreviewAsDirector`/`sclTogglePreviewAsDirector`,
+  `SCL_PREVIEW_KEY`): lets anyone self-service-preview the Directors tab without actually
+  having the role — a deliberate convenience, not a security hole, since the real gate is
+  still `canViewAllSales()`/`appRoles` server-side-equivalent data access (the toggle only
+  affects what this one browser *shows*, not what it can *read*).
+- **Admin/Director Demo Data** (`renderDemoDataActions`/`sclClearDemoData`): seeds fake
+  call-log rows for trying out the Insights sections before real data exists — make sure
+  any new Insights section is exercised against this demo data path too, not just live
+  rows, since that's how it'll first get reviewed.
+
+## Sales Panel — specifics
+
+- Mini-CRM: **Customers** (`sp_customers`, auto-created on first order via
+  `findOrCreateCustomer` if the typed name doesn't match an existing one), **Orders**
+  (`sp_orders`, status one of quotation/pending-payment/paid — `orderIsPaymentPending`),
+  **Calls** (`sp_calls`, with its own sentiment pill, same pattern as Sales Call Log's but
+  a separate, simpler implementation — the two apps' call-logging code was not unified).
+- Unlike Sales Call Log, this app's collections (`sp_customers`/`sp_orders`/`sp_calls`) are
+  **regular Firestore**, not localStorage — they predate whatever rules gap affects the
+  newer apps (see Shared architecture note above).
+- **Not in `public/apps.json`** — reachable by direct URL only, no hub card/sidebar entry.
+  Looks like an oversight (nothing in the code marks it "demo/testing" the way Purchase
+  Slip's header does) rather than deliberate — flag this to the user rather than silently
+  adding or leaving it out if the topic comes up.
+
+## Purchase Slip — specifics
+
+- Explicitly labelled **"Demo Testing Purchase Item Slip — Not live yet"** in its own
+  header and page title — treat it as a prototype, not a production app, unless the user
+  says otherwise.
+- Core idea overlaps heavily with Purchase Price Estimator (item → piece weights → each of
+  3 directors gives a rate per piece → average → adjustment % → final price) but is a
+  **separate, independent implementation** (`ps_purchases`/`ps_settings` collections, its
+  own violet colour theme deliberately different from the shared Bliss teal/mint, its own
+  director-label editing in Manage → Director Labels) — not a shared component, not kept
+  in sync with Purchase Price Estimator's own pricing logic. A pricing-formula fix in one
+  does not apply to the other.
+- `computePurchaseCalc`: each director's own average (across all their filled-in piece
+  rates) is computed first, **then** those 3 director-averages are averaged together for
+  the overall rate — not a single flat average across every rate from every director. If
+  ever asked to "fix" Purchase Slip's average to match Purchase Price Estimator's, confirm
+  which of these two averaging approaches is actually wanted; they give different numbers
+  whenever directors didn't rate the same number of pieces.
+
 ## Bliss One hub — specifics
 
 - **Mobile horizontal-overflow bug (fixed)**: `.shellWrap{align-items:flex-start}` only
@@ -346,6 +552,13 @@ lost) can pick up exactly where the previous session left off. Read this first.
    requests without confirming. Do not build without re-confirming scope first.
 3. Hitesh Dusad's email was requested at one point (to set up his `appRoles['bliss-one']`
    access) — check whether it was ever provided/added before asking again.
+4. **Trip Expense App has no way to backdate an expense** — `submitExpense()` always
+   stamps `at:new Date().toISOString()` and the Add Expense modal has no date field
+   (Category/Amount/Paid To/Bill/Remark only). A date-picker fix was proposed to the user
+   but never confirmed — don't add it without the user explicitly saying to.
+5. **Sales Panel is missing from `public/apps.json`** (see "Sales Panel — specifics" above)
+   — looks like an oversight, not deliberate, but hasn't been confirmed with the user
+   either way. Flag it if the topic comes up rather than silently adding or leaving it out.
 
 ## Style reminders specific to this project
 
