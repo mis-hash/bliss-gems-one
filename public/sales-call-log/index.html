@@ -47,7 +47,7 @@ header{background:#fff;border-bottom:1px solid var(--line)}
 .btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer;font-family:inherit}
 .btn.primary{background:var(--g);color:#fff}
 .btn.small{padding:7px 11px;font-size:12px}
-.shell{max-width:980px;margin:auto;padding:20px 18px 60px}
+.shell{max-width:1050px;margin:auto;display:grid;grid-template-columns:210px 1fr;gap:16px;padding:20px 18px 60px}
 .panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:18px;box-shadow:0 3px 10px rgba(22,36,31,.06)}
 .ph{padding:16px 18px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif}
 .pb{padding:18px}
@@ -63,10 +63,23 @@ table{width:100%;border-collapse:collapse;font-size:13.5px}
 th{text-align:left;padding:10px;background:var(--bg);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;border-bottom:1px solid var(--line)}
 td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 .emptystate{text-align:center;padding:30px;color:var(--muted);font-size:13px}
-.navBar{background:#fff;border-bottom:1px solid var(--line)}
-.navInner{max-width:980px;margin:auto;padding:0 18px;display:flex;gap:6px}
-.navBtn{border:0;background:transparent;padding:14px 16px;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;font-family:'Manrope',sans-serif}
-.navBtn.on{color:var(--g);border-bottom-color:var(--g)}
+/* Sidebar nav - same component/CSS as Petty Cash's left nav (grouped buttons, active =
+   mint background + green left border), so the two apps' navigation reads identically
+   instead of each app inventing its own pattern. */
+nav{background:#fff;border:1px solid var(--line);border-radius:14px;padding:9px;height:max-content;position:sticky;top:88px}
+nav button{width:100%;border:0;background:transparent;text-align:left;padding:12px 11px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin:2px 0;display:flex;align-items:center;gap:8px;border-left:3px solid transparent;color:var(--txt);font-family:inherit}
+nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
+.grouplabel{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:14px 11px 6px}
+.grouplabel:first-child{padding-top:4px}
+.bottomNav{display:none}
+@media(max-width:720px){
+  .shell{display:block;padding:11px 10px 76px}
+  nav{display:none}
+  .bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}
+  .bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:1 0 auto;padding:6px 8px;white-space:nowrap;font-family:inherit;cursor:pointer}
+  .bottomNav button span{display:block;font-size:19px}
+  .bottomNav button.on{color:var(--g)}
+}
 .sclPage{display:none}
 .sclPage.on{display:block}
 .pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:10.5px;font-weight:700;white-space:nowrap}
@@ -94,17 +107,19 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
     <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
   </div>
 </div></header>
-
-<div class="navBar"><div class="navInner">
-  <button class="navBtn on" data-page="log" onclick="goPage('log')">📞 Call Log</button>
-  <button class="navBtn" data-page="pipeline" onclick="goPage('pipeline')">📈 Pipeline</button>
-  <button class="navBtn" data-page="followups" onclick="goPage('followups')">⏰ Follow-ups</button>
-  <button class="navBtn" data-page="myperf" onclick="goPage('myperf')">📊 My Performance</button>
-  <button class="navBtn hidden" id="directorsNavBtn" data-page="analysis" onclick="goPage('analysis')">👑 Directors</button>
-</div></div>
 </div>
 
 <div class="shell">
+  <nav id="pageNav">
+    <div class="grouplabel">Operations</div>
+    <button class="on" data-page="log" onclick="goPage('log')">📞 Call Log</button>
+    <button data-page="pipeline" onclick="goPage('pipeline')">📈 Pipeline</button>
+    <button data-page="followups" onclick="goPage('followups')">⏰ Follow-ups</button>
+    <div class="grouplabel">Insights</div>
+    <button data-page="myperf" onclick="goPage('myperf')">📊 My Performance</button>
+    <button class="hidden directorsNavBtn" data-page="analysis" onclick="goPage('analysis')">👑 Directors</button>
+  </nav>
+  <main>
   <div class="panel" id="callFilterBarPanel">
     <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <span>🔎 Filter (Call Log aur Directors dono pe lagta hai)</span>
@@ -190,6 +205,15 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
       <div class="pb" id="callAnalysisOverview"></div>
     </div>
   </div>
+  </main>
+</div>
+
+<div class="bottomNav" id="bottomNav">
+  <button class="on" data-page="log" onclick="goPage('log')"><span>📞</span>Call Log</button>
+  <button data-page="pipeline" onclick="goPage('pipeline')"><span>📈</span>Pipeline</button>
+  <button data-page="followups" onclick="goPage('followups')"><span>⏰</span>Follow-ups</button>
+  <button data-page="myperf" onclick="goPage('myperf')"><span>📊</span>My Perf.</button>
+  <button class="hidden directorsNavBtn" data-page="analysis" onclick="goPage('analysis')"><span>👑</span>Directors</button>
 </div>
 </div>
 
@@ -318,7 +342,7 @@ function renderSalesPersonOptions(){
 
 function goPage(id){
   document.querySelectorAll('.sclPage').forEach(p=>p.classList.toggle('on',p.id==='page-'+id));
-  document.querySelectorAll('.navBtn[data-page]').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
+  document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
   // The shared Sales Person/date filter only drives Call Log + Directors - My Performance
   // always shows the viewer's own data regardless of it, so hide the filter bar there to
   // avoid confusing a Sales Person into thinking it affects their own performance view.
@@ -343,10 +367,10 @@ function renderAll(){
 // is lost while that tab happens to be open (e.g. turning Preview off), bounce back to
 // My Performance instead of leaving an empty/inaccessible tab open.
 function refreshDirectorsTabVisibility(){
-  const btn=$('directorsNavBtn');
-  if(!btn)return;
+  const btns=document.querySelectorAll('.directorsNavBtn');
+  if(!btns.length)return;
   const can=canViewAllSales();
-  btn.classList.toggle('hidden',!can);
+  btns.forEach(b=>b.classList.toggle('hidden',!can));
   if(!can&&$('page-analysis')&&$('page-analysis').classList.contains('on'))goPage('myperf');
 }
 // "My Performance" tab - always locked to the logged-in user's OWN calls regardless of
