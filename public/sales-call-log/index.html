@@ -92,9 +92,9 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 </div></div>
 
 <div class="shell">
-  <div class="panel">
+  <div class="panel" id="callFilterBarPanel">
     <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <span>🔎 Filter (Call Log aur Analysis dono pe lagta hai)</span>
+      <span>🔎 Filter (Call Log aur Directors dono pe lagta hai)</span>
       <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
         <input type="date" id="callFilterFrom" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
@@ -292,6 +292,11 @@ function renderSalesPersonOptions(){
 function goPage(id){
   document.querySelectorAll('.sclPage').forEach(p=>p.classList.toggle('on',p.id==='page-'+id));
   document.querySelectorAll('.navBtn[data-page]').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
+  // The shared Sales Person/date filter only drives Call Log + Directors - Mera Performance
+  // always shows the viewer's own data regardless of it, so hide the filter bar there to
+  // avoid confusing a Sales Person into thinking it affects their own performance view.
+  const filterBar=$('callFilterBarPanel');
+  if(filterBar)filterBar.classList.toggle('hidden',id==='myperf');
 }
 
 function renderAll(){
