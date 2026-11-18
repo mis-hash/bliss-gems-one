@@ -87,7 +87,8 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 
 <div class="navBar"><div class="navInner">
   <button class="navBtn on" data-page="log" onclick="goPage('log')">📞 Call Log</button>
-  <button class="navBtn" data-page="analysis" onclick="goPage('analysis')">🧠 Call Analysis</button>
+  <button class="navBtn" data-page="myperf" onclick="goPage('myperf')">📊 Mera Performance</button>
+  <button class="navBtn hidden" id="directorsNavBtn" data-page="analysis" onclick="goPage('analysis')">👑 Directors</button>
 </div></div>
 
 <div class="shell">
@@ -146,10 +147,17 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
     </div>
   </div>
 
+  <div id="page-myperf" class="sclPage">
+    <div class="panel">
+      <div class="ph">📊 Mera Performance</div>
+      <div class="pb" id="myPerformanceOverview"></div>
+    </div>
+  </div>
+
   <div id="page-analysis" class="sclPage">
     <div class="panel">
       <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <span>🧠 Call Analysis Overview</span>
+        <span>👑 Director Insights Overview</span>
         <span id="sclDemoDataActions"></span>
       </div>
       <div class="pb" id="callAnalysisOverview"></div>
@@ -290,9 +298,58 @@ function renderAll(){
   renderGate();
   renderSalesPersonOptions();
   renderCallHistory();
+  renderMyPerformance();
   renderCallAnalysisOverview();
   renderDemoDataActions();
   renderPreviewToggle();
+  refreshDirectorsTabVisibility();
+}
+// The 3rd nav tab ("👑 Directors") is only for Admin/Director (real role or the Preview
+// toggle) - everyone else only ever sees Call Log + Mera Performance. If the toggle/role
+// is lost while that tab happens to be open (e.g. turning Preview off), bounce back to
+// Mera Performance instead of leaving an empty/inaccessible tab open.
+function refreshDirectorsTabVisibility(){
+  const btn=$('directorsNavBtn');
+  if(!btn)return;
+  const can=canViewAllSales();
+  btn.classList.toggle('hidden',!can);
+  if(!can&&$('page-analysis')&&$('page-analysis').classList.contains('on'))goPage('myperf');
+}
+// "Mera Performance" tab - always locked to the logged-in user's OWN calls regardless of
+// role or the shared Sales Person filter (that filter only drives Call Log + the Directors
+// tab) - every Sales Person, Admin and Director gets the same personal self-review view here.
+function renderMyPerformance(){
+  const wrap=$('myPerformanceOverview');
+  if(!wrap)return;
+  const u=loggedUser();
+  if(!u){wrap.innerHTML='';return}
+  const myName=u.name||u.username||'';
+  const rows=liveCallLog().filter(r=>r.salesPerson===myName);
+  if(!rows.length){wrap.innerHTML=`<div class="emptystate">📞<p>Abhi aapki koi call log nahi hui hai.</p></div>`;return}
+  const leaderboard=computeOutcomeLeaderboard(rows);
+  const my=leaderboard[myName]||{total:rows.length,converted:0,avgDeal:null};
+  const winRate=my.total?Math.round(my.converted/my.total*100):0;
+  const tile=(label,val)=>`<div style="background:var(--mint);border-radius:10px;padding:10px 12px;min-width:110px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">${esc(label)}</div><div style="font-size:18px;font-weight:800;color:var(--g)">${esc(String(val))}</div></div>`;
+  const analyzable=rows.filter(r=>r.note);
+  let sentimentHtml='';
+  if(analyzable.length){
+    const analyses=analyzable.map(r=>analyzeCallNote(r.note));
+    const counts={positive:0,neutral:0,negative:0};
+    analyses.forEach(a=>counts[a.sentiment]++);
+    sentimentHtml=tile('🙂 Positive',counts.positive)+tile('😐 Neutral',counts.neutral)+tile('🙁 Negative',counts.negative);
+  }
+  const recentRows=analyzable.slice().sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt))).slice(0,15);
+  const coachingCardsHtml=recentRows.length?`<div style="margin-top:14px">
+    <b style="font-size:12px">🎓 Meri Recent Calls (Self Review)</b>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">${recentRows.map(r=>callAnalysisCardHtml(r)).join('')}</div>
+  </div>`:'';
+  wrap.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap">
+    ${tile('Total Calls',my.total)}
+    ${tile('Converted',my.converted)}
+    ${tile('Win Rate',winRate+'%')}
+    ${tile('Avg Deal',my.avgDeal?fmtCallMoney(my.avgDeal):'-')}
+    ${sentimentHtml}
+  </div>${coachingCardsHtml}`;
 }
 // Visible to everyone (unlike the real appRoles-based gating) so a person can flip this on
 // themselves to demo the full Director view - clearly labeled "Preview", never silently
