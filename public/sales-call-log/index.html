@@ -70,6 +70,14 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 .sclPage{display:none}
 .sclPage.on{display:block}
 .pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:10.5px;font-weight:700;white-space:nowrap}
+/* Color-coded Director Insights sections - a left accent bar + tinted icon badge per
+   section so a long scroll of stacked insights (Leaderboard, Objection Impact, Stuck
+   Leads, ...) is easy to tell apart at a glance instead of all looking identical. */
+.insightSection{background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:14px 16px;margin-top:14px}
+.insightHead{display:flex;align-items:center;gap:9px}
+.insightIcon{width:28px;height:28px;border-radius:8px;background:var(--accentbg);display:grid;place-items:center;font-size:14px;flex:none}
+.insightTitle{font-size:12.5px;font-weight:800;font-family:'Manrope',sans-serif;color:var(--txt)}
+.insightSection table{margin-top:10px}
 </style>
 </head>
 <body>
@@ -829,6 +837,15 @@ function setCallTarget(salesPerson,target){
   try{localStorage.setItem(CALL_TARGETS_KEY,JSON.stringify(t));}catch(e){console.error('setCallTarget failed:',e);}
   renderCallAnalysisOverview();
 }
+// Wraps one Director Insights section in a colored accent card (see .insightSection CSS) -
+// shared by every section below plus the two breakdown tables, so a new section only needs
+// to pick an icon/color pair, not repeat the markup.
+function insightSectionHtml(icon,accent,accentbg,title,bodyHtml){
+  return `<div class="insightSection" style="--accent:${accent};--accentbg:${accentbg}">
+    <div class="insightHead"><div class="insightIcon">${icon}</div><div class="insightTitle">${esc(title)}</div></div>
+    ${bodyHtml}
+  </div>`;
+}
 function renderSalesInsightsHtml(scopeRows,analyses){
   const leaderboard=computeOutcomeLeaderboard(scopeRows);
   const names=Object.keys(leaderboard).sort((a,b)=>leaderboard[b].total-leaderboard[a].total);
@@ -846,19 +863,15 @@ function renderSalesInsightsHtml(scopeRows,analyses){
     return `<tr><td><b>${esc(n)}</b></td><td>${d.total}</td><td>${d.converted}</td><td>${winRate}%</td><td>${d.avgDeal?fmtCallMoney(d.avgDeal)+' '+dealTrendIcon[d.dealTrend]:'-'}</td><td>${trendHtml[d.trend]}</td>
       <td>${callsThisWeek}/<input type="number" value="${esc(target)}" placeholder="target" style="width:56px;padding:4px;border:1px solid var(--line);border-radius:5px;font-size:12px" onchange="setCallTarget('${nSafe}',parseInt(this.value)||0)">${behind?' <span class="pill" style="background:var(--redbg);color:var(--red)">Peeche</span>':''}</td></tr>`;
   }).join('');
-  const leaderboardHtml=names.length?`<div style="margin-top:14px">
-    <b style="font-size:12px">🏆 Sales Person Leaderboard</b>
-    <table style="margin-top:6px">
+  const leaderboardHtml=names.length?insightSectionHtml('🏆','#a66b08','#fff6df','Sales Person Leaderboard',`
+    <table>
       <thead><tr><th>Sales Person</th><th>Calls</th><th>Converted</th><th>Win Rate</th><th>Avg Deal</th><th>Trend</th><th>Weekly Target</th></tr></thead>
       <tbody>${leaderboardRows}</tbody>
-    </table>
-  </div>`:'';
+    </table>`):'';
 
   const dealTrend=computeDealSizeTrend(scopeRows);
-  const dealTrendHtml=dealTrend.recentAvg!=null?`<div style="margin-top:14px">
-    <b style="font-size:12px">💰 Average Deal Size Trend (Company-wide, Converted deals)</b>
-    <div class="note" style="margin-top:6px">Pichle 7 din ka average deal: <b style="color:var(--g)">${fmtCallMoney(dealTrend.recentAvg)}</b> (${dealTrend.recentCount} deals)${dealTrend.priorAvg!=null?` — uske pichle 7 din se ${trendHtml[dealTrend.trend]}.`:' — compare karne ke liye aur purana data chahiye.'}</div>
-  </div>`:'';
+  const dealTrendHtml=dealTrend.recentAvg!=null?insightSectionHtml('💰','#268F76','#E8F8F2','Average Deal Size Trend (Company-wide, Converted deals)',`
+    <div class="note" style="margin-top:6px">Pichle 7 din ka average deal: <b style="color:var(--g)">${fmtCallMoney(dealTrend.recentAvg)}</b> (${dealTrend.recentCount} deals)${dealTrend.priorAvg!=null?` — uske pichle 7 din se ${trendHtml[dealTrend.trend]}.`:' — compare karne ke liye aur purana data chahiye.'}</div>`):'';
 
   const objMap=computeObjectionOutcomeInsight(scopeRows,analyses);
   const objNames=Object.keys(objMap).sort((a,b)=>objMap[b].total-objMap[a].total);
@@ -868,68 +881,54 @@ function renderSalesInsightsHtml(scopeRows,analyses){
     const lostRate=d.total?Math.round(d.lost/d.total*100):0;
     return `<tr${t==='Pricing'?' style="background:var(--mint)"':''}><td>${t==='Pricing'?'💰 ':''}${esc(t)}</td><td>${d.total}</td><td>${winRate}%</td><td style="color:var(--red)">${lostRate}%</td></tr>`;
   }).join('');
-  const objectionHtml=objNames.length?`<div style="margin-top:14px">
-    <b style="font-size:12px">🎯 Objection Impact — Win Rate by Topic (Pricing highlighted)</b>
-    <table style="margin-top:6px">
+  const objectionHtml=objNames.length?insightSectionHtml('🎯','#b43a35','#fff0ef','Objection Impact — Win Rate by Topic (Pricing highlighted)',`
+    <table>
       <thead><tr><th>Topic</th><th>Calls</th><th>Win Rate</th><th>Lost Rate</th></tr></thead>
       <tbody>${objRows}</tbody>
-    </table>
-  </div>`:'';
+    </table>`):'';
 
   const stuckLeads=computeStuckLeads();
   const pipelineAtRisk=stuckLeads.reduce((s,r)=>s+(r.dealValue||0),0);
   const stuckRows=stuckLeads.map(r=>`<tr><td>${esc(r.clientName)}</td><td>${esc(r.salesPerson)}</td><td>${esc(new Date(r.loggedAt).toLocaleDateString('en-IN'))}</td><td>${outcomeLabelHtml(r.outcome)}</td><td style="color:var(--red);font-weight:700">${r.daysPending} din</td><td>${r.dealValue?fmtCallMoney(r.dealValue):'-'}</td></tr>`).join('');
-  const stuckLeadsHtml=stuckLeads.length?`<div style="margin-top:14px">
-    <b style="font-size:12px">⚠ Stuck Leads — Follow-up Zaroori (${STUCK_LEAD_DAYS}+ din se)</b>
-    <table style="margin-top:6px">
+  const stuckLeadsHtml=stuckLeads.length?insightSectionHtml('⚠','#c9820a','#fff3df',`Stuck Leads — Follow-up Zaroori (${STUCK_LEAD_DAYS}+ din se)`,`
+    <table>
       <thead><tr><th>Client</th><th>Sales Person</th><th>Last Call</th><th>Status</th><th>Pending</th><th>Deal Value</th></tr></thead>
       <tbody>${stuckRows}</tbody>
     </table>
-    ${pipelineAtRisk?`<div class="note" style="margin-top:6px">💰 Pipeline at Risk: <b style="color:var(--red)">${fmtCallMoney(pipelineAtRisk)}</b></div>`:''}
-  </div>`:'';
+    ${pipelineAtRisk?`<div class="note" style="margin-top:6px">💰 Pipeline at Risk: <b style="color:var(--red)">${fmtCallMoney(pipelineAtRisk)}</b></div>`:''}`):'';
 
   const fsi=computeFollowupSpeedInsight(scopeRows);
-  const fsiHtml=(fsi.fastCount||fsi.slowCount)?`<div style="margin-top:14px">
-    <b style="font-size:12px">⚡ Follow-up Speed vs Win Rate</b>
+  const fsiHtml=(fsi.fastCount||fsi.slowCount)?insightSectionHtml('⚡','#8A3FFC','#F3ECFF','Follow-up Speed vs Win Rate',`
     <div class="note" style="margin-top:6px">
       ${fsi.fastCount?`2 din ya usse jaldi follow-up hui ${fsi.fastCount} leads ka win rate: <b style="color:var(--g)">${fsi.fastRate}%</b>. `:''}
       ${fsi.slowCount?`2 din se der follow-up hui ${fsi.slowCount} leads ka win rate: <b style="color:var(--red)">${fsi.slowRate}%</b>.`:''}
       ${(fsi.fastCount&&fsi.slowCount&&fsi.fastRate>fsi.slowRate)?' Jaldi follow-up karna deals close karne mein madad kar raha hai.':''}
-    </div>
-  </div>`:'';
+    </div>`):'';
 
   const turnaround=computeAvgTurnaroundTime(scopeRows);
-  const turnaroundHtml=turnaround.avgDays!=null?`<div style="margin-top:14px">
-    <b style="font-size:12px">⏱ Average Conversion Turnaround Time</b>
-    <div class="note" style="margin-top:6px">Pehli call se deal Convert hone tak average <b style="color:var(--g)">${Math.round(turnaround.avgDays)} din</b> lagte hain (${turnaround.count} converted lead${turnaround.count===1?'':'s'} ka data).</div>
-  </div>`:'';
+  const turnaroundHtml=turnaround.avgDays!=null?insightSectionHtml('⏱','#2A6DB0','#E9F2FB','Average Conversion Turnaround Time',`
+    <div class="note" style="margin-top:6px">Pehli call se deal Convert hone tak average <b style="color:var(--g)">${Math.round(turnaround.avgDays)} din</b> lagte hain (${turnaround.count} converted lead${turnaround.count===1?'':'s'} ka data).</div>`):'';
 
   const monthly=computeMonthlyTrend(scopeRows);
   const monthlyRows=monthly.map(m=>`<tr><td>${esc(m.month)}</td><td>${m.total}</td><td>${m.converted}</td><td>${m.winRate}%</td></tr>`).join('');
-  const monthlyHtml=monthly.length>1?`<div style="margin-top:14px">
-    <b style="font-size:12px">📈 Month-over-Month Trend</b>
-    <table style="margin-top:6px">
+  const monthlyHtml=monthly.length>1?insightSectionHtml('📈','#4C5FD5','#EDEFFC','Month-over-Month Trend',`
+    <table>
       <thead><tr><th>Month</th><th>Calls</th><th>Converted</th><th>Win Rate</th></tr></thead>
       <tbody>${monthlyRows}</tbody>
-    </table>
-  </div>`:'';
+    </table>`):'';
 
   const lostTrend=computeLostRateTrend(scopeRows);
   const lostTrendIconHtml=lostTrend.trend==='up'?'<span style="color:var(--red);font-weight:800">↑ Badh raha hai</span>':lostTrend.trend==='down'?'<span style="color:var(--g);font-weight:800">↓ Ghat raha hai</span>':'<span class="note">Flat</span>';
-  const lostTrendHtml=lostTrend.recentRate!=null?`<div style="margin-top:14px">
-    <b style="font-size:12px">📉 Lost-Lead Rate (Not Interested)</b>
-    <div class="note" style="margin-top:6px">Pichle 7 din mein <b style="color:var(--red)">${lostTrend.recentRate}%</b> calls "Not Interested" mein gayi (${lostTrend.recentCount} calls)${lostTrend.priorRate!=null?` — uske pichle 7 din se ${lostTrendIconHtml}.`:' — compare karne ke liye aur purana data chahiye.'}</div>
-  </div>`:'';
+  const lostTrendHtml=lostTrend.recentRate!=null?insightSectionHtml('📉','#8a3030','#fbe9e7','Lost-Lead Rate (Not Interested)',`
+    <div class="note" style="margin-top:6px">Pichle 7 din mein <b style="color:var(--red)">${lostTrend.recentRate}%</b> calls "Not Interested" mein gayi (${lostTrend.recentCount} calls)${lostTrend.priorRate!=null?` — uske pichle 7 din se ${lostTrendIconHtml}.`:' — compare karne ke liye aur purana data chahiye.'}</div>`):'';
 
   const topParties=computeTopPartiesByVolume(scopeRows);
   const topPartiesRows=topParties.map(p=>`<tr><td>${esc(p.name)}</td><td>${p.total}</td><td>${p.converted}</td></tr>`).join('');
-  const topPartiesHtml=topParties.length?`<div style="margin-top:14px">
-    <b style="font-size:12px">🏢 Top Parties by Call Volume</b>
-    <table style="margin-top:6px">
+  const topPartiesHtml=topParties.length?insightSectionHtml('🏢','#0E8A8A','#E3F7F7','Top Parties by Call Volume',`
+    <table>
       <thead><tr><th>Client</th><th>Calls</th><th>Converted</th></tr></thead>
       <tbody>${topPartiesRows}</tbody>
-    </table>
-  </div>`:'';
+    </table>`):'';
 
   return leaderboardHtml+dealTrendHtml+turnaroundHtml+monthlyHtml+objectionHtml+stuckLeadsHtml+lostTrendHtml+fsiHtml+topPartiesHtml;
 }
@@ -969,24 +968,21 @@ function renderCallAnalysisOverview(){
   analyses.forEach(a=>a.negativeHits.forEach(w=>{objCounts[w]=(objCounts[w]||0)+1}));
   const topObjection=Object.keys(objCounts).sort((a,b)=>objCounts[b]-objCounts[a])[0];
   const tile=(label,val)=>`<div style="background:var(--mint);border-radius:10px;padding:10px 12px;min-width:110px"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">${esc(label)}</div><div style="font-size:18px;font-weight:800;color:var(--g)">${esc(String(val))}</div></div>`;
-  const breakdownTableHtml=(title,icon,byMap,colLabel)=>{
+  const breakdownTableHtml=(title,icon,accent,accentbg,byMap,colLabel)=>{
     const names=Object.keys(byMap).sort((a,b)=>byMap[b].total-byMap[a].total);
     if(filter||names.length<2)return '';
-    return `
-    <div style="margin-top:14px">
-      <b style="font-size:12px">${icon} ${esc(title)}</b>
-      <table style="margin-top:6px">
+    return insightSectionHtml(icon,accent,accentbg,title,`
+      <table>
         <thead><tr><th>${esc(colLabel)}</th><th>Calls</th><th>🙂</th><th>😐</th><th>🙁</th><th>Top Objection</th></tr></thead>
         <tbody>${names.map(n=>{
           const d=byMap[n];
           const topObj=Object.keys(d.objCounts).sort((a,b)=>d.objCounts[b]-d.objCounts[a])[0]||'-';
           return `<tr><td>${esc(n)}</td><td>${d.total}</td><td>${d.positive}</td><td>${d.neutral}</td><td>${d.negative}</td><td>${esc(topObj)}</td></tr>`;
         }).join('')}</tbody>
-      </table>
-    </div>`;
+      </table>`);
   };
-  const spBreakdownHtml=breakdownTableHtml('Sales Person-wise Breakdown','👤',callAnalysisBySalesPerson(rows,analyses),'Sales Person');
-  const clientBreakdownHtml=breakdownTableHtml('Client-wise Breakdown','🏢',callAnalysisByClient(rows,analyses),'Client');
+  const spBreakdownHtml=breakdownTableHtml('Sales Person-wise Breakdown','👤','#4C5FD5','#EDEFFC',callAnalysisBySalesPerson(rows,analyses),'Sales Person');
+  const clientBreakdownHtml=breakdownTableHtml('Client-wise Breakdown','🏢','#C23B7A','#FCE9F2',callAnalysisByClient(rows,analyses),'Client');
   const salesInsightsHtml=renderSalesInsightsHtml(rows,analyses);
   const canAll=canViewAllSales();
   const headingHtml=canAll
