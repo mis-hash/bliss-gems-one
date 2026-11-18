@@ -35,13 +35,14 @@
 button,input,select,textarea{font:inherit}
 h1,h2,h3{font-family:'Manrope',sans-serif}
 .hidden{display:none!important}
-header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
-.head{height:100%;max-width:980px;margin:auto;padding:0 18px;display:flex;align-items:center;justify-content:space-between}
+#topBar{position:sticky;top:0;z-index:20;background:#fff}
+header{background:#fff;border-bottom:1px solid var(--line)}
+.head{max-width:980px;margin:auto;padding:12px 18px;display:flex;flex-wrap:wrap;row-gap:8px;align-items:center;justify-content:space-between}
 .brand{display:flex;gap:10px;align-items:center}
-.logo{width:44px;height:44px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:24px;font-weight:900;color:var(--g2)}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:24px;font-weight:900;color:var(--g2);flex:none}
 .brand b{color:var(--g);font-size:20px;font-family:'Manrope',sans-serif}
 .brand small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
-.headRight{display:flex;align-items:center;gap:10px}
+.headRight{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .pillbadge{font-size:13px;font-weight:700;background:var(--mint);color:var(--g);padding:7px 12px;border-radius:999px}
 .btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer;font-family:inherit}
 .btn.primary{background:var(--g);color:#fff}
@@ -62,7 +63,7 @@ table{width:100%;border-collapse:collapse;font-size:13.5px}
 th{text-align:left;padding:10px;background:var(--bg);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;border-bottom:1px solid var(--line)}
 td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 .emptystate{text-align:center;padding:30px;color:var(--muted);font-size:13px}
-.navBar{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:68px;z-index:19}
+.navBar{background:#fff;border-bottom:1px solid var(--line)}
 .navInner{max-width:980px;margin:auto;padding:0 18px;display:flex;gap:6px}
 .navBtn{border:0;background:transparent;padding:14px 16px;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;font-family:'Manrope',sans-serif}
 .navBtn.on{color:var(--g);border-bottom-color:var(--g)}
@@ -76,6 +77,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 <div id="gateWrap" style="display:none"><div class="gate" id="gateBox"></div></div>
 
 <div id="appWrap" style="display:none">
+<div id="topBar">
 <header><div class="head">
   <div class="brand"><div class="logo">📞</div><div><b>Sales Call Log</b><small>Bliss Gems &amp; Minerals</small></div></div>
   <div class="headRight">
@@ -90,6 +92,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
   <button class="navBtn" data-page="myperf" onclick="goPage('myperf')">📊 Mera Performance</button>
   <button class="navBtn hidden" id="directorsNavBtn" data-page="analysis" onclick="goPage('analysis')">👑 Directors</button>
 </div></div>
+</div>
 
 <div class="shell">
   <div class="panel" id="callFilterBarPanel">
