@@ -198,7 +198,13 @@ function doLogin(){
   closeLogin();
   renderAll();
 }
-function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
+function doLogout(){
+  localStorage.removeItem(SESSION_KEY);currentUser=null;
+  // Clear any locked/selected Sales Person filter so the next person to log in on this
+  // device never inherits a previous session's filter state.
+  if($('callFilterSalesPerson'))$('callFilterSalesPerson').value='';
+  renderAll();
+}
 
 function startUsersSync(){
   if(!db)return;
@@ -218,13 +224,32 @@ function renderGate(){
   $('logoutBtn').classList.remove('hidden');
 }
 
+// Admin/Director (appRoles['sales-call-log'], set from Bliss One hub's Universal Users
+// table) see every Sales Person's data in Call Analysis - a normal Sales Person is locked
+// to their own name only, so they never see a colleague's calls/numbers.
+function canViewAllSales(){
+  const u=loggedUser();
+  return !!(u&&u.appRoles&&['admin','director'].includes(u.appRoles['sales-call-log']));
+}
 function renderSalesPersonOptions(){
   const active=users.filter(u=>u.active!==false).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
   const opts=active.map(u=>`<option value="${esc(u.name||u.username)}">${esc(u.name||u.username)}</option>`).join('');
   const sel=$('callSalesPerson');
   if(sel){const cur=sel.value;sel.innerHTML='<option value="">-- Select --</option>'+opts;if(cur)sel.value=cur;}
   const filterSel=$('callFilterSalesPerson');
-  if(filterSel){const cur=filterSel.value;filterSel.innerHTML='<option value="">Sab Sales Persons</option>'+opts;if(cur)filterSel.value=cur;}
+  if(filterSel){
+    if(canViewAllSales()){
+      const cur=filterSel.value;
+      filterSel.innerHTML='<option value="">Sab Sales Persons</option>'+opts;
+      if(cur)filterSel.value=cur;
+      filterSel.disabled=false;
+    }else{
+      const myName=(loggedUser()||{}).name||(loggedUser()||{}).username||'';
+      filterSel.innerHTML=`<option value="${esc(myName)}">${esc(myName)}</option>`;
+      filterSel.value=myName;
+      filterSel.disabled=true;
+    }
+  }
 }
 
 function goPage(id){
@@ -702,7 +727,26 @@ function renderCallAnalysisOverview(){
   const spBreakdownHtml=breakdownTableHtml('Sales Person-wise Breakdown','👤',callAnalysisBySalesPerson(rows,analyses),'Sales Person');
   const clientBreakdownHtml=breakdownTableHtml('Client-wise Breakdown','🏢',callAnalysisByClient(rows,analyses),'Client');
   const salesInsightsHtml=renderSalesInsightsHtml(rows,analyses);
-  wrap.innerHTML=`<div class="note" style="margin-bottom:12px">📱 Ye data sirf is device se hai — dusre device pe log hui calls yahan abhi nahi dikhengi (Firestore sync hone tak).</div>
+  const canAll=canViewAllSales();
+  const headingHtml=canAll
+    ?`<b style="font-size:14px">👑 ${filter?esc(filter)+' — Detailed Coaching View':'Company-wide Sales Insights'}</b>`
+    :`<b style="font-size:14px">📊 Mera Performance</b>`;
+  // Director/Admin drill-down: filtered to one Sales Person, show their call-by-call
+  // coaching cards (same card used in Call Log's per-row "Analysis" expand) right here -
+  // so a Director can actually read through and guide that person in one place, instead
+  // of opening each call separately.
+  let coachingCardsHtml='';
+  if(canAll&&filter){
+    const personRows=rows.slice().sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt))).slice(0,15);
+    if(personRows.length){
+      coachingCardsHtml=`<div style="margin-top:14px">
+        <b style="font-size:12px">🎓 ${esc(filter)} — Recent Calls (Coaching Detail)</b>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">${personRows.map(r=>callAnalysisCardHtml(r)).join('')}</div>
+      </div>`;
+    }
+  }
+  wrap.innerHTML=`<div style="margin-bottom:10px">${headingHtml}</div>
+  <div class="note" style="margin-bottom:12px">📱 Ye data sirf is device se hai — dusre device pe log hui calls yahan abhi nahi dikhengi (Firestore sync hone tak).</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     ${tile('Total Analyzed',rows.length)}
     ${tile('🙂 Positive',counts.positive)}
@@ -710,7 +754,7 @@ function renderCallAnalysisOverview(){
     ${tile('🙁 Negative',counts.negative)}
     ${tile('Top Topic',topTopic||'-')}
     ${tile('Top Objection',topObjection||'-')}
-  </div>${salesInsightsHtml}${spBreakdownHtml}${clientBreakdownHtml}`;
+  </div>${salesInsightsHtml}${spBreakdownHtml}${clientBreakdownHtml}${coachingCardsHtml}`;
 }
 function downloadCSV(filename,rows){
   const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
