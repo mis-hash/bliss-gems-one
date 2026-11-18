@@ -401,16 +401,27 @@ function outcomeLabelHtml(o){
    note text the sales person typed (keyword-matched, Hindi/Hinglish + English) plus the
    recording's own duration. Honest about what it is: a keyword signal, not true call
    understanding - the UI labels it "Note-Based" for that reason. */
-const CALL_POSITIVE_WORDS=['ready','confirm','confirmed','done','yes','haan','ok','okay','theek','thik','sahi','achha','acha','good','happy','khush','satisfied','deal','order','payment','paid','approved','interested'];
-const CALL_NEGATIVE_WORDS=['nahi','no','mehenga','expensive','high','late','delay','problem','issue','complaint','cancel','wait','sochunga','soch','busy','ignore','angry','gussa','refuse','reject','dispute','return','complain','slow','deny'];
+const CALL_POSITIVE_WORDS=['ready','confirm','confirmed','done','yes','haan','ok','okay','theek','thik','sahi','achha','acha','good','happy','khush','satisfied','deal','order','payment','paid','approved','interested','genuine','pure','certified','available','asli'];
+const CALL_NEGATIVE_WORDS=['nahi','no','mehenga','expensive','high','late','delay','problem','issue','complaint','cancel','wait','sochunga','soch','busy','ignore','angry','gussa','refuse','reject','dispute','return','complain','slow','deny','fake','nakli','damage','tuta','tutaa','shortage','kami'];
 // Topic categories - what the call was actually about, so a Director skimming many calls
 // can see patterns ("most calls this week were stuck on Pricing") not just a bare sentiment.
+// Still just keyword-matching (no paid speech-to-text), so it can only recognize a call as
+// being about one of THESE specific categories - a real conversation can be about anything,
+// this just widens how much of "anything" it can actually catch, for a gems/minerals trade
+// specifically (quality/purity, stock, scheduling, returns, paperwork, packaging on top of
+// the original price/delivery/payment/competitor/decision set).
 const CALL_TOPIC_WORDS={
   'Pricing':['price','rate','rates','mehenga','expensive','discount','cheap','sasta','bhav','costly'],
   'Delivery':['delivery','delay','late','shipment','courier','dispatch','transport'],
   'Payment':['payment','paid','advance','due','balance','cheque','upi','credit'],
   'Competitor':['competitor','market','doosri','dusri','elsewhere','another'],
-  'Decision':['confirm','confirmed','order','deal','ready','cancel','reject','approved']
+  'Decision':['confirm','confirmed','order','deal','ready','cancel','reject','approved'],
+  'Quality':['quality','purity','pure','karat','carat','mix','mixed','grade','certified','certificate','genuine','asli','nakli','fake','original'],
+  'Stock':['stock','available','availability','inventory','supply','shortage','kami','khatam'],
+  'Scheduling':['meeting','milna','mulakat','visit','aayenge','aaunga','kal','parso','schedule','appointment'],
+  'ReturnExchange':['return','exchange','replace','wapas','vapis','refund','swap'],
+  'Documentation':['bill','invoice','gst','document','paperwork','receipt','challan'],
+  'Packaging':['packing','packaging','box','parcel','wrap','damage','tuta','tutaa']
 };
 function analyzeCallNote(note){
   const text=String(note||'').toLowerCase();
@@ -425,6 +436,12 @@ function analyzeCallNote(note){
   if(positiveHits.length&&!negativeHits.length)coachingTips.push('Customer positive lag raha hai - jaldi follow-up karke deal/order close karne ki koshish karein.');
   if(topics.includes('Pricing'))coachingTips.push('Pricing discuss hua - rate justify karne ke liye quality/value ki baat pehle karein, discount seedha na dein.');
   if(topics.includes('Delivery'))coachingTips.push('Delivery/timing ka zikr hua - ek clear delivery date commit karein taaki customer ko confidence mile.');
+  if(topics.includes('Quality'))coachingTips.push('Quality/purity ka sawaal utha - certificate/proof dikhane se customer ka trust badhega.');
+  if(topics.includes('Stock'))coachingTips.push('Stock/availability discuss hui - agar kami hai to alternative ya expected date clearly batayein, customer ko lambe wait mein na rakhein.');
+  if(topics.includes('Scheduling'))coachingTips.push('Meeting/visit ki baat hui - ek specific date/time confirm karke calendar mein note kar lein, vague "jald hi" na chhodein.');
+  if(topics.includes('ReturnExchange'))coachingTips.push('Return/exchange ka zikr hua - wajah samajh kar jaldi resolve karein, customer relationship lambe time ke liye zaroori hai.');
+  if(topics.includes('Documentation'))coachingTips.push('Bill/invoice ka sawaal utha - paperwork turant clear karein, isse payment bhi jaldi aata hai.');
+  if(topics.includes('Packaging'))coachingTips.push('Packaging/damage ka zikr hua - agar damage hui hai to turant replacement/compensation ki baat karein.');
   const suggestion=negativeHits.length?'Pricing/delay jaisi concern resolve karke dobara contact karein.':(positiveHits.length?'Order/confirmation ke liye follow-up karein.':'Next call schedule karein aur outcome ko specific note mein likhein.');
   return {sentiment,positiveHits,negativeHits,topics,coachingTips,suggestion};
 }
