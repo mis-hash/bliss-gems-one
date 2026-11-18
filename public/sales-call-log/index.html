@@ -89,7 +89,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 
 <div class="navBar"><div class="navInner">
   <button class="navBtn on" data-page="log" onclick="goPage('log')">📞 Call Log</button>
-  <button class="navBtn" data-page="myperf" onclick="goPage('myperf')">📊 Mera Performance</button>
+  <button class="navBtn" data-page="myperf" onclick="goPage('myperf')">📊 My Performance</button>
   <button class="navBtn hidden" id="directorsNavBtn" data-page="analysis" onclick="goPage('analysis')">👑 Directors</button>
 </div></div>
 </div>
@@ -152,7 +152,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 
   <div id="page-myperf" class="sclPage">
     <div class="panel">
-      <div class="ph">📊 Mera Performance</div>
+      <div class="ph">📊 My Performance</div>
       <div class="pb" id="myPerformanceOverview"></div>
     </div>
   </div>
@@ -295,7 +295,7 @@ function renderSalesPersonOptions(){
 function goPage(id){
   document.querySelectorAll('.sclPage').forEach(p=>p.classList.toggle('on',p.id==='page-'+id));
   document.querySelectorAll('.navBtn[data-page]').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
-  // The shared Sales Person/date filter only drives Call Log + Directors - Mera Performance
+  // The shared Sales Person/date filter only drives Call Log + Directors - My Performance
   // always shows the viewer's own data regardless of it, so hide the filter bar there to
   // avoid confusing a Sales Person into thinking it affects their own performance view.
   const filterBar=$('callFilterBarPanel');
@@ -313,9 +313,9 @@ function renderAll(){
   refreshDirectorsTabVisibility();
 }
 // The 3rd nav tab ("👑 Directors") is only for Admin/Director (real role or the Preview
-// toggle) - everyone else only ever sees Call Log + Mera Performance. If the toggle/role
+// toggle) - everyone else only ever sees Call Log + My Performance. If the toggle/role
 // is lost while that tab happens to be open (e.g. turning Preview off), bounce back to
-// Mera Performance instead of leaving an empty/inaccessible tab open.
+// My Performance instead of leaving an empty/inaccessible tab open.
 function refreshDirectorsTabVisibility(){
   const btn=$('directorsNavBtn');
   if(!btn)return;
@@ -323,7 +323,7 @@ function refreshDirectorsTabVisibility(){
   btn.classList.toggle('hidden',!can);
   if(!can&&$('page-analysis')&&$('page-analysis').classList.contains('on'))goPage('myperf');
 }
-// "Mera Performance" tab - always locked to the logged-in user's OWN calls regardless of
+// "My Performance" tab - always locked to the logged-in user's OWN calls regardless of
 // role or the shared Sales Person filter (that filter only drives Call Log + the Directors
 // tab) - every Sales Person, Admin and Director gets the same personal self-review view here.
 function renderMyPerformance(){
@@ -991,7 +991,7 @@ function renderCallAnalysisOverview(){
   const canAll=canViewAllSales();
   const headingHtml=canAll
     ?`<b style="font-size:14px">👑 ${filter?esc(filter)+' — Detailed Coaching View':'Company-wide Sales Insights'}</b>`
-    :`<b style="font-size:14px">📊 Mera Performance</b>`;
+    :`<b style="font-size:14px">📊 My Performance</b>`;
   // Director/Admin drill-down: filtered to one Sales Person, show their call-by-call
   // coaching cards (same card used in Call Log's per-row "Analysis" expand) right here -
   // so a Director can actually read through and guide that person in one place, instead
