@@ -436,8 +436,46 @@ function computeOutcomeLeaderboard(rows){
     const rate=rs=>rs.length?rs.filter(r=>CONVERTED_OUTCOMES.includes(r.outcome)).length/rs.length:null;
     const recentRate=rate(recent),priorRate=rate(prior);
     by[k].trend=(recentRate==null||priorRate==null)?'flat':(recentRate>priorRate?'up':recentRate<priorRate?'down':'flat');
+    // Average Deal Value (of Converted calls only) - company/person growth health, not
+    // just call volume: a sales person could be "winning" more small deals while deal
+    // size quietly shrinks, which the win-rate number alone would never show.
+    const dealRows=rs=>rs.filter(r=>CONVERTED_OUTCOMES.includes(r.outcome)&&r.dealValue);
+    const avgDeal=rs=>{const d=dealRows(rs);return d.length?d.reduce((s,r)=>s+r.dealValue,0)/d.length:null;};
+    const recentAvgDeal=avgDeal(recent),priorAvgDeal=avgDeal(prior);
+    by[k].avgDeal=avgDeal(personRows);
+    by[k].dealTrend=(recentAvgDeal==null||priorAvgDeal==null)?'flat':(recentAvgDeal>priorAvgDeal?'up':recentAvgDeal<priorAvgDeal?'down':'flat');
   });
   return by;
+}
+// Which objection TOPIC (Pricing/Delivery/Payment/Competitor/Decision) most often precedes
+// a lost deal vs a won one - "Price Objection Win Rate" is simply this table's Pricing row.
+// Tells a Director/sales person which specific concern is actually costing deals, instead of
+// a vague overall sentiment number.
+function computeObjectionOutcomeInsight(rows,analyses){
+  const byTopic={};
+  rows.forEach((r,i)=>{
+    const a=analyses[i];
+    if(!a||!a.topics.length)return;
+    a.topics.forEach(t=>{
+      if(!byTopic[t])byTopic[t]={total:0,converted:0,lost:0};
+      byTopic[t].total++;
+      if(CONVERTED_OUTCOMES.includes(r.outcome))byTopic[t].converted++;
+      if(r.outcome==='not_interested')byTopic[t].lost++;
+    });
+  });
+  return byTopic;
+}
+// Company-wide Average Deal Value trend (Converted calls only, recent 7 days vs prior 7).
+function computeDealSizeTrend(rows){
+  const now=Date.now();
+  const ageDays=r=>(now-new Date(r.loggedAt).getTime())/86400000;
+  const dealRows=rs=>rs.filter(r=>CONVERTED_OUTCOMES.includes(r.outcome)&&r.dealValue);
+  const recent=dealRows(rows.filter(r=>ageDays(r)<=7));
+  const prior=dealRows(rows.filter(r=>{const a=ageDays(r);return a>7&&a<=14;}));
+  const avg=rs=>rs.length?rs.reduce((s,r)=>s+r.dealValue,0)/rs.length:null;
+  const recentAvg=avg(recent),priorAvg=avg(prior);
+  return {recentAvg,priorAvg,recentCount:recent.length,
+    trend:(recentAvg==null||priorAvg==null)?'flat':(recentAvg>priorAvg?'up':recentAvg<priorAvg?'down':'flat')};
 }
 const STUCK_LEAD_DAYS=5;
 // Latest call PER CLIENT, independent of the date-range filter (a live snapshot - a lead
@@ -495,11 +533,12 @@ function setCallTarget(salesPerson,target){
   try{localStorage.setItem(CALL_TARGETS_KEY,JSON.stringify(t));}catch(e){console.error('setCallTarget failed:',e);}
   renderCallAnalysisOverview();
 }
-function renderSalesInsightsHtml(scopeRows){
+function renderSalesInsightsHtml(scopeRows,analyses){
   const leaderboard=computeOutcomeLeaderboard(scopeRows);
   const names=Object.keys(leaderboard).sort((a,b)=>leaderboard[b].total-leaderboard[a].total);
   const targets=getCallTargets();
   const trendHtml={up:'<span style="color:var(--g);font-weight:800">↑ Improving</span>',down:'<span style="color:var(--red);font-weight:800">↓ Declining</span>',flat:'<span class="note">Flat</span>'};
+  const dealTrendIcon={up:'↑',down:'↓',flat:'→'};
   const now=Date.now();
   const leaderboardRows=names.map(n=>{
     const d=leaderboard[n];
@@ -508,14 +547,36 @@ function renderSalesInsightsHtml(scopeRows){
     const target=targets[n]||'';
     const behind=target&&callsThisWeek<target;
     const nSafe=esc(n).replace(/'/g,"\\'");
-    return `<tr><td><b>${esc(n)}</b></td><td>${d.total}</td><td>${d.converted}</td><td>${winRate}%</td><td>${trendHtml[d.trend]}</td>
+    return `<tr><td><b>${esc(n)}</b></td><td>${d.total}</td><td>${d.converted}</td><td>${winRate}%</td><td>${d.avgDeal?fmtCallMoney(d.avgDeal)+' '+dealTrendIcon[d.dealTrend]:'-'}</td><td>${trendHtml[d.trend]}</td>
       <td>${callsThisWeek}/<input type="number" value="${esc(target)}" placeholder="target" style="width:56px;padding:4px;border:1px solid var(--line);border-radius:5px;font-size:12px" onchange="setCallTarget('${nSafe}',parseInt(this.value)||0)">${behind?' <span class="pill" style="background:var(--redbg);color:var(--red)">Peeche</span>':''}</td></tr>`;
   }).join('');
   const leaderboardHtml=names.length?`<div style="margin-top:14px">
     <b style="font-size:12px">🏆 Sales Person Leaderboard</b>
     <table style="margin-top:6px">
-      <thead><tr><th>Sales Person</th><th>Calls</th><th>Converted</th><th>Win Rate</th><th>Trend</th><th>Weekly Target</th></tr></thead>
+      <thead><tr><th>Sales Person</th><th>Calls</th><th>Converted</th><th>Win Rate</th><th>Avg Deal</th><th>Trend</th><th>Weekly Target</th></tr></thead>
       <tbody>${leaderboardRows}</tbody>
+    </table>
+  </div>`:'';
+
+  const dealTrend=computeDealSizeTrend(scopeRows);
+  const dealTrendHtml=dealTrend.recentAvg!=null?`<div style="margin-top:14px">
+    <b style="font-size:12px">💰 Average Deal Size Trend (Company-wide, Converted deals)</b>
+    <div class="note" style="margin-top:6px">Pichle 7 din ka average deal: <b style="color:var(--g)">${fmtCallMoney(dealTrend.recentAvg)}</b> (${dealTrend.recentCount} deals)${dealTrend.priorAvg!=null?` — uske pichle 7 din se ${trendHtml[dealTrend.trend]}.`:' — compare karne ke liye aur purana data chahiye.'}</div>
+  </div>`:'';
+
+  const objMap=computeObjectionOutcomeInsight(scopeRows,analyses);
+  const objNames=Object.keys(objMap).sort((a,b)=>objMap[b].total-objMap[a].total);
+  const objRows=objNames.map(t=>{
+    const d=objMap[t];
+    const winRate=d.total?Math.round(d.converted/d.total*100):0;
+    const lostRate=d.total?Math.round(d.lost/d.total*100):0;
+    return `<tr${t==='Pricing'?' style="background:var(--mint)"':''}><td>${t==='Pricing'?'💰 ':''}${esc(t)}</td><td>${d.total}</td><td>${winRate}%</td><td style="color:var(--red)">${lostRate}%</td></tr>`;
+  }).join('');
+  const objectionHtml=objNames.length?`<div style="margin-top:14px">
+    <b style="font-size:12px">🎯 Objection Impact — Win Rate by Topic (Pricing highlighted)</b>
+    <table style="margin-top:6px">
+      <thead><tr><th>Topic</th><th>Calls</th><th>Win Rate</th><th>Lost Rate</th></tr></thead>
+      <tbody>${objRows}</tbody>
     </table>
   </div>`:'';
 
@@ -541,7 +602,7 @@ function renderSalesInsightsHtml(scopeRows){
     </div>
   </div>`:'';
 
-  return leaderboardHtml+stuckLeadsHtml+fsiHtml;
+  return leaderboardHtml+dealTrendHtml+objectionHtml+stuckLeadsHtml+fsiHtml;
 }
 function fmtCallMoney(n){ return '₹'+Math.round(n).toLocaleString('en-IN'); }
 // Shared by the history table, the analysis overview and the CSV export, so all three
@@ -597,7 +658,7 @@ function renderCallAnalysisOverview(){
   };
   const spBreakdownHtml=breakdownTableHtml('Sales Person-wise Breakdown','👤',callAnalysisBySalesPerson(rows,analyses),'Sales Person');
   const clientBreakdownHtml=breakdownTableHtml('Client-wise Breakdown','🏢',callAnalysisByClient(rows,analyses),'Client');
-  const salesInsightsHtml=renderSalesInsightsHtml(rows);
+  const salesInsightsHtml=renderSalesInsightsHtml(rows,analyses);
   wrap.innerHTML=`<div class="note" style="margin-bottom:12px">📱 Ye data sirf is device se hai — dusre device pe log hui calls yahan abhi nahi dikhengi (Firestore sync hone tak).</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     ${tile('Total Analyzed',rows.length)}
