@@ -105,8 +105,9 @@ there's a reason it was left out).
    collections read-only. Not a real LLM integration — see its own section below.
 9. **Sales Call Log** — `public/sales-call-log/index.html` —
    https://bliss-gems-one.web.app/sales-call-log/ — Sales call logging (with audio
-   recording) plus a Pipeline/Leads tab and a Directors-only Sales Insights/Call Analysis
-   tab. The call log itself is **localStorage-only, not synced** — see Shared architecture.
+   recording) plus Pipeline/Leads and Follow-up Reminders tabs, a My Performance tab, and
+   a Directors-only Sales Insights/Call Analysis tab. The call log itself is
+   **localStorage-only, not synced** — see Shared architecture.
 10. **Sales Panel** — `public/sales-panel/index.html` —
     https://bliss-gems-one.web.app/sales-panel/ — Customers/Orders/Calls mini-CRM. **Not
     in the live apps registry** (see the note above this list) — reachable by direct URL
@@ -452,21 +453,26 @@ One more exists in `public/` but isn't part of the ten above:
 
 - **The call log itself is localStorage-only** (`CALL_LOG_KEY='scl_call_log'`, per-device,
   not synced) — see the Shared architecture note above for why. Everything else UI-visible
-  (pipeline stage overrides, call targets) is also localStorage
-  (`PIPELINE_OVERRIDE_KEY`/`CALL_TARGETS_KEY`) by the same constraint, not just the call
-  log.
-- **Three tabs**: 📞 Call Log (entry form + history, with audio recording +
+  (pipeline stage overrides, follow-up reminders, call targets) is also localStorage
+  (`PIPELINE_OVERRIDE_KEY`/`FOLLOWUP_KEY`/`CALL_TARGETS_KEY`) by the same constraint, not
+  just the call log.
+- **Five tabs**: 📞 Call Log (entry form + history, with audio recording +
   `getAudioDuration`), 📈 Pipeline (`computePipelineLeads`/`pipelineCardHtml`, a lead's
   stage defaults from its last call's outcome via `defaultStageForOutcome` but can be
-  manually overridden), and a Directors-only 👑 Directors tab
-  (`refreshDirectorsTabVisibility`, same `appRoles['sales-call-log']` admin/director gate
-  pattern as the other role-gated apps) holding Call Analysis Overview + a large set of
-  Sales Insights sections (`renderSalesInsightsHtml`): outcome leaderboard, objection→
-  outcome correlation, deal-size trend, stuck leads, follow-up speed, monthly/lost-rate
-  trends, top parties by volume, client-wise and per-sales-person breakdowns. Each
-  Insights section is colour-coded independently (see "color-code each Director Insights
-  section" in git history if adding another section — match that pattern, don't
-  reintroduce a single flat colour).
+  manually overridden), ⏰ Follow-ups (`computeFollowups`/`followupCardHtml` -
+  Overdue/Aaj/Upcoming buckets from the reminder date set on a Pipeline card; Won/Lost
+  leads are excluded even with an old reminder still set), 📊 My Performance
+  (`renderMyPerformance` - always the viewer's own data, ignoring the shared filter), and
+  a Directors-only 👑 Directors tab (`refreshDirectorsTabVisibility`, same
+  `appRoles['sales-call-log']` admin/director gate pattern as the other role-gated apps)
+  holding Call Analysis Overview + a large set of Sales Insights sections
+  (`renderSalesInsightsHtml`): outcome leaderboard, objection→outcome correlation,
+  deal-size trend, stuck leads, follow-up speed, monthly/lost-rate trends, top parties by
+  volume, client-wise and per-sales-person breakdowns. Each Insights section (and each
+  Pipeline/Follow-ups stage section) is colour-coded independently via the shared
+  `insightSectionHtml(icon, accent, accentbg, title, bodyHtml)` helper (see "color-code
+  each Director Insights section" in git history if adding another section — match that
+  pattern, don't reintroduce a single flat colour).
 - **`analyzeCallNote(note)`** is simple keyword/sentiment heuristics on the free-text call
   note (not a real NLP/LLM call, same caveat as AI Business Assistant above) — drives the
   sentiment pill and the objection-outcome insight.
