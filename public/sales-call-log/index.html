@@ -238,7 +238,21 @@ function renderSalesPersonOptions(){
   const active=users.filter(u=>u.active!==false).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
   const opts=active.map(u=>`<option value="${esc(u.name||u.username)}">${esc(u.name||u.username)}</option>`).join('');
   const sel=$('callSalesPerson');
-  if(sel){const cur=sel.value;sel.innerHTML='<option value="">-- Select --</option>'+opts;if(cur)sel.value=cur;}
+  if(sel){
+    if(canViewAllSales()){
+      const cur=sel.value;
+      sel.innerHTML='<option value="">-- Select --</option>'+opts;
+      if(cur)sel.value=cur;
+      sel.disabled=false;
+    }else{
+      // A plain Sales Person logs calls under their own name only - no free choice of
+      // "who this call was for", same lock as the Analysis filter below.
+      const myName=(loggedUser()||{}).name||(loggedUser()||{}).username||'';
+      sel.innerHTML=`<option value="${esc(myName)}">${esc(myName)}</option>`;
+      sel.value=myName;
+      sel.disabled=true;
+    }
+  }
   const filterSel=$('callFilterSalesPerson');
   if(filterSel){
     if(canViewAllSales()){
