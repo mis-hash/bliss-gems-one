@@ -91,6 +91,14 @@ nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
 .insightIcon{width:28px;height:28px;border-radius:8px;background:var(--accentbg);display:grid;place-items:center;font-size:14px;flex:none}
 .insightTitle{font-size:12.5px;font-weight:800;font-family:'Manrope',sans-serif;color:var(--txt)}
 .insightSection table{margin-top:10px}
+/* Call Recording Library - each recording gets its own bordered card so the list reads as
+   distinct entries instead of running together (an earlier version used an undefined "item"
+   class copied from Sales Panel's code and had no visible separation at all). */
+.recLibCard{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:12px}
+.recLibCard:first-child{margin-top:0}
+.recLibHead{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px}
+.recLibMeta{font-size:12px;color:var(--muted);margin-top:3px}
+.recLibActions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -1042,7 +1050,68 @@ function insightSectionHtml(icon,accent,accentbg,title,bodyHtml){
     ${bodyHtml}
   </div>`;
 }
+// Smart per-Sales-Person coaching flags for Directors: aggregates each person's negative-call
+// ratio, win-rate trend, top recurring objection and weekly-target shortfall into a short,
+// actionable "what to discuss with this person" list - built in direct response to "Directors
+// ko pata chale kisse kya baat karni hai, kaise guide karna hai". Still rule-based (same free
+// keyword-analysis approach as the rest of this app, no paid AI), not a real recommendation
+// engine - it just turns numbers the Leaderboard/breakdown tables already compute into plain
+// Hindi sentences instead of making a Director read the tables themselves.
+function computeSalesPersonCoachingFlags(scopeRows,analyses){
+  const byPerson=callAnalysisBySalesPerson(scopeRows,analyses);
+  const leaderboard=computeOutcomeLeaderboard(scopeRows);
+  const targets=getCallTargets();
+  const now=Date.now();
+  // Topic counts per person (what the call was actually ABOUT - Pricing/Quality/Delivery/...),
+  // kept separate from byPerson[name].objCounts above (which counts literal matched negative
+  // WORDS like "nahi"/"mehenga", not topics) - a topic name reads far more actionable to a
+  // Director than a raw keyword would.
+  const topicsByPerson={};
+  scopeRows.forEach((r,i)=>{
+    const name=r.salesPerson||'Unknown';
+    const a=analyses[i];
+    // Only count topics from calls that actually showed resistance (negativeHits present) -
+    // otherwise a topic like "Decision" discussed on a successful, friction-free close would
+    // wrongly surface as something needing attention, when it's actually a good sign.
+    if(!a.negativeHits.length)return;
+    if(!topicsByPerson[name])topicsByPerson[name]={};
+    a.topics.forEach(t=>{topicsByPerson[name][t]=(topicsByPerson[name][t]||0)+1;});
+  });
+  const names=Object.keys(byPerson).sort((a,b)=>a.localeCompare(b));
+  return names.map(name=>{
+    const d=byPerson[name];
+    const lb=leaderboard[name]||{trend:'flat'};
+    const flags=[];
+    const negPct=d.total?Math.round(d.negative/d.total*100):0;
+    if(d.total>=2&&negPct>=30){
+      flags.push({level:'red',text:`🔴 ${negPct}% calls negative aa rahe hain (${d.negative}/${d.total}) — inki approach discuss karein`});
+    }
+    if(lb.trend==='down'){
+      flags.push({level:'red',text:'📉 Win rate pichle hafte se gir raha hai — ek coaching/review call karein'});
+    }
+    const topics=topicsByPerson[name]||{};
+    const topTopic=Object.keys(topics).sort((a,b)=>topics[b]-topics[a])[0];
+    if(topTopic&&topics[topTopic]>=2){
+      flags.push({level:'amber',text:`🎯 Sabse zyada "${esc(topTopic)}" discuss hota hai (${topics[topTopic]} calls) — iske liye pitch/training dein`});
+    }
+    const callsThisWeek=scopeRows.filter(r=>(r.salesPerson||'Unknown')===name&&(now-new Date(r.loggedAt).getTime())/86400000<=7).length;
+    const target=targets[name]||0;
+    if(target&&callsThisWeek<target){
+      flags.push({level:'amber',text:`⏰ Weekly target se peeche hain (${callsThisWeek}/${target} calls) — follow-up frequency badhayein`});
+    }
+    if(!flags.length)flags.push({level:'green',text:'✅ Sab normal chal raha hai — abhi koi urgent baat nahi'});
+    return {name,flags};
+  });
+}
+function coachingFlagsSectionHtml(scopeRows,analyses){
+  const list=computeSalesPersonCoachingFlags(scopeRows,analyses);
+  if(!list.length)return '';
+  const colorMap={red:'#b43a35',amber:'#a66b08',green:'#268F76'};
+  const bodyHtml=list.map(p=>`<div style="margin-top:10px"><b style="font-size:12.5px">${esc(p.name)}</b><div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">${p.flags.map(f=>`<div style="font-size:12px;color:${colorMap[f.level]}">${f.text}</div>`).join('')}</div></div>`).join('');
+  return insightSectionHtml('🧭','#4C5FD5','#EDEFFC','Smart Coaching Flags — Kisse Kya Baat Karni Hai',bodyHtml);
+}
 function renderSalesInsightsHtml(scopeRows,analyses){
+  const coachingFlagsHtml=coachingFlagsSectionHtml(scopeRows,analyses);
   const leaderboard=computeOutcomeLeaderboard(scopeRows);
   const names=Object.keys(leaderboard).sort((a,b)=>leaderboard[b].total-leaderboard[a].total);
   const targets=getCallTargets();
@@ -1126,7 +1195,7 @@ function renderSalesInsightsHtml(scopeRows,analyses){
       <tbody>${topPartiesRows}</tbody>
     </table>`):'';
 
-  return leaderboardHtml+dealTrendHtml+turnaroundHtml+monthlyHtml+objectionHtml+stuckLeadsHtml+lostTrendHtml+fsiHtml+topPartiesHtml;
+  return coachingFlagsHtml+leaderboardHtml+dealTrendHtml+turnaroundHtml+monthlyHtml+objectionHtml+stuckLeadsHtml+lostTrendHtml+fsiHtml+topPartiesHtml;
 }
 function fmtCallMoney(n){ return '₹'+Math.round(n).toLocaleString('en-IN'); }
 // Shared by the history table, the analysis overview and the CSV export, so all three
@@ -1261,13 +1330,16 @@ function renderRecordingLibrary(){
   if(!rows.length){wrap.innerHTML=`<div class="emptystate">🎙<p>Is filter/search ke liye koi recording nahi mili.</p></div>`;return}
   const listHtml=rows.map(r=>{
     const open=!!callsExpanded[r.id];
-    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:6px">
-    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
-      <span><b>${esc(r.clientName||'Client N/A')}</b> — ${esc(r.salesPerson)}<br><small style="color:var(--muted)">${esc(new Date(r.loggedAt).toLocaleString('en-IN'))}${r.durationSeconds?' • '+esc(fmtDuration(r.durationSeconds)):''}</small></span>
-      <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${outcomeLabelHtml(r.outcome)}<button type="button" class="btn small" onclick="playRecording('${esc(r.id)}')">▶ Play</button><button type="button" class="btn small" onclick="toggleCallExpand('${esc(r.id)}')">${open?'🔽':'🧠'} Analysis</button></span>
+    const clientLabel=r.clientName?esc(r.clientName):'<span style="color:var(--muted);font-style:italic">Client naam nahi diya</span>';
+    return `<div class="recLibCard">
+    <div class="recLibHead">
+      <div><b>${clientLabel}</b> — ${esc(r.salesPerson)}
+        <div class="recLibMeta">${esc(new Date(r.loggedAt).toLocaleString('en-IN'))}${r.durationSeconds?' • '+esc(fmtDuration(r.durationSeconds)):''}</div>
+      </div>
+      <div class="recLibActions">${outcomeLabelHtml(r.outcome)}<button type="button" class="btn small" onclick="playRecording('${esc(r.id)}')">▶ Play</button><button type="button" class="btn small" onclick="toggleCallExpand('${esc(r.id)}')">${open?'🔽':'🧠'} Analysis</button></div>
     </div>
-    ${r.note?`<div class="note">📝 ${esc(r.note)}</div>`:''}
-    ${open?callAnalysisCardHtml(r):''}
+    ${r.note?`<div class="note" style="margin-top:8px">📝 ${esc(r.note)}</div>`:''}
+    ${open?`<div style="margin-top:10px">${callAnalysisCardHtml(r)}</div>`:''}
   </div>`;
   }).join('');
   wrap.innerHTML=`<div class="note" style="margin-bottom:10px">📱 Ye data sirf is device se hai — dusre device pe log hui recordings yahan abhi nahi dikhengi (Firestore sync hone tak). 🎙 Total ${rows.length} recording${rows.length===1?'':'s'}.</div>${listHtml}`;
