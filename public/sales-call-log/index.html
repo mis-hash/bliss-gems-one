@@ -91,6 +91,14 @@ nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
 .insightIcon{width:28px;height:28px;border-radius:8px;background:var(--accentbg);display:grid;place-items:center;font-size:14px;flex:none}
 .insightTitle{font-size:12.5px;font-weight:800;font-family:'Manrope',sans-serif;color:var(--txt)}
 .insightSection table{margin-top:10px}
+/* Call Recording Library - each recording gets its own bordered card so the list reads as
+   distinct entries instead of running together (an earlier version used an undefined "item"
+   class copied from Sales Panel's code and had no visible separation at all). */
+.recLibCard{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:12px}
+.recLibCard:first-child{margin-top:0}
+.recLibHead{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px}
+.recLibMeta{font-size:12px;color:var(--muted);margin-top:3px}
+.recLibActions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -1261,13 +1269,16 @@ function renderRecordingLibrary(){
   if(!rows.length){wrap.innerHTML=`<div class="emptystate">🎙<p>Is filter/search ke liye koi recording nahi mili.</p></div>`;return}
   const listHtml=rows.map(r=>{
     const open=!!callsExpanded[r.id];
-    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:6px">
-    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
-      <span><b>${esc(r.clientName||'Client N/A')}</b> — ${esc(r.salesPerson)}<br><small style="color:var(--muted)">${esc(new Date(r.loggedAt).toLocaleString('en-IN'))}${r.durationSeconds?' • '+esc(fmtDuration(r.durationSeconds)):''}</small></span>
-      <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${outcomeLabelHtml(r.outcome)}<button type="button" class="btn small" onclick="playRecording('${esc(r.id)}')">▶ Play</button><button type="button" class="btn small" onclick="toggleCallExpand('${esc(r.id)}')">${open?'🔽':'🧠'} Analysis</button></span>
+    const clientLabel=r.clientName?esc(r.clientName):'<span style="color:var(--muted);font-style:italic">Client naam nahi diya</span>';
+    return `<div class="recLibCard">
+    <div class="recLibHead">
+      <div><b>${clientLabel}</b> — ${esc(r.salesPerson)}
+        <div class="recLibMeta">${esc(new Date(r.loggedAt).toLocaleString('en-IN'))}${r.durationSeconds?' • '+esc(fmtDuration(r.durationSeconds)):''}</div>
+      </div>
+      <div class="recLibActions">${outcomeLabelHtml(r.outcome)}<button type="button" class="btn small" onclick="playRecording('${esc(r.id)}')">▶ Play</button><button type="button" class="btn small" onclick="toggleCallExpand('${esc(r.id)}')">${open?'🔽':'🧠'} Analysis</button></div>
     </div>
-    ${r.note?`<div class="note">📝 ${esc(r.note)}</div>`:''}
-    ${open?callAnalysisCardHtml(r):''}
+    ${r.note?`<div class="note" style="margin-top:8px">📝 ${esc(r.note)}</div>`:''}
+    ${open?`<div style="margin-top:10px">${callAnalysisCardHtml(r)}</div>`:''}
   </div>`;
   }).join('');
   wrap.innerHTML=`<div class="note" style="margin-bottom:10px">📱 Ye data sirf is device se hai — dusre device pe log hui recordings yahan abhi nahi dikhengi (Firestore sync hone tak). 🎙 Total ${rows.length} recording${rows.length===1?'':'s'}.</div>${listHtml}`;
