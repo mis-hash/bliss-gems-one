@@ -118,17 +118,18 @@ nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
     <div class="grouplabel">Insights</div>
     <button data-page="myperf" onclick="goPage('myperf')">📊 My Performance</button>
     <button class="hidden directorsNavBtn" data-page="analysis" onclick="goPage('analysis')">👑 Directors</button>
+    <button class="hidden directorsNavBtn" data-page="recordings" onclick="goPage('recordings')">🎙 Recordings</button>
   </nav>
   <main>
   <div class="panel" id="callFilterBarPanel">
     <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <span>🔎 Filter (Call Log aur Directors dono pe lagta hai)</span>
+      <span>🔎 Filter (Call Log, Directors aur Recordings pe lagta hai)</span>
       <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview();renderPipelineOverview();renderFollowupsOverview()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
-        <input type="date" id="callFilterFrom" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+        <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview();renderPipelineOverview();renderFollowupsOverview();renderRecordingLibrary()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
+        <input type="date" id="callFilterFrom" onchange="renderCallHistory();renderCallAnalysisOverview();renderRecordingLibrary()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
         <span style="font-size:12px;color:var(--muted)">se</span>
-        <input type="date" id="callFilterTo" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
-        <button type="button" class="btn small" onclick="$('callFilterFrom').value='';$('callFilterTo').value='';renderCallHistory();renderCallAnalysisOverview()">✕ Date Clear</button>
+        <input type="date" id="callFilterTo" onchange="renderCallHistory();renderCallAnalysisOverview();renderRecordingLibrary()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+        <button type="button" class="btn small" onclick="$('callFilterFrom').value='';$('callFilterTo').value='';renderCallHistory();renderCallAnalysisOverview();renderRecordingLibrary()">✕ Date Clear</button>
       </span>
     </div>
   </div>
@@ -205,6 +206,16 @@ nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
       <div class="pb" id="callAnalysisOverview"></div>
     </div>
   </div>
+
+  <div id="page-recordings" class="sclPage">
+    <div class="panel">
+      <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <span>🎙 Call Recording Library</span>
+        <input type="text" id="recLibSearch" placeholder="🔎 Client ya Sales Person se search karein" oninput="renderRecordingLibrary()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px;min-width:220px">
+      </div>
+      <div class="pb" id="recordingLibraryWrap"></div>
+    </div>
+  </div>
   </main>
 </div>
 
@@ -214,6 +225,7 @@ nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
   <button data-page="followups" onclick="goPage('followups')"><span>⏰</span>Follow-ups</button>
   <button data-page="myperf" onclick="goPage('myperf')"><span>📊</span>My Perf.</button>
   <button class="hidden directorsNavBtn" data-page="analysis" onclick="goPage('analysis')"><span>👑</span>Directors</button>
+  <button class="hidden directorsNavBtn" data-page="recordings" onclick="goPage('recordings')"><span>🎙</span>Recordings</button>
 </div>
 </div>
 
@@ -358,20 +370,23 @@ function renderAll(){
   renderFollowupsOverview();
   renderMyPerformance();
   renderCallAnalysisOverview();
+  renderRecordingLibrary();
   renderDemoDataActions();
   renderPreviewToggle();
   refreshDirectorsTabVisibility();
 }
-// The 3rd nav tab ("👑 Directors") is only for Admin/Director (real role or the Preview
-// toggle) - everyone else only ever sees Call Log + My Performance. If the toggle/role
-// is lost while that tab happens to be open (e.g. turning Preview off), bounce back to
-// My Performance instead of leaving an empty/inaccessible tab open.
+// The Directors-only nav tabs ("👑 Directors", "🎙 Recordings") are only for Admin/Director
+// (real role or the Preview toggle) - everyone else only ever sees Call Log + My Performance.
+// If the toggle/role is lost while one of those tabs happens to be open (e.g. turning Preview
+// off), bounce back to My Performance instead of leaving an empty/inaccessible tab open.
 function refreshDirectorsTabVisibility(){
   const btns=document.querySelectorAll('.directorsNavBtn');
   if(!btns.length)return;
   const can=canViewAllSales();
   btns.forEach(b=>b.classList.toggle('hidden',!can));
-  if(!can&&$('page-analysis')&&$('page-analysis').classList.contains('on'))goPage('myperf');
+  if(!can){
+    ['page-analysis','page-recordings'].forEach(id=>{ if($(id)&&$(id).classList.contains('on'))goPage('myperf'); });
+  }
 }
 // "My Performance" tab - always locked to the logged-in user's OWN calls regardless of
 // role or the shared Sales Person filter (that filter only drives Call Log + the Directors
@@ -1228,7 +1243,35 @@ function exportCallLogCSV(){
   downloadCSV('sales-call-log'+(filter?'-'+filter.replace(/\W+/g,'-'):'')+'.csv',out);
 }
 let callsExpanded={};
-function toggleCallExpand(id){callsExpanded[id]=!callsExpanded[id];renderCallHistory();}
+function toggleCallExpand(id){callsExpanded[id]=!callsExpanded[id];renderCallHistory();renderRecordingLibrary();}
+// Directors-only (same canViewAllSales() gate as the Directors tab, see directorsNavBtn):
+// a searchable/browsable list of every call that has a recording, across whichever Sales
+// Persons the shared filter bar currently scopes to - built in direct response to "team-wide
+// Call Recording Library" being raised as a gap vs. a multinational-company CRM. Shares the
+// same per-device-only data constraint as the rest of this app (see CALL_LOG_KEY above) and
+// reuses the existing playRecording() modal + callAnalysisCardHtml()/callsExpanded state
+// instead of duplicating that UI.
+function renderRecordingLibrary(){
+  const wrap=$('recordingLibraryWrap');
+  if(!wrap)return;
+  const q=($('recLibSearch')?.value||'').trim().toLowerCase();
+  let rows=callLogRowsInScope({onlyWithRecording:true});
+  if(q)rows=rows.filter(r=>(r.clientName||'').toLowerCase().includes(q)||(r.salesPerson||'').toLowerCase().includes(q));
+  rows=rows.sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt)));
+  if(!rows.length){wrap.innerHTML=`<div class="emptystate">🎙<p>Is filter/search ke liye koi recording nahi mili.</p></div>`;return}
+  const listHtml=rows.map(r=>{
+    const open=!!callsExpanded[r.id];
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:6px">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+      <span><b>${esc(r.clientName||'Client N/A')}</b> — ${esc(r.salesPerson)}<br><small style="color:var(--muted)">${esc(new Date(r.loggedAt).toLocaleString('en-IN'))}${r.durationSeconds?' • '+esc(fmtDuration(r.durationSeconds)):''}</small></span>
+      <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${outcomeLabelHtml(r.outcome)}<button type="button" class="btn small" onclick="playRecording('${esc(r.id)}')">▶ Play</button><button type="button" class="btn small" onclick="toggleCallExpand('${esc(r.id)}')">${open?'🔽':'🧠'} Analysis</button></span>
+    </div>
+    ${r.note?`<div class="note">📝 ${esc(r.note)}</div>`:''}
+    ${open?callAnalysisCardHtml(r):''}
+  </div>`;
+  }).join('');
+  wrap.innerHTML=`<div class="note" style="margin-bottom:10px">📱 Ye data sirf is device se hai — dusre device pe log hui recordings yahan abhi nahi dikhengi (Firestore sync hone tak). 🎙 Total ${rows.length} recording${rows.length===1?'':'s'}.</div>${listHtml}`;
+}
 function renderCallHistory(){
   const tbody=$('callHistoryTable');
   if(!tbody)return;
