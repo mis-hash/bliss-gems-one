@@ -794,7 +794,7 @@ function fmtDuration(sec){
   return m+'m '+String(s).padStart(2,'0')+'s';
 }
 function sentimentPillHtmlDark(sentiment){
-  const map={positive:{label:'🙂 Positive',color:'#8FE388',bg:'#233A28'},neutral:{label:'😐 Neutral',color:'#C3B8E8',bg:'#2E2A4A'},negative:{label:'🙁 Negative',color:'#F2A8B8',bg:'#3A2235'}};
+  const map={positive:{label:'🙂 Positive',color:'#8FE388',bg:'#163A2E'},neutral:{label:'😐 Neutral',color:'#8FE3C9',bg:'#1C4A40'},negative:{label:'🙁 Negative',color:'#F2A8B8',bg:'#3A2430'}};
   const s=map[sentiment]||map.neutral;
   return `<span style="font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:99px;background:${s.bg};color:${s.color}">${s.label}</span>`;
 }
@@ -806,15 +806,15 @@ function callSummarySentence(row,a){
 function callAnalysisCardHtml(row){
   const a=analyzeCallNote(row.note);
   const dur=fmtDuration(row.durationSeconds);
-  return `<div style="background:linear-gradient(160deg,#241A38,#36244F);border-radius:14px;padding:16px 18px;margin-top:4px;color:#fff;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 26px rgba(20,10,35,.3)">
+  return `<div style="background:linear-gradient(160deg,#0F2E2A,#14453D);border-radius:14px;padding:16px 18px;margin-top:4px;color:#fff;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 26px rgba(10,30,25,.3)">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
       <b style="font-size:13px">🧠 Call Analysis (Note-Based)</b>
       ${sentimentPillHtmlDark(a.sentiment)}
     </div>
-    ${dur?`<div style="font-size:12px;color:#B6A8D4">⏱ Call Duration: ${dur}</div>`:''}
-    <div style="font-size:12.5px;color:#DCD3EE;line-height:1.6">${esc(callSummarySentence(row,a))}</div>
-    ${row.note?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#3A2F5C;display:grid;place-items:center;font-size:12px;flex:none">🔑</div><div style="font-size:12px;color:#DCD3EE;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Note</b>${esc(row.note)}</div></div>`:''}
-    ${a.negativeHits.length?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#3A2F5C;display:grid;place-items:center;font-size:12px;flex:none">⚠</div><div style="font-size:12px;color:#DCD3EE;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Objections/Signals</b>${a.negativeHits.map(esc).join(', ')}</div></div>`:''}
+    ${dur?`<div style="font-size:12px;color:#9FC9BD">⏱ Call Duration: ${dur}</div>`:''}
+    <div style="font-size:12.5px;color:#D4EEE6;line-height:1.6">${esc(callSummarySentence(row,a))}</div>
+    ${row.note?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#1E4A3F;display:grid;place-items:center;font-size:12px;flex:none">🔑</div><div style="font-size:12px;color:#D4EEE6;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Note</b>${esc(row.note)}</div></div>`:''}
+    ${a.negativeHits.length?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#1E4A3F;display:grid;place-items:center;font-size:12px;flex:none">⚠</div><div style="font-size:12px;color:#D4EEE6;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Objections/Signals</b>${a.negativeHits.map(esc).join(', ')}</div></div>`:''}
     ${a.coachingTips.length?`<div style="background:linear-gradient(135deg,#3A2E10,#2A2108);border:1px solid #5C4A1A;border-radius:10px;padding:10px 12px;font-size:12px;color:#E8C97A"><b style="display:block;margin-bottom:5px">🎯 Sales Person ke liye Guidance</b><ul style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:4px">${a.coachingTips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`:''}
     <div style="background:linear-gradient(135deg,#1F3B2E,#15291F);border:1px solid #2E5940;border-radius:10px;padding:10px 12px;font-size:12px;color:#8FE388">💡 Next Step: ${esc(a.suggestion)}</div>
   </div>`;
