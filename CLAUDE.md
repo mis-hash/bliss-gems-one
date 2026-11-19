@@ -575,18 +575,11 @@ One more exists in `public/` but isn't part of the ten above:
    Parcel Dispatch, e.g. hiding specific stage sections or Notification Control from
    specific Doers) — a concrete proposal was given once but the user moved on to other
    requests without confirming. Do not build without re-confirming scope first.
-3. Hitesh Dusad's email was requested at one point (to set up his `appRoles['bliss-one']`
-   access) — **found**: `hitesh.dusad@gmail.com` (confirmed via an old task-assignment
-   email, searched because the user asked to add it without re-supplying it). The user
-   was given manual steps (Manage → Universal Users → set Email + Bliss One Role, since
-   there's no Firestore-admin tool in this session to do it directly) but completion was
-   never explicitly confirmed back — check whether it's actually set on his Universal
-   User record before doing this lookup again.
-4. **Trip Expense App has no way to backdate an expense** — `submitExpense()` always
+3. **Trip Expense App has no way to backdate an expense** — `submitExpense()` always
    stamps `at:new Date().toISOString()` and the Add Expense modal has no date field
    (Category/Amount/Paid To/Bill/Remark only). A date-picker fix was proposed to the user
    but never confirmed — don't add it without the user explicitly saying to.
-5. **Sales Panel is missing from `public/apps.json`** (see "Sales Panel — specifics" above)
+4. **Sales Panel is missing from `public/apps.json`** (see "Sales Panel — specifics" above)
    — looks like an oversight, not deliberate, but hasn't been confirmed with the user
    either way. Flag it if the topic comes up rather than silently adding or leaving it out.
 
