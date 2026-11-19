@@ -470,7 +470,8 @@ function sclClearDemoData(){
 
 // Stored in localStorage, not Firestore: a brand new Firestore collection for this would
 // hit the same "Missing or insufficient permissions" wall already found and worked around
-// in the AI Business Assistant app - this project's Firestore rules only cover
+// in the Directors Assistant app (formerly "AI Business Assistant") - this project's
+// Firestore rules only cover
 // collections that already existed before these new apps, and adding one needs a Firebase
 // Console change this app can't make itself. The trade-off: this log is per-device, not
 // synced across everyone's browsers, until that rule is added.
