@@ -1050,7 +1050,68 @@ function insightSectionHtml(icon,accent,accentbg,title,bodyHtml){
     ${bodyHtml}
   </div>`;
 }
+// Smart per-Sales-Person coaching flags for Directors: aggregates each person's negative-call
+// ratio, win-rate trend, top recurring objection and weekly-target shortfall into a short,
+// actionable "what to discuss with this person" list - built in direct response to "Directors
+// ko pata chale kisse kya baat karni hai, kaise guide karna hai". Still rule-based (same free
+// keyword-analysis approach as the rest of this app, no paid AI), not a real recommendation
+// engine - it just turns numbers the Leaderboard/breakdown tables already compute into plain
+// Hindi sentences instead of making a Director read the tables themselves.
+function computeSalesPersonCoachingFlags(scopeRows,analyses){
+  const byPerson=callAnalysisBySalesPerson(scopeRows,analyses);
+  const leaderboard=computeOutcomeLeaderboard(scopeRows);
+  const targets=getCallTargets();
+  const now=Date.now();
+  // Topic counts per person (what the call was actually ABOUT - Pricing/Quality/Delivery/...),
+  // kept separate from byPerson[name].objCounts above (which counts literal matched negative
+  // WORDS like "nahi"/"mehenga", not topics) - a topic name reads far more actionable to a
+  // Director than a raw keyword would.
+  const topicsByPerson={};
+  scopeRows.forEach((r,i)=>{
+    const name=r.salesPerson||'Unknown';
+    const a=analyses[i];
+    // Only count topics from calls that actually showed resistance (negativeHits present) -
+    // otherwise a topic like "Decision" discussed on a successful, friction-free close would
+    // wrongly surface as something needing attention, when it's actually a good sign.
+    if(!a.negativeHits.length)return;
+    if(!topicsByPerson[name])topicsByPerson[name]={};
+    a.topics.forEach(t=>{topicsByPerson[name][t]=(topicsByPerson[name][t]||0)+1;});
+  });
+  const names=Object.keys(byPerson).sort((a,b)=>a.localeCompare(b));
+  return names.map(name=>{
+    const d=byPerson[name];
+    const lb=leaderboard[name]||{trend:'flat'};
+    const flags=[];
+    const negPct=d.total?Math.round(d.negative/d.total*100):0;
+    if(d.total>=2&&negPct>=30){
+      flags.push({level:'red',text:`🔴 ${negPct}% calls negative aa rahe hain (${d.negative}/${d.total}) — inki approach discuss karein`});
+    }
+    if(lb.trend==='down'){
+      flags.push({level:'red',text:'📉 Win rate pichle hafte se gir raha hai — ek coaching/review call karein'});
+    }
+    const topics=topicsByPerson[name]||{};
+    const topTopic=Object.keys(topics).sort((a,b)=>topics[b]-topics[a])[0];
+    if(topTopic&&topics[topTopic]>=2){
+      flags.push({level:'amber',text:`🎯 Sabse zyada "${esc(topTopic)}" discuss hota hai (${topics[topTopic]} calls) — iske liye pitch/training dein`});
+    }
+    const callsThisWeek=scopeRows.filter(r=>(r.salesPerson||'Unknown')===name&&(now-new Date(r.loggedAt).getTime())/86400000<=7).length;
+    const target=targets[name]||0;
+    if(target&&callsThisWeek<target){
+      flags.push({level:'amber',text:`⏰ Weekly target se peeche hain (${callsThisWeek}/${target} calls) — follow-up frequency badhayein`});
+    }
+    if(!flags.length)flags.push({level:'green',text:'✅ Sab normal chal raha hai — abhi koi urgent baat nahi'});
+    return {name,flags};
+  });
+}
+function coachingFlagsSectionHtml(scopeRows,analyses){
+  const list=computeSalesPersonCoachingFlags(scopeRows,analyses);
+  if(!list.length)return '';
+  const colorMap={red:'#b43a35',amber:'#a66b08',green:'#268F76'};
+  const bodyHtml=list.map(p=>`<div style="margin-top:10px"><b style="font-size:12.5px">${esc(p.name)}</b><div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">${p.flags.map(f=>`<div style="font-size:12px;color:${colorMap[f.level]}">${f.text}</div>`).join('')}</div></div>`).join('');
+  return insightSectionHtml('🧭','#4C5FD5','#EDEFFC','Smart Coaching Flags — Kisse Kya Baat Karni Hai',bodyHtml);
+}
 function renderSalesInsightsHtml(scopeRows,analyses){
+  const coachingFlagsHtml=coachingFlagsSectionHtml(scopeRows,analyses);
   const leaderboard=computeOutcomeLeaderboard(scopeRows);
   const names=Object.keys(leaderboard).sort((a,b)=>leaderboard[b].total-leaderboard[a].total);
   const targets=getCallTargets();
@@ -1134,7 +1195,7 @@ function renderSalesInsightsHtml(scopeRows,analyses){
       <tbody>${topPartiesRows}</tbody>
     </table>`):'';
 
-  return leaderboardHtml+dealTrendHtml+turnaroundHtml+monthlyHtml+objectionHtml+stuckLeadsHtml+lostTrendHtml+fsiHtml+topPartiesHtml;
+  return coachingFlagsHtml+leaderboardHtml+dealTrendHtml+turnaroundHtml+monthlyHtml+objectionHtml+stuckLeadsHtml+lostTrendHtml+fsiHtml+topPartiesHtml;
 }
 function fmtCallMoney(n){ return '₹'+Math.round(n).toLocaleString('en-IN'); }
 // Shared by the history table, the analysis overview and the CSV export, so all three
