@@ -337,6 +337,11 @@ if(window.self!==window.top){
 <div class="field span2"><label>Remark / No Bill Reason</label><textarea id="expRemark"></textarea></div>
 </div><div class="actions"><button class="btn" onclick="hide('expense')">Cancel</button><button class="btn primary" id="expSubmitBtn" onclick="submitExpense()">Save Expense</button></div><div class="msg" id="expMsg"></div></div></div>
 
+<div class="modal" id="editExpense"><div class="box"><h3>Edit Expense</h3><div class="fields">
+<div class="field"><label>Category *</label><input id="editExpCategory" list="expCategoryList" autocomplete="off"></div>
+<div class="field"><label>Amount *</label><input type="number" id="editExpAmount"></div>
+</div><div class="actions"><button class="btn" onclick="hide('editExpense')">Cancel</button><button class="btn primary" id="editExpSubmitBtn" onclick="saveEditExpense()">Save Changes</button></div><div class="msg" id="editExpMsg"></div></div></div>
+
 <div class="modal" id="proofView"><div class="box"><h3>Bill / Proof</h3><img id="proofImg" style="max-width:100%;border-radius:8px"><div class="actions"><button class="btn" onclick="downloadProofImage()">⬇ Download</button><button class="btn" onclick="closeProofView()">Close</button></div></div></div>
 
 <div class="modal" id="closeTripModal"><div class="box" style="width:min(460px,100%)">
@@ -754,9 +759,10 @@ function tripOutstanding(tripId){
 // the Sales person's own Ledger page.
 function ledgerEntryLabel(l){return l.type==='advance'?'Initial Advance':l.type==='additional_advance'?'Additional Advance':l.type==='transfer_in'?'Received from '+(l.fromSalesName||'Sales'):l.type==='transfer_out'?'Transferred to '+(l.toSalesName||'Sales'):l.type==='party_cash'?'Add Fund From Party Cash — '+(l.partyName||''):(l.category||'Expense')}
 function ledgerEntryIsCredit(l){return l.type==='advance'||l.type==='additional_advance'||l.type==='transfer_in'||l.type==='party_cash'}
-function ledgerEntryRow(l,showDelete){
+function ledgerEntryRow(l,showDelete,showEdit){
   const delBtn=showDelete?`<button class="btn danger" style="padding:4px 8px;font-size:11px" onclick="deleteLedgerEntry('${esc(l.id)}','${esc(l.tripId)}')">🗑</button>`:'';
-  if(l.type==='expense')return `<div class="row"><span>${esc(l.category)}<br><small>${esc(l.at.slice(0,10))} • ${l.proofDataUri?'Proof attached':'No Bill'}</small></span>${l.proofDataUri?`<button class="btn" style="margin-right:8px" onclick="viewProof('${esc(l.id)}')">View Proof</button>`:''}<b>${money(l.amount)}</b>${delBtn}</div>`;
+  const editBtn=(showEdit&&l.type==='expense')?`<button class="btn" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();openEditExpenseModal('${esc(l.id)}')">✎ Edit</button>`:'';
+  if(l.type==='expense')return `<div class="row"><span>${esc(l.category)}<br><small>${esc(l.at.slice(0,10))} • ${l.proofDataUri?'Proof attached':'No Bill'}</small></span>${l.proofDataUri?`<button class="btn" style="margin-right:8px" onclick="viewProof('${esc(l.id)}')">View Proof</button>`:''}<b>${money(l.amount)}</b>${editBtn}${delBtn}</div>`;
   const label=ledgerEntryLabel(l),isCredit=ledgerEntryIsCredit(l);
   return `<div class="row"><span>${esc(label)}<br><small>${esc(l.at.slice(0,10))}${l.remark?' • '+esc(l.remark):''}</small></span><b style="color:${isCredit?'var(--g)':'var(--red)'}">${isCredit?'+ ':'- '}${money(l.amount)}</b>${delBtn}</div>`;
 }
@@ -775,6 +781,17 @@ async function deleteLedgerEntry(id,tripId){
   }catch(e){ console.error('delete ledger entry failed',e); alert('Delete fail ho gaya, dobara try karein.'); }
 }
 const NON_ADVANCE_LEDGER_TYPES=['expense','transfer_in','transfer_out','party_cash'];
+// A Doer correcting their own wrongly-entered expense amount/category is better handled at
+// the Doer's end than routed through Admin delete+reissue (user's explicit call - "Doer ke
+// end par hi best hai") - but only their own entry, only type 'expense' (not a transfer/
+// advance/party-cash, which involve another party's ledger too), and only while the trip
+// isn't closed yet (once Admin has Verified & Closed, the accounting is final - same rule
+// already applied to Un-submit Hisaab above).
+function canEditOwnExpense(l){
+  if(!l||l.type!=='expense'||l.byId!==currentUser)return false;
+  const t=trips.find(x=>x.id===l.tripId);
+  return !!t&&t.status!=='closed';
+}
 function isOverdue(t){return t.status!=='closed' && t.dueDate && t.dueDate<=todayISO()}
 
 /* ===== Issue / Extra / Expense / Hisaab / Close / Book ===== */
@@ -1057,6 +1074,38 @@ async function submitExpense(){
     hide('expense');
   }finally{
     _expenseSubmitting=false;
+    if(btn)btn.disabled=false;
+  }
+}
+let _editingExpenseId=null;
+function openEditExpenseModal(id){
+  const l=ledger.find(x=>x.id===id);
+  if(!canEditOwnExpense(l)){alert('Yeh entry ab edit nahi ho sakti.');return}
+  _editingExpenseId=id;
+  $('editExpCategory').value=l.category||'';
+  $('editExpAmount').value=l.amount;
+  $('editExpMsg').textContent='';
+  show('editExpense');
+}
+let _expenseEditSaving=false;
+async function saveEditExpense(){
+  if(_expenseEditSaving)return;
+  const l=ledger.find(x=>x.id===_editingExpenseId);
+  const msg=$('editExpMsg');
+  if(!canEditOwnExpense(l)){msg.style.color='#b43a35';msg.textContent='Yeh entry ab edit nahi ho sakti.';return}
+  const category=$('editExpCategory').value.trim(),amount=Number($('editExpAmount').value);
+  if(!category||!amount){msg.style.color='#b43a35';msg.textContent='Category aur Amount zaroori hain.';return}
+  _expenseEditSaving=true;
+  const btn=$('editExpSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const oldAmount=l.amount,oldCategory=l.category;
+    await db.collection('te_ledger').doc(l.id).update({category,amount});
+    await addExpenseCategoryIfNew(category);
+    logActivity(((myUserObj()||{}).name||currentUser)+' edited an expense entry',`${oldCategory} ${money(oldAmount)} → ${category} ${money(amount)} • ${l.tripId}`);
+    hide('editExpense');
+    toast('Expense update ho gaya.');
+  }finally{
+    _expenseEditSaving=false;
     if(btn)btn.disabled=false;
   }
 }
@@ -1652,7 +1701,7 @@ function salesTripCardHtml(trip){
   const partyCash=tripLedger(trip.id).filter(l=>l.type==='party_cash').reduce((s,l)=>s+Number(l.amount||0),0);
   const transferReceived=tripLedger(trip.id).filter(l=>l.type==='transfer_in').reduce((s,l)=>s+Number(l.amount||0),0);
   const transferSent=tripLedger(trip.id).filter(l=>l.type==='transfer_out').reduce((s,l)=>s+Number(l.amount||0),0);
-  const rows=tripLedger(trip.id).filter(l=>NON_ADVANCE_LEDGER_TYPES.includes(l.type)).sort((a,b)=>b.at.localeCompare(a.at)).map(l=>ledgerEntryRow(l)).join('')||'<div class="row"><small>Koi expense abhi tak nahi.</small></div>';
+  const rows=tripLedger(trip.id).filter(l=>NON_ADVANCE_LEDGER_TYPES.includes(l.type)).sort((a,b)=>b.at.localeCompare(a.at)).map(l=>ledgerEntryRow(l,false,canEditOwnExpense(l))).join('')||'<div class="row"><small>Koi expense abhi tak nahi.</small></div>';
   const submitted=trip.status==='hisaab_submitted';
   const dueReached=!submitted&&trip.dueDate&&trip.dueDate<=todayISO();
   const tid=esc(trip.id);
