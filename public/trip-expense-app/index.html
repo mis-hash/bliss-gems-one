@@ -1510,7 +1510,9 @@ function setAdminTripFilter(tripId){adminTripFilter=tripId;renderAdminPage();}
 function clearAdminNameFilter(){adminTripFilter=null;renderAdminPage();}
 function renderAdminPage(){
   const scoped=adminTripFilter?trips.filter(t=>t.id===adminTripFilter):trips;
-  const active=scoped.filter(t=>t.status!=='closed');
+  // Freshly-issued trips (newest createdAt first) show at the top of Live Sales Person
+  // Trips, instead of whatever arbitrary order Firestore's onSnapshot happened to deliver.
+  const active=scoped.filter(t=>t.status!=='closed').sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const totalIssued=scoped.reduce((s,t)=>s+tripIssued(t.id),0);
   const totalExpense=scoped.reduce((s,t)=>s+tripExpense(t.id),0);
   // Use tripOutstanding() (nets out returnedAmount for closed trips), not raw
