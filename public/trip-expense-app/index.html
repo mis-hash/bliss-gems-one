@@ -415,7 +415,7 @@ const todayISO=()=>new Date().toISOString().slice(0,10);
 function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;return `TRP-${ds}-${String(Date.now()).slice(-4)}`}
 function genLedgerId(){return 'LG-'+Date.now()+'-'+Math.floor(Math.random()*1000)}
 
-let users=[],trips=[],allTripsRaw=[],deletedTrips=[],ledger=[],notifySettings={issued:true,additional:true,overdue:true,submitted:true,closed:true,booked:true};
+let users=[],trips=[],allTripsRaw=[],deletedTrips=[],ledger=[],notifySettings={issued:true,additional:true,overdue:true,submitted:true,closed:true,booked:true,noSpending:true};
 let messageTemplates={
   issued:'💰 Trip Advance Issued\nAmount: {amount}\nLocation: {location}\nHisaab Due: {due}\nTrip: {tripId}',
   additional:'💰 Additional Advance Issued\nAmount: {amount}\nTrip: {tripId}',
@@ -426,7 +426,8 @@ let messageTemplates={
   overdue_admin:'🔴 *Hisaab Reminder — OVERDUE*\n\n👤 {name}\n📍 {location}\n📅 Due: {due} ({daysOverdue} din se pending)\n💰 Outstanding: *{balance}*\n\nKripya {name} se follow-up karke hisaab jald complete karwayein.',
   booking_pending:'📚 *Booking Pending — 1+ day*\n{name} • {location} • {tripId}\nNOC: {noc}\n\nPlease mark booking soon:\n{link}',
   booking_pending_urgent:'🔴 *URGENT — Booking Pending {daysPending}+ days!*\n{name} • {location} • {tripId}\nNOC: {noc}\n\nMarking this as booked is mandatory — please do it now:\n{link}',
-  reassigned:'📋 Trip Aapko Assign Ki Gayi Hai\nLocation: {location}\nHisaab Due: {due}\nTrip: {tripId}\nCurrent Balance: {balance}'
+  reassigned:'📋 Trip Aapko Assign Ki Gayi Hai\nLocation: {location}\nHisaab Due: {due}\nTrip: {tripId}\nCurrent Balance: {balance}',
+  no_spending:'⚠️ Spending Check\n{name}, it has been {days} days since your {location} trip was issued, and no expense entry has been logged yet.\nAre you facing any issue with the app, or is the spending still pending? Please update soon.\nTrip: {tripId}'
 };
 let currentUser=null;
 let usersStarted=false,usersLoaded=false,tripsStarted=false,ledgerStarted=false,ledgerLoaded=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false;
@@ -589,6 +590,7 @@ function startTripsSync(){
     renderAll();
     autoSendOverdueReminders();
     autoSendBookingReminders();
+    autoSendNoSpendingReminders();
   },err=>console.error('trips sync error',err));
 }
 function startLedgerSync(){
@@ -598,6 +600,7 @@ function startLedgerSync(){
     ledgerLoaded=true;
     renderAll();
     autoSendOverdueReminders();
+    autoSendNoSpendingReminders();
   },err=>console.error('ledger sync error',err));
 }
 function startSettingsSync(){
@@ -1293,9 +1296,10 @@ async function sendTripSummaryToDirectors(tripId,extra){
   recipients.forEach(u=>{ sendWA(u.phone,msg,{allowDirectorPdfOnly:true}); sendTripFileWA(u.phone,blob,fileName); });
 }
 async function markBooked(tripId){
-  await db.collection('te_trips').doc(tripId).update({bookedByAccounts:true});
+  const bookedByName=(myUserObj()||{}).name||currentUser;
+  await db.collection('te_trips').doc(tripId).update({bookedByAccounts:true,bookedBy:bookedByName,bookedAt:new Date().toISOString()});
   const trip=trips.find(t=>t.id===tripId);
-  logActivity(`${(myUserObj()||{}).name||currentUser} marked ${tripId} as Booked`,trip?`${trip.salesName} · ${trip.location}`:'');
+  logActivity(`${bookedByName} marked ${tripId} as Booked`,trip?`${trip.salesName} · ${trip.location}`:'');
   if(notifySettings.booked && trip){
     excludeDirectorPdfOnlyRecipients(usersWithRole('director')).filter(u=>!isBookkeepingNoticeExcluded(u.phone)).forEach(u=>sendWA(u.phone,renderTemplate(messageTemplates.booked,{tripId:trip.id})));
   }
@@ -1304,7 +1308,7 @@ async function markBooked(tripId){
 // shows up for booking (and booking reminders) again.
 async function unmarkBooked(tripId){
   if(!confirm('Is trip ko dobara "Ready to Book" mein daalna hai?'))return;
-  await db.collection('te_trips').doc(tripId).update({bookedByAccounts:false});
+  await db.collection('te_trips').doc(tripId).update({bookedByAccounts:false,bookedBy:firebase.firestore.FieldValue.delete(),bookedAt:firebase.firestore.FieldValue.delete()});
   const trip=trips.find(t=>t.id===tripId);
   logActivity(`${(myUserObj()||{}).name||currentUser} un-marked ${tripId} as Booked`,trip?`${trip.salesName} · ${trip.location}`:'');
 }
@@ -1362,6 +1366,45 @@ async function autoSendOverdueReminders(){
     }
   }finally{
     overdueReminderBusy=false;
+  }
+}
+// Built in direct response to a real incident: Mukund Bhukhmaria's trip was issued 2+ days
+// ago with zero expense entries logged, and the user manually WhatsApp'd him asking if he
+// was facing an app issue or genuinely hadn't spent anything yet. Automates that exact
+// check-in, same self-checking/dedup pattern as autoSendOverdueReminders() above (one send
+// per day via a date stamp, not a reminder that escalates/repeats within the same day).
+// Goes ONLY to the Doer themselves (not Admin/Director) - the user's own manual message was
+// Doer-only, this just automates it, not a new broadcast.
+const NO_SPENDING_GAP_DAYS=2;
+let noSpendingReminderBusy=false;
+async function autoSendNoSpendingReminders(){
+  if(!usersLoaded){console.log('[no-spending-reminder] skipped: users data not loaded yet');return;}
+  if(effectiveRole()!=='admin' && effectiveRole()!=='director'){console.log('[no-spending-reminder] skipped: effectiveRole() is',JSON.stringify(effectiveRole()),'(need admin/director) - currentUser:',JSON.stringify(currentUser));return;}
+  if(!ledgerLoaded){console.log('[no-spending-reminder] skipped: ledger data not loaded yet');return;}
+  if(noSpendingReminderBusy){console.log('[no-spending-reminder] skipped: already running');return;}
+  noSpendingReminderBusy=true;
+  try{
+    const today=todayISO();
+    const now=Date.now();
+    const candidates=trips.filter(t=>{
+      if(t.status!=='running')return false;
+      if(t.lastNoSpendReminderSentAt===today)return false;
+      const issuedAt=t.createdAt||t.startDate;
+      if(!issuedAt)return false;
+      const daysSinceIssue=(now-new Date(issuedAt).getTime())/86400000;
+      if(daysSinceIssue<NO_SPENDING_GAP_DAYS)return false;
+      return tripLedger(t.id).filter(l=>l.type==='expense').length===0;
+    });
+    for(const t of candidates){
+      const sales=users.find(u=>u.id===t.salesId);
+      if(sales&&sales.phone){
+        const daysSinceIssue=Math.floor((now-new Date(t.createdAt||t.startDate).getTime())/86400000);
+        sendWA(sales.phone,renderTemplate(messageTemplates.no_spending,{name:t.salesName,location:t.location,days:daysSinceIssue,tripId:t.id}));
+      }
+      try{await db.collection('te_trips').doc(t.id).update({lastNoSpendReminderSentAt:today});}catch(e){console.error('no-spending reminder stamp failed',e);}
+    }
+  }finally{
+    noSpendingReminderBusy=false;
   }
 }
 const BOOKKEEPING_LINK='https://bliss-gems-one.web.app/trip-expense-app/?page=accounts';
@@ -1721,13 +1764,14 @@ function renderAccountsPage(){
     const tag=t.bookedByAccounts?'<span class="tag">BOOKED</span>':'<span class="tag amber">READY TO BOOK</span>';
     return `<div class="person" style="cursor:pointer" onclick="openTripDetail('${esc(t.id)}')"><div class="pt"><div><h3>${esc(t.salesName)} • ${esc(t.location)} • ${esc(t.id)}</h3><p>${esc(t.purpose||'')} • ${esc(t.startDate)} → ${esc(t.dueDate)}</p></div>${tag}</div>
     <div class="money"><div class="m"><small>ISSUED</small><b>${money(issued)}</b></div><div class="m"><small>EXPENSE</small><b>${money(expense)}</b></div><div class="m"><small>RECEIVED</small><b>${money(t.returnedAmount||0)}</b></div><div class="m"><small>RECEIVED BY</small><b>${esc(t.closedBy||'-')}</b></div><div class="m"><small>STATUS</small><b>${esc(t.status)}</b></div><div class="m"><small>NOC</small><b>${esc(t.nocNumber||'-')}</b></div>
+    ${t.bookedByAccounts?`<div class="m"><small>BOOKED BY</small><b>${esc(t.bookedBy||'-')}</b></div>`:''}
     <div class="m"><small>ACTION</small>${!t.bookedByAccounts?`<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn primary" onclick="event.stopPropagation();markBooked('${esc(t.id)}')">Mark Booked</button><button class="btn" onclick="event.stopPropagation();sendBookingReminderNow('${esc(t.id)}')">🔔 Send Reminder</button></div>`:`<button class="btn" onclick="event.stopPropagation();unmarkBooked('${esc(t.id)}')">↩ Unmark Booked</button>`}</div></div></div>`;
   }).join('');
 }
 function renderNotifyPage(){
   const wrap=$('notifyRows');if(!wrap)return;
   const groups=[
-    ['👤 Sales Person','the person on the trip',[['issued','Advance issued to them'],['additional','Additional advance issued']]],
+    ['👤 Sales Person','the person on the trip',[['issued','Advance issued to them'],['additional','Additional advance issued'],['noSpending','Spending check-in (no expense entry for 2+ days)']]],
     ['▦ Admin','issues advances, verifies hisaab',[['submitted','Hisaab submitted, ready to verify'],['overdue','Overdue reminder (manual send)']]],
     ['📚 Accounts','books the closed trips',[['closed','Trip closed — NOC + settlement notice']]],
     ['★ Director','oversight, escalations',[['booked','Trip marked Booked']]],
