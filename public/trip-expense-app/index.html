@@ -1087,6 +1087,21 @@ async function submitHisaab(tripId){
     if(me)sendWA(me.phone,`🧾 Aapka Hisaab Submit Ho Gaya\n${trip.location} • ${trip.id}\n\n${summary}\n\nAdmin verify karega.`);
   }
 }
+// Lets the Doer undo their OWN accidental "Submit Hisaab" click (built in direct response
+// to a real case: Submit clicked by mistake before all expenses were added) - only works
+// while still 'hisaab_submitted' (Admin hasn't verified/closed it yet); once closed, this
+// is a no-op and Admin's own trip tools are the only way to make further changes. No extra
+// role check needed beyond this - the button only ever renders on the Doer's own My Trip
+// card for their own trip.
+async function unsubmitHisaab(tripId){
+  const trip=trips.find(t=>t.id===tripId)||mySalesTrip();
+  if(!trip){alert('Koi active trip nahi hai.');return}
+  if(trip.status!=='hisaab_submitted'){alert('Ye trip ab "Hisaab Submitted" state mein nahi hai (Admin ne aage badha diya hoga) - ab un-submit nahi ho sakti.');return}
+  if(!confirm('Hisaab submission undo karni hai? Trip wapas Active ho jayegi, aap Expense add kar sakenge, phir dobara Submit kar dena.'))return;
+  await db.collection('te_trips').doc(tripId).update({status:'running'});
+  logActivity(((myUserObj()||{}).name||currentUser)+' un-submitted hisaab',`${trip.salesName||currentUser} · ${trip.location} · ${tripId}`);
+  toast('Hisaab un-submit ho gaya, trip wapas active hai.');
+}
 function closeTrip(tripId){
   const trip=trips.find(t=>t.id===tripId);
   if(!trip)return;
@@ -1642,7 +1657,7 @@ function salesTripCardHtml(trip){
   const dueReached=!submitted&&trip.dueDate&&trip.dueDate<=todayISO();
   const tid=esc(trip.id);
   const submitBtn=submitted
-    ?`<div class="big" style="background:var(--mint);color:var(--g);cursor:default;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.3"><span>✅ Hisaab Submitted<br><small style="font-weight:500">Admin verify karega</small></span></div>`
+    ?`<div class="big" style="background:var(--mint);color:var(--g);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.3;gap:6px"><span>✅ Hisaab Submitted<br><small style="font-weight:500">Admin verify karega</small></span><button type="button" class="btn small" onclick="event.stopPropagation();unsubmitHisaab('${tid}')">↩ Un-submit (galti se ho gaya)</button></div>`
     :`<button class="big primary" style="${dueReached?'background:var(--amber)':''}" onclick="submitHisaab('${tid}')"><span>✓</span>Submit Hisaab${dueReached?' ⏰':''}</button>`;
   const dueBanner=dueReached?`<div class="row" style="background:var(--amberbg);border:1px solid var(--amber);border-radius:10px;margin:10px 0 0;color:var(--amber);font-weight:700"><small>⏰ Hisaab ki due date (${esc(trip.dueDate)}) aa gayi hai — Submit Hisaab zaroor karein.</small></div>`:'';
   return `<div class="trip"><h1>My ${esc(trip.location)} Trip</h1><p>${esc(trip.id)} • ${esc(trip.salesName)} • Hisaab Due ${esc(trip.dueDate)}</p>${dueBanner}
