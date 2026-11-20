@@ -202,7 +202,7 @@ function renderGate(){
   }
   if(!isAiAdmin(u)){
     gateWrap.style.display='flex';appWrap.style.display='none';
-    gateBox.innerHTML=`<h3>Directors Only</h3><p class="note">Yeh tool sirf Admin/Director access wale log use kar sakte hain. Bliss One hub ke Manage → Universal Users mein "Directors Assistant" role set karwayein.</p>`;
+    gateBox.innerHTML=`<h3>Directors Only</h3>`;
     return;
   }
   gateWrap.style.display='none';appWrap.style.display='block';
