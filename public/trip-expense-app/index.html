@@ -425,7 +425,8 @@ let messageTemplates={
   overdue:'🔴 *Hisaab Reminder — OVERDUE*\n\n👤 {name}\n📍 {location}\n📅 Due: {due} ({daysOverdue} din se pending)\n💰 Outstanding: *{balance}*\n\nKripya jald se jald hisaab submit karein.',
   overdue_admin:'🔴 *Hisaab Reminder — OVERDUE*\n\n👤 {name}\n📍 {location}\n📅 Due: {due} ({daysOverdue} din se pending)\n💰 Outstanding: *{balance}*\n\nKripya {name} se follow-up karke hisaab jald complete karwayein.',
   booking_pending:'📚 *Booking Pending — 1+ day*\n{name} • {location} • {tripId}\nNOC: {noc}\n\nPlease mark booking soon:\n{link}',
-  booking_pending_urgent:'🔴 *URGENT — Booking Pending {daysPending}+ days!*\n{name} • {location} • {tripId}\nNOC: {noc}\n\nMarking this as booked is mandatory — please do it now:\n{link}'
+  booking_pending_urgent:'🔴 *URGENT — Booking Pending {daysPending}+ days!*\n{name} • {location} • {tripId}\nNOC: {noc}\n\nMarking this as booked is mandatory — please do it now:\n{link}',
+  reassigned:'📋 Trip Aapko Assign Ki Gayi Hai\nLocation: {location}\nHisaab Due: {due}\nTrip: {tripId}\nCurrent Balance: {balance}'
 };
 let currentUser=null;
 let usersStarted=false,usersLoaded=false,tripsStarted=false,ledgerStarted=false,ledgerLoaded=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false;
@@ -1945,11 +1946,13 @@ async function saveEditTrip(){
   // entries' totals are attributed to going forward (tripIssued/tripExpense filter by
   // tripId, not salesId) - it does NOT rewrite each ledger entry's own byId/byName (who
   // actually performed that action stays accurate in the activity history).
+  let newSalesForNotify=null;
   if(salesId!==t.salesId){
     const newSales=users.find(u=>u.id===salesId);
     if(!confirm('Is trip ka Doer "'+(t.salesName||t.salesId)+'" se "'+(newSales?newSales.name:salesId)+'" kar diya jaaye?\n\nGalti se kisi aur Doer ko advance issue ho gaya ho to yahi sahi tarika hai use correct karne ka.'))return;
     patch.salesId=salesId;
     patch.salesName=newSales?newSales.name:salesId;
+    newSalesForNotify=newSales;
   }
   if(t&&t.status==='closed')patch.closedBy=$('editTripReceivedBy').value.trim();
   const btn=$('editTripSaveBtn');if(btn)btn.disabled=true;
@@ -1961,6 +1964,12 @@ async function saveEditTrip(){
     msg.style.color='#b43a35';msg.textContent='Save fail ho gaya, dobara try karein.';
     if(btn)btn.disabled=false;
     return;
+  }
+  // Same WhatsApp-on-assignment pattern as a fresh Issue Advance (notifySettings.issued) -
+  // the newly-assigned Doer gets told about this trip, same as if it had just been issued
+  // to them, instead of silently finding out only when they open the app.
+  if(newSalesForNotify && notifySettings.issued && newSalesForNotify.phone){
+    sendWA(newSalesForNotify.phone,renderTemplate(messageTemplates.reassigned,{location,due,tripId:_editTripId,balance:money(tripOutstanding(_editTripId))}));
   }
   if(btn)btn.disabled=false;
   hide('editTripModal');
