@@ -283,6 +283,7 @@ function liveTeTrips(cb){ return db.collection('te_trips').get().then(snap=>{con
 function liveSiItems(cb){ return db.collection('si_items').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows);}).catch(e=>{console.error('liveSiItems failed:',e);cb([]);}); }
 function livePcLedger(cb){ return db.collection('pc_ledger').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}).catch(e=>{console.error('livePcLedger failed:',e);cb([]);}); }
 function liveFuelLog(cb){ return db.collection('fuel_log').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}).catch(e=>{console.error('liveFuelLog failed:',e);cb([]);}); }
+function liveTeLedger(cb){ return db.collection('te_ledger').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows);}).catch(e=>{console.error('liveTeLedger failed:',e);cb([]);}); }
 // Busy import summaries are stored in localStorage, not Firestore - "busy_import" is a
 // brand new collection this app introduced, and this project's Firestore security rules
 // only allow the collections that already existed (confirmed: a direct unauthenticated
@@ -397,6 +398,42 @@ function fuzzyWordMatch(w,k){
   const maxDist=k.length<=4?1:2;
   return levenshtein(w,k)<=maxDist;
 }
+// Matches a specific Sales person mentioned in the question against known trip salesNames -
+// tries an exact full-name substring match first (longest name wins, so a more specific full
+// name doesn't get shadowed by a shorter one), then a fuzzy match on just the first name
+// (handles typos, and being referred to by first name only, e.g. "Vijay" for "Vijay Kumar").
+function matchSalesPersonFromQuestion(trips,q){
+  const names=[...new Set(trips.map(t=>t.salesName).filter(Boolean))].sort((a,b)=>b.length-a.length);
+  for(const name of names){ if(q.includes(name.toLowerCase()))return name; }
+  const qWords=q.split(/\s+/).filter(Boolean);
+  for(const name of names){
+    const firstName=name.toLowerCase().split(/\s+/)[0];
+    if(qWords.some(w=>fuzzyWordMatch(w,firstName)))return name;
+  }
+  return null;
+}
+// Answers "<Name> expense/kharcha kitna hai" by summing that Sales person's expense ledger
+// entries across all their trips - returns null (not a fallback message) when no known
+// person's name is found in the question, so the caller can keep trying other intents.
+async function answerPersonExpense(q){
+  const trips=await new Promise(res=>liveTeTrips(res));
+  const name=matchSalesPersonFromQuestion(trips,q);
+  if(!name)return null;
+  const myTrips=trips.filter(t=>t.salesName===name);
+  const tripIds=new Set(myTrips.map(t=>t.id));
+  const ledger=await new Promise(res=>liveTeLedger(res));
+  const myExpense=ledger.filter(l=>l.type==='expense'&&tripIds.has(l.tripId));
+  if(!myExpense.length)return {text:`${name} ka abhi tak koi expense entry record nahi hai.`,sources:['Bliss One — Trip Expense App']};
+  const total=myExpense.reduce((s,l)=>s+Number(l.amount||0),0);
+  const byTrip={};
+  myExpense.forEach(l=>{
+    const t=myTrips.find(x=>x.id===l.tripId);
+    const loc=(t&&t.location)||l.tripId;
+    byTrip[loc]=(byTrip[loc]||0)+Number(l.amount||0);
+  });
+  const lines=Object.keys(byTrip).map(loc=>`• ${loc}: ${fmtAmt(byTrip[loc])}`);
+  return {text:`${name} ka total expense: ${fmtAmt(total)}\n`+lines.join('\n'),sources:['Bliss One — Trip Expense App']};
+}
 async function answerQuestion(text){
   const q=String(text||'').toLowerCase();
   if(q.includes('trip')) return answerOpenTrips();
@@ -404,6 +441,15 @@ async function answerQuestion(text){
   if(q.includes('petty')||q.includes('cash balance')||q.includes('balance')) return answerPettyCashBalance();
   if(q.includes('petrol')||q.includes('fuel')||q.includes('diesel')) return answerTodayFuelExpense();
   if(q.includes('busy')||q.includes('report')) return answerBusyReports(text);
+  // A question naming a specific Sales person alongside an expense-like word (exact or a typo,
+  // e.g. "Vijay Expence") answers that person's total trip expense - checked before the generic
+  // Busy-report-name fallback below, since a known person's name is a stronger signal.
+  const expenseWords=['expense','kharch','kharcha','spend','spent'];
+  const qWordsEarly=q.split(/\s+/).filter(Boolean);
+  if(expenseWords.some(k=>q.includes(k))||qWordsEarly.some(w=>expenseWords.some(k=>fuzzyWordMatch(w,k)))){
+    const personAns=await answerPersonExpense(q);
+    if(personAns)return personAns;
+  }
   // No other keyword matched - last resort, check if any uploaded Busy report's own NAME
   // appears in the question (e.g. "Sales Register ka total kya hai" with no "busy"/"report"
   // word at all) before giving up.
@@ -422,7 +468,7 @@ async function answerQuestion(text){
   for(const intent of fuzzyIntents){
     if(qWords.some(w=>intent.words.some(k=>fuzzyWordMatch(w,k))))return intent.fn();
   }
-  return {text:'Maaf kijiye, abhi main sirf kuch specific sawaalon ke jawab de sakta hoon — trips, stationery stock, petty cash balance, aaj ka fuel expense, ya kisi uploaded Busy report ka naam. Baaki sawaal aane wale updates mein add honge.',sources:[]};
+  return {text:'Maaf kijiye, abhi main sirf kuch specific sawaalon ke jawab de sakta hoon — trips, stationery stock, petty cash balance, aaj ka fuel expense, kisi Sales person ka expense (jaise "Vijay ka expense"), ya kisi uploaded/connected report ka naam. Baaki sawaal aane wale updates mein add honge.',sources:[]};
 }
 
 function askSuggested(text){ if($('mtabAsk'))aiSetMobileTab('ask'); $('chatInput').value=text; sendChat(); }
