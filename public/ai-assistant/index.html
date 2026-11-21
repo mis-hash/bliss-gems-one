@@ -28,6 +28,11 @@
 <!-- Free client-side parsing only (no paid API) - lets Busy exports be uploaded as real
      .xlsx/.xls, not just .csv, same free-plan constraint as everything else here. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Loaded as two separate libraries (not the html2pdf.js bundle) - same direct
+     html2canvas+jsPDF pipeline used by Purchase Price Estimator/Trip Expense/Petty Cash's
+     PDFs, which verifies the canvas actually has content before handing it to jsPDF. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -114,6 +119,25 @@ header::before{content:'';display:block;height:3px;flex-shrink:0;background:line
   .mobileTabs button.active{background:var(--g);color:#fff;border-color:var(--g);box-shadow:0 2px 8px rgba(38,143,118,.25)}
   .sidebar.mobileHide,.chatPanel.mobileHide{display:none}
 }
+/* Report export PDF - built as a standalone off-screen HTML string (not a clone of any
+   on-screen panel, since the View modal's content isn't styled for print/export) rendered via
+   html2canvas+jsPDF, same pattern as the other Bliss apps' PDFs. */
+.reportPdfWrap{width:420px;background:#fff;padding:16px;box-sizing:border-box;font-family:'Work Sans',Arial,sans-serif;color:var(--txt)}
+.reportPdfHero{background:linear-gradient(135deg,var(--g),var(--g2));color:#fff;border-radius:14px;padding:16px;margin-bottom:14px;display:flex;align-items:center;gap:12px}
+.reportPdfHero .eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.05em;opacity:.85;font-weight:700}
+.reportPdfHero h1{font-size:19px;margin:4px 0 2px;font-weight:800;font-family:'Manrope',sans-serif}
+.reportPdfHero p{margin:0;font-size:12px;opacity:.9}
+.reportPdfHeroBadge{flex:none;width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:#fff}
+.reportPdfStats{display:flex;gap:10px;margin-bottom:14px}
+.reportPdfStatTile{flex:1;background:var(--mint);border-radius:10px;padding:10px}
+.reportPdfStatTile small{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:700;margin-bottom:3px}
+.reportPdfStatTile b{font-size:17px;color:var(--txt)}
+.reportPdfSectionTitle{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin:0 0 8px}
+.reportPdfTable{width:100%;border-collapse:collapse;margin-bottom:14px}
+.reportPdfTable th{text-align:left;font-size:10.5px;color:var(--muted);padding:6px 4px;border-bottom:1px solid var(--line)}
+.reportPdfTable th:last-child,.reportPdfTable td:last-child{text-align:right}
+.reportPdfTable td{font-size:12.5px;padding:7px 4px;border-bottom:1px solid var(--line)}
+.reportPdfFooter{font-size:10.5px;color:var(--muted);text-align:center;margin-top:4px}
 </style>
 </head>
 <body>
@@ -200,7 +224,8 @@ Jo bhi link mile, wahi yahan paste kar dein - data update hone par "🔄" button
 <div class="modal" id="busyViewModal"><div class="box" style="width:min(480px,100%)">
 <h3 id="busyViewTitle">Report</h3>
 <div id="busyViewBody"></div>
-<div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn" onclick="closeBusyViewModal()">Close</button></div>
+<p class="note" id="busyViewPdfMsg" style="margin:8px 0 0"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeBusyViewModal()">Close</button><button class="btn primary" id="busyViewPdfBtn" onclick="downloadReportPdf()">⬇ Export PDF</button></div>
 </div></div>
 
 <script>
@@ -429,31 +454,46 @@ function computeTripMoney(ledger,tripId){
   const expense=entries.filter(l=>['expense','transfer_out'].includes(l.type)).reduce((s,l)=>s+Number(l.amount||0),0);
   return {issued,expense,balance:issued-expense};
 }
+// Same-session (in-memory only, resets on page reload - no server-side state) conversation
+// memory, so a follow-up like "Current trip ka puch raha hu only" right after "Mukund ne
+// kitna spend kiya" can resolve back to Mukund/expense without the name being repeated.
+let lastMentionedSalesPerson=null;
+let lastMoneyMetric=null; // 'balance'|'expense'|'advance'
 // Answers a question naming a specific Sales person alongside a money-word - expense/kharcha
 // (exact or typo'd, e.g. "Vijay Expence"), balance/baaki, or advance - scoped to their CURRENT
 // (non-closed) trip(s) only, matching every other intent in this app (live/open status, not a
 // historical lifetime total a closed, already-settled trip would otherwise inflate). Returns
-// null (not a fallback message) when no money-word matched either, so a name mentioned for an
-// unrelated reason (e.g. "Vijay kaun hai") isn't wrongly hijacked into this intent.
-async function answerPersonTripQuery(q,trips,name){
+// null (not a fallback message) when no money-word matched either (unless isFollowup, which
+// reuses the last metric asked in this session), so a name mentioned for an unrelated reason
+// (e.g. "Vijay kaun hai") isn't wrongly hijacked into this intent.
+async function answerPersonTripQuery(q,trips,name,isFollowup){
   const myTrips=trips.filter(t=>t.salesName===name && t.status!=='closed');
   if(!myTrips.length)return {text:`${name} ka abhi koi active trip nahi hai.`,sources:['Bliss One — Trip Expense App']};
   const qWords=q.split(/\s+/).filter(Boolean);
   const matches=words=>words.some(k=>q.includes(k))||qWords.some(w=>words.some(k=>fuzzyWordMatch(w,k)));
-  const wantsBalance=matches(['balance','baaki','bakaya','due']);
-  const wantsExpense=matches(['expense','kharch','kharcha','spend','spent']);
-  const wantsAdvance=matches(['advance']);
-  if(!wantsBalance&&!wantsExpense&&!wantsAdvance)return null;
+  let wantsBalance=matches(['balance','baaki','bakaya','due']);
+  let wantsExpense=matches(['expense','kharch','kharcha','spend','spent']);
+  let wantsAdvance=matches(['advance']);
+  if(!wantsBalance&&!wantsExpense&&!wantsAdvance){
+    if(isFollowup&&lastMoneyMetric){
+      if(lastMoneyMetric==='balance')wantsBalance=true;
+      else if(lastMoneyMetric==='advance')wantsAdvance=true;
+      else wantsExpense=true;
+    }else{
+      return null;
+    }
+  }
   const ledger=await new Promise(res=>liveTeLedger(res));
   const rows=myTrips.map(t=>({loc:t.location||t.id,...computeTripMoney(ledger,t.id)}));
-  const reply=(label,field)=>{
+  const reply=(label,field,metric)=>{
+    lastMoneyMetric=metric;
     const total=rows.reduce((s,r)=>s+r[field],0);
     const lines=rows.map(r=>`• ${r.loc}: ${fmtAmt(r[field])}`);
     return {text:`${name} ka current trip ${label}: ${fmtAmt(total)}\n`+lines.join('\n'),sources:['Bliss One — Trip Expense App']};
   };
-  if(wantsBalance)return reply('balance',"balance");
-  if(wantsExpense)return reply('expense',"expense");
-  return reply('advance (issued)',"issued");
+  if(wantsBalance)return reply('balance','balance','balance');
+  if(wantsExpense)return reply('expense','expense','expense');
+  return reply('advance (issued)','issued','advance');
 }
 async function answerQuestion(text){
   const q=String(text||'').toLowerCase();
@@ -464,7 +504,23 @@ async function answerQuestion(text){
   const trips=await new Promise(res=>liveTeTrips(res));
   const personName=matchSalesPersonFromQuestion(trips,q);
   if(personName){
-    const personAns=await answerPersonTripQuery(q,trips,personName);
+    const personAns=await answerPersonTripQuery(q,trips,personName,false);
+    if(personAns){ lastMentionedSalesPerson=personName; return personAns; }
+  }
+  // Conversational follow-up (same browser session only, in-memory - resets on reload): e.g.
+  // "Current trip ka puch raha hu only" right after asking about a specific Sales person's
+  // money, with no name repeated this time. Checked here, before the generic 'trip' keyword
+  // below (which would otherwise just list every open trip for "...trip..."), but skipped
+  // whenever the question also looks like it's about a clearly different domain (Petty Cash,
+  // fuel, Busy/report, stationery) - those still take their normal, unambiguous path below.
+  // Deliberately excludes common words like "current"/"abhi" from the trigger list on their
+  // own (e.g. "Chunnu ka trip abhi open hai kya" is a real, different question that merely
+  // contains "abhi" - not a follow-up) - only the narrower, more distinctive markers below.
+  const otherDomainWords=['petty','cash','fuel','petrol','diesel','busy','report','stock','stationery'];
+  if(lastMentionedSalesPerson&&lastMoneyMetric
+     &&/\b(only|sirf|wahi|usi|iska|uska|isska|usska)\b/.test(q)
+     &&!otherDomainWords.some(k=>q.includes(k))){
+    const personAns=await answerPersonTripQuery(q,trips,lastMentionedSalesPerson,true);
     if(personAns)return personAns;
   }
   if(q.includes('trip')) return answerOpenTrips();
@@ -687,10 +743,13 @@ function confirmBusyUpload(){
 // Shows what this report actually has on record - only the total + top 10 groups, not
 // every raw row (full rows aren't stored at all, to keep localStorage small per-device -
 // see the comment above BUSY_IMPORTS_KEY). Honest about that limit in the modal itself.
+let _viewingReportKey=null;
 function viewBusyReport(key){
   const imports=JSON.parse(localStorage.getItem(BUSY_IMPORTS_KEY)||'{}');
   const r=imports[key];
   if(!r)return;
+  _viewingReportKey=key;
+  $('busyViewPdfMsg').textContent='';
   $('busyViewTitle').textContent=r.name;
   const rowsHtml=r.topRows&&r.topRows.length
     ?`<table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px">
@@ -712,6 +771,92 @@ function viewBusyReport(key){
   $('busyViewModal').classList.add('show');
 }
 function closeBusyViewModal(){ $('busyViewModal').classList.remove('show'); }
+// Standalone HTML string (not a clone of any on-screen panel - the View modal isn't styled
+// for print/export) for the report PDF, rendered off-screen then captured via html2canvas.
+function buildReportPdfHtml(r){
+  const sourceLine=r.sourceType==='sheet'
+    ?`Live Sheet link · Last fetch ${new Date(r.uploadedAt).toLocaleDateString('en-IN')}`
+    :`File: ${esc(r.fileName||'')} · Upload ${new Date(r.uploadedAt).toLocaleDateString('en-IN')}`;
+  const rowsHtml=r.topRows&&r.topRows.length
+    ?`<table class="reportPdfTable">
+        <thead><tr><th>${esc(r.labelColLabel||'Party/Item')}</th><th>Amount</th></tr></thead>
+        <tbody>${r.topRows.map(t=>`<tr><td>${esc(t.label)}</td><td>${fmtAmt(t.amount)}</td></tr>`).join('')}</tbody>
+      </table>`
+    :'';
+  return `<div class="reportPdfWrap">
+    <div class="reportPdfHero">
+      <div class="reportPdfHeroBadge">B</div>
+      <div>
+        <div class="eyebrow">Bliss Gems &amp; Minerals</div>
+        <h1>${esc(r.name)}</h1>
+        <p>${esc(sourceLine)}</p>
+      </div>
+    </div>
+    <div class="reportPdfStats">
+      <div class="reportPdfStatTile"><small>Total</small><b>${fmtAmt(r.total)}</b></div>
+      <div class="reportPdfStatTile"><small>Rows</small><b>${r.rowCount}</b></div>
+    </div>
+    ${r.labelColLabel?`<div class="reportPdfSectionTitle">Top 10 (${esc(r.labelColLabel)}-wise)</div>${rowsHtml}`:''}
+    <div class="reportPdfFooter">Bliss Gems &amp; Minerals — Directors Assistant</div>
+  </div>`;
+}
+function reportPdfCanvasHasContent(canvas){
+  try{
+    const ctx=canvas.getContext('2d');
+    const w=canvas.width,h=canvas.height;
+    const sample=ctx.getImageData(0,0,w,Math.min(h,400));
+    const data=sample.data;
+    for(let i=0;i<data.length;i+=4*37){
+      if(data[i]<250||data[i+1]<250||data[i+2]<250)return true;
+    }
+    return false;
+  }catch(e){ console.error('Report PDF canvas content check failed:',e); return false; }
+}
+async function generateReportPdfBlob(r){
+  if(typeof html2canvas==='undefined'||!(window.jspdf&&window.jspdf.jsPDF)){console.warn('PDF libraries not loaded');return null;}
+  const wrap=document.createElement('div');
+  wrap.style.cssText='position:absolute;left:-1500px;top:0;z-index:-1';
+  wrap.innerHTML=buildReportPdfHtml(r);
+  document.body.appendChild(wrap);
+  try{
+    await new Promise(res=>requestAnimationFrame(()=>requestAnimationFrame(res)));
+    if(wrap.getBoundingClientRect().height<10){
+      console.error('Report PDF export has no height - aborting instead of sending a blank PDF');
+      return null;
+    }
+    const canvas=await html2canvas(wrap,{scale:2,backgroundColor:'#ffffff',windowWidth:420,scrollX:0,scrollY:0});
+    if(!reportPdfCanvasHasContent(canvas)){
+      console.error('Report PDF canvas has no visible content - aborting instead of sending a blank PDF');
+      return null;
+    }
+    const imgData=canvas.toDataURL('image/jpeg',0.92);
+    const {jsPDF}=window.jspdf;
+    const margin=10;
+    const imgW=150;
+    const imgH=canvas.height*(imgW/canvas.width);
+    const pdf=new jsPDF({unit:'mm',format:[imgW+margin*2,imgH+margin*2]});
+    pdf.addImage(imgData,'JPEG',margin,margin,imgW,imgH);
+    return pdf;
+  }catch(e){ console.error('Report PDF generation failed:',e); return null; }
+  finally{ wrap.remove(); }
+}
+async function downloadReportPdf(){
+  const key=_viewingReportKey;
+  const imports=JSON.parse(localStorage.getItem(BUSY_IMPORTS_KEY)||'{}');
+  const r=imports[key];
+  const msg=$('busyViewPdfMsg');
+  if(!r){msg.style.color='var(--red)';msg.textContent='Report nahi mila.';return}
+  const btn=$('busyViewPdfBtn');if(btn)btn.disabled=true;
+  msg.style.color='var(--muted)';msg.textContent='PDF bana raha hoon...';
+  try{
+    const pdf=await generateReportPdfBlob(r);
+    if(!pdf){msg.style.color='var(--red)';msg.textContent='PDF nahi ban paya, dobara try karein.';return}
+    pdf.save(`${r.name.replace(/[\\/:*?"<>|]/g,'').trim()}.pdf`);
+    msg.style.color='var(--g)';msg.textContent='PDF download ho gayi.';
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
 function removeBusyReport(key){
   if(!confirm('Ye Busy report hata dein?'))return;
   const imports=JSON.parse(localStorage.getItem(BUSY_IMPORTS_KEY)||'{}');
