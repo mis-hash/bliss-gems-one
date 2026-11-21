@@ -710,6 +710,19 @@ function speakReply(text){
 // unconditionally made every such real export fail to parse at all (returned null -> "Data
 // nahi mila", which looks exactly like "upload is not working"). Scan the first several rows
 // for one that works as a real header instead of assuming it's always the first row.
+// Indian accounting software (Busy, Tally) commonly exports amounts as TEXT cells with
+// Indian-style thousands separators and a currency symbol (e.g. "1,50,000.00" or
+// "₹1,50,000") rather than a raw numeric cell - plain parseFloat() stops at the first
+// comma, so parseFloat("1,50,000") silently returns 1 instead of 150000. This single bug
+// could make every total/breakdown computed from such an export wildly wrong without any
+// visible error. Strips currency symbols/separators/whitespace before parsing.
+function parseAmount(v){
+  if(v===undefined||v===null||v==='')return NaN;
+  if(typeof v==='number')return v;
+  const cleaned=String(v).replace(/[₹$,\s]/g,'');
+  if(cleaned==='')return NaN;
+  return parseFloat(cleaned);
+}
 function analyzeRows(rows){
   if(!rows||rows.length<2)return null;
   const maxHeaderScan=Math.min(10,rows.length-2);
@@ -727,7 +740,7 @@ function analyzeFromHeaderRow(rows,headerIdx){
   let amountCol=headerLc.findIndex(h=>h.includes('amount')||h.includes('total')||h.includes('value')||h.includes('amt')||h.includes('balance'));
   if(amountCol===-1){
     for(let c=header.length-1;c>=0;c--){
-      if(dataRows.every(r=>r[c]!==undefined&&r[c]!==''&&!isNaN(parseFloat(r[c])))){amountCol=c;break;}
+      if(dataRows.every(r=>r[c]!==undefined&&r[c]!==''&&!isNaN(parseAmount(r[c])))){amountCol=c;break;}
     }
   }
   if(amountCol===-1)return null;
@@ -736,13 +749,13 @@ function analyzeFromHeaderRow(rows,headerIdx){
   let labelCol=-1;
   for(let c=0;c<header.length;c++){
     if(c===amountCol)continue;
-    const nonNumericCount=dataRows.filter(r=>r[c]!==undefined&&r[c]!==''&&isNaN(parseFloat(r[c]))).length;
+    const nonNumericCount=dataRows.filter(r=>r[c]!==undefined&&r[c]!==''&&isNaN(parseAmount(r[c]))).length;
     if(nonNumericCount>=dataRows.length*0.7){labelCol=c;break;}
   }
   let total=0,rowCount=0;
   const byLabel={};
   dataRows.forEach(r=>{
-    const v=parseFloat(r[amountCol]);
+    const v=parseAmount(r[amountCol]);
     if(isNaN(v))return;
     total+=v;rowCount++;
     if(labelCol!==-1){
@@ -755,11 +768,20 @@ function analyzeFromHeaderRow(rows,headerIdx){
     :[];
   return {total,rowCount,amountColLabel:header[amountCol],labelColLabel:labelCol!==-1?header[labelCol]:null,topRows};
 }
+// Some real exports (especially Google Sheets/Excel Online workbooks) have multiple
+// sheets/tabs - e.g. a "Summary" sheet first, with the real data on a later tab. Reading
+// only wb.SheetNames[0] silently analyzed the wrong (or an empty) sheet. Tries each sheet
+// in the workbook in order, same "scan until something works" approach as the header-row
+// detection above, instead of assuming the first sheet always has the real data.
 function parseBusySheet(arrayBuffer){
   const wb=XLSX.read(new Uint8Array(arrayBuffer),{type:'array'});
-  const sheet=wb.Sheets[wb.SheetNames[0]];
-  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:''});
-  return analyzeRows(rows);
+  for(const sheetName of wb.SheetNames){
+    const sheet=wb.Sheets[sheetName];
+    const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:''});
+    const result=analyzeRows(rows);
+    if(result)return result;
+  }
+  return null;
 }
 function reportSourceLabel(r){ return (r&&r.sourceType==='sheet')?'Live Sheet':'Busy Export'; }
 /* ===== Live Sheet connect (any public CSV/XLSX/XLS link - Google Sheets "Publish to web",
