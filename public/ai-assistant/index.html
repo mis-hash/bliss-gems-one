@@ -510,13 +510,51 @@ let lastMoneyMetric=null; // 'balance'|'expense'|'advance'
 // null (not a fallback message) when no money-word matched either (unless isFollowup, which
 // reuses the last metric asked in this session), so a name mentioned for an unrelated reason
 // (e.g. "Vijay kaun hai") isn't wrongly hijacked into this intent.
+// Category-wise expense breakdown ("Chunnu ne kis cheez par expense kiya", "kin cheezon par
+// kharcha kiya") grouped by the SAME `category` field Trip Expense app stores on each expense
+// ledger entry (Hotel/Taxi/Food/etc, its own 24-category list) - a different question from
+// "how much did they spend" (a single total), so it's answered separately, not folded into
+// the plain expense-total reply below.
+async function answerPersonExpenseCategoryBreakdown(myTrips,name){
+  const ledger=await new Promise(res=>liveTeLedger(res));
+  const entries=ledger.filter(l=>myTrips.some(t=>t.id===l.tripId)&&l.type==='expense');
+  if(!entries.length)return {text:`${name} ke current trip mein abhi tak koi expense entry nahi hai.`,sources:['Bliss One — Trip Expense App']};
+  const byCategory={};
+  entries.forEach(l=>{
+    const cat=l.category||'Other';
+    byCategory[cat]=(byCategory[cat]||0)+Number(l.amount||0);
+  });
+  const ranked=Object.keys(byCategory).map(cat=>({cat,amount:byCategory[cat]})).sort((a,b)=>b.amount-a.amount);
+  const total=ranked.reduce((s,r)=>s+r.amount,0);
+  const lines=ranked.map((r,i)=>`${i+1}. ${r.cat}: ${fmtAmt(r.amount)}`);
+  return {text:`${name} ka current trip expense category-wise (total ${fmtAmt(total)}):\n`+lines.join('\n'),sources:['Bliss One — Trip Expense App']};
+}
 async function answerPersonTripQuery(q,trips,name,isFollowup){
   const myTrips=trips.filter(t=>t.salesName===name && t.status!=='closed');
   if(!myTrips.length)return {text:`${name} ka abhi koi active trip nahi hai.`,sources:['Bliss One — Trip Expense App']};
   const qWords=q.split(/\s+/).filter(Boolean);
   const matches=words=>words.some(k=>q.includes(k))||qWords.some(w=>words.some(k=>fuzzyWordMatch(w,k)));
+  // Checked before the plain balance/expense/advance totals below - a distinct question
+  // ("what was it spent ON", not "how much") even though it usually also contains a money
+  // word like "expense"/"kharcha" which would otherwise just return the flat total. Matched
+  // word-by-word (with the same fuzzy tolerance as everywhere else), not a brittle literal
+  // phrase regex - a real reported case ("ksi chiz par expen kiya") had BOTH "kisi"->"ksi"
+  // (fuzzy, distance 1) AND "cheez" typed as the equally-valid alternate spelling "chiz"
+  // (distance 2 from "cheez", so listed as its own explicit word, not relied on fuzzy
+  // tolerance to bridge). "category wise"/"kahan kharch" cover the other common phrasings.
+  const wantsCategoryBreakdown=
+    (matches(['kis','kisi','konsi','kaunsi','kin'])&&matches(['cheez','cheej','chiz','item']))
+    ||matches(['category'])
+    ||(q.includes('kahan')&&matches(['kharch','kharcha']));
+  if(wantsCategoryBreakdown){
+    return answerPersonExpenseCategoryBreakdown(myTrips,name);
+  }
   let wantsBalance=matches(['balance','baaki','bakaya','due']);
-  let wantsExpense=matches(['expense','kharch','kharcha','spend','spent']);
+  // "expen" (a common truncation/typo of "expense" that's a real reported case - distance 2
+  // from "expense", outside this app's distance-1 fuzzy tolerance) is listed explicitly
+  // rather than loosening the shared fuzzy tolerance, which would reopen the earlier
+  // "open"~"spend" false-positive collision this app already fixed once.
+  let wantsExpense=matches(['expense','expen','kharch','kharcha','spend','spent']);
   // "issue"/"issued"/"amount"/"amt" all cover the real way people actually ask this (e.g.
   // "Chunnu ko kitna amount issue hua", typo'd "isuue"/"issu") - not just the literal word
   // "advance". "issu" (not a real word) is included deliberately since "isuu"-style typos
