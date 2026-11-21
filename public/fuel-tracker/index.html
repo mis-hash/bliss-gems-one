@@ -480,7 +480,10 @@ tbody tr:hover td{background:#f7faf8}
 <div class="modal" id="manageModal"><div class="box" style="width:min(640px,100%)">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Admin / Manage Records</h3><button class="btn small" onclick="closeManage()">✕</button></div>
 <div class="tabs" style="margin:0 0 10px">
-<button class="tab on" data-tab="records" onclick="mtab(this,'records')">🗑 Manage Records</button>
+<button class="tab on" data-tab="records" onclick="mtab(this,'records')">⛽ Fuel</button>
+<button class="tab" data-tab="service" onclick="mtab(this,'service')">🔧 Service</button>
+<button class="tab" data-tab="documents" onclick="mtab(this,'documents')">📄 Documents</button>
+<button class="tab" data-tab="vehicles" onclick="mtab(this,'vehicles')">🚗 Vehicles</button>
 </div>
 <div id="manageContent"></div>
 </div></div>
@@ -1935,7 +1938,80 @@ function renderManage(){
     </div>
     <div id="mRecordsList"></div>`;
     renderRecordsManageTab();
+  }else if(currentTab==='service'){
+    c.innerHTML=`<p class="note">Entry ko <b>Disable</b> karne par wo History se hat jaati hai (Restore ho sakta hai). <b>Permanently Delete</b> karne par entry Firestore se hamesha ke liye hat jaati hai — wapas NAHI aayegi.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
+      <input id="mServiceSearch" placeholder="Search Vehicle / Type" oninput="renderServiceManageTab()" style="flex:1;min-width:160px">
+      <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="mServiceShowDisabled" onchange="renderServiceManageTab()" style="width:auto"> Show Disabled</label>
+    </div>
+    <div id="mServiceList"></div>`;
+    renderServiceManageTab();
+  }else if(currentTab==='documents'){
+    c.innerHTML=`<p class="note">Har vehicle ke current document record (Insurance/PUC/Permit/RC/License/Parking) ko yahan se permanently clear kar sakte hain — cost, expiry, photo aur history sab hat jaayega.</p>
+    <div id="mDocumentsList"></div>`;
+    renderDocumentsManageTab();
+  }else if(currentTab==='vehicles'){
+    c.innerHTML=`<p class="note">Vehicle ko list se permanently hata dein. Iske purane fuel/service/document records delete NAHI honge (wo apni apni tabs se alag delete karein).</p>
+    <div id="mVehiclesList"></div>`;
+    renderVehiclesManageTab();
   }
+}
+function renderServiceManageTab(){
+  const list=$('mServiceList');
+  if(!list)return;
+  if(!superAdminUnlocked){list.innerHTML='<div class="note">Sirf Super Admin yeh dekh sakta hai.</div>';return}
+  const q=($('mServiceSearch')?.value||'').toLowerCase();
+  const showDisabled=$('mServiceShowDisabled')?.checked;
+  let a=serviceLog.slice();
+  if(!showDisabled)a=a.filter(x=>!x.deletedAt);
+  a=a.filter(x=>`${x.vehicle||''} ${x.type||''} ${x.date||''}`.toLowerCase().includes(q));
+  a.sort((x,y)=>String(y.date).localeCompare(String(x.date)));
+  list.innerHTML=a.length?a.map(x=>{
+    const toggleBtn=x.deletedAt
+      ?`<button class="btn small" onclick="(async()=>{await restoreServiceEntry('${esc(x.id)}');renderServiceManageTab()})()">↩ Restore</button>`
+      :`<button class="btn small" onclick="(async()=>{await deleteServiceEntry('${esc(x.id)}',true);renderServiceManageTab()})()">Disable</button>`;
+    const permBtn=`<button class="btn small danger" onclick="(async()=>{await permanentlyDeleteServiceEntry('${esc(x.id)}');renderServiceManageTab()})()">🗑 Delete Permanently</button>`;
+    return `<div class="item"><span><b>${esc(x.vehicle)}</b> <small>${esc(x.type||'-')} • ${fmtAmt(x.amount)} • ${esc(x.date)}</small>${x.deletedAt?' <small style="color:#9b1c1c">(DISABLED)</small>':''}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${toggleBtn} ${permBtn}</span></div>`;
+  }).join(''):'<div class="note">Koi record nahi mila.</div>';
+}
+// Each vehicle's document record (Insurance/PUC/etc) is a nested field on fv_settings/masters,
+// not its own Firestore doc with an id, unlike fuel/service entries - so this clears it the same
+// way deleteVehicle() clears a vehicle (editing masters in place + saveMasters()), rather than
+// reusing the per-entry delete pattern above which assumes a standalone collection doc.
+function deleteVehicleDocRecord(vehicle,docKey){
+  if(!superAdminUnlocked)return;
+  const dt=DOC_TYPES.find(d=>d.key===docKey);
+  if(!confirm(`${vehicle} ka ${dt?dt.label:docKey} record hamesha ke liye clear karna hai? (cost, expiry, photo, history sab hatega)`))return;
+  if(masters.vehicleDocs&&masters.vehicleDocs[vehicle])delete masters.vehicleDocs[vehicle][docKey];
+  saveMasters();
+  renderAll();
+}
+function renderDocumentsManageTab(){
+  const list=$('mDocumentsList');
+  if(!list)return;
+  if(!superAdminUnlocked){list.innerHTML='<div class="note">Sirf Super Admin yeh dekh sakta hai.</div>';return}
+  const rows=[];
+  (masters.vehicles||[]).forEach(v=>{
+    const vd=(masters.vehicleDocs&&masters.vehicleDocs[v])||{};
+    DOC_TYPES.forEach(dt=>{
+      const rec=vd[dt.key];
+      if(rec&&(rec.expiryDate||rec.cost))rows.push({v,dt,rec});
+    });
+  });
+  list.innerHTML=rows.length?rows.map(({v,dt,rec})=>{
+    const vSafe=esc(v).replace(/'/g,"\\'");
+    return `<div class="item"><span><b>${esc(v)}</b> <small>${dt.icon} ${esc(dt.label)} • ${rec.cost?fmtAmt(rec.cost):'-'} • Expiry: ${esc(rec.expiryDate||'-')}</small></span><button class="btn small danger" onclick="deleteVehicleDocRecord('${vSafe}','${dt.key}')">🗑 Delete</button></div>`;
+  }).join(''):'<div class="note">Koi document record nahi mila.</div>';
+}
+function renderVehiclesManageTab(){
+  const list=$('mVehiclesList');
+  if(!list)return;
+  if(!superAdminUnlocked){list.innerHTML='<div class="note">Sirf Super Admin yeh dekh sakta hai.</div>';return}
+  const vehicles=masters.vehicles||[];
+  list.innerHTML=vehicles.length?vehicles.map(v=>{
+    const vSafe=esc(v).replace(/'/g,"\\'");
+    return `<div class="item"><span><b>${esc(v)}</b></span><button class="btn small danger" onclick="deleteVehicle('${vSafe}')">🗑 Delete Vehicle</button></div>`;
+  }).join(''):'<div class="note">Koi vehicle nahi hai.</div>';
 }
 function renderRecordsManageTab(){
   const list=$('mRecordsList');
@@ -2018,7 +2094,12 @@ function renderAll(){
   renderMonthlyTrend();
   renderServiceHistory();
   renderHistory();
-  if(currentTab==='records'&&$('manageModal')&&$('manageModal').classList.contains('show'))renderRecordsManageTab();
+  if($('manageModal')&&$('manageModal').classList.contains('show')){
+    if(currentTab==='records')renderRecordsManageTab();
+    else if(currentTab==='service')renderServiceManageTab();
+    else if(currentTab==='documents')renderDocumentsManageTab();
+    else if(currentTab==='vehicles')renderVehiclesManageTab();
+  }
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
