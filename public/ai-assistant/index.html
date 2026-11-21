@@ -473,7 +473,11 @@ async function answerPersonTripQuery(q,trips,name,isFollowup){
   const matches=words=>words.some(k=>q.includes(k))||qWords.some(w=>words.some(k=>fuzzyWordMatch(w,k)));
   let wantsBalance=matches(['balance','baaki','bakaya','due']);
   let wantsExpense=matches(['expense','kharch','kharcha','spend','spent']);
-  let wantsAdvance=matches(['advance']);
+  // "issue"/"issued"/"amount"/"amt" all cover the real way people actually ask this (e.g.
+  // "Chunnu ko kitna amount issue hua", typo'd "isuue"/"issu") - not just the literal word
+  // "advance". "issu" (not a real word) is included deliberately since "isuu"-style typos
+  // land exactly on it at edit-distance 1, while missing "issue" itself at distance 2.
+  let wantsAdvance=matches(['advance','issue','issued','issu','amount','amt']);
   if(!wantsBalance&&!wantsExpense&&!wantsAdvance){
     if(isFollowup&&lastMoneyMetric){
       if(lastMoneyMetric==='balance')wantsBalance=true;
