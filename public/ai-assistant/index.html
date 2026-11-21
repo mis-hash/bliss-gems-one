@@ -213,7 +213,7 @@ header::before{content:'';display:block;height:3px;flex-shrink:0;background:line
 <div class="modal" id="googleSheetModal"><div class="box" style="width:min(480px,100%)">
 <h3>Live Sheet Connect Karein</h3>
 <p class="note">Koi bhi public CSV/XLSX/XLS link se live connect kar sakte hain - koi API key ya coding nahi chahiye. Jo bhi tool ho (Google Sheets, Excel Online, ya koi aur jiska data export/download-link public ho), agar usse ek public link mil jaye to wahi yahan paste kar dein:<br>
-<b>Google Sheets:</b> File → Share → Publish to web → format "Comma-separated values (.csv)" → Publish → jo link mile wahi copy karein.<br>
+<b>Google Sheets:</b> Share button se link lein, sharing "Anyone with the link can view" set karein, aur wahi normal link yahan paste kar dein (Publish to web karna zaroori nahi, link apne aap sahi format mein convert ho jayega).<br>
 <b>Excel Online (OneDrive):</b> File → Share → "Anyone with the link can view" → us link ka direct download/export link lein.<br>
 <b>Koi aur tool</b> (jaise Tally, ya koi CRM/automation tool): agar uska koi report "Publish"/"Public share link"/"Export URL" deta ho, wahi try karein - fetch/parse automatically ho jayega. Agar tool sirf login ke piche file deta hai (koi public link nahi), to wo "Live" connect nahi ho sakta - uska export file "File Upload" se daalna hoga.<br>
 Jo bhi link mile, wahi yahan paste kar dein - data update hone par "🔄" button se naya data mil jayega.</p>
@@ -775,13 +775,44 @@ function reportSourceLabel(r){ return (r&&r.sourceType==='sheet')?'Live Sheet':'
    the ArrayBuffer/Uint8Array Busy-import bug that only a real browser caught. A source that
    requires login (no public "anyone with link" access) will never work this way - that needs
    a real API/OAuth integration, a different and much bigger undertaking. */
-function fetchAndSaveLiveSheet(name,url){
+// The most common real-world mistake here: a non-technical user pastes the REGULAR Google
+// Sheets share link (docs.google.com/spreadsheets/d/<ID>/edit...) instead of doing the
+// separate, non-obvious "File -> Share -> Publish to web -> CSV" flow this modal's own
+// instructions ask for - fetch()ing that regular link anonymously returns Google's HTML
+// login/viewer page (not CSV/XLSX bytes), which fails to parse and surfaces as "connect
+// failed". Auto-converts both link shapes to a working direct CSV export URL instead of
+// requiring the user to get the exact link format right every time.
+function normalizeSheetUrl(url){
+  try{
+    const u=new URL(url);
+    if(u.hostname!=='docs.google.com')return url;
+    // Already a "Publish to web" link (/spreadsheets/d/e/<key>/pub...) - just make sure the
+    // output format is csv (a pasted link might say output=html or have no output param).
+    if(/\/spreadsheets\/d\/e\/[^/]+\/pub/.test(u.pathname)){
+      u.searchParams.set('output','csv');
+      return u.toString();
+    }
+    // A normal share/edit link (/spreadsheets/d/<ID>/edit...) - convert to the direct CSV
+    // export endpoint, which works for any sheet shared as "Anyone with the link can view"
+    // without the user ever needing to find the separate "Publish to web" menu option.
+    const idMatch=u.pathname.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    if(idMatch){
+      const gid=u.searchParams.get('gid')||(u.hash.match(/gid=(\d+)/)||[])[1]||'0';
+      return `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv&gid=${gid}`;
+    }
+    return url;
+  }catch(e){
+    return url;
+  }
+}
+function fetchAndSaveLiveSheet(name,rawUrl){
+  const url=normalizeSheetUrl(rawUrl);
   return fetch(url).then(res=>{
     if(!res.ok)throw new Error('HTTP '+res.status);
     return res.arrayBuffer();
   }).catch(err=>{
     console.error('live sheet fetch failed:',err);
-    throw {_fetchMsg:'Data nahi mil paya: '+(err.message||err)+'. Link check karein - file/sheet "Anyone with the link" public honi chahiye.'};
+    throw {_fetchMsg:'Data nahi mil paya: '+(err.message||err)+'. Google Sheet ka sharing "Anyone with the link can view" par set karein (File → Share), aur link check karein.'};
   }).then(buf=>{
     let parsed;
     try{ parsed=parseBusySheet(buf); }
