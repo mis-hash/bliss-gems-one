@@ -475,6 +475,29 @@ function computeTripMoney(ledger,tripId){
   const expense=entries.filter(l=>['expense','transfer_out'].includes(l.type)).reduce((s,l)=>s+Number(l.amount||0),0);
   return {issued,expense,balance:issued-expense};
 }
+// Ranks every Sales person (by their CURRENT/open trips only, same scoping as the rest of
+// this app) by a given money metric ('issued'/'expense'/'balance') - powers "sabse zyada/kam
+// kisne X kiya" comparison questions, a step beyond answering about one named person.
+function rankSalesPersonsByMetric(trips,ledger,metric){
+  const names=[...new Set(trips.filter(t=>t.status!=='closed').map(t=>t.salesName).filter(Boolean))];
+  const rows=names.map(name=>{
+    const myTrips=trips.filter(t=>t.salesName===name&&t.status!=='closed');
+    const total=myTrips.reduce((s,t)=>s+computeTripMoney(ledger,t.id)[metric],0);
+    return {name,total};
+  });
+  return rows.sort((a,b)=>b.total-a.total);
+}
+async function answerSalesPersonExtreme(trips,direction,metric){
+  const ledger=await new Promise(res=>liveTeLedger(res));
+  const ranked=rankSalesPersonsByMetric(trips,ledger,metric);
+  if(!ranked.length)return {text:'Abhi koi Sales person ka current trip open nahi hai.',sources:['Bliss One — Trip Expense App']};
+  const sorted=direction==='min'?[...ranked].reverse():ranked;
+  const top=sorted[0];
+  const metricLabel=metric==='balance'?'balance':metric==='issued'?'advance (issued)':'expense';
+  const label=direction==='min'?'Sabse kam':'Sabse zyada';
+  const lines=sorted.slice(0,5).map((r,i)=>`${i+1}. ${r.name}: ${fmtAmt(r.total)}`);
+  return {text:`${label} ${metricLabel} (current trips mein): ${top.name} — ${fmtAmt(top.total)}\n\nTop ${Math.min(5,sorted.length)}:\n`+lines.join('\n'),sources:['Bliss One — Trip Expense App']};
+}
 // Same-session (in-memory only, resets on page reload - no server-side state) conversation
 // memory, so a follow-up like "Current trip ka puch raha hu only" right after "Mukund ne
 // kitna spend kiya" can resolve back to Mukund/expense without the name being repeated.
@@ -550,6 +573,28 @@ async function answerQuestion(text){
      &&!otherDomainWords.some(k=>q.includes(k))){
     const personAns=await answerPersonTripQuery(q,trips,lastMentionedSalesPerson,true);
     if(personAns)return personAns;
+  }
+  // Cross-Sales-person comparison ("sabse zyada/kam kisne X kiya hai") - only when no
+  // specific person was already named above. Guarded against colliding with a named Busy/
+  // Live Sheet report's own "top"/"sabse zyada" breakdown (e.g. "Purchase Register mein
+  // sabse zyada kiska amount hai") by checking the uploaded report names FIRST and bailing
+  // out of this intent entirely if one matches - that question still falls through to the
+  // normal Busy routing below.
+  if(!personName){
+    const isMax=/\b(sabse zyada|sabse jyada|sabse jayada|highest|zyada se zyada)\b/.test(q);
+    const isMin=/\b(sabse kam|lowest|kam se kam)\b/.test(q);
+    if((isMax||isMin)&&!otherDomainWords.some(k=>q.includes(k))){
+      const imports=await new Promise(res=>liveBusyImports(res));
+      if(!matchBusyReportFromQuestion(imports,q)){
+        const qWordsForMetric=q.split(/\s+/).filter(Boolean);
+        const matchesMetric=words=>words.some(k=>q.includes(k))||qWordsForMetric.some(w=>words.some(k=>fuzzyWordMatch(w,k)));
+        let metric=null;
+        if(matchesMetric(['balance','baaki','bakaya','due']))metric='balance';
+        else if(matchesMetric(['expense','kharch','kharcha','spend','spent']))metric='expense';
+        else if(matchesMetric(['advance','issue','issued','issu','amount','amt']))metric='issued';
+        if(metric)return answerSalesPersonExtreme(trips,isMax?'max':'min',metric);
+      }
+    }
   }
   if(q.includes('trip')) return answerOpenTrips();
   if(q.includes('stock')||q.includes('stationery')) return answerLowStock();
