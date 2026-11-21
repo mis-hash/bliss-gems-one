@@ -377,6 +377,41 @@ function matchBusyReportFromQuestion(imports,q){
   }
   return null;
 }
+// A looser fuzzy tolerance (distance<=2, not the app-wide distance<=1) used ONLY for matching
+// a report's own party/item names from its top-10 breakdown - never for this app's command/
+// keyword vocabulary, where the tighter distance-1 tolerance stays (needed to avoid collisions
+// like the earlier "open"~"spend" false positive). A real party name pulled from the user's
+// OWN uploaded data is a much lower collision risk than arbitrary free-text command words, and
+// this is the only tolerance wide enough to catch a real reported typo like "Jaeels" for
+// "Jewels" (edit-distance 2). Words of 3 chars or fewer are excluded from the distance-2
+// allowance (too short to safely widen without risking an unrelated short word matching).
+function fuzzyLabelWordMatch(w,k){
+  if(w===k)return true;
+  if(w.length<=3||k.length<=3)return false;
+  if(Math.abs(w.length-k.length)>2)return false;
+  return levenshtein(w,k)<=2;
+}
+// Finds a specific row (party/item) named in the question from any uploaded report's top-10
+// breakdown (e.g. "Hitesh Jaeels ki sale" matching "Hitesh Jewels" in a report) - checked
+// BEFORE the generic busy/report routing so a party-specific question answers about that one
+// party, not the whole report's total. Only the top-10 rows are ever stored per report (see
+// the comment above BUSY_IMPORTS_KEY), so a party outside that top-10 can't be found this way.
+function matchTopRowFromQuestion(imports,q){
+  const qWords=q.split(/\s+/).filter(Boolean);
+  let best=null;
+  for(const key in imports){
+    const report=imports[key];
+    if(!report.topRows)continue;
+    for(const row of report.topRows){
+      if(!row.label)continue;
+      const labelWords=row.label.toLowerCase().split(/\s+/).filter(Boolean);
+      if(labelWords.length&&labelWords.every(lw=>qWords.some(w=>fuzzyLabelWordMatch(w,lw)))){
+        if(!best||labelWords.length>best.labelWords.length)best={report,row,labelWords};
+      }
+    }
+  }
+  return best?{report:best.report,row:best.row}:null;
+}
 function busyReportSummaryText(r,wantTop){
   let text=`${r.name} ka total: ${fmtAmt(r.total)}\n(${r.rowCount} rows • upload: ${new Date(r.uploadedAt).toLocaleString('en-IN')})`;
   if(wantTop&&r.topRows&&r.topRows.length){
@@ -634,11 +669,19 @@ async function answerQuestion(text){
       }
     }
   }
+  // A specific party/item named from an uploaded report's own top-10 breakdown (e.g. "Hitesh
+  // Jaeels ki sale") is checked before the generic busy/report routing below, so it answers
+  // about that one party instead of dumping the whole report's total.
+  const importsForRowMatch=await new Promise(res=>liveBusyImports(res));
+  const rowMatch=matchTopRowFromQuestion(importsForRowMatch,q);
+  if(rowMatch)return {text:`${rowMatch.row.label} ka total (${rowMatch.report.name}): ${fmtAmt(rowMatch.row.amount)}`,sources:[reportSourceLabel(rowMatch.report)+' — '+rowMatch.report.name]};
   if(q.includes('trip')) return answerOpenTrips();
   if(q.includes('stock')||q.includes('stationery')) return answerLowStock();
   if(q.includes('petty')||q.includes('cash balance')||q.includes('balance')) return answerPettyCashBalance();
   if(q.includes('petrol')||q.includes('fuel')||q.includes('diesel')) return answerTodayFuelExpense();
-  if(q.includes('busy')||q.includes('report')) return answerBusyReports(text);
+  // "sale"/"sales" alongside "busy"/"report" - a generic "Total sale bato" with no report name
+  // and no "report"/"busy" word at all is a real reported phrasing, not just the literal words.
+  if(q.includes('busy')||q.includes('report')||q.includes('sale')) return answerBusyReports(text);
   // No other keyword matched - last resort, check if any uploaded Busy report's own NAME
   // appears in the question (e.g. "Sales Register ka total kya hai" with no "busy"/"report"
   // word at all) before giving up.
@@ -651,7 +694,7 @@ async function answerQuestion(text){
     {words:['stock','stationery'],fn:answerLowStock},
     {words:['petty','balance'],fn:answerPettyCashBalance},
     {words:['petrol','fuel','diesel'],fn:answerTodayFuelExpense},
-    {words:['busy','report'],fn:()=>answerBusyReports(text)},
+    {words:['busy','report','sale','sales'],fn:()=>answerBusyReports(text)},
   ];
   const qWords=q.split(/\s+/).filter(Boolean);
   for(const intent of fuzzyIntents){
