@@ -679,10 +679,18 @@ function toggleTts(){
 }
 function speakReply(text){
   if(!ttsEnabled||!hasSpeechSynthesis()||!text)return;
-  window.speechSynthesis.cancel();
-  const utter=new SpeechSynthesisUtterance(text);
-  utter.lang='en-IN';
-  window.speechSynthesis.speak(utter);
+  // Voice output is a cosmetic add-on to the real (already-displayed) text answer, never
+  // allowed to affect it - any speechSynthesis failure here (unsupported voice/lang, a
+  // browser quirk, etc.) must fail silently, not throw into the caller (updateMsg(), called
+  // from sendChat()'s response handling) and risk replacing a correct answer with an error.
+  try{
+    window.speechSynthesis.cancel();
+    const utter=new SpeechSynthesisUtterance(text);
+    utter.lang='en-IN';
+    window.speechSynthesis.speak(utter);
+  }catch(e){
+    console.error('speakReply failed (ignored, text answer is unaffected):',e);
+  }
 }
 
 /* ===== Busy report upload (xlsx/xls/csv, multiple named reports) =====
