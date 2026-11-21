@@ -105,20 +105,15 @@ header::before{content:'';display:block;height:3px;flex-shrink:0;background:line
 .emptyMsgs{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted);gap:12px;padding:40px 20px}
 .emptyMsgs{font-size:38px}
 .emptyMsgs div{font-size:13.5px}
-/* Mobile tab switcher - on narrow screens .shell stacks the sidebar above the chat panel,
-   so "Ask a question" ends up buried below a long Connected Sources list. Below this
-   breakpoint, show one panel at a time with a tab switcher instead; on wider screens the
-   tabs are hidden and both panels show side by side as before. The breakpoint is wider than
-   a phone alone (820px) - this app is often opened inside the Bliss One hub's iframe or a
-   snapped/half desktop window, both of which can land in the 820-1024px range and need the
-   same single-panel treatment, not a cramped/cut-off side-by-side squeeze. */
-.mobileTabs{display:none}
-@media (max-width:1024px){
-  .mobileTabs{display:flex;gap:8px;width:100%;margin-bottom:2px}
-  .mobileTabs button{flex:1;padding:11px;border-radius:12px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted);cursor:pointer;transition:background .12s ease,color .12s ease,border-color .12s ease}
-  .mobileTabs button.active{background:var(--g);color:#fff;border-color:var(--g);box-shadow:0 2px 8px rgba(38,143,118,.25)}
-  .sidebar.mobileHide,.chatPanel.mobileHide{display:none}
-}
+/* Sources/Ask tab switcher - shown one panel at a time at EVERY screen width (not just
+   narrow screens - user explicitly asked for this after comparing both, preferring the
+   focused single-panel view even on a full-width desktop window over the old side-by-side
+   layout). "mobileTabs"/"mobileHide" class names kept as-is (no longer mobile-only) to avoid
+   an unnecessary rename churn across the HTML/CSS/JS that reference them. */
+.mobileTabs{display:flex;gap:8px;width:100%;margin-bottom:2px}
+.mobileTabs button{flex:1;padding:11px;border-radius:12px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted);cursor:pointer;transition:background .12s ease,color .12s ease,border-color .12s ease}
+.mobileTabs button.active{background:var(--g);color:#fff;border-color:var(--g);box-shadow:0 2px 8px rgba(38,143,118,.25)}
+.sidebar.mobileHide,.chatPanel.mobileHide{display:none}
 /* Report export PDF - built as a standalone off-screen HTML string (not a clone of any
    on-screen panel, since the View modal's content isn't styled for print/export) rendered via
    html2canvas+jsPDF, same pattern as the other Bliss apps' PDFs. */
