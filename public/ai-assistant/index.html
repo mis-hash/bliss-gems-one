@@ -593,7 +593,7 @@ function setMicListening(on){
 function toggleVoiceInput(){
   const SR=getSpeechRecognitionCtor();
   if(!SR)return;
-  if(voiceListening){ if(voiceRecognition)voiceRecognition.stop(); return; }
+  if(voiceListening){ if(voiceRecognition){ try{ voiceRecognition.stop(); }catch(e){ setMicListening(false); } } return; }
   const input=$('chatInput');
   voiceRecognition=new SR();
   voiceRecognition.lang='en-IN';
@@ -675,7 +675,7 @@ function toggleTts(){
   ttsEnabled=!ttsEnabled;
   localStorage.setItem('ai_tts_enabled',String(ttsEnabled));
   refreshTtsBtn();
-  if(!ttsEnabled&&hasSpeechSynthesis())window.speechSynthesis.cancel();
+  if(!ttsEnabled&&hasSpeechSynthesis()){ try{ window.speechSynthesis.cancel(); }catch(e){} }
 }
 function speakReply(text){
   if(!ttsEnabled||!hasSpeechSynthesis()||!text)return;
