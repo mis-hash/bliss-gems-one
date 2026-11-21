@@ -437,13 +437,23 @@ function fuzzyWordMatch(w,k){
 // tries an exact full-name substring match first (longest name wins, so a more specific full
 // name doesn't get shadowed by a shorter one), then a fuzzy match on just the first name
 // (handles typos, and being referred to by first name only, e.g. "Vijay" for "Vijay Kumar").
+// Returns a full name string on an unambiguous match, null on no match, or
+// {ambiguous:true,names:[...]} when two or more different people share that first name - a
+// silent guess at the wrong person would be a worse accuracy failure than asking to clarify.
 function matchSalesPersonFromQuestion(trips,q){
   const names=[...new Set(trips.map(t=>t.salesName).filter(Boolean))].sort((a,b)=>b.length-a.length);
   for(const name of names){ if(q.includes(name.toLowerCase()))return name; }
   const qWords=q.split(/\s+/).filter(Boolean);
+  const byFirstName={};
   for(const name of names){
     const firstName=name.toLowerCase().split(/\s+/)[0];
-    if(qWords.some(w=>fuzzyWordMatch(w,firstName)))return name;
+    (byFirstName[firstName]=byFirstName[firstName]||[]).push(name);
+  }
+  for(const firstName in byFirstName){
+    if(qWords.some(w=>fuzzyWordMatch(w,firstName))){
+      const matched=byFirstName[firstName];
+      return matched.length===1?matched[0]:{ambiguous:true,names:matched};
+    }
   }
   return null;
 }
@@ -509,6 +519,9 @@ async function answerQuestion(text){
   // (e.g. "Chunnu ka balance kitna hai" must not answer with the Petty Cash balance).
   const trips=await new Promise(res=>liveTeTrips(res));
   const personName=matchSalesPersonFromQuestion(trips,q);
+  if(personName&&typeof personName==='object'&&personName.ambiguous){
+    return {text:`Isi naam ke ${personName.names.length} Sales persons hain — ${personName.names.join(', ')}. Pura naam likh kar poochein (jaise "${personName.names[0]} ka balance").`,sources:[]};
+  }
   if(personName){
     const personAns=await answerPersonTripQuery(q,trips,personName,false);
     if(personAns){ lastMentionedSalesPerson=personName; return personAns; }
