@@ -366,6 +366,15 @@ async function answerPettyCashBalance(){
 function matchBusyReportFromQuestion(imports,q){
   const names=Object.keys(imports).sort((a,b)=>imports[b].name.length-imports[a].name.length);
   for(const key of names){ if(q.includes(imports[key].name.toLowerCase()))return imports[key]; }
+  // Typo-tolerant pass: a user-typed custom report name misspelled by roughly one letter
+  // (e.g. "Sales Registr" for "Sales Register") should still resolve, same fuzzy tolerance
+  // used elsewhere in this app - but EVERY word of the report's name must match (not just
+  // one), so a short/generic word in the name can't cause an unrelated report to match.
+  const qWords=q.split(/\s+/).filter(Boolean);
+  for(const key of names){
+    const nameWords=imports[key].name.toLowerCase().split(/\s+/).filter(Boolean);
+    if(nameWords.length&&nameWords.every(nw=>qWords.some(w=>fuzzyWordMatch(w,nw))))return imports[key];
+  }
   return null;
 }
 function busyReportSummaryText(r,wantTop){
