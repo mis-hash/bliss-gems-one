@@ -704,11 +704,25 @@ function speakReply(text){
 // Shared by parseBusySheet - used for both a file upload and a fetched live-sheet link,
 // since both end up handing the same raw rows into this one place, so the amount/label-column
 // detection and top-10 breakdown logic isn't duplicated between the two input paths.
+// Real Busy/Tally-style exports almost always lead with a few title/date-range rows
+// (company name, "Sales Register  From: ... To: ...", a blank separator) before the actual
+// column header row - the table does NOT start at row 0. Treating row 0 as the header
+// unconditionally made every such real export fail to parse at all (returned null -> "Data
+// nahi mila", which looks exactly like "upload is not working"). Scan the first several rows
+// for one that works as a real header instead of assuming it's always the first row.
 function analyzeRows(rows){
   if(!rows||rows.length<2)return null;
-  const header=rows[0].map(h=>String(h||'').trim());
+  const maxHeaderScan=Math.min(10,rows.length-2);
+  for(let headerIdx=0;headerIdx<=maxHeaderScan;headerIdx++){
+    const result=analyzeFromHeaderRow(rows,headerIdx);
+    if(result)return result;
+  }
+  return null;
+}
+function analyzeFromHeaderRow(rows,headerIdx){
+  const header=rows[headerIdx].map(h=>String(h||'').trim());
   const headerLc=header.map(h=>h.toLowerCase());
-  const dataRows=rows.slice(1).filter(r=>r.some(c=>String(c??'').trim()!==''));
+  const dataRows=rows.slice(headerIdx+1).filter(r=>r.some(c=>String(c??'').trim()!==''));
   if(!dataRows.length)return null;
   let amountCol=headerLc.findIndex(h=>h.includes('amount')||h.includes('total')||h.includes('value')||h.includes('amt')||h.includes('balance'));
   if(amountCol===-1){
