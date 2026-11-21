@@ -103,6 +103,7 @@ header::before{content:'';display:block;height:3px;flex-shrink:0;background:line
 .micBtn:hover{transform:scale(1.06)}
 .micBtn.listening{background:#e03131;color:#fff;border-color:#e03131;animation:micPulse 1.1s ease-in-out infinite}
 @keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(224,49,49,.35)}50%{box-shadow:0 0 0 8px rgba(224,49,49,0)}}
+.micBtn.off{opacity:.4}
 .sendBtn{background:linear-gradient(135deg,var(--g),var(--g2));color:#fff;border:none;border-radius:999px;width:42px;height:42px;font-size:15px;cursor:pointer;flex-shrink:0;box-shadow:0 2px 8px rgba(38,143,118,.3);transition:transform .12s ease}
 .sendBtn:hover{transform:scale(1.06)}
 .sendBtn:active{transform:scale(.96)}
@@ -185,6 +186,7 @@ header::before{content:'';display:block;height:3px;flex-shrink:0;background:line
     </div>
     <div class="inputRow">
       <input type="text" id="chatInput" placeholder="Apna sawaal type karein..." onkeydown="if(event.key==='Enter')sendChat()">
+      <button type="button" class="micBtn" id="ttsBtn" onclick="toggleTts()" title="Jawab bolna band karein">🔊</button>
       <button type="button" class="micBtn" id="micBtn" onclick="toggleVoiceInput()" title="Bolkar poochein">🎤</button>
       <button type="button" class="sendBtn" onclick="sendChat()">➤</button>
     </div>
@@ -635,6 +637,30 @@ function updateMsg(id,text,sources){
     sources.forEach(s=>{const tag=document.createElement('span');tag.className='srcTag';tag.textContent=s;div.appendChild(tag);});
   }
   $('msgsWrap').scrollTop=$('msgsWrap').scrollHeight;
+  speakReply(text);
+}
+
+let ttsEnabled=(localStorage.getItem('ai_tts_enabled')||'true')==='true';
+function hasSpeechSynthesis(){ return !!(window.speechSynthesis&&window.SpeechSynthesisUtterance); }
+function refreshTtsBtn(){
+  const btn=$('ttsBtn');
+  if(!btn)return;
+  btn.textContent=ttsEnabled?'🔊':'🔇';
+  btn.classList.toggle('off',!ttsEnabled);
+  btn.title=ttsEnabled?'Jawab bolna band karein':'Jawab bolkar sunayein';
+}
+function toggleTts(){
+  ttsEnabled=!ttsEnabled;
+  localStorage.setItem('ai_tts_enabled',String(ttsEnabled));
+  refreshTtsBtn();
+  if(!ttsEnabled&&hasSpeechSynthesis())window.speechSynthesis.cancel();
+}
+function speakReply(text){
+  if(!ttsEnabled||!hasSpeechSynthesis()||!text)return;
+  window.speechSynthesis.cancel();
+  const utter=new SpeechSynthesisUtterance(text);
+  utter.lang='en-IN';
+  window.speechSynthesis.speak(utter);
 }
 
 /* ===== Busy report upload (xlsx/xls/csv, multiple named reports) =====
@@ -931,6 +957,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderAll();
   renderBusyReportsList();
   if(!getSpeechRecognitionCtor()&&$('micBtn'))$('micBtn').style.display='none';
+  if(!hasSpeechSynthesis()&&$('ttsBtn'))$('ttsBtn').style.display='none'; else refreshTtsBtn();
 });
 window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
 </script>
