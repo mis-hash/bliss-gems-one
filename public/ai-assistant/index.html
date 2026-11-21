@@ -397,9 +397,14 @@ function levenshtein(a,b){
 }
 function fuzzyWordMatch(w,k){
   if(w===k)return true;
-  if(Math.abs(w.length-k.length)>2)return false;
-  const maxDist=k.length<=4?1:2;
-  return levenshtein(w,k)<=maxDist;
+  // A distance-2 allowance (previously used for longer keywords) let unrelated short common
+  // words collide with a keyword - e.g. "open" (as in "trip abhi open hai") fuzzy-matched
+  // "spend"/"spent" at distance 2, wrongly pulling an unrelated question into the per-person
+  // expense intent. A single-edit typo (the actual real-world case, e.g. "Fuesl"->"fuel",
+  // "stationary"->"stationery") is still always distance <=1, so tightening to 1 loses no
+  // real typo-tolerance while cutting out this false-positive class.
+  if(Math.abs(w.length-k.length)>1)return false;
+  return levenshtein(w,k)<=1;
 }
 // Matches a specific Sales person mentioned in the question against known trip salesNames -
 // tries an exact full-name substring match first (longest name wins, so a more specific full
@@ -415,44 +420,58 @@ function matchSalesPersonFromQuestion(trips,q){
   }
   return null;
 }
-// Answers "<Name> expense/kharcha kitna hai" by summing that Sales person's expense ledger
-// entries across all their trips - returns null (not a fallback message) when no known
-// person's name is found in the question, so the caller can keep trying other intents.
-async function answerPersonExpense(q){
-  const trips=await new Promise(res=>liveTeTrips(res));
-  const name=matchSalesPersonFromQuestion(trips,q);
-  if(!name)return null;
-  const myTrips=trips.filter(t=>t.salesName===name);
-  const tripIds=new Set(myTrips.map(t=>t.id));
+// Per-trip money breakdown from raw ledger entries, mirroring the Trip Expense app's own
+// tripIssued/tripExpense/tripBalance logic (advance+additional_advance+transfer_in+party_cash
+// is money issued; expense+transfer_out is money spent; balance = issued-expense).
+function computeTripMoney(ledger,tripId){
+  const entries=ledger.filter(l=>l.tripId===tripId);
+  const issued=entries.filter(l=>['advance','additional_advance','transfer_in','party_cash'].includes(l.type)).reduce((s,l)=>s+Number(l.amount||0),0);
+  const expense=entries.filter(l=>['expense','transfer_out'].includes(l.type)).reduce((s,l)=>s+Number(l.amount||0),0);
+  return {issued,expense,balance:issued-expense};
+}
+// Answers a question naming a specific Sales person alongside a money-word - expense/kharcha
+// (exact or typo'd, e.g. "Vijay Expence"), balance/baaki, or advance - scoped to their CURRENT
+// (non-closed) trip(s) only, matching every other intent in this app (live/open status, not a
+// historical lifetime total a closed, already-settled trip would otherwise inflate). Returns
+// null (not a fallback message) when no money-word matched either, so a name mentioned for an
+// unrelated reason (e.g. "Vijay kaun hai") isn't wrongly hijacked into this intent.
+async function answerPersonTripQuery(q,trips,name){
+  const myTrips=trips.filter(t=>t.salesName===name && t.status!=='closed');
+  if(!myTrips.length)return {text:`${name} ka abhi koi active trip nahi hai.`,sources:['Bliss One — Trip Expense App']};
+  const qWords=q.split(/\s+/).filter(Boolean);
+  const matches=words=>words.some(k=>q.includes(k))||qWords.some(w=>words.some(k=>fuzzyWordMatch(w,k)));
+  const wantsBalance=matches(['balance','baaki','bakaya','due']);
+  const wantsExpense=matches(['expense','kharch','kharcha','spend','spent']);
+  const wantsAdvance=matches(['advance']);
+  if(!wantsBalance&&!wantsExpense&&!wantsAdvance)return null;
   const ledger=await new Promise(res=>liveTeLedger(res));
-  const myExpense=ledger.filter(l=>l.type==='expense'&&tripIds.has(l.tripId));
-  if(!myExpense.length)return {text:`${name} ka abhi tak koi expense entry record nahi hai.`,sources:['Bliss One — Trip Expense App']};
-  const total=myExpense.reduce((s,l)=>s+Number(l.amount||0),0);
-  const byTrip={};
-  myExpense.forEach(l=>{
-    const t=myTrips.find(x=>x.id===l.tripId);
-    const loc=(t&&t.location)||l.tripId;
-    byTrip[loc]=(byTrip[loc]||0)+Number(l.amount||0);
-  });
-  const lines=Object.keys(byTrip).map(loc=>`• ${loc}: ${fmtAmt(byTrip[loc])}`);
-  return {text:`${name} ka total expense: ${fmtAmt(total)}\n`+lines.join('\n'),sources:['Bliss One — Trip Expense App']};
+  const rows=myTrips.map(t=>({loc:t.location||t.id,...computeTripMoney(ledger,t.id)}));
+  const reply=(label,field)=>{
+    const total=rows.reduce((s,r)=>s+r[field],0);
+    const lines=rows.map(r=>`• ${r.loc}: ${fmtAmt(r[field])}`);
+    return {text:`${name} ka current trip ${label}: ${fmtAmt(total)}\n`+lines.join('\n'),sources:['Bliss One — Trip Expense App']};
+  };
+  if(wantsBalance)return reply('balance',"balance");
+  if(wantsExpense)return reply('expense',"expense");
+  return reply('advance (issued)',"issued");
 }
 async function answerQuestion(text){
   const q=String(text||'').toLowerCase();
+  // A question naming a specific Sales person is checked FIRST, before any generic keyword
+  // bucket below - a known person's name is a stronger, more specific signal than a word like
+  // "balance", which would otherwise always get claimed by the company-wide Petty Cash check
+  // (e.g. "Chunnu ka balance kitna hai" must not answer with the Petty Cash balance).
+  const trips=await new Promise(res=>liveTeTrips(res));
+  const personName=matchSalesPersonFromQuestion(trips,q);
+  if(personName){
+    const personAns=await answerPersonTripQuery(q,trips,personName);
+    if(personAns)return personAns;
+  }
   if(q.includes('trip')) return answerOpenTrips();
   if(q.includes('stock')||q.includes('stationery')) return answerLowStock();
   if(q.includes('petty')||q.includes('cash balance')||q.includes('balance')) return answerPettyCashBalance();
   if(q.includes('petrol')||q.includes('fuel')||q.includes('diesel')) return answerTodayFuelExpense();
   if(q.includes('busy')||q.includes('report')) return answerBusyReports(text);
-  // A question naming a specific Sales person alongside an expense-like word (exact or a typo,
-  // e.g. "Vijay Expence") answers that person's total trip expense - checked before the generic
-  // Busy-report-name fallback below, since a known person's name is a stronger signal.
-  const expenseWords=['expense','kharch','kharcha','spend','spent'];
-  const qWordsEarly=q.split(/\s+/).filter(Boolean);
-  if(expenseWords.some(k=>q.includes(k))||qWordsEarly.some(w=>expenseWords.some(k=>fuzzyWordMatch(w,k)))){
-    const personAns=await answerPersonExpense(q);
-    if(personAns)return personAns;
-  }
   // No other keyword matched - last resort, check if any uploaded Busy report's own NAME
   // appears in the question (e.g. "Sales Register ka total kya hai" with no "busy"/"report"
   // word at all) before giving up.
@@ -471,7 +490,7 @@ async function answerQuestion(text){
   for(const intent of fuzzyIntents){
     if(qWords.some(w=>intent.words.some(k=>fuzzyWordMatch(w,k))))return intent.fn();
   }
-  return {text:'Maaf kijiye, abhi main sirf kuch specific sawaalon ke jawab de sakta hoon — trips, stationery stock, petty cash balance, aaj ka fuel expense, kisi Sales person ka expense (jaise "Vijay ka expense"), ya kisi uploaded/connected report ka naam. Baaki sawaal aane wale updates mein add honge.',sources:[]};
+  return {text:'Maaf kijiye, abhi main sirf kuch specific sawaalon ke jawab de sakta hoon — trips, stationery stock, petty cash balance, aaj ka fuel expense, kisi Sales person ka current trip expense/balance/advance (jaise "Vijay ka expense", "Chunnu ka balance"), ya kisi uploaded/connected report ka naam. Baaki sawaal aane wale updates mein add honge.',sources:[]};
 }
 
 function askSuggested(text){ if($('mtabAsk'))aiSetMobileTab('ask'); $('chatInput').value=text; sendChat(); }
