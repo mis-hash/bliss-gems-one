@@ -429,31 +429,46 @@ function computeTripMoney(ledger,tripId){
   const expense=entries.filter(l=>['expense','transfer_out'].includes(l.type)).reduce((s,l)=>s+Number(l.amount||0),0);
   return {issued,expense,balance:issued-expense};
 }
+// Same-session (in-memory only, resets on page reload - no server-side state) conversation
+// memory, so a follow-up like "Current trip ka puch raha hu only" right after "Mukund ne
+// kitna spend kiya" can resolve back to Mukund/expense without the name being repeated.
+let lastMentionedSalesPerson=null;
+let lastMoneyMetric=null; // 'balance'|'expense'|'advance'
 // Answers a question naming a specific Sales person alongside a money-word - expense/kharcha
 // (exact or typo'd, e.g. "Vijay Expence"), balance/baaki, or advance - scoped to their CURRENT
 // (non-closed) trip(s) only, matching every other intent in this app (live/open status, not a
 // historical lifetime total a closed, already-settled trip would otherwise inflate). Returns
-// null (not a fallback message) when no money-word matched either, so a name mentioned for an
-// unrelated reason (e.g. "Vijay kaun hai") isn't wrongly hijacked into this intent.
-async function answerPersonTripQuery(q,trips,name){
+// null (not a fallback message) when no money-word matched either (unless isFollowup, which
+// reuses the last metric asked in this session), so a name mentioned for an unrelated reason
+// (e.g. "Vijay kaun hai") isn't wrongly hijacked into this intent.
+async function answerPersonTripQuery(q,trips,name,isFollowup){
   const myTrips=trips.filter(t=>t.salesName===name && t.status!=='closed');
   if(!myTrips.length)return {text:`${name} ka abhi koi active trip nahi hai.`,sources:['Bliss One — Trip Expense App']};
   const qWords=q.split(/\s+/).filter(Boolean);
   const matches=words=>words.some(k=>q.includes(k))||qWords.some(w=>words.some(k=>fuzzyWordMatch(w,k)));
-  const wantsBalance=matches(['balance','baaki','bakaya','due']);
-  const wantsExpense=matches(['expense','kharch','kharcha','spend','spent']);
-  const wantsAdvance=matches(['advance']);
-  if(!wantsBalance&&!wantsExpense&&!wantsAdvance)return null;
+  let wantsBalance=matches(['balance','baaki','bakaya','due']);
+  let wantsExpense=matches(['expense','kharch','kharcha','spend','spent']);
+  let wantsAdvance=matches(['advance']);
+  if(!wantsBalance&&!wantsExpense&&!wantsAdvance){
+    if(isFollowup&&lastMoneyMetric){
+      if(lastMoneyMetric==='balance')wantsBalance=true;
+      else if(lastMoneyMetric==='advance')wantsAdvance=true;
+      else wantsExpense=true;
+    }else{
+      return null;
+    }
+  }
   const ledger=await new Promise(res=>liveTeLedger(res));
   const rows=myTrips.map(t=>({loc:t.location||t.id,...computeTripMoney(ledger,t.id)}));
-  const reply=(label,field)=>{
+  const reply=(label,field,metric)=>{
+    lastMoneyMetric=metric;
     const total=rows.reduce((s,r)=>s+r[field],0);
     const lines=rows.map(r=>`• ${r.loc}: ${fmtAmt(r[field])}`);
     return {text:`${name} ka current trip ${label}: ${fmtAmt(total)}\n`+lines.join('\n'),sources:['Bliss One — Trip Expense App']};
   };
-  if(wantsBalance)return reply('balance',"balance");
-  if(wantsExpense)return reply('expense',"expense");
-  return reply('advance (issued)',"issued");
+  if(wantsBalance)return reply('balance','balance','balance');
+  if(wantsExpense)return reply('expense','expense','expense');
+  return reply('advance (issued)','issued','advance');
 }
 async function answerQuestion(text){
   const q=String(text||'').toLowerCase();
@@ -464,7 +479,23 @@ async function answerQuestion(text){
   const trips=await new Promise(res=>liveTeTrips(res));
   const personName=matchSalesPersonFromQuestion(trips,q);
   if(personName){
-    const personAns=await answerPersonTripQuery(q,trips,personName);
+    const personAns=await answerPersonTripQuery(q,trips,personName,false);
+    if(personAns){ lastMentionedSalesPerson=personName; return personAns; }
+  }
+  // Conversational follow-up (same browser session only, in-memory - resets on reload): e.g.
+  // "Current trip ka puch raha hu only" right after asking about a specific Sales person's
+  // money, with no name repeated this time. Checked here, before the generic 'trip' keyword
+  // below (which would otherwise just list every open trip for "...trip..."), but skipped
+  // whenever the question also looks like it's about a clearly different domain (Petty Cash,
+  // fuel, Busy/report, stationery) - those still take their normal, unambiguous path below.
+  // Deliberately excludes common words like "current"/"abhi" from the trigger list on their
+  // own (e.g. "Chunnu ka trip abhi open hai kya" is a real, different question that merely
+  // contains "abhi" - not a follow-up) - only the narrower, more distinctive markers below.
+  const otherDomainWords=['petty','cash','fuel','petrol','diesel','busy','report','stock','stationery'];
+  if(lastMentionedSalesPerson&&lastMoneyMetric
+     &&/\b(only|sirf|wahi|usi|iska|uska|isska|usska)\b/.test(q)
+     &&!otherDomainWords.some(k=>q.includes(k))){
+    const personAns=await answerPersonTripQuery(q,trips,lastMentionedSalesPerson,true);
     if(personAns)return personAns;
   }
   if(q.includes('trip')) return answerOpenTrips();
