@@ -600,6 +600,19 @@ function startMastersSync(){
   db.collection('fv_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={vehicles:[],paymentModes:[],vehicleService:{},vehicleServiceDate:{},vehicleCleaning:{},vehicleDocs:{},vehicleMeta:{},...doc.data()};renderAll();},err=>console.error('masters sync error',err));
 }
 function saveMasters(){ if(db) db.collection('fv_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
+// Removes a vehicle from the master list only (Super Admin only, matching every other
+// permanent-delete button in this app) - its past fuel/service/document records are NOT
+// touched, since those are separate collections/fields keyed by vehicle number and this is
+// meant for clearing a wrongly-added or test vehicle number, not its real history. If a
+// vehicle really needs its records wiped too, that's done per-entry from the Fuel/Service/
+// Documents tabs' own Delete Permanently buttons, same as any other record in this app.
+function deleteVehicle(v){
+  if(!superAdminUnlocked)return;
+  if(!confirm(`"${v}" ko vehicle list se hamesha ke liye hata dein?\n\nIske purane fuel/service/document records delete NAHI honge (wo alag se apni tabs se delete karein) - sirf ye vehicle number master list se hatega.`))return;
+  masters.vehicles=(masters.vehicles||[]).filter(x=>x!==v);
+  saveMasters();
+  renderAll();
+}
 
 /* ===== Nav / gate ===== */
 function goPage(id){
@@ -1152,8 +1165,9 @@ function renderVehicleDocuments(){
     const doerName=meta.responsibleDoer?nameOfUserId(meta.responsibleDoer):null;
     const catIcon=CATEGORY_ICONS[meta.category]||'🚗';
     const evBadge=meta.fuelType==='Electric'?' <span class="pill" style="background:var(--mint);color:var(--g)">⚡ EV</span>':'';
+    const delBtn=superAdminUnlocked?` <button class="btn small danger" onclick="deleteVehicle('${esc(v).replace(/'/g,"\\'")}')">🗑 Delete Vehicle</button>`:'';
     return `<div class="item" style="flex-direction:column;align-items:stretch;gap:8px">
-      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><b style="font-size:15px">${catIcon} ${esc(v)}${meta.name?' — '+esc(meta.name):''}</b>${evBadge}<span class="note">Current Meter: <b>${curMeter!=null?curMeter.toLocaleString('en-IN'):'-'}</b></span></div>
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><b style="font-size:15px">${catIcon} ${esc(v)}${meta.name?' — '+esc(meta.name):''}</b>${evBadge}<span class="note">Current Meter: <b>${curMeter!=null?curMeter.toLocaleString('en-IN'):'-'}</b></span>${delBtn}</div>
       <div class="note">Insurance: ${ins.startDate?esc(ins.startDate):'-'} → ${ins.expiryDate?esc(ins.expiryDate):'-'}${meta.lastServiceDate?' • Last Service: '+esc(meta.lastServiceDate):''}${doerName?' • Responsible: '+esc(doerName):''}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${pills}</div>
     </div>`;
