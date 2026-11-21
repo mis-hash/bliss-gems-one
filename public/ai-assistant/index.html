@@ -110,26 +110,15 @@ header::before{content:'';display:block;height:3px;flex-shrink:0;background:line
 .emptyMsgs{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted);gap:12px;padding:40px 20px}
 .emptyMsgs{font-size:38px}
 .emptyMsgs div{font-size:13.5px}
-/* Sources/Ask/Overview/History tab switcher - shown one panel at a time at EVERY screen
-   width (not just narrow screens - user explicitly asked for this after comparing both,
-   preferring the focused single-panel view even on a full-width desktop window over the old
-   side-by-side layout). "mobileTabs"/"mobileHide" class names kept as-is (no longer
-   mobile-only) to avoid an unnecessary rename churn across the HTML/CSS/JS that reference
-   them. Grid (not flex) so a 4th/5th tab reflows naturally (narrower screens wrap to 2 per
-   row) instead of every button getting squeezed equally thin. */
-.mobileTabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;width:100%;margin-bottom:2px}
-.mobileTabs button{padding:11px;border-radius:12px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted);cursor:pointer;transition:background .12s ease,color .12s ease,border-color .12s ease}
+/* Sources/Ask tab switcher - shown one panel at a time at EVERY screen width (not just
+   narrow screens - user explicitly asked for this after comparing both, preferring the
+   focused single-panel view even on a full-width desktop window over the old side-by-side
+   layout). "mobileTabs"/"mobileHide" class names kept as-is (no longer mobile-only) to avoid
+   an unnecessary rename churn across the HTML/CSS/JS that reference them. */
+.mobileTabs{display:flex;gap:8px;width:100%;margin-bottom:2px}
+.mobileTabs button{flex:1;padding:11px;border-radius:12px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted);cursor:pointer;transition:background .12s ease,color .12s ease,border-color .12s ease}
 .mobileTabs button.active{background:var(--g);color:#fff;border-color:var(--g);box-shadow:0 2px 8px rgba(38,143,118,.25)}
-.sidebar.mobileHide,.chatPanel.mobileHide,.overviewPanel.mobileHide,.historyPanel.mobileHide{display:none}
-.overviewPanel,.historyPanel{flex:1 1 480px;min-width:300px;display:flex;flex-direction:column;gap:14px}
-.statTile{flex:1 1 140px;background:var(--mint);border-radius:10px;padding:10px}
-.statTile small{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:700;margin-bottom:3px}
-.statTile b{font-size:17px;color:var(--txt)}
-.histEntry{padding:12px 0;border-bottom:1px dashed var(--line)}
-.histEntry:last-child{border-bottom:0}
-.histQ{font-weight:700;font-size:13px;margin-bottom:4px}
-.histA{font-size:12.5px;color:var(--muted);white-space:pre-wrap}
-.histAt{font-size:10.5px;color:var(--muted);margin-top:5px}
+.sidebar.mobileHide,.chatPanel.mobileHide{display:none}
 /* Report export PDF - built as a standalone off-screen HTML string (not a clone of any
    on-screen panel, since the View modal's content isn't styled for print/export) rendered via
    html2canvas+jsPDF, same pattern as the other Bliss apps' PDFs. */
@@ -168,8 +157,6 @@ header::before{content:'';display:block;height:3px;flex-shrink:0;background:line
   <div class="mobileTabs">
     <button type="button" id="mtabSources" onclick="aiSetMobileTab('sources')">🗂 Sources</button>
     <button type="button" id="mtabAsk" class="active" onclick="aiSetMobileTab('ask')">💬 Ask a Question</button>
-    <button type="button" id="mtabOverview" onclick="aiSetMobileTab('overview')">📊 Overview</button>
-    <button type="button" id="mtabHistory" onclick="aiSetMobileTab('history')">🕘 History</button>
   </div>
   <div class="sidebar mobileHide">
     <div class="sideCard">
@@ -202,34 +189,6 @@ header::before{content:'';display:block;height:3px;flex-shrink:0;background:line
       <button type="button" class="micBtn" id="ttsBtn" onclick="toggleTts()" title="Jawab bolna band karein">🔊</button>
       <button type="button" class="micBtn" id="micBtn" onclick="toggleVoiceInput()" title="Bolkar poochein">🎤</button>
       <button type="button" class="sendBtn" onclick="sendChat()">➤</button>
-    </div>
-  </div>
-
-  <div class="overviewPanel mobileHide" id="overviewPanel">
-    <div class="sideCard">
-      <div class="sTitle" style="display:flex;justify-content:space-between;align-items:center">
-        <span>AAJ KA OVERVIEW</span>
-        <button type="button" class="btn small" onclick="renderOverviewPanel()">🔄 Dekhein</button>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:10px" id="overviewTiles"><div class="srcMeta">"Dekhein" dabayein - data automatically load nahi hota.</div></div>
-    </div>
-    <div class="sideCard" id="overviewTripsCard" style="display:none">
-      <div class="sTitle">OPEN TRIPS</div>
-      <div id="overviewTripsList"></div>
-    </div>
-    <div class="sideCard" id="overviewStockCard" style="display:none">
-      <div class="sTitle">LOW STOCK ITEMS</div>
-      <div id="overviewStockList"></div>
-    </div>
-  </div>
-
-  <div class="historyPanel mobileHide" id="historyPanel">
-    <div class="sideCard">
-      <div class="sTitle" style="display:flex;justify-content:space-between;align-items:center">
-        <span>PAST SAWAAL-JAWAB</span>
-        <button type="button" class="btn small" onclick="clearChatHistory()">🗑 Clear</button>
-      </div>
-      <div id="historyList"></div>
     </div>
   </div>
 </div>
@@ -306,86 +265,20 @@ function doLogin(){
   renderAll();
 }
 function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
-// Tab switcher between Sources / Ask a Question / Overview / History - exactly one panel
-// shown at a time at every screen width (see the CSS comment above .mobileTabs for why).
+// Mobile-only tab switcher between the Sources sidebar and the Ask-a-question chat panel -
+// on wider screens the .mobileHide class has no effect (see the media query in <style>) so
+// both panels keep showing side by side as before; this only changes narrow-screen behaviour.
 function aiSetMobileTab(tab){
-  const panels={sources:document.querySelector('.sidebar'),ask:document.querySelector('.chatPanel'),overview:$('overviewPanel'),history:$('historyPanel')};
-  const btns={sources:$('mtabSources'),ask:$('mtabAsk'),overview:$('mtabOverview'),history:$('mtabHistory')};
-  if(!panels[tab]||!btns[tab])return;
-  for(const key in panels){ if(panels[key])panels[key].classList.toggle('mobileHide',key!==tab); }
-  for(const key in btns){ if(btns[key])btns[key].classList.toggle('active',key===tab); }
-  // Overview is NOT auto-fetched on opening the tab (explicit user request: nothing
-  // automatic, only when they actually ask for it) - renderOverviewPanel() only runs when
-  // the "Dekhein" button inside the panel is clicked. History is just a local read of
-  // already-saved past Q&A (no live cross-app fetch), so that one still refreshes on open.
-  if(tab==='history')renderHistoryPanel();
-}
-// Overview tab: a no-questions-asked snapshot of the same data the chat can answer about,
-// reusing the same read-only live* fetchers as the chat intents (answerOpenTrips/
-// answerLowStock/answerPettyCashBalance/answerTodayFuelExpense) rather than re-deriving the
-// same numbers a second way.
-async function renderOverviewPanel(){
-  const tiles=$('overviewTiles');
-  if(!tiles||!db)return;
-  tiles.innerHTML='<div class="srcMeta">Load ho raha hai...</div>';
-  const [trips,stock,pcLedger,fuelLog]=await Promise.all([
-    new Promise(res=>liveTeTrips(res)),
-    new Promise(res=>liveSiItems(res)),
-    new Promise(res=>livePcLedger(res)),
-    new Promise(res=>liveFuelLog(res)),
-  ]);
-  const openTrips=trips.filter(x=>x.status!=='closed');
-  const lowStock=stock.filter(x=>Number(x.stock||0)<Number(x.min||0));
-  const pcIn=pcLedger.filter(x=>x.type==='in').reduce((s,x)=>s+(x.amount||0),0);
-  const pcOut=pcLedger.filter(x=>x.type==='out').reduce((s,x)=>s+(x.amount||0),0);
-  const today=new Date().toISOString().slice(0,10);
-  const todayFuel=fuelLog.filter(x=>x.date===today).reduce((s,x)=>s+(x.amount||0),0);
-  tiles.innerHTML=`
-    <div class="statTile"><small>Open Trips</small><b>${openTrips.length}</b></div>
-    <div class="statTile"><small>Low Stock Items</small><b>${lowStock.length}</b></div>
-    <div class="statTile"><small>Petty Cash Balance</small><b>${fmtAmt(pcIn-pcOut)}</b></div>
-    <div class="statTile"><small>Aaj ka Fuel Spend</small><b>${fmtAmt(todayFuel)}</b></div>
-  `;
-  const tripsCard=$('overviewTripsCard'),tripsList=$('overviewTripsList');
-  if(tripsCard)tripsCard.style.display='';
-  if(tripsList){
-    tripsList.innerHTML=openTrips.length
-      ?openTrips.slice(0,8).map(t=>`<div class="srcRow"><span class="srcDot" style="background:var(--g)"></span><div><div class="srcName">${esc(t.salesName||'-')}</div><div class="srcMeta">${esc(t.location||'Trip')} • status: ${esc(t.status||'-')}</div></div></div>`).join('')
-      :'<div class="srcMeta">Koi trip abhi open nahi hai.</div>';
+  const sidebar=document.querySelector('.sidebar'),chat=document.querySelector('.chatPanel');
+  const btnS=$('mtabSources'),btnA=$('mtabAsk');
+  if(!sidebar||!chat||!btnS||!btnA)return;
+  if(tab==='sources'){
+    sidebar.classList.remove('mobileHide');chat.classList.add('mobileHide');
+    btnS.classList.add('active');btnA.classList.remove('active');
+  }else{
+    chat.classList.remove('mobileHide');sidebar.classList.add('mobileHide');
+    btnA.classList.add('active');btnS.classList.remove('active');
   }
-  const stockCard=$('overviewStockCard'),stockList=$('overviewStockList');
-  if(stockCard)stockCard.style.display='';
-  if(stockList){
-    stockList.innerHTML=lowStock.length
-      ?lowStock.slice(0,8).map(x=>`<div class="srcRow"><span class="srcDot" style="background:var(--amber)"></span><div><div class="srcName">${esc(x.name)}</div><div class="srcMeta">${x.stock||0} ${esc(x.unit||'')} bache (reorder level ${x.min||0})</div></div></div>`).join('')
-      :'<div class="srcMeta">Koi item low-stock mein nahi hai.</div>';
-  }
-}
-// History tab: a persisted (localStorage, per-device - same constraint as the Busy/Live
-// Sheet imports) log of past chat Q&A, since the chat itself is in-memory only and clears on
-// reload. Capped at CHAT_HISTORY_MAX entries so it can't grow unbounded.
-const CHAT_HISTORY_KEY='ai_chat_history';
-const CHAT_HISTORY_MAX=50;
-function saveChatHistoryEntry(q,a){
-  try{
-    const hist=JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY)||'[]');
-    hist.unshift({q,a,at:new Date().toISOString()});
-    if(hist.length>CHAT_HISTORY_MAX)hist.length=CHAT_HISTORY_MAX;
-    localStorage.setItem(CHAT_HISTORY_KEY,JSON.stringify(hist));
-  }catch(e){console.error('saveChatHistoryEntry failed:',e);}
-}
-function renderHistoryPanel(){
-  const list=$('historyList');
-  if(!list)return;
-  let hist=[];
-  try{ hist=JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY)||'[]'); }catch(e){}
-  if(!hist.length){ list.innerHTML='<div class="srcMeta">Abhi tak koi sawaal nahi poocha gaya hai.</div>'; return; }
-  list.innerHTML=hist.map(h=>`<div class="histEntry"><div class="histQ">${esc(h.q)}</div><div class="histA">${esc(h.a)}</div><div class="histAt">${esc(new Date(h.at).toLocaleString('en-IN'))}</div></div>`).join('');
-}
-function clearChatHistory(){
-  if(!confirm('Pura sawaal-jawab history delete karna hai?'))return;
-  localStorage.removeItem(CHAT_HISTORY_KEY);
-  renderHistoryPanel();
 }
 
 function startUsersSync(){
@@ -737,8 +630,6 @@ async function sendChat(){
   try{
     const res=await answerQuestion(text);
     updateMsg(thinkingId,res.text,res.sources);
-    saveChatHistoryEntry(text,res.text);
-    renderHistoryPanel();
   }catch(e){
     console.error('answerQuestion failed:',e);
     updateMsg(thinkingId,'Error aaya jawab dete waqt: '+(e.message||e),[]);
