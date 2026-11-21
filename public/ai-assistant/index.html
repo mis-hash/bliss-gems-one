@@ -183,12 +183,13 @@ header::before{content:'';display:block;height:3px;flex-shrink:0;background:line
 
 <div class="modal" id="googleSheetModal"><div class="box" style="width:min(480px,100%)">
 <h3>Live Sheet Connect Karein</h3>
-<p class="note">Koi bhi sheet (Google Sheets ya Excel Online) ko ek public CSV link se live connect kar sakte hain - koi API key ya coding nahi chahiye:<br>
+<p class="note">Koi bhi public CSV/XLSX/XLS link se live connect kar sakte hain - koi API key ya coding nahi chahiye. Jo bhi tool ho (Google Sheets, Excel Online, ya koi aur jiska data export/download-link public ho), agar usse ek public link mil jaye to wahi yahan paste kar dein:<br>
 <b>Google Sheets:</b> File → Share → Publish to web → format "Comma-separated values (.csv)" → Publish → jo link mile wahi copy karein.<br>
-<b>Excel Online (OneDrive):</b> File → Share → Publish to web/Embed se CSV/Table link lein.<br>
-Jo bhi link mile, wahi yahan paste kar dein - Sheet mein data update hone par "🔄" button se naya data mil jayega.</p>
+<b>Excel Online (OneDrive):</b> File → Share → "Anyone with the link can view" → us link ka direct download/export link lein.<br>
+<b>Koi aur tool</b> (jaise Tally, ya koi CRM/automation tool): agar uska koi report "Publish"/"Public share link"/"Export URL" deta ho, wahi try karein - fetch/parse automatically ho jayega. Agar tool sirf login ke piche file deta hai (koi public link nahi), to wo "Live" connect nahi ho sakta - uska export file "File Upload" se daalna hoga.<br>
+Jo bhi link mile, wahi yahan paste kar dein - data update hone par "🔄" button se naya data mil jayega.</p>
 <div class="field" style="margin-top:8px"><label>Report ka naam (jaise "Sales Register")</label><input id="gsheetName" autocomplete="off"></div>
-<div class="field" style="margin-top:8px"><label>Public CSV Link</label><input id="gsheetUrl" autocomplete="off" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"></div>
+<div class="field" style="margin-top:8px"><label>Public CSV/XLSX Link</label><input id="gsheetUrl" autocomplete="off" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"></div>
 <p class="note" id="gsheetMsg" style="margin:8px 0 0"></p>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeGoogleSheetModal()">Cancel</button><button class="btn primary" id="gsheetConnectBtn" onclick="confirmGoogleSheetConnect()">Connect</button></div>
 </div></div>
@@ -474,9 +475,9 @@ function updateMsg(id,text,sources){
    name) to group by - sums the amount column and keeps the top 10 groups, storing just
    that summary (not every row) to keep localStorage small. XLSX.read() parses CSV too, so
    one code path handles all three file types. */
-// Shared by parseBusySheet (file upload) and parseCsvText (live sheet link) - both just
-// get the raw rows into this one place, so the amount/label-column detection and top-10
-// breakdown logic isn't duplicated between the two input paths.
+// Shared by parseBusySheet - used for both a file upload and a fetched live-sheet link,
+// since both end up handing the same raw rows into this one place, so the amount/label-column
+// detection and top-10 breakdown logic isn't duplicated between the two input paths.
 function analyzeRows(rows){
   if(!rows||rows.length<2)return null;
   const header=rows[0].map(h=>String(h||'').trim());
@@ -520,36 +521,31 @@ function parseBusySheet(arrayBuffer){
   const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:''});
   return analyzeRows(rows);
 }
-function parseCsvText(text){
-  const wb=XLSX.read(text,{type:'string'});
-  const sheet=wb.Sheets[wb.SheetNames[0]];
-  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:''});
-  return analyzeRows(rows);
-}
 function reportSourceLabel(r){ return (r&&r.sourceType==='sheet')?'Live Sheet':'Busy Export'; }
-/* ===== Live Sheet connect (Google Sheets "Publish to web" / Excel Online public CSV link) =====
-   No API key/OAuth - the sheet owner publishes it (a link designed for exactly this, external
-   embedding), which serves a public CSV, so this app can fetch() it straight from the browser.
-   Stored in the SAME BUSY_IMPORTS_KEY map as file uploads (tagged sourceType:'sheet' + csvUrl)
-   so the existing chat Q&A / reports list code works unchanged - only re-fetching (Refresh)
-   instead of re-uploading differs. NOTE: not yet verified against a real published Google
-   Sheet in a real browser (this sandbox can't reach docs.google.com) - if a real link ever
-   fails to fetch, suspect a CORS/redirect quirk on Google's end first, same caution as the
-   ArrayBuffer/Uint8Array Busy-import bug that only a real browser caught. */
+/* ===== Live Sheet connect (any public CSV/XLSX/XLS link - Google Sheets "Publish to web",
+   Excel Online's public download link, or any other static host serving a tabular export) =====
+   No API key/OAuth - fetched as raw bytes and handed to the SAME XLSX.read(...,{type:'array'})
+   path as a file upload (parseBusySheet), which already auto-detects CSV vs XLS vs XLSX - so
+   one URL field covers all three, not just Google's CSV-specific publish link. Stored in the
+   SAME BUSY_IMPORTS_KEY map as file uploads (tagged sourceType:'sheet' + csvUrl) so the existing
+   chat Q&A / reports list code works unchanged - only re-fetching (Refresh) instead of
+   re-uploading differs. NOTE: not yet verified against a real published Google Sheet or Excel
+   Online link in a real browser (this sandbox has no outbound reach to those hosts) - if a real
+   link ever fails to fetch, suspect a CORS/redirect quirk on that host first, same caution as
+   the ArrayBuffer/Uint8Array Busy-import bug that only a real browser caught. A source that
+   requires login (no public "anyone with link" access) will never work this way - that needs
+   a real API/OAuth integration, a different and much bigger undertaking. */
 function fetchAndSaveLiveSheet(name,url){
-  if(!/\/pub\b|output=csv/i.test(url)){
-    return Promise.resolve({ok:false,error:'Ye public CSV link nahi lagta. "Publish to web" se jo CSV link milta hai wahi paste karein.'});
-  }
   return fetch(url).then(res=>{
     if(!res.ok)throw new Error('HTTP '+res.status);
-    return res.text();
+    return res.arrayBuffer();
   }).catch(err=>{
     console.error('live sheet fetch failed:',err);
-    throw {_fetchMsg:'Data nahi mil paya: '+(err.message||err)+'. Link dobara check karein ya sheet dobara publish karein.'};
-  }).then(text=>{
+    throw {_fetchMsg:'Data nahi mil paya: '+(err.message||err)+'. Link check karein - file/sheet "Anyone with the link" public honi chahiye.'};
+  }).then(buf=>{
     let parsed;
-    try{ parsed=parseCsvText(text); }
-    catch(err){ console.error('parseCsvText failed:',err); throw {_fetchMsg:'Data parse nahi ho paya: '+(err.message||err)}; }
+    try{ parsed=parseBusySheet(buf); }
+    catch(err){ console.error('live sheet parse failed:',err); throw {_fetchMsg:'Data parse nahi ho paya: '+(err.message||err)+'. Ye link CSV/XLSX export nahi lag rahi.'}; }
     if(!parsed)throw {_fetchMsg:'Data nahi mila. Ek column amount/total/value naam ka hona chahiye, ya sabse right wali numeric column use hogi.'};
     const imports=JSON.parse(localStorage.getItem(BUSY_IMPORTS_KEY)||'{}');
     const key=busyReportKey(name);
