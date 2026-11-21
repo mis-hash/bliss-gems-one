@@ -100,10 +100,10 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
       <div class="sTitle">CONNECTED SOURCES</div>
       <div class="srcRow"><span class="srcDot" style="background:var(--g)"></span><div><div class="srcName">Bliss One — 6 Apps</div><div class="srcMeta">Trip, Stationery, Petty Cash, Vehicle • Live</div></div></div>
       <div class="srcRow"><span class="srcDot" style="background:var(--amber)"></span><div style="flex:1">
-        <div class="srcName">Busy</div>
-        <div class="srcMeta">Roz Busy se jitni reports chahiye utni upload karein (Sales, Purchase, Stock, Ledger, waghera) - naya upload usi naam ki purani report ko refresh kar dega.</div>
+        <div class="srcName">Busy / Live Sheet</div>
+        <div class="srcMeta">Busy ki export file (xlsx/xls/csv) upload karein, ya Google Sheet/Excel Online ka public CSV link connect karein - jitni reports chahiye utni (Sales, Purchase, Stock, Ledger, waghera). Naya upload/refresh usi naam ki purani report ko update kar dega.</div>
         <div id="busyReportsList" style="margin-top:8px"></div>
-        <button type="button" class="btn small" style="margin-top:8px" onclick="openBusyUploadModal()">⬆ Add/Update Busy Report</button>
+        <div style="display:flex;gap:6px;margin-top:8px"><button type="button" class="btn small" onclick="openBusyUploadModal()">⬆ File Upload</button><button type="button" class="btn small" onclick="openGoogleSheetModal()">🔗 Live Sheet Connect</button></div>
       </div></div>
       <div class="srcRow"><span class="srcDot" style="background:#C8C2B4"></span><div><div class="srcName" style="color:var(--muted)">Client/Supplier Portals</div><div class="srcMeta">Not connected — no API access yet</div></div></div>
     </div>
@@ -143,6 +143,18 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 <div class="field" style="margin-top:8px"><label>File (.xlsx, .xls ya .csv)</label><input type="file" id="busyFileInput" accept=".csv,.xlsx,.xls"></div>
 <p class="note" id="busyUploadMsg" style="margin:8px 0 0"></p>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeBusyUploadModal()">Cancel</button><button class="btn primary" onclick="confirmBusyUpload()">Upload</button></div>
+</div></div>
+
+<div class="modal" id="googleSheetModal"><div class="box" style="width:min(480px,100%)">
+<h3>Live Sheet Connect Karein</h3>
+<p class="note">Koi bhi sheet (Google Sheets ya Excel Online) ko ek public CSV link se live connect kar sakte hain - koi API key ya coding nahi chahiye:<br>
+<b>Google Sheets:</b> File → Share → Publish to web → format "Comma-separated values (.csv)" → Publish → jo link mile wahi copy karein.<br>
+<b>Excel Online (OneDrive):</b> File → Share → Publish to web/Embed se CSV/Table link lein.<br>
+Jo bhi link mile, wahi yahan paste kar dein - Sheet mein data update hone par "🔄" button se naya data mil jayega.</p>
+<div class="field" style="margin-top:8px"><label>Report ka naam (jaise "Sales Register")</label><input id="gsheetName" autocomplete="off"></div>
+<div class="field" style="margin-top:8px"><label>Public CSV Link</label><input id="gsheetUrl" autocomplete="off" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"></div>
+<p class="note" id="gsheetMsg" style="margin:8px 0 0"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeGoogleSheetModal()">Cancel</button><button class="btn primary" id="gsheetConnectBtn" onclick="confirmGoogleSheetConnect()">Connect</button></div>
 </div></div>
 
 <div class="modal" id="busyViewModal"><div class="box" style="width:min(480px,100%)">
@@ -284,19 +296,19 @@ function busyReportSummaryText(r,wantTop){
 async function answerBusyReports(questionText){
   const imports=await new Promise(res=>liveBusyImports(res));
   const names=Object.keys(imports);
-  if(!names.length)return {text:'Abhi tak koi Busy report upload nahi hui hai. Left panel se "Add/Update Busy Report" button se apni Busy export (xlsx/xls/csv) daal dein.',sources:[]};
+  if(!names.length)return {text:'Abhi tak koi report upload/connect nahi hui hai. Left panel se Busy file upload karein ya Google Sheet/Excel ka live CSV link connect karein.',sources:[]};
   const q=String(questionText||'').toLowerCase();
   const wantTop=q.includes('top')||q.includes('sabse zyada')||q.includes('sabse jyada')||q.includes('highest');
   const matched=matchBusyReportFromQuestion(imports,q);
   // A specific report name in the question always wins, even while asking "which reports"
   // (e.g. "Sales Register report hai kya" should answer about Sales Register directly).
-  if(matched)return {text:busyReportSummaryText(matched,wantTop),sources:['Busy Export — '+matched.name+' ('+new Date(matched.uploadedAt).toLocaleDateString('en-IN')+')']};
+  if(matched)return {text:busyReportSummaryText(matched,wantTop),sources:[reportSourceLabel(matched)+' — '+matched.name+' ('+new Date(matched.uploadedAt).toLocaleDateString('en-IN')+')']};
   // Only one report uploaded - no name needed, same as the old single-report behaviour.
-  if(names.length===1){ const r=imports[names[0]]; return {text:busyReportSummaryText(r,wantTop),sources:['Busy Export — '+r.name+' ('+new Date(r.uploadedAt).toLocaleDateString('en-IN')+')']}; }
+  if(names.length===1){ const r=imports[names[0]]; return {text:busyReportSummaryText(r,wantTop),sources:[reportSourceLabel(r)+' — '+r.name+' ('+new Date(r.uploadedAt).toLocaleDateString('en-IN')+')']}; }
   // Multiple reports, no name matched (or an explicit "which reports" ask) - list them all
   // and ask the user to name one for a detailed answer.
   const lines=names.map(k=>`• ${imports[k].name} — total ${fmtAmt(imports[k].total)} (${imports[k].rowCount} rows)`);
-  return {text:`Abhi ye Busy reports upload hui hain:\n${lines.join('\n')}\n\nKisi specific report ka naam bhi sawaal mein likh sakte hain (jaise "Sales Register ka total kya hai").`,sources:names.map(k=>'Busy Export — '+imports[k].name)};
+  return {text:`Abhi ye reports upload/connect hui hain:\n${lines.join('\n')}\n\nKisi specific report ka naam bhi sawaal mein likh sakte hain (jaise "Sales Register ka total kya hai").`,sources:names.map(k=>reportSourceLabel(imports[k])+' — '+imports[k].name)};
 }
 async function answerTodayFuelExpense(){
   const rows=await new Promise(res=>liveFuelLog(res));
@@ -373,11 +385,11 @@ function updateMsg(id,text,sources){
    name) to group by - sums the amount column and keeps the top 10 groups, storing just
    that summary (not every row) to keep localStorage small. XLSX.read() parses CSV too, so
    one code path handles all three file types. */
-function parseBusySheet(arrayBuffer){
-  const wb=XLSX.read(new Uint8Array(arrayBuffer),{type:'array'});
-  const sheet=wb.Sheets[wb.SheetNames[0]];
-  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:''});
-  if(rows.length<2)return null;
+// Shared by parseBusySheet (file upload) and parseCsvText (live sheet link) - both just
+// get the raw rows into this one place, so the amount/label-column detection and top-10
+// breakdown logic isn't duplicated between the two input paths.
+function analyzeRows(rows){
+  if(!rows||rows.length<2)return null;
   const header=rows[0].map(h=>String(h||'').trim());
   const headerLc=header.map(h=>h.toLowerCase());
   const dataRows=rows.slice(1).filter(r=>r.some(c=>String(c??'').trim()!==''));
@@ -412,6 +424,82 @@ function parseBusySheet(arrayBuffer){
     ?Object.keys(byLabel).map(label=>({label,amount:byLabel[label]})).sort((a,b)=>b.amount-a.amount).slice(0,10)
     :[];
   return {total,rowCount,amountColLabel:header[amountCol],labelColLabel:labelCol!==-1?header[labelCol]:null,topRows};
+}
+function parseBusySheet(arrayBuffer){
+  const wb=XLSX.read(new Uint8Array(arrayBuffer),{type:'array'});
+  const sheet=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:''});
+  return analyzeRows(rows);
+}
+function parseCsvText(text){
+  const wb=XLSX.read(text,{type:'string'});
+  const sheet=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:''});
+  return analyzeRows(rows);
+}
+function reportSourceLabel(r){ return (r&&r.sourceType==='sheet')?'Live Sheet':'Busy Export'; }
+/* ===== Live Sheet connect (Google Sheets "Publish to web" / Excel Online public CSV link) =====
+   No API key/OAuth - the sheet owner publishes it (a link designed for exactly this, external
+   embedding), which serves a public CSV, so this app can fetch() it straight from the browser.
+   Stored in the SAME BUSY_IMPORTS_KEY map as file uploads (tagged sourceType:'sheet' + csvUrl)
+   so the existing chat Q&A / reports list code works unchanged - only re-fetching (Refresh)
+   instead of re-uploading differs. NOTE: not yet verified against a real published Google
+   Sheet in a real browser (this sandbox can't reach docs.google.com) - if a real link ever
+   fails to fetch, suspect a CORS/redirect quirk on Google's end first, same caution as the
+   ArrayBuffer/Uint8Array Busy-import bug that only a real browser caught. */
+function fetchAndSaveLiveSheet(name,url){
+  if(!/\/pub\b|output=csv/i.test(url)){
+    return Promise.resolve({ok:false,error:'Ye public CSV link nahi lagta. "Publish to web" se jo CSV link milta hai wahi paste karein.'});
+  }
+  return fetch(url).then(res=>{
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    return res.text();
+  }).catch(err=>{
+    console.error('live sheet fetch failed:',err);
+    throw {_fetchMsg:'Data nahi mil paya: '+(err.message||err)+'. Link dobara check karein ya sheet dobara publish karein.'};
+  }).then(text=>{
+    let parsed;
+    try{ parsed=parseCsvText(text); }
+    catch(err){ console.error('parseCsvText failed:',err); throw {_fetchMsg:'Data parse nahi ho paya: '+(err.message||err)}; }
+    if(!parsed)throw {_fetchMsg:'Data nahi mila. Ek column amount/total/value naam ka hona chahiye, ya sabse right wali numeric column use hogi.'};
+    const imports=JSON.parse(localStorage.getItem(BUSY_IMPORTS_KEY)||'{}');
+    const key=busyReportKey(name);
+    imports[key]={name,sourceType:'sheet',csvUrl:url,uploadedAt:new Date().toISOString(),total:parsed.total,rowCount:parsed.rowCount,amountColLabel:parsed.amountColLabel,labelColLabel:parsed.labelColLabel,topRows:parsed.topRows};
+    saveBusyImports(imports);
+    renderBusyReportsList();
+    return {ok:true};
+  }).catch(err=>{
+    if(err&&err._fetchMsg)return {ok:false,error:err._fetchMsg};
+    console.error('live sheet import save failed',err);
+    return {ok:false,error:'Save karte waqt error aaya: '+(err.message||err)};
+  });
+}
+function openGoogleSheetModal(){
+  $('gsheetName').value='';
+  $('gsheetUrl').value='';
+  $('gsheetMsg').textContent='';
+  $('googleSheetModal').classList.add('show');
+}
+function closeGoogleSheetModal(){ $('googleSheetModal').classList.remove('show'); }
+async function confirmGoogleSheetConnect(){
+  const name=$('gsheetName').value.trim();
+  const url=$('gsheetUrl').value.trim();
+  const msg=$('gsheetMsg');
+  if(!name){msg.style.color='var(--red)';msg.textContent='Report ka naam likhein (jaise "Sales Register").';return}
+  if(!url){msg.style.color='var(--red)';msg.textContent='Public CSV link paste karein.';return}
+  const btn=$('gsheetConnectBtn');if(btn)btn.disabled=true;
+  msg.style.color='var(--muted)';msg.textContent='Connect ho raha hai...';
+  const res=await fetchAndSaveLiveSheet(name,url);
+  if(btn)btn.disabled=false;
+  if(res.ok){closeGoogleSheetModal();}
+  else{msg.style.color='var(--red)';msg.textContent=res.error;}
+}
+async function refreshGoogleSheetReport(key){
+  const imports=JSON.parse(localStorage.getItem(BUSY_IMPORTS_KEY)||'{}');
+  const r=imports[key];
+  if(!r||r.sourceType!=='sheet')return;
+  const res=await fetchAndSaveLiveSheet(r.name,r.csvUrl);
+  if(!res.ok)alert('Refresh fail ho gaya: '+res.error);
 }
 function openBusyUploadModal(){
   $('busyReportName').value='';
@@ -457,8 +545,11 @@ function viewBusyReport(key){
         <tbody>${r.topRows.map(t=>`<tr><td style="padding:6px 4px;border-bottom:1px solid var(--line)">${esc(t.label)}</td><td style="padding:6px 4px;border-bottom:1px solid var(--line);text-align:right">${fmtAmt(t.amount)}</td></tr>`).join('')}</tbody>
       </table>`
     :'';
+  const sourceLine=r.sourceType==='sheet'
+    ?`Source: Live Sheet link • Last fetch: ${esc(new Date(r.uploadedAt).toLocaleString('en-IN'))}`
+    :`File: ${esc(r.fileName)} • Upload: ${esc(new Date(r.uploadedAt).toLocaleString('en-IN'))}`;
   $('busyViewBody').innerHTML=`
-    <div class="note">File: ${esc(r.fileName)} • Upload: ${esc(new Date(r.uploadedAt).toLocaleString('en-IN'))}</div>
+    <div class="note">${sourceLine}</div>
     <div style="display:flex;gap:10px;margin-top:10px">
       <div class="sideCard" style="flex:1;padding:10px"><div class="srcMeta">TOTAL</div><b style="font-size:17px">${fmtAmt(r.total)}</b></div>
       <div class="sideCard" style="flex:1;padding:10px"><div class="srcMeta">ROWS</div><b style="font-size:17px">${r.rowCount}</b></div>
@@ -480,10 +571,12 @@ function renderBusyReportsList(){
   if(!wrap)return;
   liveBusyImports(imports=>{
     const keys=Object.keys(imports);
-    if(!keys.length){wrap.innerHTML='<div class="srcMeta">Koi report upload nahi hui abhi tak</div>';return}
+    if(!keys.length){wrap.innerHTML='<div class="srcMeta">Koi report upload/connect nahi hui abhi tak</div>';return}
     wrap.innerHTML=keys.map(k=>{
       const r=imports[k];
-      return `<div class="busyReportRow"><div><b>${esc(r.name)}</b><div class="srcMeta">${r.rowCount} rows • ${esc(new Date(r.uploadedAt).toLocaleDateString('en-IN'))}</div></div><div style="display:flex;gap:6px"><button type="button" class="btn small" onclick="viewBusyReport('${k}')">👁</button><button type="button" class="btn small" onclick="removeBusyReport('${k}')">🗑</button></div></div>`;
+      const isSheet=r.sourceType==='sheet';
+      const refreshBtn=isSheet?`<button type="button" class="btn small" onclick="refreshGoogleSheetReport('${k}')">🔄</button>`:'';
+      return `<div class="busyReportRow"><div><b>${esc(r.name)}</b>${isSheet?' <span class="srcMeta">🔗 Live Sheet</span>':''}<div class="srcMeta">${r.rowCount} rows • ${esc(new Date(r.uploadedAt).toLocaleDateString('en-IN'))}</div></div><div style="display:flex;gap:6px">${refreshBtn}<button type="button" class="btn small" onclick="viewBusyReport('${k}')">👁</button><button type="button" class="btn small" onclick="removeBusyReport('${k}')">🗑</button></div></div>`;
     }).join('');
   });
 }
