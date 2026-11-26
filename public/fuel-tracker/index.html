@@ -501,6 +501,7 @@ tbody tr:hover td{background:#f7faf8}
 <button class="tab" data-tab="documents" onclick="mtab(this,'documents')">📄 Documents</button>
 <button class="tab" data-tab="vehicles" onclick="mtab(this,'vehicles')">🚗 Vehicles</button>
 <button class="tab" data-tab="alerts" onclick="mtab(this,'alerts')">🔔 Alerts</button>
+<button class="tab" data-tab="access" onclick="mtab(this,'access')">👤 Access</button>
 </div>
 <div id="manageContent"></div>
 </div></div>
@@ -1207,7 +1208,7 @@ function onboardVehicle(){
 }
 let editVehicleTarget=null;
 function openEditVehicleModal(vehicle){
-  if(!superAdminUnlocked){alert('Sirf Super Admin vehicle details edit kar sakta hai.');return}
+  if(!canEditVehicleDetails()){alert('Sirf Super Admin ya Admin/Director/Accountant role wala user vehicle details edit kar sakta hai.');return}
   editVehicleTarget=vehicle;
   const meta=(masters.vehicleMeta&&masters.vehicleMeta[vehicle])||{};
   $('evNumber').value=vehicle;
@@ -1309,7 +1310,7 @@ function renderVehicleDocuments(){
     const catIcon=CATEGORY_ICONS[meta.category]||'🚗';
     const evBadge=meta.fuelType==='Electric'?' <span class="pill" style="background:var(--mint);color:var(--g)">⚡ EV</span>':'';
     const vSafeEdit=esc(v).replace(/'/g,"\\'");
-    const editBtn=superAdminUnlocked?` <button class="btn small secondary" onclick="openEditVehicleModal('${vSafeEdit}')">✏️ Edit Details</button>`:'';
+    const editBtn=canEditVehicleDetails()?` <button class="btn small secondary" onclick="openEditVehicleModal('${vSafeEdit}')">✏️ Edit Details</button>`:'';
     const delBtn=superAdminUnlocked?` <button class="btn small danger" onclick="deleteVehicle('${vSafeEdit}')">🗑 Delete Vehicle</button>`:'';
     return `<div class="item" style="flex-direction:column;align-items:stretch;gap:8px">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><b style="font-size:15px">${catIcon} ${esc(v)}${meta.name?' — '+esc(meta.name):''}</b>${evBadge}<span class="note">Current Meter: <b>${curMeter!=null?curMeter.toLocaleString('en-IN'):'-'}</b></span>${editBtn}${delBtn}</div>
@@ -2100,6 +2101,10 @@ function renderManage(){
     c.innerHTML=`<p class="note">Cleaning Due WhatsApp reminder kisko jaaye, yahan se select karein (har vehicle ke Responsible Doer ko to pehle se hi jaata hai, agar unka phone number set ho). Sirf phone number wale active users yahan dikhte hain.</p>
     <div id="mAlertsList"></div>`;
     renderAlertsManageTab();
+  }else if(currentTab==='access'){
+    c.innerHTML=`<p class="note">Vehicle Details <b>Edit</b> karne ka access (Delete Vehicle ab bhi sirf Super Admin kar sakta hai) - Admin/Director/Accountant role wale users Super Admin unlock kiye bina hi Edit Details kar sakenge.</p>
+    <div id="mAccessList"></div>`;
+    renderAccessManageTab();
   }
 }
 function toggleAlertRecipient(userId){
@@ -2118,6 +2123,36 @@ function renderAlertsManageTab(){
   list.innerHTML=withPhone.length
     ?withPhone.map(u=>`<div class="item"><span>${esc(u.name)}</span><input type="checkbox" ${selected.includes(u.id)?'checked':''} onchange="toggleAlertRecipient('${esc(u.id)}')"></div>`).join('')
     :'<div class="note">Koi active user ka phone number save nahi hai.</div>';
+}
+// A user whose appRoles['fuel-tracker'] is admin/director/accountant can Edit Vehicle Details
+// without needing the Super Admin 10-tap unlock - Delete Vehicle and every other Manage tab
+// stay Super-Admin-only, unaffected by this role (deliberately narrower than full admin access).
+function canEditVehicleDetails(){
+  if(superAdminUnlocked)return true;
+  const u=loggedUser();
+  return !!(u&&u.appRoles&&['admin','director','accountant'].includes(u.appRoles['fuel-tracker']));
+}
+async function setFuelTrackerAccessRole(userId,role){
+  if(!superAdminUnlocked){alert('Sirf Super Admin role set kar sakta hai.');return}
+  try{
+    const update={};
+    update['appRoles.fuel-tracker']=role||firebase.firestore.FieldValue.delete();
+    await db.collection('universal_users').doc(userId).update(update);
+    toast('Role update ho gaya');
+  }catch(e){console.error('setFuelTrackerAccessRole failed',e);alert('Role update nahi ho paya.');}
+}
+function renderAccessManageTab(){
+  const list=$('mAccessList');
+  if(!list)return;
+  if(!superAdminUnlocked){list.innerHTML='<div class="note">Sirf Super Admin yeh dekh sakta hai.</div>';return}
+  const active=users.filter(u=>u.active!==false);
+  const ROLE_OPTS=[['','No Access'],['admin','Admin'],['director','Director'],['accountant','Accountant']];
+  list.innerHTML=active.length
+    ?active.map(u=>{
+      const cur=(u.appRoles&&u.appRoles['fuel-tracker'])||'';
+      return `<div class="item"><span>${esc(u.name)}</span><select onchange="setFuelTrackerAccessRole('${esc(u.id)}',this.value)">${ROLE_OPTS.map(([v,label])=>`<option value="${v}" ${cur===v?'selected':''}>${label}</option>`).join('')}</select></div>`;
+    }).join('')
+    :'<div class="note">Koi active user nahi hai.</div>';
 }
 function renderServiceManageTab(){
   const list=$('mServiceList');
