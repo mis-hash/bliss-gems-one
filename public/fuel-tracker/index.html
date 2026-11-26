@@ -484,6 +484,7 @@ tbody tr:hover td{background:#f7faf8}
 <button class="tab" data-tab="service" onclick="mtab(this,'service')">🔧 Service</button>
 <button class="tab" data-tab="documents" onclick="mtab(this,'documents')">📄 Documents</button>
 <button class="tab" data-tab="vehicles" onclick="mtab(this,'vehicles')">🚗 Vehicles</button>
+<button class="tab" data-tab="alerts" onclick="mtab(this,'alerts')">🔔 Alerts</button>
 </div>
 <div id="manageContent"></div>
 </div></div>
@@ -515,9 +516,26 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const todayISO=()=>new Date().toISOString().slice(0,10);
 const fmtAmt=n=>'₹'+Number(n||0).toLocaleString('en-IN');
+function normalizePhone(p){p=String(p||'').replace(/\D/g,'');if(p.length===11&&p[0]==='0')p=p.slice(1);if(p.length===10)p='91'+p;return p;}
+// Shared GREEN-API WhatsApp credentials - the SAME app_config/greenapi doc Petty Cash/Trip
+// Expense/Purchase Price Estimator already use (one shared account for the whole project, not
+// a per-app setup) - so a real send just reuses what's already configured, nothing new to set
+// up in GCP/GREEN-API itself.
+let waApi={};
+if(db)db.collection('app_config').doc('greenapi').get().then(doc=>{if(doc.exists)waApi=doc.data()||{};}).catch(e=>console.error('greenapi load failed',e));
+async function sendPhoneWA(phone,message){
+  if(!phone)return 'no-phone';
+  const id=String(waApi.idInstance||'').trim(),token=String(waApi.apiToken||'').trim(),base=String(waApi.baseUrl||'https://api.green-api.com').replace(/\/$/,'');
+  if(!id||!token){console.warn('GREEN-API settings missing');return 'no-credentials'}
+  const p=normalizePhone(phone);if(p.length<11)return 'invalid-phone';
+  try{
+    const r=await fetch(`${base}/waInstance${encodeURIComponent(id)}/sendMessage/${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:p+'@c.us',message})});
+    return r.ok?'sent':'api-error';
+  }catch(e){console.error('WA send failed:',e);return 'network-error'}
+}
 
 let users=[],fuelLog=[],serviceLog=[];
-let masters={vehicles:[],paymentModes:[],vehicleService:{},vehicleServiceDate:{},vehicleCleaning:{},vehicleDocs:{},vehicleMeta:{}};
+let masters={vehicles:[],paymentModes:[],vehicleService:{},vehicleServiceDate:{},vehicleCleaning:{},vehicleDocs:{},vehicleMeta:{},alertRecipients:[],cleaningReminderSent:{}};
 let currentUser=null,currentTab='records';
 let usersStarted=false,fuelStarted=false,mastersStarted=false,serviceStarted=false;
 
@@ -600,7 +618,7 @@ function seedStarterMastersIfEmpty(){
 function startMastersSync(){
   if(mastersStarted||!db)return;mastersStarted=true;
   seedStarterMastersIfEmpty();
-  db.collection('fv_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={vehicles:[],paymentModes:[],vehicleService:{},vehicleServiceDate:{},vehicleCleaning:{},vehicleDocs:{},vehicleMeta:{},...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  db.collection('fv_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={vehicles:[],paymentModes:[],vehicleService:{},vehicleServiceDate:{},vehicleCleaning:{},vehicleDocs:{},vehicleMeta:{},alertRecipients:[],cleaningReminderSent:{},...doc.data()};renderAll();if(typeof maybeAutoSendCleaningReminders==='function')maybeAutoSendCleaningReminders();},err=>console.error('masters sync error',err));
 }
 function saveMasters(){ if(db) db.collection('fv_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
 // Removes a vehicle from the master list only (Super Admin only, matching every other
@@ -1007,22 +1025,84 @@ function computeCleaningReminders(){
   });
   return due;
 }
+// Real recipients for a vehicle's Cleaning Due WhatsApp reminder: that vehicle's own
+// Responsible Doer (if one is set and has a phone number) PLUS whoever is checked in
+// Manage > Alerts (masters.alertRecipients, same picker pattern as Petty Cash's High
+// Amount Alert recipients) - deduplicated so a Doer who's ALSO checked there doesn't get
+// the message twice.
+function cleaningReminderRecipients(vehicle){
+  const meta=(masters.vehicleMeta&&masters.vehicleMeta[vehicle])||{};
+  const doer=meta.responsibleDoer?users.find(u=>u.id===meta.responsibleDoer):null;
+  const configured=users.filter(u=>u.active!==false&&u.phone&&(masters.alertRecipients||[]).includes(u.id));
+  const seen=new Set();
+  return [doer,...configured].filter(u=>{
+    if(!u||!u.phone||seen.has(u.id))return false;
+    seen.add(u.id);return true;
+  });
+}
+function buildCleaningReminderMessage(vehicle,reason){
+  return `🧽 *Bliss Gems & Minerals — Vehicle Tracker*\n\n${vehicle} ki safai is hafte abhi tak nahi hui hai (${reason}).\n\nKripya jald cleaning karwayein aur app mein "Mark Cleaned" kar dein.`;
+}
+// Manual (isAuto=false, always sends + shows a toast) and automatic (isAuto=true, called
+// only when this week's reminder hasn't gone out yet - see maybeAutoSendCleaningReminders)
+// both funnel through here, same shared send + same masters.cleaningReminderSent dedup
+// stamp either way, so a manual send also counts as "already sent this week" for auto-send.
+async function sendCleaningReminderWA(vehicle,isAuto){
+  const recipients=cleaningReminderRecipients(vehicle);
+  if(!recipients.length){if(!isAuto)toast('Koi recipient nahi mila - Manage > Alerts se add karein, ya vehicle ka Responsible Doer set karein (dono ka phone number hona chahiye).');return}
+  const due=computeCleaningReminders().find(d=>d.vehicle===vehicle);
+  const reason=due&&due.lastCleaned?'last clean: '+due.lastCleaned:'kabhi clean mark nahi hui';
+  const message=buildCleaningReminderMessage(vehicle,reason);
+  let anySent=false;
+  for(const u of recipients){
+    const result=await sendPhoneWA(u.phone,message);
+    if(result==='sent')anySent=true;
+  }
+  if(anySent){
+    if(!masters.cleaningReminderSent)masters.cleaningReminderSent={};
+    masters.cleaningReminderSent[vehicle]=mostRecentMonday();
+    saveMasters();
+  }
+  if(!isAuto)toast(anySent?'WhatsApp reminder bhej diya':'WhatsApp nahi bheja — GREEN-API settings ya phone number check karein');
+}
+// Client-side best-effort auto-send (this app has no server/cron - Spark plan has no Cloud
+// Functions/Scheduler, same constraint as Petty Cash's Director Hisaab auto-send): fires
+// once per masters sync update, for every vehicle that's due AND hasn't had a reminder sent
+// this week yet. Only actually fires when someone has the app open - no guarantee of exact
+// timing, just that it catches up the next time someone does.
+let cleaningAutoSendRunning=false;
+async function maybeAutoSendCleaningReminders(){
+  if(cleaningAutoSendRunning)return;
+  cleaningAutoSendRunning=true;
+  try{
+    const weekStart=mostRecentMonday();
+    for(const d of computeCleaningReminders()){
+      if((masters.cleaningReminderSent||{})[d.vehicle]===weekStart)continue;
+      await sendCleaningReminderWA(d.vehicle,true);
+    }
+  }finally{
+    cleaningAutoSendRunning=false;
+  }
+}
 function renderCleaningReminders(){
   const wrap=$('cleaningReminders');
   if(!wrap)return;
   const due=computeCleaningReminders();
   if(!due.length){wrap.innerHTML='';return;}
+  const weekStart=mostRecentMonday();
   wrap.innerHTML=`<div class="panel"><div class="ph"><span>🧽 Is Hafte ki Cleaning Due (har Monday se naya)</span></div><div class="pb">${due.map(d=>{
-    const meta=(masters.vehicleMeta&&masters.vehicleMeta[d.vehicle])||{};
-    const doerName=meta.responsibleDoer?nameOfUserId(meta.responsibleDoer):null;
-    const recipients=[doerName,'Admin','Accounts'].filter(Boolean).join(', ');
+    const recipients=cleaningReminderRecipients(d.vehicle);
+    const recipientNames=recipients.length?recipients.map(u=>u.name).join(', '):'Koi recipient configure nahi hai';
     const reason=d.lastCleaned?'Is hafte abhi clean nahi hui (last: '+esc(d.lastCleaned)+')':'Kabhi clean mark nahi hui';
+    const sentThisWeek=(masters.cleaningReminderSent||{})[d.vehicle]===weekStart;
+    const vSafe=esc(d.vehicle).replace(/'/g,"\\'");
+    const sendBtn=superAdminUnlocked?`<button class="btn small secondary" onclick="sendCleaningReminderWA('${vSafe}',false)">📤 ${sentThisWeek?'Dobara Bhejein':'Abhi Bhejein'}</button>`:'';
     return `<div class="item" style="flex-direction:column;align-items:stretch;gap:4px">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
         <span><b>${esc(d.vehicle)}</b> — ${reason}</span>
-        ${superAdminUnlocked?`<button class="btn small primary" onclick="markVehicleCleaned('${esc(d.vehicle)}')">✓ Mark Cleaned</button>`:'<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ Due</span>'}
+        <span style="display:flex;gap:6px;flex-wrap:wrap">${sendBtn}${superAdminUnlocked?`<button class="btn small primary" onclick="markVehicleCleaned('${vSafe}')">✓ Mark Cleaned</button>`:'<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ Due</span>'}</span>
       </div>
-      <small class="note">📲 WhatsApp jayega: ${esc(recipients)} (app khulte hi — real sending GREEN-API connect hone ke baad)</small>
+      <small class="note">📲 WhatsApp jayega: ${esc(recipientNames)}${sentThisWeek?' • is hafte bheja ja chuka hai':''}</small>
     </div>`;
   }).join('')}</div></div>`;
 }
@@ -1954,7 +2034,28 @@ function renderManage(){
     c.innerHTML=`<p class="note">Vehicle ko list se permanently hata dein. Iske purane fuel/service/document records delete NAHI honge (wo apni apni tabs se alag delete karein).</p>
     <div id="mVehiclesList"></div>`;
     renderVehiclesManageTab();
+  }else if(currentTab==='alerts'){
+    c.innerHTML=`<p class="note">Cleaning Due WhatsApp reminder kisko jaaye, yahan se select karein (har vehicle ke Responsible Doer ko to pehle se hi jaata hai, agar unka phone number set ho). Sirf phone number wale active users yahan dikhte hain.</p>
+    <div id="mAlertsList"></div>`;
+    renderAlertsManageTab();
   }
+}
+function toggleAlertRecipient(userId){
+  if(!masters.alertRecipients)masters.alertRecipients=[];
+  const i=masters.alertRecipients.indexOf(userId);
+  if(i===-1)masters.alertRecipients.push(userId);else masters.alertRecipients.splice(i,1);
+  saveMasters();
+  renderAlertsManageTab();
+}
+function renderAlertsManageTab(){
+  const list=$('mAlertsList');
+  if(!list)return;
+  if(!superAdminUnlocked){list.innerHTML='<div class="note">Sirf Super Admin yeh dekh sakta hai.</div>';return}
+  const withPhone=users.filter(u=>u.active!==false&&u.phone);
+  const selected=masters.alertRecipients||[];
+  list.innerHTML=withPhone.length
+    ?withPhone.map(u=>`<div class="item"><span>${esc(u.name)}</span><input type="checkbox" ${selected.includes(u.id)?'checked':''} onchange="toggleAlertRecipient('${esc(u.id)}')"></div>`).join('')
+    :'<div class="note">Koi active user ka phone number save nahi hai.</div>';
 }
 function renderServiceManageTab(){
   const list=$('mServiceList');
@@ -2099,6 +2200,7 @@ function renderAll(){
     else if(currentTab==='service')renderServiceManageTab();
     else if(currentTab==='documents')renderDocumentsManageTab();
     else if(currentTab==='vehicles')renderVehiclesManageTab();
+    else if(currentTab==='alerts')renderAlertsManageTab();
   }
 }
 
