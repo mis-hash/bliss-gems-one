@@ -1393,22 +1393,32 @@ function sendOverdueReminder(tripId,opts){
   if(!(opts&&opts.silent))toast('Reminder bhej diya.');
 }
 // Auto-fires the same Admin+Doer Overdue reminder the manual "Send WhatsApp Reminder" button
-// sends, the first time an Admin/Director's session sees a trip go overdue each day - no Cloud
-// Function/cron needed (Spark plan), the check just runs off whichever Admin/Director session
-// is open. isOverdue() is checked first so only trips that are actually overdue right now ever
-// fire. Dedup is a lastOverdueReminderSentAt date stamp on the trip doc itself, so re-opening
-// the app or multiple Admin sessions the same day don't resend; a rare double-send if two
-// Admin sessions both check before either writes the stamp is an acceptable tradeoff here.
+// sends, up to OVERDUE_REMINDER_MAX_PER_DAY times a day (spaced at least
+// OVERDUE_REMINDER_MIN_GAP_HOURS apart) for as long as a trip stays overdue, but only within
+// office hours (OVERDUE_OFFICE_HOURS_START-OVERDUE_OFFICE_HOURS_END) - no Cloud Function/cron
+// needed (Spark plan), the check just runs off whichever Admin/Director session happens to be
+// open. isOverdue() is checked first so only trips that are actually overdue right now ever
+// fire. Dedup/count lives on the trip doc itself (overdueReminderCount + overdueReminderCountDate
+// + lastOverdueReminderSentAt), reset once the date rolls over, so re-opening the app or
+// multiple Admin sessions the same day don't resend past the daily cap; a rare double-send if
+// two Admin sessions both check before either writes the stamp is an acceptable tradeoff here.
+const OVERDUE_OFFICE_HOURS_START=10; // 10 AM
+const OVERDUE_OFFICE_HOURS_END=19; // 7 PM
+const OVERDUE_REMINDER_MAX_PER_DAY=2;
+const OVERDUE_REMINDER_MIN_GAP_HOURS=3;
 let overdueReminderBusy=false;
 async function autoSendOverdueReminders(){
-  // Must wait for users data first - effectiveRole()/myRole() reads `users`, which syncs
-  // separately from trips with no ordering guarantee (both start together in boot()). If
-  // trips' snapshot arrives before users' does, `users` is still empty, myRole() silently
-  // returns null regardless of the real logged-in user's actual role, and this gate fails
-  // even for a genuine Admin/Director - so this never silently sends nothing again once
-  // users data has actually loaded.
+  // Must wait for users data first - myRole() reads `users`, which syncs separately from
+  // trips with no ordering guarantee (both start together in boot()). If trips' snapshot
+  // arrives before users' does, `users` is still empty and this gate fails even for a real
+  // logged-in employee - so this never silently sends nothing again once users data has
+  // actually loaded.
   if(!usersLoaded){console.log('[overdue-reminder] skipped: users data not loaded yet');return;}
-  if(effectiveRole()!=='admin' && effectiveRole()!=='director'){console.log('[overdue-reminder] skipped: effectiveRole() is',JSON.stringify(effectiveRole()),'(need admin/director) - currentUser:',JSON.stringify(currentUser));return;}
+  // No longer Admin/Director-only - ANY logged-in employee opening the app (any role) now
+  // triggers this check, so an overdue reminder isn't stuck waiting for an Admin/Director to
+  // happen to open their session. Recipients (Doer + Admin/Director) are unaffected by this -
+  // only who can trigger the check changed, not who the message goes to.
+  if(!currentUser){console.log('[overdue-reminder] skipped: no user logged in - currentUser:',JSON.stringify(currentUser));return;}
   // Must wait for ledger data too, not just trips - tripBalance()/Outstanding reads from
   // `ledger`, which syncs separately and can still be empty the moment trips load (both
   // syncs start together in boot() with no ordering guarantee), which would otherwise send
@@ -1423,10 +1433,22 @@ async function autoSendOverdueReminders(){
   overdueReminderBusy=true;
   try{
     const today=todayISO();
-    const due=trips.filter(t=>isOverdue(t) && t.lastOverdueReminderSentAt!==today);
+    const nowHour=new Date().getHours();
+    if(nowHour<OVERDUE_OFFICE_HOURS_START || nowHour>=OVERDUE_OFFICE_HOURS_END){console.log('[overdue-reminder] skipped: outside office hours ('+nowHour+'h)');return;}
+    const due=trips.filter(t=>{
+      if(!isOverdue(t))return false;
+      const countToday=(t.overdueReminderCountDate===today)?(t.overdueReminderCount||0):0;
+      if(countToday>=OVERDUE_REMINDER_MAX_PER_DAY)return false;
+      if(countToday>0 && t.lastOverdueReminderSentAt){
+        const hoursSinceLast=(Date.now()-new Date(t.lastOverdueReminderSentAt).getTime())/3600000;
+        if(hoursSinceLast<OVERDUE_REMINDER_MIN_GAP_HOURS)return false;
+      }
+      return true;
+    });
     for(const t of due){
       sendOverdueReminder(t.id,{silent:true});
-      try{await db.collection('te_trips').doc(t.id).update({lastOverdueReminderSentAt:today});}catch(e){console.error('overdue reminder stamp failed',e);}
+      const countToday=(t.overdueReminderCountDate===today)?(t.overdueReminderCount||0):0;
+      try{await db.collection('te_trips').doc(t.id).update({lastOverdueReminderSentAt:new Date().toISOString(),overdueReminderCount:countToday+1,overdueReminderCountDate:today});}catch(e){console.error('overdue reminder stamp failed',e);}
     }
   }finally{
     overdueReminderBusy=false;
