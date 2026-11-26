@@ -384,6 +384,22 @@ tbody tr:hover td{background:#f7faf8}
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeAddVehicleModal()">Cancel</button><button class="btn primary" onclick="onboardVehicle()">＋ Onboard Vehicle</button></div>
 </div></div>
 
+<!-- Edit Vehicle Details modal -->
+<div class="modal" id="editVehicleModal"><div class="box" style="width:min(460px,100%)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">✏️ Vehicle Details Edit Karein</h3><button class="btn small" onclick="closeEditVehicleModal()">✕</button></div>
+<div class="grid">
+  <div class="field span2"><label>Vehicle Number</label><input id="evNumber" disabled></div>
+  <div class="field span2"><label>Vehicle Name / Model</label><input id="evName" placeholder="e.g. Delivery Van, TVS iQube, Honda City"></div>
+  <div class="field"><label>Vehicle Category</label><select id="evCategory"><option value="Car">🚗 Car</option><option value="Bike">🏍 Bike</option><option value="Scooter">🛵 Scooter (Activa etc.)</option><option value="Van">🚐 Van</option><option value="Other">Other</option></select></div>
+  <div class="field"><label>Vehicle Type</label><select id="evFuelType"><option value="Fuel">⛽ Fuel (Petrol/Diesel/CNG)</option><option value="Electric">⚡ Electric (EV)</option></select></div>
+  <div class="field"><label>Onboard Meter Reading</label><input type="number" id="evMeter"></div>
+  <div class="field span2"><label>Last Service Date</label><input type="date" id="evLastService"></div>
+  <div class="field span2"><label>Responsible Doer (is gaadi ka alert kisko jaaye)</label><select id="evResponsibleDoer"><option value="">-- Select --</option></select></div>
+</div>
+<p class="note" style="margin-top:8px">Vehicle Number change nahi ho sakta (fuel/service/document records isi number se linked hain) - number galat ho to naya vehicle onboard karke purana delete karein.</p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeEditVehicleModal()">Cancel</button><button class="btn primary" onclick="saveVehicleDetails()">✓ Save Changes</button></div>
+</div></div>
+
 <!-- New Service/Repair Entry modal -->
 <div class="modal" id="newServiceModal"><div class="box" style="width:min(460px,100%)">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">🔧 New Service / Repair Entry</h3><button class="btn small" onclick="closeNewServiceModal()">✕</button></div>
@@ -677,6 +693,12 @@ function renderSelects(){
     const au=users.filter(u=>u.active!==false);
     $('avResponsibleDoer').innerHTML='<option value="">-- Select --</option>'+au.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
     if(au.some(u=>u.id===cur))$('avResponsibleDoer').value=cur;
+  }
+  if($('evResponsibleDoer')){
+    const cur=$('evResponsibleDoer').value;
+    const au=users.filter(u=>u.active!==false);
+    $('evResponsibleDoer').innerHTML='<option value="">-- Select --</option>'+au.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+    if(au.some(u=>u.id===cur))$('evResponsibleDoer').value=cur;
   }
 }
 
@@ -1183,6 +1205,44 @@ function onboardVehicle(){
   closeAddVehicleModal();
   toast('Vehicle onboard ho gaya');
 }
+let editVehicleTarget=null;
+function openEditVehicleModal(vehicle){
+  if(!superAdminUnlocked){alert('Sirf Super Admin vehicle details edit kar sakta hai.');return}
+  editVehicleTarget=vehicle;
+  const meta=(masters.vehicleMeta&&masters.vehicleMeta[vehicle])||{};
+  $('evNumber').value=vehicle;
+  $('evName').value=meta.name||'';
+  $('evCategory').value=meta.category||'Car';
+  $('evFuelType').value=meta.fuelType||'Fuel';
+  $('evMeter').value=meta.onboardMeter!=null?meta.onboardMeter:'';
+  $('evLastService').value=meta.lastServiceDate||'';
+  if($('evResponsibleDoer')){
+    const au=users.filter(u=>u.active!==false);
+    $('evResponsibleDoer').innerHTML='<option value="">-- Select --</option>'+au.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+    $('evResponsibleDoer').value=meta.responsibleDoer||'';
+  }
+  $('editVehicleModal').classList.add('show');
+}
+function closeEditVehicleModal(){$('editVehicleModal')?.classList.remove('show');editVehicleTarget=null;}
+function saveVehicleDetails(){
+  if(!editVehicleTarget)return;
+  const meterRaw=$('evMeter').value;
+  const meter=meterRaw===''?null:parseFloat(meterRaw);
+  if(meterRaw!==''&&isNaN(meter)){alert('Meter Reading number honi chahiye.');return}
+  if(!masters.vehicleMeta)masters.vehicleMeta={};
+  const prev=masters.vehicleMeta[editVehicleTarget]||{};
+  masters.vehicleMeta[editVehicleTarget]=Object.assign({},prev,{
+    name:$('evName').value.trim(),
+    category:$('evCategory').value,
+    fuelType:$('evFuelType').value,
+    onboardMeter:meter,
+    lastServiceDate:$('evLastService').value||'',
+    responsibleDoer:$('evResponsibleDoer')?$('evResponsibleDoer').value:''
+  });
+  saveMasters();
+  closeEditVehicleModal();
+  toast('Vehicle details update ho gaye');
+}
 const DOC_ALERT_DAYS=15;
 function docDaysLeft(expiryDate){
   if(!expiryDate)return null;
@@ -1248,9 +1308,11 @@ function renderVehicleDocuments(){
     const doerName=meta.responsibleDoer?nameOfUserId(meta.responsibleDoer):null;
     const catIcon=CATEGORY_ICONS[meta.category]||'🚗';
     const evBadge=meta.fuelType==='Electric'?' <span class="pill" style="background:var(--mint);color:var(--g)">⚡ EV</span>':'';
-    const delBtn=superAdminUnlocked?` <button class="btn small danger" onclick="deleteVehicle('${esc(v).replace(/'/g,"\\'")}')">🗑 Delete Vehicle</button>`:'';
+    const vSafeEdit=esc(v).replace(/'/g,"\\'");
+    const editBtn=superAdminUnlocked?` <button class="btn small secondary" onclick="openEditVehicleModal('${vSafeEdit}')">✏️ Edit Details</button>`:'';
+    const delBtn=superAdminUnlocked?` <button class="btn small danger" onclick="deleteVehicle('${vSafeEdit}')">🗑 Delete Vehicle</button>`:'';
     return `<div class="item" style="flex-direction:column;align-items:stretch;gap:8px">
-      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><b style="font-size:15px">${catIcon} ${esc(v)}${meta.name?' — '+esc(meta.name):''}</b>${evBadge}<span class="note">Current Meter: <b>${curMeter!=null?curMeter.toLocaleString('en-IN'):'-'}</b></span>${delBtn}</div>
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><b style="font-size:15px">${catIcon} ${esc(v)}${meta.name?' — '+esc(meta.name):''}</b>${evBadge}<span class="note">Current Meter: <b>${curMeter!=null?curMeter.toLocaleString('en-IN'):'-'}</b></span>${editBtn}${delBtn}</div>
       <div class="note">Insurance: ${ins.startDate?esc(ins.startDate):'-'} → ${ins.expiryDate?esc(ins.expiryDate):'-'}${meta.lastServiceDate?' • Last Service: '+esc(meta.lastServiceDate):''}${doerName?' • Responsible: '+esc(doerName):''}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${pills}</div>
     </div>`;
@@ -2111,7 +2173,7 @@ function renderVehiclesManageTab(){
   const vehicles=masters.vehicles||[];
   list.innerHTML=vehicles.length?vehicles.map(v=>{
     const vSafe=esc(v).replace(/'/g,"\\'");
-    return `<div class="item"><span><b>${esc(v)}</b></span><button class="btn small danger" onclick="deleteVehicle('${vSafe}')">🗑 Delete Vehicle</button></div>`;
+    return `<div class="item"><span><b>${esc(v)}</b></span><span style="display:flex;gap:6px"><button class="btn small secondary" onclick="openEditVehicleModal('${vSafe}')">✏️ Edit</button><button class="btn small danger" onclick="deleteVehicle('${vSafe}')">🗑 Delete Vehicle</button></span></div>`;
   }).join(''):'<div class="note">Koi vehicle nahi hai.</div>';
 }
 function renderRecordsManageTab(){
