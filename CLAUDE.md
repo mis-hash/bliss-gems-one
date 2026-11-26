@@ -98,15 +98,18 @@ there's a reason it was left out).
    `public/apps.json`/the hub's sidebar — a rename that's only half done (see its own
    section below for the renamed-vs-not detail). Fuel log with mileage/cost-per-km,
    service log, document (RC/insurance/license) expiry alerts.
-8. **AI Business Assistant** — `public/ai-assistant/index.html` —
-   https://bliss-gems-one.web.app/ai-assistant/ — Admin/Director-only chat tool that
-   answers a small fixed set of keyword-matched questions (open trips, low stock, petty
-   cash balance, today's fuel spend, Busy export total) by reading other apps' Firestore
-   collections read-only. Not a real LLM integration — see its own section below.
+8. **Directors Assistant** (renamed from "AI Business Assistant") —
+   `public/ai-assistant/index.html` — https://bliss-gems-one.web.app/ai-assistant/ —
+   Admin/Director-only chat tool that answers a small fixed set of keyword-matched
+   questions (open trips, low stock, petty cash balance, today's fuel spend, Busy report
+   totals/breakdowns) by reading other apps' Firestore collections read-only, plus
+   multiple named Busy accounting-software report uploads (xlsx/xls/csv). Not a real LLM
+   integration — see its own section below.
 9. **Sales Call Log** — `public/sales-call-log/index.html` —
    https://bliss-gems-one.web.app/sales-call-log/ — Sales call logging (with audio
-   recording) plus a Pipeline/Leads tab and a Directors-only Sales Insights/Call Analysis
-   tab. The call log itself is **localStorage-only, not synced** — see Shared architecture.
+   recording) plus Pipeline/Leads and Follow-up Reminders tabs, a My Performance tab, and
+   a Directors-only Sales Insights/Call Analysis tab. The call log itself is
+   **localStorage-only, not synced** — see Shared architecture.
 10. **Sales Panel** — `public/sales-panel/index.html` —
     https://bliss-gems-one.web.app/sales-panel/ — Customers/Orders/Calls mini-CRM. **Not
     in the live apps registry** (see the note above this list) — reachable by direct URL
@@ -206,14 +209,13 @@ One more exists in `public/` but isn't part of the ten above:
   becomes editable once the previous one is locked (`previousStagesLocked`). Locks live
   in `localStorage[APPROVAL_LOCK_KEY]`, keyed by `parcelId`.
   - `canEditField()` currently gives the Doer who locked a stage a **self-correction
-    grace window**: they can still edit that stage until the *next* stage also locks;
-    after that, only `unlockStageAsAdmin()` (Admin/Super Admin) can reopen it.
-  - **OPEN QUESTION as of the last session**: the user flagged this grace window as
-    possibly unwanted ("normal doer bhi pichla fill kiya hua edit kar sakta hai" — a
-    normal Doer can still edit a previously-filled section). I asked whether to remove
-    the self-correction window entirely so any locked stage needs Admin Unlock
-    immediately, even for the Doer who locked it. **Awaiting the user's answer** — do not
-    change `canEditField()` until they respond.
+    grace window**: a fixed `STAGE_SELF_CORRECTION_WINDOW_MS` (15 minutes) after locking,
+    during which only that same Doer can still edit it; after that, only
+    `unlockStageAsAdmin()` (Admin/Super Admin) can reopen it.
+  - **RESOLVED**: the user was asked whether to remove this grace window entirely so any
+    locked stage needs Admin Unlock immediately, even for the Doer who locked it — they
+    said to leave it as-is ("jaisa tha vaisa sai tha"). Do not remove/change this window
+    unless the user explicitly asks again.
 - **Analytics Dashboard** (renamed from a generic "Dashboard"): gated to Admin/Director
   only via `parcelDashboardAccessAllowed()` (`superAdminUnlocked` OR the logged-in Doer's
   `appRoles['parcel-dispatched']` is admin/director). Role is settable either from the
@@ -313,6 +315,36 @@ One more exists in `public/` but isn't part of the ten above:
   Uses the same direct-html2canvas-then-jsPDF pipeline as Purchase Price Estimator's PDF
   (see below) — built from a standalone HTML string (`buildTripSummaryHtml`), not a clone
   of any on-screen panel, since this app has no single "deal form" panel to clone.
+- **Reassigning a trip's Doer** (Edit Trip modal, Admin/Director only, same
+  `canEditTripDates()` gate): built in response to a real mistaken-issue incident — a
+  trip was issued to the wrong Sales Person by mistake. The "Sales Person (Doer)"
+  dropdown in `openEditTripModal`/`saveEditTrip` (same active-users list as the Issue
+  Advance form) reassigns `trip.salesId`/`salesName` in one step (confirm prompt naming
+  both old and new Doer, logged to Activity), **and sends the newly-assigned Doer the
+  same WhatsApp notification a fresh Issue Advance would** (`messageTemplates.reassigned`,
+  gated by `notifySettings.issued`) — added after the user pointed out the first version
+  silently reassigned with no message. Past ledger entries' own `byId`/`byName` (who
+  actually performed each past action) are left untouched — only which trip/person the
+  trip itself is attributed to going forward changes.
+- **"Live Sales Person Trips" (Admin Trip Control) is sorted newest-issue-first**
+  (`renderAdminPage`, sorted by `createdAt` descending) — previously rendered in
+  whatever arbitrary order Firestore's `onSnapshot` delivered trips.
+- **"BOOKED BY" tile** (Bookkeeping Register, `renderAccountsPage`): `markBooked()` now
+  stamps `bookedBy`/`bookedAt` on the trip doc (cleared via `FieldValue.delete()` on
+  `unmarkBooked()`) and shows a tile with that name once a trip is booked — same visual
+  pattern as the existing "RECEIVED BY" tile. Previously who-marked-it was only visible in
+  the Activity Log, not on the card itself.
+- **Automatic "no spending" Doer check-in** (`autoSendNoSpendingReminders`,
+  `NO_SPENDING_GAP_DAYS=2`): built in response to a real incident — a trip had been issued
+  2+ days with zero expense entries, and the user manually WhatsApp'd the Doer asking if
+  they were facing an app issue or genuinely hadn't spent yet. Automates exactly that:
+  same self-checking/dedup pattern as `autoSendOverdueReminders()` (role gate, re-entrancy
+  guard, a `lastNoSpendReminderSentAt` date stamp that blocks a same-day resend but
+  re-fires every subsequent day the trip is still at zero expenses — not a send-once-ever
+  reminder), goes **only to the Doer** (not Admin/Director, matching the user's own manual
+  message), stops the moment any expense entry is logged. New `messageTemplates.no_spending`
+  (English, matching the existing templates' style) and a `notifySettings.noSpending`
+  toggle (Notify settings page, Sales Person group), on by default.
 
 ## Stationery Inventory — specifics
 
@@ -424,26 +456,52 @@ One more exists in `public/` but isn't part of the ten above:
   — follow this same approach rather than introducing a charting library if another app
   ever needs a similar trend view.
 
-## AI Business Assistant — specifics
+## Directors Assistant — specifics
 
-- **Not a real LLM / no AI API call anywhere** — despite the name, `answerQuestion()` is a
-  plain `if(q.includes(...))` keyword router over ~5 hardcoded intents (open trips,
-  stationery low stock, petty cash balance, today's fuel expense, Busy export total). A
-  question outside those 5 gets a fixed "I can only answer these for now" reply. If the
-  user asks for it to "understand more" or "answer anything", that means adding more
-  keyword branches to `answerQuestion()`, not integrating a real model, unless they
-  explicitly ask for the latter (which would need its own API key/billing decision — this
-  project must stay on Firebase's free Spark plan, see above, but a separate LLM API is a
-  different billing surface entirely and would need explicit sign-off).
+- **Renamed from "AI Business Assistant"** to **"Directors Assistant"** (title, brand,
+  gate text in `public/ai-assistant/index.html`, and the `name` field in
+  `public/apps.json` that drives the hub card/sidebar label) — folder/slug/URL
+  (`public/ai-assistant/`, `/ai-assistant/`) and all function/variable names are
+  unchanged, only the user-facing name changed. If older notes or git history refer to
+  "AI Business Assistant", that's this same app.
+- **Not a real LLM / no AI API call anywhere** — despite the (new) name, `answerQuestion()`
+  is a plain `if(q.includes(...))` keyword router over a handful of hardcoded intents
+  (open trips, stationery low stock, petty cash balance, today's fuel expense, Busy
+  report totals/breakdowns). A question outside those gets a fixed "I can only answer
+  these for now" reply. If the user asks for it to "understand more" or "answer
+  anything", that means adding more keyword branches to `answerQuestion()`, not
+  integrating a real model, unless they explicitly ask for the latter (which would need
+  its own API key/billing decision — this project must stay on Firebase's free Spark
+  plan, see above, but a separate LLM API is a different billing surface entirely and
+  would need explicit sign-off). **Confirmed again in a later session**: user explicitly
+  chose "Free rahe, keywords badhao" over a paid LLM — keep this free/keyword-based
+  unless they say otherwise.
 - **Read-only cross-app queries** (`liveTeTrips`/`liveSiItems`/`livePcLedger`/
   `liveFuelLog`): plain `.get()` reads (not `.onSnapshot()`) against other apps'
   collections (`te_trips`, `si_items`, `pc_ledger`, `fuel_log`) — this app never writes to
   any of them.
-- **Busy accounting software export**: Busy only supports a manual CSV/Excel export, no
-  API, so this is upload-the-latest-file, not a live connection. `parseBusyCsv` finds an
-  amount-like column by header name (falls back to the last fully-numeric column) and
-  stores only the **summary** (total + row count), not the raw rows — in localStorage
-  (`busy_import` collection isn't rules-covered; see the Shared architecture note above).
+- **Busy accounting software export — now supports multiple named reports**, not just one:
+  `parseBusySheet(arrayBuffer)` uses the **SheetJS/XLSX** library (loaded via CDN,
+  `cdnjs.cloudflare.com/.../xlsx.full.min.js`) to parse any of `.xlsx`/`.xls`/`.csv`
+  (replaced the old naive CSV-only string-split `parseBusyCsv`), auto-detecting an
+  amount column and an optional label/grouping column for a top-10 breakdown. Each
+  upload is named by the user (e.g. "Sales Register", "Purchase Register") and stored in
+  `BUSY_IMPORTS_KEY='ai_busy_imports'` (a map keyed by `busyReportKey(name)`) — uploading
+  the same name again refreshes that report instead of duplicating it. A chat question
+  naming a specific report answers about that one; with exactly one report uploaded it
+  answers about that one regardless of name; with 2+ reports and no name match it lists
+  all of them instead of guessing. A 👁 view button per report (`viewBusyReport`) shows
+  the total/row-count/top-10 breakdown — honest in the modal itself that only this
+  summary is stored, not the full raw file (still localStorage, not Firestore — see the
+  Shared architecture note on `busy_import` not being rules-covered).
+  - **Known real bug, already fixed**: `parseBusySheet` was initially handed the raw
+    `ArrayBuffer` from `FileReader.readAsArrayBuffer` directly, but `XLSX.read`'s
+    `type:'array'` needs a byte-indexable `Uint8Array` — this silently failed to parse in
+    a real browser (a jsdom test using the real `xlsx` npm package did NOT catch it,
+    since that package's own `XLSX.write(...,{type:'array'})` output was already a
+    `Uint8Array` — only a real-browser Playwright test surfaced it). Fixed with
+    `new Uint8Array(arrayBuffer)`. If this pattern is ever touched again, verify with a
+    real browser, not just jsdom.
 - **Gated to Admin/Director only** (`isAiAdmin`) — a logged-in user with no
   `appRoles['ai-assistant']` of admin/director sees a "Directors Only" gate screen, not
   the chat.
@@ -452,23 +510,60 @@ One more exists in `public/` but isn't part of the ten above:
 
 - **The call log itself is localStorage-only** (`CALL_LOG_KEY='scl_call_log'`, per-device,
   not synced) — see the Shared architecture note above for why. Everything else UI-visible
-  (pipeline stage overrides, call targets) is also localStorage
-  (`PIPELINE_OVERRIDE_KEY`/`CALL_TARGETS_KEY`) by the same constraint, not just the call
-  log.
-- **Three tabs**: 📞 Call Log (entry form + history, with audio recording +
-  `getAudioDuration`), 📈 Pipeline (`computePipelineLeads`/`pipelineCardHtml`, a lead's
-  stage defaults from its last call's outcome via `defaultStageForOutcome` but can be
-  manually overridden), and a Directors-only 👑 Directors tab
-  (`refreshDirectorsTabVisibility`, same `appRoles['sales-call-log']` admin/director gate
-  pattern as the other role-gated apps) holding Call Analysis Overview + a large set of
-  Sales Insights sections (`renderSalesInsightsHtml`): outcome leaderboard, objection→
-  outcome correlation, deal-size trend, stuck leads, follow-up speed, monthly/lost-rate
-  trends, top parties by volume, client-wise and per-sales-person breakdowns. Each
-  Insights section is colour-coded independently (see "color-code each Director Insights
-  section" in git history if adding another section — match that pattern, don't
-  reintroduce a single flat colour).
+  (pipeline stage overrides, follow-up reminders, call targets) is also localStorage
+  (`PIPELINE_OVERRIDE_KEY`/`FOLLOWUP_KEY`/`CALL_TARGETS_KEY`) by the same constraint, not
+  just the call log.
+- **Sidebar + bottomNav navigation** (same component/CSS as Petty Cash's left nav — grouped
+  buttons, active = mint background + green left border; replaced an earlier top-tab nav
+  per the user's explicit request to match Petty Cash's look). `goPage(id)` toggles `.on`
+  on `.sclPage` divs and on every `[data-page]` element (covers both the sidebar button and
+  its bottomNav twin via one shared class, not a unique ID per button). Two groups:
+  - **Operations**: 📞 Call Log (entry form + history, with audio recording +
+    `getAudioDuration`), 📈 Pipeline (`computePipelineLeads`/`pipelineCardHtml`, a lead's
+    stage defaults from its last call's outcome via `defaultStageForOutcome` but can be
+    manually overridden), ⏰ Follow-ups (`computeFollowups`/`followupCardHtml` -
+    Overdue/Aaj/Upcoming buckets from the reminder date set on a Pipeline card; Won/Lost
+    leads are excluded even with an old reminder still set).
+  - **Insights**: 📊 My Performance (`renderMyPerformance` - always the viewer's own data,
+    ignoring the shared filter), and two Directors-only tabs sharing one `.directorsNavBtn`
+    class (both hidden/shown together, both redirect to My Performance if access is lost
+    while open — see `refreshDirectorsTabVisibility()`), gated the same
+    `canViewAllSales()` way (`appRoles['sales-call-log']` admin/director, or the
+    Preview-as-Director toggle):
+    - 👑 **Directors**: Call Analysis Overview + a large set of Sales Insights sections
+      (`renderSalesInsightsHtml`), topped by a **Smart Coaching Flags** section
+      (`computeSalesPersonCoachingFlags`) — per-Sales-Person 🔴/🟠/🟢 flags turning the
+      Leaderboard/breakdown numbers into plain-language "what to discuss with this
+      person" bullets (negative-call ratio ≥30%, a declining win-rate trend, a topic
+      recurring ≥2× specifically in calls that showed resistance — deliberately excludes
+      topics from friction-free calls so a successful close's "Decision" topic doesn't
+      wrongly flag — or behind the weekly call target; an all-clear green flag when none
+      apply). Then outcome leaderboard, objection→outcome correlation, deal-size trend,
+      stuck leads, follow-up speed, monthly/lost-rate trends, top parties by volume,
+      client-wise and per-sales-person breakdowns. Each Insights section (and each
+      Pipeline/Follow-ups stage section) is colour-coded independently via the shared
+      `insightSectionHtml(icon, accent, accentbg, title, bodyHtml)` helper (see
+      "color-code each Director Insights section" in git history if adding another
+      section — match that pattern, don't reintroduce a single flat colour).
+    - 🎙 **Recordings** (`renderRecordingLibrary`): a searchable library of every call that
+      has a recording (own free-text search box on top of the shared Sales
+      Person/date filter bar), each as its own bordered `.recLibCard` (an earlier version
+      copied an undefined `class="item"` from Sales Panel's code and had no visible
+      separation at all — if a list ever looks flat/cramped again, check for exactly this:
+      a class copied from another app's code that isn't defined in this file's CSS).
+      Reuses the existing ▶ Play (`playRecording()`/`photoModal`) and 🧠 Analysis
+      (`callAnalysisCardHtml()`/the shared `callsExpanded` state) UI rather than
+      duplicating it.
+- **Call Analysis card color**: the dark "call intelligence" card (`callAnalysisCardHtml`,
+  `sentimentPillHtmlDark`) is **Teal/Mint** (matches the app's own brand palette) — was
+  dark navy, then briefly Deep Purple, before the user asked to see more options and
+  picked Teal/Mint for brand consistency. **Sales Panel has the exact same dark-card
+  pattern** (`sentimentPillHtmlDark`/`callAnalysisCardHtml` in `public/sales-panel/
+  index.html`) as a separate, independent implementation (not shared code) — it was
+  updated to match this same Teal/Mint, but if this card's color is ever changed again,
+  remember to also update Sales Panel's copy or explicitly confirm leaving it out of sync.
 - **`analyzeCallNote(note)`** is simple keyword/sentiment heuristics on the free-text call
-  note (not a real NLP/LLM call, same caveat as AI Business Assistant above) — drives the
+  note (not a real NLP/LLM call, same caveat as Directors Assistant above) — drives the
   sentiment pill and the objection-outcome insight.
 - **"Preview as Director" toggle** (`sclPreviewAsDirector`/`sclTogglePreviewAsDirector`,
   `SCL_PREVIEW_KEY`): lets anyone self-service-preview the Directors tab without actually
@@ -479,6 +574,25 @@ One more exists in `public/` but isn't part of the ten above:
   call-log rows for trying out the Insights sections before real data exists — make sure
   any new Insights section is exercised against this demo data path too, not just live
   rows, since that's how it'll first get reviewed.
+- **Mobile header overlap bug (fixed)**: the header's `<b>Sales Call Log</b>` brand title
+  wrapped to 2 lines on narrow phones, and the header-right button group (Preview toggle +
+  user badge + Logout) couldn't fit alongside it in the header's old *fixed* 68px height —
+  both visually overflowed and collided with the nav bar underneath. Fixed by giving
+  `header`/`.head` an automatic height (`flex-wrap` instead of a fixed `height:68px`) and
+  wrapping `<header>` + `.navBar` together in one `#topBar` sticky container, so the nav
+  bar no longer depends on a hardcoded `top: 68px` offset that assumed a single-line
+  header. If a future header/nav addition looks cramped or overlapping on a narrow
+  screen, check for this same pattern again (a fixed-height sticky element whose content
+  can wrap).
+- **Enterprise-readiness gap analysis** (discussed when asked what a multinational
+  company would find missing): the Pipeline, Follow-ups, and Recordings tabs, and the
+  Smart Coaching Flags section, above were built in direct response to gaps raised here.
+  Still **not** built (raised but not asked for yet — confirm before building): an
+  Admin/Settings tab (targets/categories/outcomes in one place),
+  phone/WhatsApp/email/calendar integrations, and an audit/edit-history log. The bigger
+  structural gaps (localStorage-only data per device, keyword-only "AI" analysis,
+  Spark-plan scale limits, weak auth) are architectural and were explained to the user as
+  honest trade-offs, not something to silently start fixing.
 
 ## Sales Panel — specifics
 
@@ -544,19 +658,15 @@ One more exists in `public/` but isn't part of the ten above:
 
 ## Known unresolved / pending items (as of this file's last update)
 
-1. **Stage-lock self-correction window** (see above) — awaiting user's yes/no on removing
-   it entirely.
-2. **Feature Access Control** (per-Doer, per-section/feature visibility toggles within
+1. **Feature Access Control** (per-Doer, per-section/feature visibility toggles within
    Parcel Dispatch, e.g. hiding specific stage sections or Notification Control from
    specific Doers) — a concrete proposal was given once but the user moved on to other
    requests without confirming. Do not build without re-confirming scope first.
-3. Hitesh Dusad's email was requested at one point (to set up his `appRoles['bliss-one']`
-   access) — check whether it was ever provided/added before asking again.
-4. **Trip Expense App has no way to backdate an expense** — `submitExpense()` always
+2. **Trip Expense App has no way to backdate an expense** — `submitExpense()` always
    stamps `at:new Date().toISOString()` and the Add Expense modal has no date field
    (Category/Amount/Paid To/Bill/Remark only). A date-picker fix was proposed to the user
    but never confirmed — don't add it without the user explicitly saying to.
-5. **Sales Panel is missing from `public/apps.json`** (see "Sales Panel — specifics" above)
+3. **Sales Panel is missing from `public/apps.json`** (see "Sales Panel — specifics" above)
    — looks like an oversight, not deliberate, but hasn't been confirmed with the user
    either way. Flag it if the topic comes up rather than silently adding or leaving it out.
 

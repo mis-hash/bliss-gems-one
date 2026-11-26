@@ -1663,8 +1663,19 @@ function openAppInline(slug,name){
       }catch(e){console.error('silent super admin propagation failed',e);}
     }
   };
-  frame.src='/'+slug+'/';
-  document.getElementById('appViewerOpenNew').href='/'+slug+'/';
+  // Setting iframe.src to the SAME URL it already has is a browser no-op (no navigation, no
+  // reload) - re-opening the same app from the sidebar without first opening a different one
+  // would keep showing whatever was loaded whenever this iframe first navigated there, even
+  // long after a new deploy. Force a true reload in that case instead of relying on the src
+  // assignment below to trigger one.
+  const target='/'+slug+'/';
+  if(frame.getAttribute('src')===target){
+    try{ frame.contentWindow.location.reload(); }
+    catch(e){ frame.src='about:blank'; setTimeout(()=>{ frame.src=target; },0); }
+  }else{
+    frame.src=target;
+  }
+  document.getElementById('appViewerOpenNew').href=target;
   document.getElementById('appViewer')?.classList.remove('hidden');
   document.getElementById('staffLoginWrap')?.classList.add('hidden');
   document.getElementById('sideDashboardBtn')?.classList.remove('active');

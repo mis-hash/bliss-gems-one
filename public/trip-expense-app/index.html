@@ -337,6 +337,11 @@ if(window.self!==window.top){
 <div class="field span2"><label>Remark / No Bill Reason</label><textarea id="expRemark"></textarea></div>
 </div><div class="actions"><button class="btn" onclick="hide('expense')">Cancel</button><button class="btn primary" id="expSubmitBtn" onclick="submitExpense()">Save Expense</button></div><div class="msg" id="expMsg"></div></div></div>
 
+<div class="modal" id="editExpense"><div class="box"><h3>Edit Expense</h3><div class="fields">
+<div class="field"><label>Category *</label><input id="editExpCategory" list="expCategoryList" autocomplete="off"></div>
+<div class="field"><label>Amount *</label><input type="number" id="editExpAmount"></div>
+</div><div class="actions"><button class="btn" onclick="hide('editExpense')">Cancel</button><button class="btn primary" id="editExpSubmitBtn" onclick="saveEditExpense()">Save Changes</button></div><div class="msg" id="editExpMsg"></div></div></div>
+
 <div class="modal" id="proofView"><div class="box"><h3>Bill / Proof</h3><img id="proofImg" style="max-width:100%;border-radius:8px"><div class="actions"><button class="btn" onclick="downloadProofImage()">⬇ Download</button><button class="btn" onclick="closeProofView()">Close</button></div></div></div>
 
 <div class="modal" id="closeTripModal"><div class="box" style="width:min(460px,100%)">
@@ -373,6 +378,7 @@ if(window.self!==window.top){
 <div class="modal" id="tripDetailModal"><div class="box" style="width:min(560px,100%)"><div id="tripDetailBody"></div><div class="actions"><button class="btn" onclick="hide('tripDetailModal')">Close</button></div></div></div>
 
 <div class="modal" id="editTripModal"><div class="box"><h3>Edit Trip</h3><div class="fields">
+<div class="field span2"><label>Sales Person (Doer) * <small style="font-weight:400;color:var(--muted)">(galti se kisi aur ko trip assign ho gayi ho to yahan se sahi Doer select karein)</small></label><select id="editTripSalesId"></select></div>
 <div class="field span2"><label>Location * <small style="font-weight:400;color:var(--muted)">(ek se zyada shehar ho to sab select karein)</small></label>
   <div id="editTripLocationChecks" style="display:flex;flex-wrap:wrap;gap:8px;border:1px solid var(--line);border-radius:8px;padding:8px;max-height:140px;overflow-y:auto"></div>
   <button class="btn" type="button" style="margin-top:6px" onclick="addNewLocationInEditTrip()">＋ Add new location…</button>
@@ -414,7 +420,7 @@ const todayISO=()=>new Date().toISOString().slice(0,10);
 function genId(){let d=new Date(),ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;return `TRP-${ds}-${String(Date.now()).slice(-4)}`}
 function genLedgerId(){return 'LG-'+Date.now()+'-'+Math.floor(Math.random()*1000)}
 
-let users=[],trips=[],allTripsRaw=[],deletedTrips=[],ledger=[],notifySettings={issued:true,additional:true,overdue:true,submitted:true,closed:true,booked:true};
+let users=[],trips=[],allTripsRaw=[],deletedTrips=[],ledger=[],notifySettings={issued:true,additional:true,overdue:true,submitted:true,closed:true,booked:true,noSpending:true};
 let messageTemplates={
   issued:'💰 Trip Advance Issued\nAmount: {amount}\nLocation: {location}\nHisaab Due: {due}\nTrip: {tripId}',
   additional:'💰 Additional Advance Issued\nAmount: {amount}\nTrip: {tripId}',
@@ -424,7 +430,9 @@ let messageTemplates={
   overdue:'🔴 *Hisaab Reminder — OVERDUE*\n\n👤 {name}\n📍 {location}\n📅 Due: {due} ({daysOverdue} din se pending)\n💰 Outstanding: *{balance}*\n\nKripya jald se jald hisaab submit karein.',
   overdue_admin:'🔴 *Hisaab Reminder — OVERDUE*\n\n👤 {name}\n📍 {location}\n📅 Due: {due} ({daysOverdue} din se pending)\n💰 Outstanding: *{balance}*\n\nKripya {name} se follow-up karke hisaab jald complete karwayein.',
   booking_pending:'📚 *Booking Pending — 1+ day*\n{name} • {location} • {tripId}\nNOC: {noc}\n\nPlease mark booking soon:\n{link}',
-  booking_pending_urgent:'🔴 *URGENT — Booking Pending {daysPending}+ days!*\n{name} • {location} • {tripId}\nNOC: {noc}\n\nMarking this as booked is mandatory — please do it now:\n{link}'
+  booking_pending_urgent:'🔴 *URGENT — Booking Pending {daysPending}+ days!*\n{name} • {location} • {tripId}\nNOC: {noc}\n\nMarking this as booked is mandatory — please do it now:\n{link}',
+  reassigned:'📋 Trip Aapko Assign Ki Gayi Hai\nLocation: {location}\nHisaab Due: {due}\nTrip: {tripId}\nCurrent Balance: {balance}',
+  no_spending:'⚠️ Spending Check\n{name}, it has been {days} days since your {location} trip was issued, and no expense entry has been logged yet.\nAre you facing any issue with the app, or is the spending still pending? Please update soon.\nTrip: {tripId}'
 };
 let currentUser=null;
 let usersStarted=false,usersLoaded=false,tripsStarted=false,ledgerStarted=false,ledgerLoaded=false,settingsStarted=false,optionsStarted=false,ledgerHeadsStarted=false,activityStarted=false,templatesStarted=false,expenseCategoriesStarted=false;
@@ -587,6 +595,7 @@ function startTripsSync(){
     renderAll();
     autoSendOverdueReminders();
     autoSendBookingReminders();
+    autoSendNoSpendingReminders();
   },err=>console.error('trips sync error',err));
 }
 function startLedgerSync(){
@@ -596,6 +605,7 @@ function startLedgerSync(){
     ledgerLoaded=true;
     renderAll();
     autoSendOverdueReminders();
+    autoSendNoSpendingReminders();
   },err=>console.error('ledger sync error',err));
 }
 function startSettingsSync(){
@@ -749,9 +759,10 @@ function tripOutstanding(tripId){
 // the Sales person's own Ledger page.
 function ledgerEntryLabel(l){return l.type==='advance'?'Initial Advance':l.type==='additional_advance'?'Additional Advance':l.type==='transfer_in'?'Received from '+(l.fromSalesName||'Sales'):l.type==='transfer_out'?'Transferred to '+(l.toSalesName||'Sales'):l.type==='party_cash'?'Add Fund From Party Cash — '+(l.partyName||''):(l.category||'Expense')}
 function ledgerEntryIsCredit(l){return l.type==='advance'||l.type==='additional_advance'||l.type==='transfer_in'||l.type==='party_cash'}
-function ledgerEntryRow(l,showDelete){
+function ledgerEntryRow(l,showDelete,showEdit){
   const delBtn=showDelete?`<button class="btn danger" style="padding:4px 8px;font-size:11px" onclick="deleteLedgerEntry('${esc(l.id)}','${esc(l.tripId)}')">🗑</button>`:'';
-  if(l.type==='expense')return `<div class="row"><span>${esc(l.category)}<br><small>${esc(l.at.slice(0,10))} • ${l.proofDataUri?'Proof attached':'No Bill'}</small></span>${l.proofDataUri?`<button class="btn" style="margin-right:8px" onclick="viewProof('${esc(l.id)}')">View Proof</button>`:''}<b>${money(l.amount)}</b>${delBtn}</div>`;
+  const editBtn=(showEdit&&l.type==='expense')?`<button class="btn" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();openEditExpenseModal('${esc(l.id)}')">✎ Edit</button>`:'';
+  if(l.type==='expense')return `<div class="row"><span>${esc(l.category)}<br><small>${esc(l.at.slice(0,10))} • ${l.proofDataUri?'Proof attached':'No Bill'}</small></span>${l.proofDataUri?`<button class="btn" style="margin-right:8px" onclick="viewProof('${esc(l.id)}')">View Proof</button>`:''}<b>${money(l.amount)}</b>${editBtn}${delBtn}</div>`;
   const label=ledgerEntryLabel(l),isCredit=ledgerEntryIsCredit(l);
   return `<div class="row"><span>${esc(label)}<br><small>${esc(l.at.slice(0,10))}${l.remark?' • '+esc(l.remark):''}</small></span><b style="color:${isCredit?'var(--g)':'var(--red)'}">${isCredit?'+ ':'- '}${money(l.amount)}</b>${delBtn}</div>`;
 }
@@ -770,6 +781,17 @@ async function deleteLedgerEntry(id,tripId){
   }catch(e){ console.error('delete ledger entry failed',e); alert('Delete fail ho gaya, dobara try karein.'); }
 }
 const NON_ADVANCE_LEDGER_TYPES=['expense','transfer_in','transfer_out','party_cash'];
+// A Doer correcting their own wrongly-entered expense amount/category is better handled at
+// the Doer's end than routed through Admin delete+reissue (user's explicit call - "Doer ke
+// end par hi best hai") - but only their own entry, only type 'expense' (not a transfer/
+// advance/party-cash, which involve another party's ledger too), and only while the trip
+// isn't closed yet (once Admin has Verified & Closed, the accounting is final - same rule
+// already applied to Un-submit Hisaab above).
+function canEditOwnExpense(l){
+  if(!l||l.type!=='expense'||l.byId!==currentUser)return false;
+  const t=trips.find(x=>x.id===l.tripId);
+  return !!t&&t.status!=='closed';
+}
 function isOverdue(t){return t.status!=='closed' && t.dueDate && t.dueDate<=todayISO()}
 
 /* ===== Issue / Extra / Expense / Hisaab / Close / Book ===== */
@@ -1055,6 +1077,38 @@ async function submitExpense(){
     if(btn)btn.disabled=false;
   }
 }
+let _editingExpenseId=null;
+function openEditExpenseModal(id){
+  const l=ledger.find(x=>x.id===id);
+  if(!canEditOwnExpense(l)){alert('Yeh entry ab edit nahi ho sakti.');return}
+  _editingExpenseId=id;
+  $('editExpCategory').value=l.category||'';
+  $('editExpAmount').value=l.amount;
+  $('editExpMsg').textContent='';
+  show('editExpense');
+}
+let _expenseEditSaving=false;
+async function saveEditExpense(){
+  if(_expenseEditSaving)return;
+  const l=ledger.find(x=>x.id===_editingExpenseId);
+  const msg=$('editExpMsg');
+  if(!canEditOwnExpense(l)){msg.style.color='#b43a35';msg.textContent='Yeh entry ab edit nahi ho sakti.';return}
+  const category=$('editExpCategory').value.trim(),amount=Number($('editExpAmount').value);
+  if(!category||!amount){msg.style.color='#b43a35';msg.textContent='Category aur Amount zaroori hain.';return}
+  _expenseEditSaving=true;
+  const btn=$('editExpSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    const oldAmount=l.amount,oldCategory=l.category;
+    await db.collection('te_ledger').doc(l.id).update({category,amount});
+    await addExpenseCategoryIfNew(category);
+    logActivity(((myUserObj()||{}).name||currentUser)+' edited an expense entry',`${oldCategory} ${money(oldAmount)} → ${category} ${money(amount)} • ${l.tripId}`);
+    hide('editExpense');
+    toast('Expense update ho gaya.');
+  }finally{
+    _expenseEditSaving=false;
+    if(btn)btn.disabled=false;
+  }
+}
 function hisaabSummaryLines(tripId){
   const advance=tripLedger(tripId).filter(l=>l.type==='advance'||l.type==='additional_advance').reduce((s,l)=>s+Number(l.amount||0),0);
   const expense=tripLedger(tripId).filter(l=>l.type==='expense').reduce((s,l)=>s+Number(l.amount||0),0);
@@ -1081,6 +1135,21 @@ async function submitHisaab(tripId){
     const me=myUserObj();
     if(me)sendWA(me.phone,`🧾 Aapka Hisaab Submit Ho Gaya\n${trip.location} • ${trip.id}\n\n${summary}\n\nAdmin verify karega.`);
   }
+}
+// Lets the Doer undo their OWN accidental "Submit Hisaab" click (built in direct response
+// to a real case: Submit clicked by mistake before all expenses were added) - only works
+// while still 'hisaab_submitted' (Admin hasn't verified/closed it yet); once closed, this
+// is a no-op and Admin's own trip tools are the only way to make further changes. No extra
+// role check needed beyond this - the button only ever renders on the Doer's own My Trip
+// card for their own trip.
+async function unsubmitHisaab(tripId){
+  const trip=trips.find(t=>t.id===tripId)||mySalesTrip();
+  if(!trip){alert('Koi active trip nahi hai.');return}
+  if(trip.status!=='hisaab_submitted'){alert('Ye trip ab "Hisaab Submitted" state mein nahi hai (Admin ne aage badha diya hoga) - ab un-submit nahi ho sakti.');return}
+  if(!confirm('Hisaab submission undo karni hai? Trip wapas Active ho jayegi, aap Expense add kar sakenge, phir dobara Submit kar dena.'))return;
+  await db.collection('te_trips').doc(tripId).update({status:'running'});
+  logActivity(((myUserObj()||{}).name||currentUser)+' un-submitted hisaab',`${trip.salesName||currentUser} · ${trip.location} · ${tripId}`);
+  toast('Hisaab un-submit ho gaya, trip wapas active hai.');
 }
 function closeTrip(tripId){
   const trip=trips.find(t=>t.id===tripId);
@@ -1291,9 +1360,10 @@ async function sendTripSummaryToDirectors(tripId,extra){
   recipients.forEach(u=>{ sendWA(u.phone,msg,{allowDirectorPdfOnly:true}); sendTripFileWA(u.phone,blob,fileName); });
 }
 async function markBooked(tripId){
-  await db.collection('te_trips').doc(tripId).update({bookedByAccounts:true});
+  const bookedByName=(myUserObj()||{}).name||currentUser;
+  await db.collection('te_trips').doc(tripId).update({bookedByAccounts:true,bookedBy:bookedByName,bookedAt:new Date().toISOString()});
   const trip=trips.find(t=>t.id===tripId);
-  logActivity(`${(myUserObj()||{}).name||currentUser} marked ${tripId} as Booked`,trip?`${trip.salesName} · ${trip.location}`:'');
+  logActivity(`${bookedByName} marked ${tripId} as Booked`,trip?`${trip.salesName} · ${trip.location}`:'');
   if(notifySettings.booked && trip){
     excludeDirectorPdfOnlyRecipients(usersWithRole('director')).filter(u=>!isBookkeepingNoticeExcluded(u.phone)).forEach(u=>sendWA(u.phone,renderTemplate(messageTemplates.booked,{tripId:trip.id})));
   }
@@ -1302,7 +1372,7 @@ async function markBooked(tripId){
 // shows up for booking (and booking reminders) again.
 async function unmarkBooked(tripId){
   if(!confirm('Is trip ko dobara "Ready to Book" mein daalna hai?'))return;
-  await db.collection('te_trips').doc(tripId).update({bookedByAccounts:false});
+  await db.collection('te_trips').doc(tripId).update({bookedByAccounts:false,bookedBy:firebase.firestore.FieldValue.delete(),bookedAt:firebase.firestore.FieldValue.delete()});
   const trip=trips.find(t=>t.id===tripId);
   logActivity(`${(myUserObj()||{}).name||currentUser} un-marked ${tripId} as Booked`,trip?`${trip.salesName} · ${trip.location}`:'');
 }
@@ -1323,22 +1393,32 @@ function sendOverdueReminder(tripId,opts){
   if(!(opts&&opts.silent))toast('Reminder bhej diya.');
 }
 // Auto-fires the same Admin+Doer Overdue reminder the manual "Send WhatsApp Reminder" button
-// sends, the first time an Admin/Director's session sees a trip go overdue each day - no Cloud
-// Function/cron needed (Spark plan), the check just runs off whichever Admin/Director session
-// is open. isOverdue() is checked first so only trips that are actually overdue right now ever
-// fire. Dedup is a lastOverdueReminderSentAt date stamp on the trip doc itself, so re-opening
-// the app or multiple Admin sessions the same day don't resend; a rare double-send if two
-// Admin sessions both check before either writes the stamp is an acceptable tradeoff here.
+// sends, up to OVERDUE_REMINDER_MAX_PER_DAY times a day (spaced at least
+// OVERDUE_REMINDER_MIN_GAP_HOURS apart) for as long as a trip stays overdue, but only within
+// office hours (OVERDUE_OFFICE_HOURS_START-OVERDUE_OFFICE_HOURS_END) - no Cloud Function/cron
+// needed (Spark plan), the check just runs off whichever Admin/Director session happens to be
+// open. isOverdue() is checked first so only trips that are actually overdue right now ever
+// fire. Dedup/count lives on the trip doc itself (overdueReminderCount + overdueReminderCountDate
+// + lastOverdueReminderSentAt), reset once the date rolls over, so re-opening the app or
+// multiple Admin sessions the same day don't resend past the daily cap; a rare double-send if
+// two Admin sessions both check before either writes the stamp is an acceptable tradeoff here.
+const OVERDUE_OFFICE_HOURS_START=10; // 10 AM
+const OVERDUE_OFFICE_HOURS_END=19; // 7 PM
+const OVERDUE_REMINDER_MAX_PER_DAY=2;
+const OVERDUE_REMINDER_MIN_GAP_HOURS=3;
 let overdueReminderBusy=false;
 async function autoSendOverdueReminders(){
-  // Must wait for users data first - effectiveRole()/myRole() reads `users`, which syncs
-  // separately from trips with no ordering guarantee (both start together in boot()). If
-  // trips' snapshot arrives before users' does, `users` is still empty, myRole() silently
-  // returns null regardless of the real logged-in user's actual role, and this gate fails
-  // even for a genuine Admin/Director - so this never silently sends nothing again once
-  // users data has actually loaded.
+  // Must wait for users data first - myRole() reads `users`, which syncs separately from
+  // trips with no ordering guarantee (both start together in boot()). If trips' snapshot
+  // arrives before users' does, `users` is still empty and this gate fails even for a real
+  // logged-in employee - so this never silently sends nothing again once users data has
+  // actually loaded.
   if(!usersLoaded){console.log('[overdue-reminder] skipped: users data not loaded yet');return;}
-  if(effectiveRole()!=='admin' && effectiveRole()!=='director'){console.log('[overdue-reminder] skipped: effectiveRole() is',JSON.stringify(effectiveRole()),'(need admin/director) - currentUser:',JSON.stringify(currentUser));return;}
+  // No longer Admin/Director-only - ANY logged-in employee opening the app (any role) now
+  // triggers this check, so an overdue reminder isn't stuck waiting for an Admin/Director to
+  // happen to open their session. Recipients (Doer + Admin/Director) are unaffected by this -
+  // only who can trigger the check changed, not who the message goes to.
+  if(!currentUser){console.log('[overdue-reminder] skipped: no user logged in - currentUser:',JSON.stringify(currentUser));return;}
   // Must wait for ledger data too, not just trips - tripBalance()/Outstanding reads from
   // `ledger`, which syncs separately and can still be empty the moment trips load (both
   // syncs start together in boot() with no ordering guarantee), which would otherwise send
@@ -1353,13 +1433,64 @@ async function autoSendOverdueReminders(){
   overdueReminderBusy=true;
   try{
     const today=todayISO();
-    const due=trips.filter(t=>isOverdue(t) && t.lastOverdueReminderSentAt!==today);
+    const nowHour=new Date().getHours();
+    if(nowHour<OVERDUE_OFFICE_HOURS_START || nowHour>=OVERDUE_OFFICE_HOURS_END){console.log('[overdue-reminder] skipped: outside office hours ('+nowHour+'h)');return;}
+    const due=trips.filter(t=>{
+      if(!isOverdue(t))return false;
+      const countToday=(t.overdueReminderCountDate===today)?(t.overdueReminderCount||0):0;
+      if(countToday>=OVERDUE_REMINDER_MAX_PER_DAY)return false;
+      if(countToday>0 && t.lastOverdueReminderSentAt){
+        const hoursSinceLast=(Date.now()-new Date(t.lastOverdueReminderSentAt).getTime())/3600000;
+        if(hoursSinceLast<OVERDUE_REMINDER_MIN_GAP_HOURS)return false;
+      }
+      return true;
+    });
     for(const t of due){
       sendOverdueReminder(t.id,{silent:true});
-      try{await db.collection('te_trips').doc(t.id).update({lastOverdueReminderSentAt:today});}catch(e){console.error('overdue reminder stamp failed',e);}
+      const countToday=(t.overdueReminderCountDate===today)?(t.overdueReminderCount||0):0;
+      try{await db.collection('te_trips').doc(t.id).update({lastOverdueReminderSentAt:new Date().toISOString(),overdueReminderCount:countToday+1,overdueReminderCountDate:today});}catch(e){console.error('overdue reminder stamp failed',e);}
     }
   }finally{
     overdueReminderBusy=false;
+  }
+}
+// Built in direct response to a real incident: Mukund Bhukhmaria's trip was issued 2+ days
+// ago with zero expense entries logged, and the user manually WhatsApp'd him asking if he
+// was facing an app issue or genuinely hadn't spent anything yet. Automates that exact
+// check-in, same self-checking/dedup pattern as autoSendOverdueReminders() above (one send
+// per day via a date stamp, not a reminder that escalates/repeats within the same day).
+// Goes ONLY to the Doer themselves (not Admin/Director) - the user's own manual message was
+// Doer-only, this just automates it, not a new broadcast.
+const NO_SPENDING_GAP_DAYS=2;
+let noSpendingReminderBusy=false;
+async function autoSendNoSpendingReminders(){
+  if(!usersLoaded){console.log('[no-spending-reminder] skipped: users data not loaded yet');return;}
+  if(effectiveRole()!=='admin' && effectiveRole()!=='director'){console.log('[no-spending-reminder] skipped: effectiveRole() is',JSON.stringify(effectiveRole()),'(need admin/director) - currentUser:',JSON.stringify(currentUser));return;}
+  if(!ledgerLoaded){console.log('[no-spending-reminder] skipped: ledger data not loaded yet');return;}
+  if(noSpendingReminderBusy){console.log('[no-spending-reminder] skipped: already running');return;}
+  noSpendingReminderBusy=true;
+  try{
+    const today=todayISO();
+    const now=Date.now();
+    const candidates=trips.filter(t=>{
+      if(t.status!=='running')return false;
+      if(t.lastNoSpendReminderSentAt===today)return false;
+      const issuedAt=t.createdAt||t.startDate;
+      if(!issuedAt)return false;
+      const daysSinceIssue=(now-new Date(issuedAt).getTime())/86400000;
+      if(daysSinceIssue<NO_SPENDING_GAP_DAYS)return false;
+      return tripLedger(t.id).filter(l=>l.type==='expense').length===0;
+    });
+    for(const t of candidates){
+      const sales=users.find(u=>u.id===t.salesId);
+      if(sales&&sales.phone){
+        const daysSinceIssue=Math.floor((now-new Date(t.createdAt||t.startDate).getTime())/86400000);
+        sendWA(sales.phone,renderTemplate(messageTemplates.no_spending,{name:t.salesName,location:t.location,days:daysSinceIssue,tripId:t.id}));
+      }
+      try{await db.collection('te_trips').doc(t.id).update({lastNoSpendReminderSentAt:today});}catch(e){console.error('no-spending reminder stamp failed',e);}
+    }
+  }finally{
+    noSpendingReminderBusy=false;
   }
 }
 const BOOKKEEPING_LINK='https://bliss-gems-one.web.app/trip-expense-app/?page=accounts';
@@ -1509,7 +1640,9 @@ function setAdminTripFilter(tripId){adminTripFilter=tripId;renderAdminPage();}
 function clearAdminNameFilter(){adminTripFilter=null;renderAdminPage();}
 function renderAdminPage(){
   const scoped=adminTripFilter?trips.filter(t=>t.id===adminTripFilter):trips;
-  const active=scoped.filter(t=>t.status!=='closed');
+  // Freshly-issued trips (newest createdAt first) show at the top of Live Sales Person
+  // Trips, instead of whatever arbitrary order Firestore's onSnapshot happened to deliver.
+  const active=scoped.filter(t=>t.status!=='closed').sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const totalIssued=scoped.reduce((s,t)=>s+tripIssued(t.id),0);
   const totalExpense=scoped.reduce((s,t)=>s+tripExpense(t.id),0);
   // Use tripOutstanding() (nets out returnedAmount for closed trips), not raw
@@ -1590,12 +1723,12 @@ function salesTripCardHtml(trip){
   const partyCash=tripLedger(trip.id).filter(l=>l.type==='party_cash').reduce((s,l)=>s+Number(l.amount||0),0);
   const transferReceived=tripLedger(trip.id).filter(l=>l.type==='transfer_in').reduce((s,l)=>s+Number(l.amount||0),0);
   const transferSent=tripLedger(trip.id).filter(l=>l.type==='transfer_out').reduce((s,l)=>s+Number(l.amount||0),0);
-  const rows=tripLedger(trip.id).filter(l=>NON_ADVANCE_LEDGER_TYPES.includes(l.type)).sort((a,b)=>b.at.localeCompare(a.at)).map(l=>ledgerEntryRow(l)).join('')||'<div class="row"><small>Koi expense abhi tak nahi.</small></div>';
+  const rows=tripLedger(trip.id).filter(l=>NON_ADVANCE_LEDGER_TYPES.includes(l.type)).sort((a,b)=>b.at.localeCompare(a.at)).map(l=>ledgerEntryRow(l,false,canEditOwnExpense(l))).join('')||'<div class="row"><small>Koi expense abhi tak nahi.</small></div>';
   const submitted=trip.status==='hisaab_submitted';
   const dueReached=!submitted&&trip.dueDate&&trip.dueDate<=todayISO();
   const tid=esc(trip.id);
   const submitBtn=submitted
-    ?`<div class="big" style="background:var(--mint);color:var(--g);cursor:default;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.3"><span>✅ Hisaab Submitted<br><small style="font-weight:500">Admin verify karega</small></span></div>`
+    ?`<div class="big" style="background:var(--mint);color:var(--g);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.3;gap:6px"><span>✅ Hisaab Submitted<br><small style="font-weight:500">Admin verify karega</small></span><button type="button" class="btn small" onclick="event.stopPropagation();unsubmitHisaab('${tid}')">↩ Un-submit (galti se ho gaya)</button></div>`
     :`<button class="big primary" style="${dueReached?'background:var(--amber)':''}" onclick="submitHisaab('${tid}')"><span>✓</span>Submit Hisaab${dueReached?' ⏰':''}</button>`;
   const dueBanner=dueReached?`<div class="row" style="background:var(--amberbg);border:1px solid var(--amber);border-radius:10px;margin:10px 0 0;color:var(--amber);font-weight:700"><small>⏰ Hisaab ki due date (${esc(trip.dueDate)}) aa gayi hai — Submit Hisaab zaroor karein.</small></div>`:'';
   return `<div class="trip"><h1>My ${esc(trip.location)} Trip</h1><p>${esc(trip.id)} • ${esc(trip.salesName)} • Hisaab Due ${esc(trip.dueDate)}</p>${dueBanner}
@@ -1717,13 +1850,14 @@ function renderAccountsPage(){
     const tag=t.bookedByAccounts?'<span class="tag">BOOKED</span>':'<span class="tag amber">READY TO BOOK</span>';
     return `<div class="person" style="cursor:pointer" onclick="openTripDetail('${esc(t.id)}')"><div class="pt"><div><h3>${esc(t.salesName)} • ${esc(t.location)} • ${esc(t.id)}</h3><p>${esc(t.purpose||'')} • ${esc(t.startDate)} → ${esc(t.dueDate)}</p></div>${tag}</div>
     <div class="money"><div class="m"><small>ISSUED</small><b>${money(issued)}</b></div><div class="m"><small>EXPENSE</small><b>${money(expense)}</b></div><div class="m"><small>RECEIVED</small><b>${money(t.returnedAmount||0)}</b></div><div class="m"><small>RECEIVED BY</small><b>${esc(t.closedBy||'-')}</b></div><div class="m"><small>STATUS</small><b>${esc(t.status)}</b></div><div class="m"><small>NOC</small><b>${esc(t.nocNumber||'-')}</b></div>
+    ${t.bookedByAccounts?`<div class="m"><small>BOOKED BY</small><b>${esc(t.bookedBy||'-')}</b></div>`:''}
     <div class="m"><small>ACTION</small>${!t.bookedByAccounts?`<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn primary" onclick="event.stopPropagation();markBooked('${esc(t.id)}')">Mark Booked</button><button class="btn" onclick="event.stopPropagation();sendBookingReminderNow('${esc(t.id)}')">🔔 Send Reminder</button></div>`:`<button class="btn" onclick="event.stopPropagation();unmarkBooked('${esc(t.id)}')">↩ Unmark Booked</button>`}</div></div></div>`;
   }).join('');
 }
 function renderNotifyPage(){
   const wrap=$('notifyRows');if(!wrap)return;
   const groups=[
-    ['👤 Sales Person','the person on the trip',[['issued','Advance issued to them'],['additional','Additional advance issued']]],
+    ['👤 Sales Person','the person on the trip',[['issued','Advance issued to them'],['additional','Additional advance issued'],['noSpending','Spending check-in (no expense entry for 2+ days)']]],
     ['▦ Admin','issues advances, verifies hisaab',[['submitted','Hisaab submitted, ready to verify'],['overdue','Overdue reminder (manual send)']]],
     ['📚 Accounts','books the closed trips',[['closed','Trip closed — NOC + settlement notice']]],
     ['★ Director','oversight, escalations',[['booked','Trip marked Booked']]],
@@ -1916,6 +2050,9 @@ function openEditTripModal(tripId){
   if(!canEditTripDates()){alert('Sirf Admin/Director trip edit kar sakte hain.');return}
   const t=trips.find(x=>x.id===tripId);if(!t)return;
   _editTripId=tripId;
+  const salesSel=$('editTripSalesId');
+  salesSel.innerHTML=users.filter(u=>u.active!==false).map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('')||'<option value="">Koi active user nahi hai.</option>';
+  salesSel.value=t.salesId||'';
   const currentLocations=String(t.location||'').split('&').map(s=>s.trim()).filter(Boolean);
   renderEditTripLocationChecks(currentLocations);
   $('editTripStart').value=t.startDate||'';
@@ -1928,20 +2065,41 @@ function openEditTripModal(tripId){
 async function saveEditTrip(){
   if(!_editTripId)return;
   const t=trips.find(x=>x.id===_editTripId);
+  const salesId=$('editTripSalesId').value;
   const location=getSelectedEditTripLocations().join(' & '),start=$('editTripStart').value,due=$('editTripDue').value;
   const msg=$('editTripMsg');
+  if(!salesId){msg.style.color='#b43a35';msg.textContent='Sales Person (Doer) select karein.';return}
   if(!location||!start||!due){msg.style.color='#b43a35';msg.textContent='Sabhi fields bharein, kam se kam 1 location select karein.';return}
   if(due<start){msg.style.color='#b43a35';msg.textContent='Due date, Start date se pehle nahi ho sakti.';return}
   const patch={location,startDate:start,dueDate:due};
+  // Reassigning the Doer only changes which trip/person this trip and its PAST ledger
+  // entries' totals are attributed to going forward (tripIssued/tripExpense filter by
+  // tripId, not salesId) - it does NOT rewrite each ledger entry's own byId/byName (who
+  // actually performed that action stays accurate in the activity history).
+  let newSalesForNotify=null;
+  if(salesId!==t.salesId){
+    const newSales=users.find(u=>u.id===salesId);
+    if(!confirm('Is trip ka Doer "'+(t.salesName||t.salesId)+'" se "'+(newSales?newSales.name:salesId)+'" kar diya jaaye?\n\nGalti se kisi aur Doer ko advance issue ho gaya ho to yahi sahi tarika hai use correct karne ka.'))return;
+    patch.salesId=salesId;
+    patch.salesName=newSales?newSales.name:salesId;
+    newSalesForNotify=newSales;
+  }
   if(t&&t.status==='closed')patch.closedBy=$('editTripReceivedBy').value.trim();
   const btn=$('editTripSaveBtn');if(btn)btn.disabled=true;
   try{
     await db.collection('te_trips').doc(_editTripId).update(patch);
+    if(patch.salesId)logActivity(((myUserObj()||{}).name||currentUser)+' changed trip Doer','from '+(t.salesName||t.salesId)+' to '+patch.salesName+' · '+_editTripId);
   }catch(e){
     console.error('edit trip failed',e);
     msg.style.color='#b43a35';msg.textContent='Save fail ho gaya, dobara try karein.';
     if(btn)btn.disabled=false;
     return;
+  }
+  // Same WhatsApp-on-assignment pattern as a fresh Issue Advance (notifySettings.issued) -
+  // the newly-assigned Doer gets told about this trip, same as if it had just been issued
+  // to them, instead of silently finding out only when they open the app.
+  if(newSalesForNotify && notifySettings.issued && newSalesForNotify.phone){
+    sendWA(newSalesForNotify.phone,renderTemplate(messageTemplates.reassigned,{location,due,tripId:_editTripId,balance:money(tripOutstanding(_editTripId))}));
   }
   if(btn)btn.disabled=false;
   hide('editTripModal');

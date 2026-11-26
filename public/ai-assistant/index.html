@@ -21,59 +21,123 @@
   window.addEventListener('unhandledrejection',function(e){console.error('Unhandled promise rejection:',e.reason);showCrashBanner(e.reason&&e.reason.message?e.reason.message:String(e.reason));});
 })();
 </script>
-<title>AI Business Assistant</title>
+<title>Directors Assistant</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<!-- Free client-side parsing only (no paid API) - lets Busy exports be uploaded as real
+     .xlsx/.xls, not just .csv, same free-plan constraint as everything else here. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Loaded as two separate libraries (not the html2pdf.js bundle) - same direct
+     html2canvas+jsPDF pipeline used by Purchase Price Estimator/Trip Expense/Petty Cash's
+     PDFs, which verifies the canvas actually has content before handing it to jsPDF. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-/* Same design system as the other Bliss apps, so all apps read as one family. */
-:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df}
+/* Same design system as the other Bliss apps, so all apps read as one family -
+   this pass only adds polish (shadows, gradients, motion, hierarchy) on top of the
+   same brand tokens; no color/structure change that would make this app look
+   out of place next to the others. */
+:root{--g:#268F76;--g2:#3FAF93;--mint:#E8F8F2;--bg:#FBFDFC;--line:#DCEAE4;--txt:#16241F;--muted:#6E7D76;--red:#b43a35;--redbg:#fff0ef;--amber:#a66b08;--amberbg:#fff6df;--shadow:0 1px 2px rgba(22,36,31,.04),0 4px 16px rgba(22,36,31,.05)}
 *{box-sizing:border-box}body{margin:0;font-family:'Work Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.45}
 button,input,select,textarea{font:inherit}
 h1,h2,h3,.card b,.tabular{font-family:'Manrope',sans-serif}
 .hidden{display:none!important}
-header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
-.head{height:100%;max-width:1180px;margin:auto;padding:0 18px;display:flex;align-items:center;justify-content:space-between}
-.brand{display:flex;gap:10px;align-items:center}
-.logo{width:44px;height:44px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:24px;font-weight:900;color:var(--g2)}
-.brand b{color:var(--g);font-size:20px;font-family:'Manrope',sans-serif}
+header{height:71px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;box-shadow:0 1px 0 rgba(22,36,31,.03);display:flex;flex-direction:column}
+header::before{content:'';display:block;height:3px;flex-shrink:0;background:linear-gradient(90deg,var(--g),var(--g2))}
+.head{flex:1;min-height:0;max-width:1180px;width:100%;margin:auto;padding:0 18px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:11px;align-items:center}
+.logo{width:44px;height:44px;border-radius:12px;background:linear-gradient(145deg,var(--mint),#d6f2e8);display:grid;place-items:center;font-size:23px;font-weight:900;color:var(--g2);box-shadow:inset 0 0 0 1px rgba(38,143,118,.12)}
+.brand b{color:var(--g);font-size:20px;font-family:'Manrope',sans-serif;letter-spacing:-.2px}
 .brand small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
 .headRight{display:flex;align-items:center;gap:10px}
 .pillbadge{font-size:13px;font-weight:700;background:var(--mint);color:var(--g);padding:7px 12px;border-radius:999px}
-.btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer;font-family:inherit}
-.btn.primary{background:var(--g);color:#fff}
+.btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer;font-family:inherit;transition:transform .12s ease,box-shadow .12s ease,background .12s ease}
+.btn:hover{background:#dcf2ea;transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.primary{background:var(--g);color:#fff;box-shadow:0 2px 8px rgba(38,143,118,.25)}
+.btn.primary:hover{background:#1f7a64;box-shadow:0 4px 12px rgba(38,143,118,.32)}
 .btn.secondary{background:#eef2f0;color:var(--txt)}
 .btn.small{padding:7px 11px;font-size:12px}
-.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:14px;z-index:50}
-.modal.show{display:flex}
-.box{width:min(640px,100%);background:#fff;border-radius:14px;padding:19px;max-height:90vh;overflow:auto}
-.field label{display:block;font-size:11px;font-weight:bold;margin-bottom:5px}
-.field input{width:100%;padding:11px;border:1px solid var(--line);border-radius:7px;font-size:14px;background:#fff;color:var(--txt)}
+.btn.danger{background:var(--redbg);color:var(--red)}
+.modal{position:fixed;inset:0;background:rgba(14,26,22,.55);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;padding:14px;z-index:50}
+.modal.show{display:flex;animation:fadeIn .15s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.box{width:min(640px,100%);background:#fff;border-radius:16px;padding:20px;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(14,26,22,.25);animation:popIn .16s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes popIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+.box h3{margin-top:0}
+.field label{display:block;font-size:11px;font-weight:bold;margin-bottom:5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+.field input{width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff;color:var(--txt);transition:border-color .12s ease,box-shadow .12s ease}
+.field input:focus{outline:none;border-color:var(--g2);box-shadow:0 0 0 3px rgba(63,175,147,.14)}
 .note{font-size:12px;color:var(--muted)}
-.gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px}
+.gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--line);border-radius:16px;padding:30px;box-shadow:var(--shadow)}
 
 .shell{max-width:1180px;margin:auto;padding:20px 18px 60px;display:flex;flex-wrap:wrap;gap:18px}
 .sidebar{flex:1 1 280px;min-width:260px;display:flex;flex-direction:column;gap:14px}
-.sideCard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}
-.sideCard .sTitle{font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--muted);margin-bottom:12px}
-.srcRow{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
-.srcDot{width:9px;height:9px;border-radius:50%;margin-top:6px;flex-shrink:0}
+.sideCard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:var(--shadow)}
+.sideCard .sTitle{font-size:11.5px;font-weight:800;letter-spacing:.6px;color:var(--muted);margin-bottom:13px}
+.srcRow{display:flex;align-items:flex-start;gap:11px;margin-bottom:13px;padding-bottom:13px;border-bottom:1px dashed var(--line)}
+.srcRow:last-child{margin-bottom:0;padding-bottom:0;border-bottom:0}
+.srcDot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex-shrink:0;box-shadow:0 0 0 3px rgba(0,0,0,.05)}
 .srcName{font-weight:700;font-size:13.5px}
-.srcMeta{font-size:12px;color:var(--muted)}
-.chip{display:block;width:100%;text-align:left;background:var(--mint);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:12.5px;color:var(--txt);cursor:pointer}
-.chatPanel{flex:2 1 480px;min-width:300px;background:#fff;border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;min-height:560px}
+.srcMeta{font-size:12px;color:var(--muted);line-height:1.5}
+.busyReportRow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 9px;border-radius:9px;font-size:12px;transition:background .12s ease}
+.busyReportRow:hover{background:var(--bg)}
+.chip{display:flex;align-items:center;width:100%;text-align:left;background:var(--mint);border:1px solid transparent;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:12.5px;color:var(--txt);cursor:pointer;transition:transform .12s ease,border-color .12s ease,background .12s ease}
+.chip:hover{border-color:var(--g2);background:#dff3ec;transform:translateX(2px)}
+.chip:last-child{margin-bottom:0}
+.chatPanel{flex:2 1 480px;min-width:300px;background:#fff;border:1px solid var(--line);border-radius:16px;display:flex;flex-direction:column;min-height:560px;box-shadow:var(--shadow);overflow:hidden}
 .msgs{flex:1;padding:22px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;max-height:70vh}
-.msg{max-width:85%;border-radius:14px;padding:12px 16px;font-size:13.5px;line-height:1.6;white-space:pre-line}
-.msg.user{align-self:flex-end;background:var(--g);color:#fff;border-radius:14px 14px 2px 14px}
+.msg{max-width:85%;border-radius:14px;padding:12px 16px;font-size:13.5px;line-height:1.6;white-space:pre-line;animation:msgIn .18s ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--g),var(--g2));color:#fff;border-radius:14px 14px 2px 14px;box-shadow:0 2px 8px rgba(38,143,118,.2)}
 .msg.ai{align-self:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:14px 14px 14px 2px}
 .srcTag{display:inline-block;font-size:10.5px;font-weight:700;color:var(--g);background:var(--mint);border-radius:999px;padding:3px 9px;margin:8px 6px 0 0}
-.inputRow{border-top:1px solid var(--line);padding:14px 16px;display:flex;gap:10px;align-items:center}
-.inputRow input{flex:1;border:1px solid var(--line);border-radius:999px;padding:11px 16px;font-size:13.5px;outline:none}
-.sendBtn{background:var(--g);color:#fff;border:none;border-radius:999px;width:40px;height:40px;font-size:15px;cursor:pointer;flex-shrink:0}
-.emptyMsgs{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted);gap:10px;padding:40px 20px}
+.inputRow{border-top:1px solid var(--line);padding:14px 16px;display:flex;gap:10px;align-items:center;background:#fff}
+.inputRow input{flex:1;border:1px solid var(--line);border-radius:999px;padding:11px 16px;font-size:13.5px;outline:none;transition:border-color .12s ease,box-shadow .12s ease}
+.inputRow input:focus{border-color:var(--g2);box-shadow:0 0 0 3px rgba(63,175,147,.14)}
+.micBtn{background:#fff;color:var(--g);border:1px solid var(--line);border-radius:999px;width:42px;height:42px;font-size:16px;cursor:pointer;flex-shrink:0;transition:background .12s ease,color .12s ease,border-color .12s ease,transform .12s ease}
+.micBtn:hover{transform:scale(1.06)}
+.micBtn.listening{background:#e03131;color:#fff;border-color:#e03131;animation:micPulse 1.1s ease-in-out infinite}
+@keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(224,49,49,.35)}50%{box-shadow:0 0 0 8px rgba(224,49,49,0)}}
+.micBtn.off{opacity:.4}
+.sendBtn{background:linear-gradient(135deg,var(--g),var(--g2));color:#fff;border:none;border-radius:999px;width:42px;height:42px;font-size:15px;cursor:pointer;flex-shrink:0;box-shadow:0 2px 8px rgba(38,143,118,.3);transition:transform .12s ease}
+.sendBtn:hover{transform:scale(1.06)}
+.sendBtn:active{transform:scale(.96)}
+.emptyMsgs{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted);gap:12px;padding:40px 20px}
+.emptyMsgs{font-size:38px}
+.emptyMsgs div{font-size:13.5px}
+/* Sources/Ask tab switcher - shown one panel at a time at EVERY screen width (not just
+   narrow screens - user explicitly asked for this after comparing both, preferring the
+   focused single-panel view even on a full-width desktop window over the old side-by-side
+   layout). "mobileTabs"/"mobileHide" class names kept as-is (no longer mobile-only) to avoid
+   an unnecessary rename churn across the HTML/CSS/JS that reference them. */
+.mobileTabs{display:flex;gap:8px;width:100%;margin-bottom:2px}
+.mobileTabs button{flex:1;padding:11px;border-radius:12px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted);cursor:pointer;transition:background .12s ease,color .12s ease,border-color .12s ease}
+.mobileTabs button.active{background:var(--g);color:#fff;border-color:var(--g);box-shadow:0 2px 8px rgba(38,143,118,.25)}
+.sidebar.mobileHide,.chatPanel.mobileHide{display:none}
+/* Report export PDF - built as a standalone off-screen HTML string (not a clone of any
+   on-screen panel, since the View modal's content isn't styled for print/export) rendered via
+   html2canvas+jsPDF, same pattern as the other Bliss apps' PDFs. */
+.reportPdfWrap{width:420px;background:#fff;padding:16px;box-sizing:border-box;font-family:'Work Sans',Arial,sans-serif;color:var(--txt)}
+.reportPdfHero{background:linear-gradient(135deg,var(--g),var(--g2));color:#fff;border-radius:14px;padding:16px;margin-bottom:14px;display:flex;align-items:center;gap:12px}
+.reportPdfHero .eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.05em;opacity:.85;font-weight:700}
+.reportPdfHero h1{font-size:19px;margin:4px 0 2px;font-weight:800;font-family:'Manrope',sans-serif}
+.reportPdfHero p{margin:0;font-size:12px;opacity:.9}
+.reportPdfHeroBadge{flex:none;width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:#fff}
+.reportPdfStats{display:flex;gap:10px;margin-bottom:14px}
+.reportPdfStatTile{flex:1;background:var(--mint);border-radius:10px;padding:10px}
+.reportPdfStatTile small{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:700;margin-bottom:3px}
+.reportPdfStatTile b{font-size:17px;color:var(--txt)}
+.reportPdfSectionTitle{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin:0 0 8px}
+.reportPdfTable{width:100%;border-collapse:collapse;margin-bottom:14px}
+.reportPdfTable th{text-align:left;font-size:10.5px;color:var(--muted);padding:6px 4px;border-bottom:1px solid var(--line)}
+.reportPdfTable th:last-child,.reportPdfTable td:last-child{text-align:right}
+.reportPdfTable td{font-size:12.5px;padding:7px 4px;border-bottom:1px solid var(--line)}
+.reportPdfFooter{font-size:10.5px;color:var(--muted);text-align:center;margin-top:4px}
 </style>
 </head>
 <body>
@@ -82,7 +146,7 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 
 <div id="appWrap" style="display:none">
 <header><div class="head">
-  <div class="brand"><div class="logo">🤖</div><div><b>AI Business Assistant</b><small>Bliss Gems &amp; Minerals</small></div></div>
+  <div class="brand"><div class="logo">🤖</div><div><b>Directors Assistant</b><small>Bliss Gems &amp; Minerals</small></div></div>
   <div class="headRight">
     <span class="pillbadge" id="loginBadge">Not Logged In</span>
     <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
@@ -90,15 +154,19 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 </div></header>
 
 <div class="shell">
-  <div class="sidebar">
+  <div class="mobileTabs">
+    <button type="button" id="mtabSources" onclick="aiSetMobileTab('sources')">🗂 Sources</button>
+    <button type="button" id="mtabAsk" class="active" onclick="aiSetMobileTab('ask')">💬 Ask a Question</button>
+  </div>
+  <div class="sidebar mobileHide">
     <div class="sideCard">
       <div class="sTitle">CONNECTED SOURCES</div>
       <div class="srcRow"><span class="srcDot" style="background:var(--g)"></span><div><div class="srcName">Bliss One — 6 Apps</div><div class="srcMeta">Trip, Stationery, Petty Cash, Vehicle • Live</div></div></div>
       <div class="srcRow"><span class="srcDot" style="background:var(--amber)"></span><div style="flex:1">
-        <div class="srcName">Busy</div>
-        <div class="srcMeta" id="busyStatus">Koi export upload nahi hua abhi tak</div>
-        <input type="file" id="busyFileInput" accept=".csv" style="display:none" onchange="handleBusyFileSelected(event)">
-        <button type="button" class="btn small" style="margin-top:8px" onclick="document.getElementById('busyFileInput').click()">⬆ Upload Busy Export (CSV)</button>
+        <div class="srcName">Busy / Live Sheet</div>
+        <div class="srcMeta">Busy ki export file (xlsx/xls/csv) upload karein, ya Google Sheet/Excel Online ka public CSV link connect karein - jitni reports chahiye utni (Sales, Purchase, Stock, Ledger, waghera). Naya upload/refresh usi naam ki purani report ko update kar dega.</div>
+        <div id="busyReportsList" style="margin-top:8px"></div>
+        <div style="display:flex;gap:6px;margin-top:8px"><button type="button" class="btn small" onclick="openBusyUploadModal()">⬆ File Upload</button><button type="button" class="btn small" onclick="openGoogleSheetModal()">🔗 Live Sheet Connect</button></div>
       </div></div>
       <div class="srcRow"><span class="srcDot" style="background:#C8C2B4"></span><div><div class="srcName" style="color:var(--muted)">Client/Supplier Portals</div><div class="srcMeta">Not connected — no API access yet</div></div></div>
     </div>
@@ -114,10 +182,12 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 
   <div class="chatPanel">
     <div class="msgs" id="msgsWrap">
-      <div class="emptyMsgs" id="emptyMsgs">💬<div style="max-width:320px">Left panel se koi sawaal try karein, ya niche type karein — Hindi ya English dono chalega.</div></div>
+      <div class="emptyMsgs" id="emptyMsgs">💬<div style="max-width:320px">Niche type karein, ya "Sources" tab ke "Try Asking" suggestions use karein — Hindi ya English dono chalega.</div></div>
     </div>
     <div class="inputRow">
       <input type="text" id="chatInput" placeholder="Apna sawaal type karein..." onkeydown="if(event.key==='Enter')sendChat()">
+      <button type="button" class="micBtn" id="ttsBtn" onclick="toggleTts()" title="Jawab bolna band karein">🔊</button>
+      <button type="button" class="micBtn" id="micBtn" onclick="toggleVoiceInput()" title="Bolkar poochein">🎤</button>
       <button type="button" class="sendBtn" onclick="sendChat()">➤</button>
     </div>
   </div>
@@ -130,6 +200,34 @@ header{height:68px;background:#fff;border-bottom:1px solid var(--line);position:
 <div class="field" style="margin-top:8px"><label>Password</label><input id="loginPassword" type="password" onkeydown="if(event.key==='Enter')doLogin()"></div>
 <p class="note" id="loginMsg" style="margin:8px 0 0"></p>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeLogin()">Cancel</button><button class="btn primary" onclick="doLogin()">Login</button></div>
+</div></div>
+
+<div class="modal" id="busyUploadModal"><div class="box" style="width:min(420px,100%)">
+<h3>Busy Report Add/Update Karein</h3>
+<div class="field"><label>Report ka naam (jaise "Sales Register", "Stock Summary")</label><input id="busyReportName" autocomplete="off"></div>
+<div class="field" style="margin-top:8px"><label>File (.xlsx, .xls ya .csv)</label><input type="file" id="busyFileInput" accept=".csv,.xlsx,.xls"></div>
+<p class="note" id="busyUploadMsg" style="margin:8px 0 0"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeBusyUploadModal()">Cancel</button><button class="btn primary" onclick="confirmBusyUpload()">Upload</button></div>
+</div></div>
+
+<div class="modal" id="googleSheetModal"><div class="box" style="width:min(480px,100%)">
+<h3>Live Sheet Connect Karein</h3>
+<p class="note">Koi bhi public CSV/XLSX/XLS link se live connect kar sakte hain - koi API key ya coding nahi chahiye. Jo bhi tool ho (Google Sheets, Excel Online, ya koi aur jiska data export/download-link public ho), agar usse ek public link mil jaye to wahi yahan paste kar dein:<br>
+<b>Google Sheets:</b> Share button se link lein, sharing "Anyone with the link can view" set karein, aur wahi normal link yahan paste kar dein (Publish to web karna zaroori nahi, link apne aap sahi format mein convert ho jayega).<br>
+<b>Excel Online (OneDrive):</b> File → Share → "Anyone with the link can view" → us link ka direct download/export link lein.<br>
+<b>Koi aur tool</b> (jaise Tally, ya koi CRM/automation tool): agar uska koi report "Publish"/"Public share link"/"Export URL" deta ho, wahi try karein - fetch/parse automatically ho jayega. Agar tool sirf login ke piche file deta hai (koi public link nahi), to wo "Live" connect nahi ho sakta - uska export file "File Upload" se daalna hoga.<br>
+Jo bhi link mile, wahi yahan paste kar dein - data update hone par "🔄" button se naya data mil jayega.</p>
+<div class="field" style="margin-top:8px"><label>Report ka naam (jaise "Sales Register")</label><input id="gsheetName" autocomplete="off"></div>
+<div class="field" style="margin-top:8px"><label>Public CSV/XLSX Link</label><input id="gsheetUrl" autocomplete="off" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"></div>
+<p class="note" id="gsheetMsg" style="margin:8px 0 0"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeGoogleSheetModal()">Cancel</button><button class="btn primary" id="gsheetConnectBtn" onclick="confirmGoogleSheetConnect()">Connect</button></div>
+</div></div>
+
+<div class="modal" id="busyViewModal"><div class="box" style="width:min(480px,100%)">
+<h3 id="busyViewTitle">Report</h3>
+<div id="busyViewBody"></div>
+<p class="note" id="busyViewPdfMsg" style="margin:8px 0 0"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeBusyViewModal()">Close</button><button class="btn primary" id="busyViewPdfBtn" onclick="downloadReportPdf()">⬇ Export PDF</button></div>
 </div></div>
 
 <script>
@@ -167,6 +265,21 @@ function doLogin(){
   renderAll();
 }
 function doLogout(){localStorage.removeItem(SESSION_KEY);currentUser=null;renderAll();}
+// Mobile-only tab switcher between the Sources sidebar and the Ask-a-question chat panel -
+// on wider screens the .mobileHide class has no effect (see the media query in <style>) so
+// both panels keep showing side by side as before; this only changes narrow-screen behaviour.
+function aiSetMobileTab(tab){
+  const sidebar=document.querySelector('.sidebar'),chat=document.querySelector('.chatPanel');
+  const btnS=$('mtabSources'),btnA=$('mtabAsk');
+  if(!sidebar||!chat||!btnS||!btnA)return;
+  if(tab==='sources'){
+    sidebar.classList.remove('mobileHide');chat.classList.add('mobileHide');
+    btnS.classList.add('active');btnA.classList.remove('active');
+  }else{
+    chat.classList.remove('mobileHide');sidebar.classList.add('mobileHide');
+    btnA.classList.add('active');btnS.classList.remove('active');
+  }
+}
 
 function startUsersSync(){
   if(!db)return;
@@ -178,12 +291,12 @@ function renderGate(){
   const u=loggedUser();
   if(!currentUser||!u){
     gateWrap.style.display='flex';appWrap.style.display='none';
-    gateBox.innerHTML=`<h3>Login Required</h3><p class="note">AI Business Assistant dekhne ke liye login karein — wahi username/password jo baaki Bliss apps me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
+    gateBox.innerHTML=`<h3>Login Required</h3><p class="note">Directors Assistant dekhne ke liye login karein — wahi username/password jo baaki Bliss apps me use hota hai.</p><button class="btn primary" onclick="openLogin()">Login</button>`;
     return;
   }
   if(!isAiAdmin(u)){
     gateWrap.style.display='flex';appWrap.style.display='none';
-    gateBox.innerHTML=`<h3>Directors Only</h3><p class="note">Yeh tool sirf Admin/Director access wale log use kar sakte hain. Bliss One hub ke Manage → Universal Users mein "AI Business Assistant" role set karwayein.</p>`;
+    gateBox.innerHTML=`<h3>Directors Only</h3>`;
     return;
   }
   gateWrap.style.display='none';appWrap.style.display='block';
@@ -200,18 +313,29 @@ function liveTeTrips(cb){ return db.collection('te_trips').get().then(snap=>{con
 function liveSiItems(cb){ return db.collection('si_items').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows);}).catch(e=>{console.error('liveSiItems failed:',e);cb([]);}); }
 function livePcLedger(cb){ return db.collection('pc_ledger').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}).catch(e=>{console.error('livePcLedger failed:',e);cb([]);}); }
 function liveFuelLog(cb){ return db.collection('fuel_log').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows.filter(x=>!x.deletedAt));}).catch(e=>{console.error('liveFuelLog failed:',e);cb([]);}); }
-// Busy import summary is stored in localStorage, not Firestore - "busy_import" is a brand
-// new collection this app introduced, and this project's Firestore security rules only
-// allow the collections that already existed (confirmed: a direct unauthenticated read on
-// it returns 403 PERMISSION_DENIED, while existing collections like te_trips are open).
-// Adding a new collection needs a rules change in the Firebase Console, which this app
-// can't make itself - localStorage avoids that entirely, at the cost of this one summary
-// being per-device rather than synced for every Director. Can move to Firestore once the
-// rule is added.
-const BUSY_IMPORT_KEY='ai_busy_import_latest';
-function liveBusyImport(cb){
-  try{ const raw=localStorage.getItem(BUSY_IMPORT_KEY); cb(raw?JSON.parse(raw):null); }
-  catch(e){ console.error('liveBusyImport read failed:',e); cb(null); }
+function liveTeLedger(cb){ return db.collection('te_ledger').get().then(snap=>{const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));cb(rows);}).catch(e=>{console.error('liveTeLedger failed:',e);cb([]);}); }
+// Busy import summaries are stored in localStorage, not Firestore - "busy_import" is a
+// brand new collection this app introduced, and this project's Firestore security rules
+// only allow the collections that already existed (confirmed: a direct unauthenticated
+// read on it returns 403 PERMISSION_DENIED, while existing collections like te_trips are
+// open). Adding a new collection needs a rules change in the Firebase Console, which this
+// app can't make itself - localStorage avoids that entirely, at the cost of being
+// per-device rather than synced for every Director. Can move to Firestore once the rule
+// is added.
+// Keyed by a slugified report NAME (not overwritten by every upload like the old single
+// "latest" record) so a Director can upload as many different Busy report types as they
+// like (Sales Register, Purchase Register, Stock Summary, ...) side by side - re-uploading
+// the same name refreshes that one report (the expected daily-re-upload flow), it does
+// not pile up duplicates.
+const BUSY_IMPORTS_KEY='ai_busy_imports';
+function busyReportKey(name){ return String(name||'').trim().toLowerCase().replace(/\s+/g,'-'); }
+function liveBusyImports(cb){
+  try{ const raw=localStorage.getItem(BUSY_IMPORTS_KEY); cb(raw?JSON.parse(raw):{}); }
+  catch(e){ console.error('liveBusyImports read failed:',e); cb({}); }
+}
+function saveBusyImports(map){
+  try{ localStorage.setItem(BUSY_IMPORTS_KEY,JSON.stringify(map)); }
+  catch(e){ console.error('saveBusyImports write failed:',e); throw e; }
 }
 
 async function answerOpenTrips(){
@@ -234,10 +358,84 @@ async function answerPettyCashBalance(){
   const totalOut=rows.filter(x=>x.type==='out').reduce((s,x)=>s+(x.amount||0),0);
   return {text:`Petty Cash current balance: ${fmtAmt(totalIn-totalOut)}\n(Total Received: ${fmtAmt(totalIn)} • Total Issued: ${fmtAmt(totalOut)})`,sources:['Bliss One — Petty Cash']};
 }
-async function answerBusyTotal(){
-  const data=await new Promise(res=>liveBusyImport(res));
-  if(!data)return {text:'Abhi tak koi Busy export upload nahi hua hai. Left panel se "Upload Busy Export" button se CSV daal dein.',sources:[]};
-  return {text:`Busy export ka total: ${fmtAmt(data.total)}\n(${data.rowCount} rows • upload: ${new Date(data.uploadedAt).toLocaleString('en-IN')})`,sources:['Busy Export ('+new Date(data.uploadedAt).toLocaleDateString('en-IN')+')']};
+// Matches a Busy report by NAME inside the question text (e.g. "sales register ka total
+// kya hai" matches the "Sales Register" upload) - picks the longest matching name first so
+// a more specific name ("Purchase Return Register") wins over a shorter one that's also a
+// substring of it ("Purchase Register" would not match that text, but this guards the
+// general case of one report name containing another).
+function matchBusyReportFromQuestion(imports,q){
+  const names=Object.keys(imports).sort((a,b)=>imports[b].name.length-imports[a].name.length);
+  for(const key of names){ if(q.includes(imports[key].name.toLowerCase()))return imports[key]; }
+  // Typo-tolerant pass: a user-typed custom report name misspelled by roughly one letter
+  // (e.g. "Sales Registr" for "Sales Register") should still resolve, same fuzzy tolerance
+  // used elsewhere in this app - but EVERY word of the report's name must match (not just
+  // one), so a short/generic word in the name can't cause an unrelated report to match.
+  const qWords=q.split(/\s+/).filter(Boolean);
+  for(const key of names){
+    const nameWords=imports[key].name.toLowerCase().split(/\s+/).filter(Boolean);
+    if(nameWords.length&&nameWords.every(nw=>qWords.some(w=>fuzzyWordMatch(w,nw))))return imports[key];
+  }
+  return null;
+}
+// A looser fuzzy tolerance (distance<=2, not the app-wide distance<=1) used ONLY for matching
+// a report's own party/item names from its top-10 breakdown - never for this app's command/
+// keyword vocabulary, where the tighter distance-1 tolerance stays (needed to avoid collisions
+// like the earlier "open"~"spend" false positive). A real party name pulled from the user's
+// OWN uploaded data is a much lower collision risk than arbitrary free-text command words, and
+// this is the only tolerance wide enough to catch a real reported typo like "Jaeels" for
+// "Jewels" (edit-distance 2). Words of 3 chars or fewer are excluded from the distance-2
+// allowance (too short to safely widen without risking an unrelated short word matching).
+function fuzzyLabelWordMatch(w,k){
+  if(w===k)return true;
+  if(w.length<=3||k.length<=3)return false;
+  if(Math.abs(w.length-k.length)>2)return false;
+  return levenshtein(w,k)<=2;
+}
+// Finds a specific row (party/item) named in the question from any uploaded report's top-10
+// breakdown (e.g. "Hitesh Jaeels ki sale" matching "Hitesh Jewels" in a report) - checked
+// BEFORE the generic busy/report routing so a party-specific question answers about that one
+// party, not the whole report's total. Only the top-10 rows are ever stored per report (see
+// the comment above BUSY_IMPORTS_KEY), so a party outside that top-10 can't be found this way.
+function matchTopRowFromQuestion(imports,q){
+  const qWords=q.split(/\s+/).filter(Boolean);
+  let best=null;
+  for(const key in imports){
+    const report=imports[key];
+    if(!report.topRows)continue;
+    for(const row of report.topRows){
+      if(!row.label)continue;
+      const labelWords=row.label.toLowerCase().split(/\s+/).filter(Boolean);
+      if(labelWords.length&&labelWords.every(lw=>qWords.some(w=>fuzzyLabelWordMatch(w,lw)))){
+        if(!best||labelWords.length>best.labelWords.length)best={report,row,labelWords};
+      }
+    }
+  }
+  return best?{report:best.report,row:best.row}:null;
+}
+function busyReportSummaryText(r,wantTop){
+  let text=`${r.name} ka total: ${fmtAmt(r.total)}\n(${r.rowCount} rows • upload: ${new Date(r.uploadedAt).toLocaleString('en-IN')})`;
+  if(wantTop&&r.topRows&&r.topRows.length){
+    text+='\n\nTop '+r.topRows.length+' ('+(r.labelColLabel||'Party/Item')+'-wise):\n'
+      +r.topRows.map((t,i)=>`${i+1}. ${t.label} — ${fmtAmt(t.amount)}`).join('\n');
+  }
+  return text;
+}
+async function answerBusyReports(questionText){
+  const imports=await new Promise(res=>liveBusyImports(res));
+  const names=Object.keys(imports);
+  if(!names.length)return {text:'Abhi tak koi report upload/connect nahi hui hai. Left panel se Busy file upload karein ya Google Sheet/Excel ka live CSV link connect karein.',sources:[]};
+  const q=String(questionText||'').toLowerCase();
+  const wantTop=q.includes('top')||q.includes('sabse zyada')||q.includes('sabse jyada')||q.includes('highest');
+  const matched=matchBusyReportFromQuestion(imports,q);
+  // A specific report name in the question always wins, even while asking "which reports"
+  // (e.g. "Sales Register report hai kya" should answer about Sales Register directly).
+  if(matched)return {text:busyReportSummaryText(matched,wantTop),sources:[reportSourceLabel(matched)+' — '+matched.name+' ('+new Date(matched.uploadedAt).toLocaleDateString('en-IN')+')']};
+  // Only one report uploaded - no name needed, same as the old single-report behaviour.
+  if(names.length===1){ const r=imports[names[0]]; return {text:busyReportSummaryText(r,wantTop),sources:[reportSourceLabel(r)+' — '+r.name+' ('+new Date(r.uploadedAt).toLocaleDateString('en-IN')+')']}; }
+  // Multiple reports, no name matched (or an explicit "which reports" ask) - list them all
+  // and ask the user to name one for a detailed answer.
+  const lines=names.map(k=>`• ${imports[k].name} — total ${fmtAmt(imports[k].total)} (${imports[k].rowCount} rows)`);
+  return {text:`Abhi ye reports upload/connect hui hain:\n${lines.join('\n')}\n\nKisi specific report ka naam bhi sawaal mein likh sakte hain (jaise "Sales Register ka total kya hai").`,sources:names.map(k=>reportSourceLabel(imports[k])+' — '+imports[k].name)};
 }
 async function answerTodayFuelExpense(){
   const rows=await new Promise(res=>liveFuelLog(res));
@@ -249,17 +447,305 @@ async function answerTodayFuelExpense(){
   return {text:`Aaj ka total petrol/fuel expense: ${fmtAmt(total)}\n`+lines.join('\n'),sources:['Bliss One — Vehicle Tracker']};
 }
 
+// Levenshtein edit distance - used only for the typo-tolerant fallback below, so a real
+// user's typo (e.g. "Fuesl today" meant "Fuel today") still reaches the right answer instead
+// of the generic "I can't answer that" reply. Free/local (no AI API), same free-plan
+// constraint as the rest of this app - just a small string-distance check.
+function levenshtein(a,b){
+  const m=a.length,n=b.length;
+  if(!m)return n; if(!n)return m;
+  const dp=new Array(n+1);
+  for(let j=0;j<=n;j++)dp[j]=j;
+  for(let i=1;i<=m;i++){
+    let prev=dp[0];dp[0]=i;
+    for(let j=1;j<=n;j++){
+      const tmp=dp[j];
+      dp[j]=a[i-1]===b[j-1]?prev:1+Math.min(prev,dp[j],dp[j-1]);
+      prev=tmp;
+    }
+  }
+  return dp[n];
+}
+function fuzzyWordMatch(w,k){
+  if(w===k)return true;
+  // A distance-2 allowance (previously used for longer keywords) let unrelated short common
+  // words collide with a keyword - e.g. "open" (as in "trip abhi open hai") fuzzy-matched
+  // "spend"/"spent" at distance 2, wrongly pulling an unrelated question into the per-person
+  // expense intent. A single-edit typo (the actual real-world case, e.g. "Fuesl"->"fuel",
+  // "stationary"->"stationery") is still always distance <=1, so tightening to 1 loses no
+  // real typo-tolerance while cutting out this false-positive class.
+  if(Math.abs(w.length-k.length)>1)return false;
+  return levenshtein(w,k)<=1;
+}
+// Matches a specific Sales person mentioned in the question against known trip salesNames -
+// tries an exact full-name substring match first (longest name wins, so a more specific full
+// name doesn't get shadowed by a shorter one), then a fuzzy match on just the first name
+// (handles typos, and being referred to by first name only, e.g. "Vijay" for "Vijay Kumar").
+// Returns a full name string on an unambiguous match, null on no match, or
+// {ambiguous:true,names:[...]} when two or more different people share that first name - a
+// silent guess at the wrong person would be a worse accuracy failure than asking to clarify.
+function matchSalesPersonFromQuestion(trips,q){
+  const names=[...new Set(trips.map(t=>t.salesName).filter(Boolean))].sort((a,b)=>b.length-a.length);
+  for(const name of names){ if(q.includes(name.toLowerCase()))return name; }
+  const qWords=q.split(/\s+/).filter(Boolean);
+  const byFirstName={};
+  for(const name of names){
+    const firstName=name.toLowerCase().split(/\s+/)[0];
+    (byFirstName[firstName]=byFirstName[firstName]||[]).push(name);
+  }
+  for(const firstName in byFirstName){
+    if(qWords.some(w=>fuzzyWordMatch(w,firstName))){
+      const matched=byFirstName[firstName];
+      return matched.length===1?matched[0]:{ambiguous:true,names:matched};
+    }
+  }
+  return null;
+}
+// Per-trip money breakdown from raw ledger entries, mirroring the Trip Expense app's own
+// tripIssued/tripExpense/tripBalance logic (advance+additional_advance+transfer_in+party_cash
+// is money issued; expense+transfer_out is money spent; balance = issued-expense).
+function computeTripMoney(ledger,tripId){
+  const entries=ledger.filter(l=>l.tripId===tripId);
+  const issued=entries.filter(l=>['advance','additional_advance','transfer_in','party_cash'].includes(l.type)).reduce((s,l)=>s+Number(l.amount||0),0);
+  const expense=entries.filter(l=>['expense','transfer_out'].includes(l.type)).reduce((s,l)=>s+Number(l.amount||0),0);
+  return {issued,expense,balance:issued-expense};
+}
+// Ranks every Sales person (by their CURRENT/open trips only, same scoping as the rest of
+// this app) by a given money metric ('issued'/'expense'/'balance') - powers "sabse zyada/kam
+// kisne X kiya" comparison questions, a step beyond answering about one named person.
+function rankSalesPersonsByMetric(trips,ledger,metric){
+  const names=[...new Set(trips.filter(t=>t.status!=='closed').map(t=>t.salesName).filter(Boolean))];
+  const rows=names.map(name=>{
+    const myTrips=trips.filter(t=>t.salesName===name&&t.status!=='closed');
+    const total=myTrips.reduce((s,t)=>s+computeTripMoney(ledger,t.id)[metric],0);
+    return {name,total};
+  });
+  return rows.sort((a,b)=>b.total-a.total);
+}
+async function answerSalesPersonExtreme(trips,direction,metric){
+  const ledger=await new Promise(res=>liveTeLedger(res));
+  const ranked=rankSalesPersonsByMetric(trips,ledger,metric);
+  if(!ranked.length)return {text:'Abhi koi Sales person ka current trip open nahi hai.',sources:['Bliss One — Trip Expense App']};
+  const sorted=direction==='min'?[...ranked].reverse():ranked;
+  const top=sorted[0];
+  const metricLabel=metric==='balance'?'balance':metric==='issued'?'advance (issued)':'expense';
+  const label=direction==='min'?'Sabse kam':'Sabse zyada';
+  const lines=sorted.slice(0,5).map((r,i)=>`${i+1}. ${r.name}: ${fmtAmt(r.total)}`);
+  return {text:`${label} ${metricLabel} (current trips mein): ${top.name} — ${fmtAmt(top.total)}\n\nTop ${Math.min(5,sorted.length)}:\n`+lines.join('\n'),sources:['Bliss One — Trip Expense App']};
+}
+// Same-session (in-memory only, resets on page reload - no server-side state) conversation
+// memory, so a follow-up like "Current trip ka puch raha hu only" right after "Mukund ne
+// kitna spend kiya" can resolve back to Mukund/expense without the name being repeated.
+let lastMentionedSalesPerson=null;
+let lastMoneyMetric=null; // 'balance'|'expense'|'advance'
+// Answers a question naming a specific Sales person alongside a money-word - expense/kharcha
+// (exact or typo'd, e.g. "Vijay Expence"), balance/baaki, or advance - scoped to their CURRENT
+// (non-closed) trip(s) only, matching every other intent in this app (live/open status, not a
+// historical lifetime total a closed, already-settled trip would otherwise inflate). Returns
+// null (not a fallback message) when no money-word matched either (unless isFollowup, which
+// reuses the last metric asked in this session), so a name mentioned for an unrelated reason
+// (e.g. "Vijay kaun hai") isn't wrongly hijacked into this intent.
+// Category-wise expense breakdown ("Chunnu ne kis cheez par expense kiya", "kin cheezon par
+// kharcha kiya") grouped by the SAME `category` field Trip Expense app stores on each expense
+// ledger entry (Hotel/Taxi/Food/etc, its own 24-category list) - a different question from
+// "how much did they spend" (a single total), so it's answered separately, not folded into
+// the plain expense-total reply below.
+async function answerPersonExpenseCategoryBreakdown(myTrips,name){
+  const ledger=await new Promise(res=>liveTeLedger(res));
+  const entries=ledger.filter(l=>myTrips.some(t=>t.id===l.tripId)&&l.type==='expense');
+  if(!entries.length)return {text:`${name} ke current trip mein abhi tak koi expense entry nahi hai.`,sources:['Bliss One — Trip Expense App']};
+  const byCategory={};
+  entries.forEach(l=>{
+    const cat=l.category||'Other';
+    byCategory[cat]=(byCategory[cat]||0)+Number(l.amount||0);
+  });
+  const ranked=Object.keys(byCategory).map(cat=>({cat,amount:byCategory[cat]})).sort((a,b)=>b.amount-a.amount);
+  const total=ranked.reduce((s,r)=>s+r.amount,0);
+  const lines=ranked.map((r,i)=>`${i+1}. ${r.cat}: ${fmtAmt(r.amount)}`);
+  return {text:`${name} ka current trip expense category-wise (total ${fmtAmt(total)}):\n`+lines.join('\n'),sources:['Bliss One — Trip Expense App']};
+}
+async function answerPersonTripQuery(q,trips,name,isFollowup){
+  const myTrips=trips.filter(t=>t.salesName===name && t.status!=='closed');
+  if(!myTrips.length)return {text:`${name} ka abhi koi active trip nahi hai.`,sources:['Bliss One — Trip Expense App']};
+  const qWords=q.split(/\s+/).filter(Boolean);
+  const matches=words=>words.some(k=>q.includes(k))||qWords.some(w=>words.some(k=>fuzzyWordMatch(w,k)));
+  // Checked before the plain balance/expense/advance totals below - a distinct question
+  // ("what was it spent ON", not "how much") even though it usually also contains a money
+  // word like "expense"/"kharcha" which would otherwise just return the flat total. Matched
+  // word-by-word (with the same fuzzy tolerance as everywhere else), not a brittle literal
+  // phrase regex - a real reported case ("ksi chiz par expen kiya") had BOTH "kisi"->"ksi"
+  // (fuzzy, distance 1) AND "cheez" typed as the equally-valid alternate spelling "chiz"
+  // (distance 2 from "cheez", so listed as its own explicit word, not relied on fuzzy
+  // tolerance to bridge). "category wise"/"kahan kharch" cover the other common phrasings.
+  const wantsCategoryBreakdown=
+    (matches(['kis','kisi','konsi','kaunsi','kin'])&&matches(['cheez','cheej','chiz','item']))
+    ||matches(['category'])
+    ||(q.includes('kahan')&&matches(['kharch','kharcha']));
+  if(wantsCategoryBreakdown){
+    return answerPersonExpenseCategoryBreakdown(myTrips,name);
+  }
+  let wantsBalance=matches(['balance','baaki','bakaya','due']);
+  // "expen" (a common truncation/typo of "expense" that's a real reported case - distance 2
+  // from "expense", outside this app's distance-1 fuzzy tolerance) is listed explicitly
+  // rather than loosening the shared fuzzy tolerance, which would reopen the earlier
+  // "open"~"spend" false-positive collision this app already fixed once.
+  let wantsExpense=matches(['expense','expen','kharch','kharcha','spend','spent']);
+  // "issue"/"issued"/"amount"/"amt" all cover the real way people actually ask this (e.g.
+  // "Chunnu ko kitna amount issue hua", typo'd "isuue"/"issu") - not just the literal word
+  // "advance". "issu" (not a real word) is included deliberately since "isuu"-style typos
+  // land exactly on it at edit-distance 1, while missing "issue" itself at distance 2.
+  let wantsAdvance=matches(['advance','issue','issued','issu','amount','amt']);
+  if(!wantsBalance&&!wantsExpense&&!wantsAdvance){
+    if(isFollowup&&lastMoneyMetric){
+      if(lastMoneyMetric==='balance')wantsBalance=true;
+      else if(lastMoneyMetric==='advance')wantsAdvance=true;
+      else wantsExpense=true;
+    }else{
+      return null;
+    }
+  }
+  const ledger=await new Promise(res=>liveTeLedger(res));
+  const rows=myTrips.map(t=>({loc:t.location||t.id,...computeTripMoney(ledger,t.id)}));
+  const reply=(label,field,metric)=>{
+    lastMoneyMetric=metric;
+    const total=rows.reduce((s,r)=>s+r[field],0);
+    const lines=rows.map(r=>`• ${r.loc}: ${fmtAmt(r[field])}`);
+    return {text:`${name} ka current trip ${label}: ${fmtAmt(total)}\n`+lines.join('\n'),sources:['Bliss One — Trip Expense App']};
+  };
+  if(wantsBalance)return reply('balance','balance','balance');
+  if(wantsExpense)return reply('expense','expense','expense');
+  return reply('advance (issued)','issued','advance');
+}
 async function answerQuestion(text){
   const q=String(text||'').toLowerCase();
+  // A question naming a specific Sales person is checked FIRST, before any generic keyword
+  // bucket below - a known person's name is a stronger, more specific signal than a word like
+  // "balance", which would otherwise always get claimed by the company-wide Petty Cash check
+  // (e.g. "Chunnu ka balance kitna hai" must not answer with the Petty Cash balance).
+  const trips=await new Promise(res=>liveTeTrips(res));
+  const personName=matchSalesPersonFromQuestion(trips,q);
+  if(personName&&typeof personName==='object'&&personName.ambiguous){
+    return {text:`Isi naam ke ${personName.names.length} Sales persons hain — ${personName.names.join(', ')}. Pura naam likh kar poochein (jaise "${personName.names[0]} ka balance").`,sources:[]};
+  }
+  if(personName){
+    const personAns=await answerPersonTripQuery(q,trips,personName,false);
+    if(personAns){ lastMentionedSalesPerson=personName; return personAns; }
+  }
+  // Conversational follow-up (same browser session only, in-memory - resets on reload): e.g.
+  // "Current trip ka puch raha hu only" right after asking about a specific Sales person's
+  // money, with no name repeated this time. Checked here, before the generic 'trip' keyword
+  // below (which would otherwise just list every open trip for "...trip..."), but skipped
+  // whenever the question also looks like it's about a clearly different domain (Petty Cash,
+  // fuel, Busy/report, stationery) - those still take their normal, unambiguous path below.
+  // Deliberately excludes common words like "current"/"abhi" from the trigger list on their
+  // own (e.g. "Chunnu ka trip abhi open hai kya" is a real, different question that merely
+  // contains "abhi" - not a follow-up) - only the narrower, more distinctive markers below.
+  const otherDomainWords=['petty','cash','fuel','petrol','diesel','busy','report','stock','stationery'];
+  if(lastMentionedSalesPerson&&lastMoneyMetric
+     &&/\b(only|sirf|wahi|usi|iska|uska|isska|usska)\b/.test(q)
+     &&!otherDomainWords.some(k=>q.includes(k))){
+    const personAns=await answerPersonTripQuery(q,trips,lastMentionedSalesPerson,true);
+    if(personAns)return personAns;
+  }
+  // Cross-Sales-person comparison ("sabse zyada/kam kisne X kiya hai") - only when no
+  // specific person was already named above. Guarded against colliding with a named Busy/
+  // Live Sheet report's own "top"/"sabse zyada" breakdown (e.g. "Purchase Register mein
+  // sabse zyada kiska amount hai") by checking the uploaded report names FIRST and bailing
+  // out of this intent entirely if one matches - that question still falls through to the
+  // normal Busy routing below.
+  if(!personName){
+    const isMax=/\b(sabse zyada|sabse jyada|sabse jayada|highest|zyada se zyada)\b/.test(q);
+    const isMin=/\b(sabse kam|lowest|kam se kam)\b/.test(q);
+    if((isMax||isMin)&&!otherDomainWords.some(k=>q.includes(k))){
+      const imports=await new Promise(res=>liveBusyImports(res));
+      if(!matchBusyReportFromQuestion(imports,q)){
+        const qWordsForMetric=q.split(/\s+/).filter(Boolean);
+        const matchesMetric=words=>words.some(k=>q.includes(k))||qWordsForMetric.some(w=>words.some(k=>fuzzyWordMatch(w,k)));
+        let metric=null;
+        if(matchesMetric(['balance','baaki','bakaya','due']))metric='balance';
+        else if(matchesMetric(['expense','kharch','kharcha','spend','spent']))metric='expense';
+        else if(matchesMetric(['advance','issue','issued','issu','amount','amt']))metric='issued';
+        if(metric)return answerSalesPersonExtreme(trips,isMax?'max':'min',metric);
+      }
+    }
+  }
+  // A specific party/item named from an uploaded report's own top-10 breakdown (e.g. "Hitesh
+  // Jaeels ki sale") is checked before the generic busy/report routing below, so it answers
+  // about that one party instead of dumping the whole report's total.
+  const importsForRowMatch=await new Promise(res=>liveBusyImports(res));
+  const rowMatch=matchTopRowFromQuestion(importsForRowMatch,q);
+  if(rowMatch)return {text:`${rowMatch.row.label} ka total (${rowMatch.report.name}): ${fmtAmt(rowMatch.row.amount)}`,sources:[reportSourceLabel(rowMatch.report)+' — '+rowMatch.report.name]};
   if(q.includes('trip')) return answerOpenTrips();
   if(q.includes('stock')||q.includes('stationery')) return answerLowStock();
   if(q.includes('petty')||q.includes('cash balance')||q.includes('balance')) return answerPettyCashBalance();
   if(q.includes('petrol')||q.includes('fuel')||q.includes('diesel')) return answerTodayFuelExpense();
-  if(q.includes('busy')||q.includes('sales')) return answerBusyTotal();
-  return {text:'Maaf kijiye, abhi main sirf kuch specific sawaalon ke jawab de sakta hoon — trips, stationery stock, petty cash balance, aaj ka fuel expense, ya Busy export total. Baaki sawaal aane wale updates mein add honge.',sources:[]};
+  // "sale"/"sales" alongside "busy"/"report" - a generic "Total sale bato" with no report name
+  // and no "report"/"busy" word at all is a real reported phrasing, not just the literal words.
+  if(q.includes('busy')||q.includes('report')||q.includes('sale')) return answerBusyReports(text);
+  // No other keyword matched - last resort, check if any uploaded Busy report's own NAME
+  // appears in the question (e.g. "Sales Register ka total kya hai" with no "busy"/"report"
+  // word at all) before giving up.
+  const imports=await new Promise(res=>liveBusyImports(res));
+  if(matchBusyReportFromQuestion(imports,q))return answerBusyReports(text);
+  // Still nothing - try a typo-tolerant pass before giving up (handles a misspelled keyword,
+  // e.g. "Fuesl today" for "Fuel today", or "stationary" for "stationery").
+  const fuzzyIntents=[
+    {words:['trip','trips'],fn:answerOpenTrips},
+    {words:['stock','stationery'],fn:answerLowStock},
+    {words:['petty','balance'],fn:answerPettyCashBalance},
+    {words:['petrol','fuel','diesel'],fn:answerTodayFuelExpense},
+    {words:['busy','report','sale','sales'],fn:()=>answerBusyReports(text)},
+  ];
+  const qWords=q.split(/\s+/).filter(Boolean);
+  for(const intent of fuzzyIntents){
+    if(qWords.some(w=>intent.words.some(k=>fuzzyWordMatch(w,k))))return intent.fn();
+  }
+  return {text:'Maaf kijiye, abhi main sirf kuch specific sawaalon ke jawab de sakta hoon — trips, stationery stock, petty cash balance, aaj ka fuel expense, kisi Sales person ka current trip expense/balance/advance (jaise "Vijay ka expense", "Chunnu ka balance"), ya kisi uploaded/connected report ka naam. Baaki sawaal aane wale updates mein add honge.',sources:[]};
 }
 
-function askSuggested(text){ $('chatInput').value=text; sendChat(); }
+function askSuggested(text){ if($('mtabAsk'))aiSetMobileTab('ask'); $('chatInput').value=text; sendChat(); }
+
+let voiceRecognition=null;
+let voiceListening=false;
+function getSpeechRecognitionCtor(){ return window.SpeechRecognition||window.webkitSpeechRecognition||null; }
+function setMicListening(on){
+  voiceListening=on;
+  const btn=$('micBtn');
+  if(!btn)return;
+  btn.classList.toggle('listening',on);
+  btn.textContent=on?'⏹':'🎤';
+  btn.title=on?'Sunna band karein':'Bolkar poochein';
+}
+function toggleVoiceInput(){
+  const SR=getSpeechRecognitionCtor();
+  if(!SR)return;
+  if(voiceListening){ if(voiceRecognition){ try{ voiceRecognition.stop(); }catch(e){ setMicListening(false); } } return; }
+  const input=$('chatInput');
+  voiceRecognition=new SR();
+  voiceRecognition.lang='en-IN';
+  voiceRecognition.continuous=false;
+  voiceRecognition.interimResults=true;
+  voiceRecognition.maxAlternatives=1;
+  voiceRecognition.onresult=function(e){
+    let finalText='',interimText='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const transcript=e.results[i][0].transcript;
+      if(e.results[i].isFinal)finalText+=transcript; else interimText+=transcript;
+    }
+    input.value=(finalText||interimText).trim();
+  };
+  voiceRecognition.onerror=function(e){
+    setMicListening(false);
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+      appendMsg('ai','Voice input ke liye microphone permission allow karein browser settings mein.',[]);
+    }
+  };
+  voiceRecognition.onend=function(){
+    setMicListening(false);
+    if(input.value.trim())sendChat();
+  };
+  try{ voiceRecognition.start(); setMicListening(true); }catch(err){ setMicListening(false); }
+}
 async function sendChat(){
   const input=$('chatInput');
   const text=input.value.trim();
@@ -299,52 +785,402 @@ function updateMsg(id,text,sources){
     sources.forEach(s=>{const tag=document.createElement('span');tag.className='srcTag';tag.textContent=s;div.appendChild(tag);});
   }
   $('msgsWrap').scrollTop=$('msgsWrap').scrollHeight;
+  speakReply(text);
 }
 
-/* ===== Busy CSV upload =====
-   Busy only supports manual CSV/Excel export (no API) - so this is a simple "upload the
-   latest export" flow, not a live connection. Parses the header row to find an
-   amount-like numeric column (by header name, else the first fully-numeric column),
-   sums it, and stores just the summary (not every row) in one small Firestore doc. */
-function parseBusyCsv(text){
-  const lines=text.split(/\r?\n/).filter(l=>l.trim().length);
-  if(lines.length<2)return null;
-  const header=lines[0].split(',').map(h=>h.trim().toLowerCase());
-  let amountCol=header.findIndex(h=>h.includes('amount')||h.includes('total')||h.includes('value'));
-  const dataRows=lines.slice(1).map(l=>l.split(','));
+let ttsEnabled=(localStorage.getItem('ai_tts_enabled')||'true')==='true';
+function hasSpeechSynthesis(){ return !!(window.speechSynthesis&&window.SpeechSynthesisUtterance); }
+function refreshTtsBtn(){
+  const btn=$('ttsBtn');
+  if(!btn)return;
+  btn.textContent=ttsEnabled?'🔊':'🔇';
+  btn.classList.toggle('off',!ttsEnabled);
+  btn.title=ttsEnabled?'Jawab bolna band karein':'Jawab bolkar sunayein';
+}
+function toggleTts(){
+  ttsEnabled=!ttsEnabled;
+  localStorage.setItem('ai_tts_enabled',String(ttsEnabled));
+  refreshTtsBtn();
+  if(!ttsEnabled&&hasSpeechSynthesis()){ try{ window.speechSynthesis.cancel(); }catch(e){} }
+}
+function speakReply(text){
+  if(!ttsEnabled||!hasSpeechSynthesis()||!text)return;
+  // Voice output is a cosmetic add-on to the real (already-displayed) text answer, never
+  // allowed to affect it - any speechSynthesis failure here (unsupported voice/lang, a
+  // browser quirk, etc.) must fail silently, not throw into the caller (updateMsg(), called
+  // from sendChat()'s response handling) and risk replacing a correct answer with an error.
+  try{
+    window.speechSynthesis.cancel();
+    const utter=new SpeechSynthesisUtterance(text);
+    utter.lang='en-IN';
+    window.speechSynthesis.speak(utter);
+  }catch(e){
+    console.error('speakReply failed (ignored, text answer is unaffected):',e);
+  }
+}
+
+/* ===== Busy report upload (xlsx/xls/csv, multiple named reports) =====
+   Busy only supports manual export (no API) - so this is a simple "upload the latest
+   export" flow, not a live connection. Parses the header row to find an amount-like
+   numeric column (by header name, else the first fully-numeric column) and a label-like
+   text column (the first non-amount column that's mostly non-numeric, e.g. Party/Item
+   name) to group by - sums the amount column and keeps the top 10 groups, storing just
+   that summary (not every row) to keep localStorage small. XLSX.read() parses CSV too, so
+   one code path handles all three file types. */
+// Shared by parseBusySheet - used for both a file upload and a fetched live-sheet link,
+// since both end up handing the same raw rows into this one place, so the amount/label-column
+// detection and top-10 breakdown logic isn't duplicated between the two input paths.
+// Real Busy/Tally-style exports almost always lead with a few title/date-range rows
+// (company name, "Sales Register  From: ... To: ...", a blank separator) before the actual
+// column header row - the table does NOT start at row 0. Treating row 0 as the header
+// unconditionally made every such real export fail to parse at all (returned null -> "Data
+// nahi mila", which looks exactly like "upload is not working"). Scan the first several rows
+// for one that works as a real header instead of assuming it's always the first row.
+// Indian accounting software (Busy, Tally) commonly exports amounts as TEXT cells with
+// Indian-style thousands separators and a currency symbol (e.g. "1,50,000.00" or
+// "₹1,50,000") rather than a raw numeric cell - plain parseFloat() stops at the first
+// comma, so parseFloat("1,50,000") silently returns 1 instead of 150000. This single bug
+// could make every total/breakdown computed from such an export wildly wrong without any
+// visible error. Strips currency symbols/separators/whitespace before parsing.
+function parseAmount(v){
+  if(v===undefined||v===null||v==='')return NaN;
+  if(typeof v==='number')return v;
+  const cleaned=String(v).replace(/[₹$,\s]/g,'');
+  if(cleaned==='')return NaN;
+  return parseFloat(cleaned);
+}
+function analyzeRows(rows){
+  if(!rows||rows.length<2)return null;
+  const maxHeaderScan=Math.min(10,rows.length-2);
+  for(let headerIdx=0;headerIdx<=maxHeaderScan;headerIdx++){
+    const result=analyzeFromHeaderRow(rows,headerIdx);
+    if(result)return result;
+  }
+  return null;
+}
+function analyzeFromHeaderRow(rows,headerIdx){
+  const header=rows[headerIdx].map(h=>String(h||'').trim());
+  const headerLc=header.map(h=>h.toLowerCase());
+  const dataRows=rows.slice(headerIdx+1).filter(r=>r.some(c=>String(c??'').trim()!==''));
+  if(!dataRows.length)return null;
+  let amountCol=headerLc.findIndex(h=>h.includes('amount')||h.includes('total')||h.includes('value')||h.includes('amt')||h.includes('balance'));
   if(amountCol===-1){
     for(let c=header.length-1;c>=0;c--){
-      if(dataRows.every(r=>r[c]!==undefined&&!isNaN(parseFloat(r[c])))){amountCol=c;break;}
+      if(dataRows.every(r=>r[c]!==undefined&&r[c]!==''&&!isNaN(parseAmount(r[c])))){amountCol=c;break;}
     }
   }
   if(amountCol===-1)return null;
+  // Label column: first OTHER column where most values are non-numeric text (likely a
+  // Party/Item/Ledger name) - used to group the top entries, optional (null if none found).
+  let labelCol=-1;
+  for(let c=0;c<header.length;c++){
+    if(c===amountCol)continue;
+    const nonNumericCount=dataRows.filter(r=>r[c]!==undefined&&r[c]!==''&&isNaN(parseAmount(r[c]))).length;
+    if(nonNumericCount>=dataRows.length*0.7){labelCol=c;break;}
+  }
   let total=0,rowCount=0;
-  dataRows.forEach(r=>{const v=parseFloat(r[amountCol]);if(!isNaN(v)){total+=v;rowCount++;}});
-  return {total,rowCount};
+  const byLabel={};
+  dataRows.forEach(r=>{
+    const v=parseAmount(r[amountCol]);
+    if(isNaN(v))return;
+    total+=v;rowCount++;
+    if(labelCol!==-1){
+      const label=String(r[labelCol]||'-').trim()||'-';
+      byLabel[label]=(byLabel[label]||0)+v;
+    }
+  });
+  const topRows=labelCol!==-1
+    ?Object.keys(byLabel).map(label=>({label,amount:byLabel[label]})).sort((a,b)=>b.amount-a.amount).slice(0,10)
+    :[];
+  return {total,rowCount,amountColLabel:header[amountCol],labelColLabel:labelCol!==-1?header[labelCol]:null,topRows};
 }
-function handleBusyFileSelected(e){
-  const file=e.target.files[0];
-  if(!file)return;
+// Some real exports (especially Google Sheets/Excel Online workbooks) have multiple
+// sheets/tabs - e.g. a "Summary" sheet first, with the real data on a later tab. Reading
+// only wb.SheetNames[0] silently analyzed the wrong (or an empty) sheet. Tries each sheet
+// in the workbook in order, same "scan until something works" approach as the header-row
+// detection above, instead of assuming the first sheet always has the real data.
+function parseBusySheet(arrayBuffer){
+  const wb=XLSX.read(new Uint8Array(arrayBuffer),{type:'array'});
+  for(const sheetName of wb.SheetNames){
+    const sheet=wb.Sheets[sheetName];
+    const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:''});
+    const result=analyzeRows(rows);
+    if(result)return result;
+  }
+  return null;
+}
+function reportSourceLabel(r){ return (r&&r.sourceType==='sheet')?'Live Sheet':'Busy Export'; }
+/* ===== Live Sheet connect (any public CSV/XLSX/XLS link - Google Sheets "Publish to web",
+   Excel Online's public download link, or any other static host serving a tabular export) =====
+   No API key/OAuth - fetched as raw bytes and handed to the SAME XLSX.read(...,{type:'array'})
+   path as a file upload (parseBusySheet), which already auto-detects CSV vs XLS vs XLSX - so
+   one URL field covers all three, not just Google's CSV-specific publish link. Stored in the
+   SAME BUSY_IMPORTS_KEY map as file uploads (tagged sourceType:'sheet' + csvUrl) so the existing
+   chat Q&A / reports list code works unchanged - only re-fetching (Refresh) instead of
+   re-uploading differs. NOTE: not yet verified against a real published Google Sheet or Excel
+   Online link in a real browser (this sandbox has no outbound reach to those hosts) - if a real
+   link ever fails to fetch, suspect a CORS/redirect quirk on that host first, same caution as
+   the ArrayBuffer/Uint8Array Busy-import bug that only a real browser caught. A source that
+   requires login (no public "anyone with link" access) will never work this way - that needs
+   a real API/OAuth integration, a different and much bigger undertaking. */
+// The most common real-world mistake here: a non-technical user pastes the REGULAR Google
+// Sheets share link (docs.google.com/spreadsheets/d/<ID>/edit...) instead of doing the
+// separate, non-obvious "File -> Share -> Publish to web -> CSV" flow this modal's own
+// instructions ask for - fetch()ing that regular link anonymously returns Google's HTML
+// login/viewer page (not CSV/XLSX bytes), which fails to parse and surfaces as "connect
+// failed". Auto-converts both link shapes to a working direct CSV export URL instead of
+// requiring the user to get the exact link format right every time.
+function normalizeSheetUrl(url){
+  try{
+    const u=new URL(url);
+    if(u.hostname!=='docs.google.com')return url;
+    // Already a "Publish to web" link (/spreadsheets/d/e/<key>/pub...) - just make sure the
+    // output format is csv (a pasted link might say output=html or have no output param).
+    if(/\/spreadsheets\/d\/e\/[^/]+\/pub/.test(u.pathname)){
+      u.searchParams.set('output','csv');
+      return u.toString();
+    }
+    // A normal share/edit link (/spreadsheets/d/<ID>/edit...) - convert to the direct CSV
+    // export endpoint, which works for any sheet shared as "Anyone with the link can view"
+    // without the user ever needing to find the separate "Publish to web" menu option.
+    const idMatch=u.pathname.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    if(idMatch){
+      const gid=u.searchParams.get('gid')||(u.hash.match(/gid=(\d+)/)||[])[1]||'0';
+      return `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv&gid=${gid}`;
+    }
+    return url;
+  }catch(e){
+    return url;
+  }
+}
+function fetchAndSaveLiveSheet(name,rawUrl){
+  const url=normalizeSheetUrl(rawUrl);
+  return fetch(url).then(res=>{
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    return res.arrayBuffer();
+  }).catch(err=>{
+    console.error('live sheet fetch failed:',err);
+    throw {_fetchMsg:'Data nahi mil paya: '+(err.message||err)+'. Google Sheet ka sharing "Anyone with the link can view" par set karein (File → Share), aur link check karein.'};
+  }).then(buf=>{
+    let parsed;
+    try{ parsed=parseBusySheet(buf); }
+    catch(err){ console.error('live sheet parse failed:',err); throw {_fetchMsg:'Data parse nahi ho paya: '+(err.message||err)+'. Ye link CSV/XLSX export nahi lag rahi.'}; }
+    if(!parsed)throw {_fetchMsg:'Data nahi mila. Ek column amount/total/value naam ka hona chahiye, ya sabse right wali numeric column use hogi.'};
+    const imports=JSON.parse(localStorage.getItem(BUSY_IMPORTS_KEY)||'{}');
+    const key=busyReportKey(name);
+    imports[key]={name,sourceType:'sheet',csvUrl:url,uploadedAt:new Date().toISOString(),total:parsed.total,rowCount:parsed.rowCount,amountColLabel:parsed.amountColLabel,labelColLabel:parsed.labelColLabel,topRows:parsed.topRows};
+    saveBusyImports(imports);
+    renderBusyReportsList();
+    return {ok:true};
+  }).catch(err=>{
+    if(err&&err._fetchMsg)return {ok:false,error:err._fetchMsg};
+    console.error('live sheet import save failed',err);
+    return {ok:false,error:'Save karte waqt error aaya: '+(err.message||err)};
+  });
+}
+function openGoogleSheetModal(){
+  $('gsheetName').value='';
+  $('gsheetUrl').value='';
+  $('gsheetMsg').textContent='';
+  $('googleSheetModal').classList.add('show');
+}
+function closeGoogleSheetModal(){ $('googleSheetModal').classList.remove('show'); }
+async function confirmGoogleSheetConnect(){
+  const name=$('gsheetName').value.trim();
+  const url=$('gsheetUrl').value.trim();
+  const msg=$('gsheetMsg');
+  if(!name){msg.style.color='var(--red)';msg.textContent='Report ka naam likhein (jaise "Sales Register").';return}
+  if(!url){msg.style.color='var(--red)';msg.textContent='Public CSV link paste karein.';return}
+  const btn=$('gsheetConnectBtn');if(btn)btn.disabled=true;
+  msg.style.color='var(--muted)';msg.textContent='Connect ho raha hai...';
+  const res=await fetchAndSaveLiveSheet(name,url);
+  if(btn)btn.disabled=false;
+  if(res.ok){closeGoogleSheetModal();}
+  else{msg.style.color='var(--red)';msg.textContent=res.error;}
+}
+async function refreshGoogleSheetReport(key){
+  const imports=JSON.parse(localStorage.getItem(BUSY_IMPORTS_KEY)||'{}');
+  const r=imports[key];
+  if(!r||r.sourceType!=='sheet')return;
+  const res=await fetchAndSaveLiveSheet(r.name,r.csvUrl);
+  if(!res.ok)alert('Refresh fail ho gaya: '+res.error);
+}
+function openBusyUploadModal(){
+  $('busyReportName').value='';
+  $('busyFileInput').value='';
+  $('busyUploadMsg').textContent='';
+  $('busyUploadModal').classList.add('show');
+}
+function closeBusyUploadModal(){ $('busyUploadModal').classList.remove('show'); }
+function confirmBusyUpload(){
+  const name=$('busyReportName').value.trim();
+  const file=$('busyFileInput').files[0];
+  const msg=$('busyUploadMsg');
+  if(!name){msg.style.color='var(--red)';msg.textContent='Report ka naam likhein (jaise "Sales Register").';return}
+  if(!file){msg.style.color='var(--red)';msg.textContent='File select karein.';return}
   const reader=new FileReader();
-  reader.onload=async function(){
-    const parsed=parseBusyCsv(String(reader.result||''));
-    if(!parsed){alert('CSV parse nahi ho paya. Ek column amount/total/value naam ka hona chahiye, ya sabse right wali numeric column use hogi.');return}
+  reader.onload=function(){
+    let parsed;
+    try{ parsed=parseBusySheet(reader.result); }
+    catch(err){ console.error('parseBusySheet failed:',err); msg.style.color='var(--red)'; msg.textContent='File parse nahi ho payi: '+(err.message||err); return; }
+    if(!parsed){msg.style.color='var(--red)';msg.textContent='Data nahi mila. Ek column amount/total/value naam ka hona chahiye, ya sabse right wali numeric column use hogi.';return}
     try{
-      const record={total:parsed.total,rowCount:parsed.rowCount,uploadedAt:new Date().toISOString(),fileName:file.name};
-      localStorage.setItem(BUSY_IMPORT_KEY,JSON.stringify(record));
-      $('busyStatus').textContent='Last export: '+file.name+' ('+parsed.rowCount+' rows)';
-      alert('Busy export upload ho gaya: '+parsed.rowCount+' rows, total '+fmtAmt(parsed.total));
-    }catch(err){console.error('busy import save failed',err);alert('Upload save karte waqt error aaya: '+err.message);}
+      const imports=JSON.parse(localStorage.getItem(BUSY_IMPORTS_KEY)||'{}');
+      const key=busyReportKey(name);
+      imports[key]={name,fileName:file.name,uploadedAt:new Date().toISOString(),total:parsed.total,rowCount:parsed.rowCount,amountColLabel:parsed.amountColLabel,labelColLabel:parsed.labelColLabel,topRows:parsed.topRows};
+      saveBusyImports(imports);
+      renderBusyReportsList();
+      closeBusyUploadModal();
+    }catch(err){console.error('busy import save failed',err);msg.style.color='var(--red)';msg.textContent='Save karte waqt error aaya: '+(err.message||err);}
   };
-  reader.readAsText(file);
-  e.target.value='';
+  reader.readAsArrayBuffer(file);
+}
+// Shows what this report actually has on record - only the total + top 10 groups, not
+// every raw row (full rows aren't stored at all, to keep localStorage small per-device -
+// see the comment above BUSY_IMPORTS_KEY). Honest about that limit in the modal itself.
+let _viewingReportKey=null;
+function viewBusyReport(key){
+  const imports=JSON.parse(localStorage.getItem(BUSY_IMPORTS_KEY)||'{}');
+  const r=imports[key];
+  if(!r)return;
+  _viewingReportKey=key;
+  $('busyViewPdfMsg').textContent='';
+  $('busyViewTitle').textContent=r.name;
+  const rowsHtml=r.topRows&&r.topRows.length
+    ?`<table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px">
+        <thead><tr><th style="text-align:left;padding:6px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-size:11px">${esc(r.labelColLabel||'Party/Item')}</th><th style="text-align:right;padding:6px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-size:11px">Amount</th></tr></thead>
+        <tbody>${r.topRows.map(t=>`<tr><td style="padding:6px 4px;border-bottom:1px solid var(--line)">${esc(t.label)}</td><td style="padding:6px 4px;border-bottom:1px solid var(--line);text-align:right">${fmtAmt(t.amount)}</td></tr>`).join('')}</tbody>
+      </table>`
+    :'';
+  const sourceLine=r.sourceType==='sheet'
+    ?`Source: Live Sheet link • Last fetch: ${esc(new Date(r.uploadedAt).toLocaleString('en-IN'))}`
+    :`File: ${esc(r.fileName)} • Upload: ${esc(new Date(r.uploadedAt).toLocaleString('en-IN'))}`;
+  $('busyViewBody').innerHTML=`
+    <div class="note">${sourceLine}</div>
+    <div style="display:flex;gap:10px;margin-top:10px">
+      <div class="sideCard" style="flex:1;padding:10px"><div class="srcMeta">TOTAL</div><b style="font-size:17px">${fmtAmt(r.total)}</b></div>
+      <div class="sideCard" style="flex:1;padding:10px"><div class="srcMeta">ROWS</div><b style="font-size:17px">${r.rowCount}</b></div>
+    </div>
+    ${r.labelColLabel?`<div class="note" style="margin-top:12px">Top 10 (${esc(r.labelColLabel)}-wise) — poori file save nahi hoti, sirf ye summary rakha jata hai:</div>${rowsHtml}`:'<div class="note" style="margin-top:12px">Is report mein group karne layak koi text column nahi mila, sirf total/rows record hua hai.</div>'}
+  `;
+  $('busyViewModal').classList.add('show');
+}
+function closeBusyViewModal(){ $('busyViewModal').classList.remove('show'); }
+// Standalone HTML string (not a clone of any on-screen panel - the View modal isn't styled
+// for print/export) for the report PDF, rendered off-screen then captured via html2canvas.
+function buildReportPdfHtml(r){
+  const sourceLine=r.sourceType==='sheet'
+    ?`Live Sheet link · Last fetch ${new Date(r.uploadedAt).toLocaleDateString('en-IN')}`
+    :`File: ${esc(r.fileName||'')} · Upload ${new Date(r.uploadedAt).toLocaleDateString('en-IN')}`;
+  const rowsHtml=r.topRows&&r.topRows.length
+    ?`<table class="reportPdfTable">
+        <thead><tr><th>${esc(r.labelColLabel||'Party/Item')}</th><th>Amount</th></tr></thead>
+        <tbody>${r.topRows.map(t=>`<tr><td>${esc(t.label)}</td><td>${fmtAmt(t.amount)}</td></tr>`).join('')}</tbody>
+      </table>`
+    :'';
+  return `<div class="reportPdfWrap">
+    <div class="reportPdfHero">
+      <div class="reportPdfHeroBadge">B</div>
+      <div>
+        <div class="eyebrow">Bliss Gems &amp; Minerals</div>
+        <h1>${esc(r.name)}</h1>
+        <p>${esc(sourceLine)}</p>
+      </div>
+    </div>
+    <div class="reportPdfStats">
+      <div class="reportPdfStatTile"><small>Total</small><b>${fmtAmt(r.total)}</b></div>
+      <div class="reportPdfStatTile"><small>Rows</small><b>${r.rowCount}</b></div>
+    </div>
+    ${r.labelColLabel?`<div class="reportPdfSectionTitle">Top 10 (${esc(r.labelColLabel)}-wise)</div>${rowsHtml}`:''}
+    <div class="reportPdfFooter">Bliss Gems &amp; Minerals — Directors Assistant</div>
+  </div>`;
+}
+function reportPdfCanvasHasContent(canvas){
+  try{
+    const ctx=canvas.getContext('2d');
+    const w=canvas.width,h=canvas.height;
+    const sample=ctx.getImageData(0,0,w,Math.min(h,400));
+    const data=sample.data;
+    for(let i=0;i<data.length;i+=4*37){
+      if(data[i]<250||data[i+1]<250||data[i+2]<250)return true;
+    }
+    return false;
+  }catch(e){ console.error('Report PDF canvas content check failed:',e); return false; }
+}
+async function generateReportPdfBlob(r){
+  if(typeof html2canvas==='undefined'||!(window.jspdf&&window.jspdf.jsPDF)){console.warn('PDF libraries not loaded');return null;}
+  const wrap=document.createElement('div');
+  wrap.style.cssText='position:absolute;left:-1500px;top:0;z-index:-1';
+  wrap.innerHTML=buildReportPdfHtml(r);
+  document.body.appendChild(wrap);
+  try{
+    await new Promise(res=>requestAnimationFrame(()=>requestAnimationFrame(res)));
+    if(wrap.getBoundingClientRect().height<10){
+      console.error('Report PDF export has no height - aborting instead of sending a blank PDF');
+      return null;
+    }
+    const canvas=await html2canvas(wrap,{scale:2,backgroundColor:'#ffffff',windowWidth:420,scrollX:0,scrollY:0});
+    if(!reportPdfCanvasHasContent(canvas)){
+      console.error('Report PDF canvas has no visible content - aborting instead of sending a blank PDF');
+      return null;
+    }
+    const imgData=canvas.toDataURL('image/jpeg',0.92);
+    const {jsPDF}=window.jspdf;
+    const margin=10;
+    const imgW=150;
+    const imgH=canvas.height*(imgW/canvas.width);
+    const pdf=new jsPDF({unit:'mm',format:[imgW+margin*2,imgH+margin*2]});
+    pdf.addImage(imgData,'JPEG',margin,margin,imgW,imgH);
+    return pdf;
+  }catch(e){ console.error('Report PDF generation failed:',e); return null; }
+  finally{ wrap.remove(); }
+}
+async function downloadReportPdf(){
+  const key=_viewingReportKey;
+  const imports=JSON.parse(localStorage.getItem(BUSY_IMPORTS_KEY)||'{}');
+  const r=imports[key];
+  const msg=$('busyViewPdfMsg');
+  if(!r){msg.style.color='var(--red)';msg.textContent='Report nahi mila.';return}
+  const btn=$('busyViewPdfBtn');if(btn)btn.disabled=true;
+  msg.style.color='var(--muted)';msg.textContent='PDF bana raha hoon...';
+  try{
+    const pdf=await generateReportPdfBlob(r);
+    if(!pdf){msg.style.color='var(--red)';msg.textContent='PDF nahi ban paya, dobara try karein.';return}
+    pdf.save(`${r.name.replace(/[\\/:*?"<>|]/g,'').trim()}.pdf`);
+    msg.style.color='var(--g)';msg.textContent='PDF download ho gayi.';
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
+function removeBusyReport(key){
+  if(!confirm('Ye Busy report hata dein?'))return;
+  const imports=JSON.parse(localStorage.getItem(BUSY_IMPORTS_KEY)||'{}');
+  delete imports[key];
+  saveBusyImports(imports);
+  renderBusyReportsList();
+}
+function renderBusyReportsList(){
+  const wrap=$('busyReportsList');
+  if(!wrap)return;
+  liveBusyImports(imports=>{
+    const keys=Object.keys(imports);
+    if(!keys.length){wrap.innerHTML='<div class="srcMeta">Koi report upload/connect nahi hui abhi tak</div>';return}
+    wrap.innerHTML=keys.map(k=>{
+      const r=imports[k];
+      const isSheet=r.sourceType==='sheet';
+      const refreshBtn=isSheet?`<button type="button" class="btn small" onclick="refreshGoogleSheetReport('${k}')">🔄</button>`:'';
+      return `<div class="busyReportRow"><div><b>${esc(r.name)}</b>${isSheet?' <span class="srcMeta">🔗 Live Sheet</span>':''}<div class="srcMeta">${r.rowCount} rows • ${esc(new Date(r.uploadedAt).toLocaleDateString('en-IN'))}</div></div><div style="display:flex;gap:6px">${refreshBtn}<button type="button" class="btn small" onclick="viewBusyReport('${k}')">👁</button><button type="button" class="btn small" onclick="removeBusyReport('${k}')">🗑</button></div></div>`;
+    }).join('');
+  });
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
   currentUser=localStorage.getItem(SESSION_KEY)||null;
   if(db)startUsersSync();
   renderAll();
-  liveBusyImport(data=>{ if(data&&$('busyStatus'))$('busyStatus').textContent='Last export: '+(data.fileName||'-')+' ('+data.rowCount+' rows, '+new Date(data.uploadedAt).toLocaleDateString('en-IN')+')'; });
+  renderBusyReportsList();
+  if(!getSpeechRecognitionCtor()&&$('micBtn'))$('micBtn').style.display='none';
+  if(!hasSpeechSynthesis()&&$('ttsBtn'))$('ttsBtn').style.display='none'; else refreshTtsBtn();
 });
 window.addEventListener('storage',e=>{ if(e.key===SESSION_KEY){currentUser=localStorage.getItem(SESSION_KEY)||null;renderAll();} });
 </script>

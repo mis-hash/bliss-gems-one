@@ -47,7 +47,7 @@ header{background:#fff;border-bottom:1px solid var(--line)}
 .btn{border:0;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:bold;background:var(--mint);color:var(--g);cursor:pointer;font-family:inherit}
 .btn.primary{background:var(--g);color:#fff}
 .btn.small{padding:7px 11px;font-size:12px}
-.shell{max-width:980px;margin:auto;padding:20px 18px 60px}
+.shell{max-width:1050px;margin:auto;display:grid;grid-template-columns:210px 1fr;gap:16px;padding:20px 18px 60px}
 .panel{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:18px;box-shadow:0 3px 10px rgba(22,36,31,.06)}
 .ph{padding:16px 18px;border-bottom:1px solid var(--line);font-size:14px;font-weight:800;font-family:'Manrope',sans-serif}
 .pb{padding:18px}
@@ -63,10 +63,23 @@ table{width:100%;border-collapse:collapse;font-size:13.5px}
 th{text-align:left;padding:10px;background:var(--bg);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;border-bottom:1px solid var(--line)}
 td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 .emptystate{text-align:center;padding:30px;color:var(--muted);font-size:13px}
-.navBar{background:#fff;border-bottom:1px solid var(--line)}
-.navInner{max-width:980px;margin:auto;padding:0 18px;display:flex;gap:6px}
-.navBtn{border:0;background:transparent;padding:14px 16px;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;font-family:'Manrope',sans-serif}
-.navBtn.on{color:var(--g);border-bottom-color:var(--g)}
+/* Sidebar nav - same component/CSS as Petty Cash's left nav (grouped buttons, active =
+   mint background + green left border), so the two apps' navigation reads identically
+   instead of each app inventing its own pattern. */
+nav{background:#fff;border:1px solid var(--line);border-radius:14px;padding:9px;height:max-content;position:sticky;top:88px}
+nav button{width:100%;border:0;background:transparent;text-align:left;padding:12px 11px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin:2px 0;display:flex;align-items:center;gap:8px;border-left:3px solid transparent;color:var(--txt);font-family:inherit}
+nav button.on{background:var(--mint);color:var(--g);border-left-color:var(--g)}
+.grouplabel{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:14px 11px 6px}
+.grouplabel:first-child{padding-top:4px}
+.bottomNav{display:none}
+@media(max-width:720px){
+  .shell{display:block;padding:11px 10px 76px}
+  nav{display:none}
+  .bottomNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);z-index:30;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px}
+  .bottomNav button{border:0;background:transparent;font-size:10px;color:var(--muted);font-weight:bold;flex:1 0 auto;padding:6px 8px;white-space:nowrap;font-family:inherit;cursor:pointer}
+  .bottomNav button span{display:block;font-size:19px}
+  .bottomNav button.on{color:var(--g)}
+}
 .sclPage{display:none}
 .sclPage.on{display:block}
 .pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:10.5px;font-weight:700;white-space:nowrap}
@@ -78,6 +91,14 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 .insightIcon{width:28px;height:28px;border-radius:8px;background:var(--accentbg);display:grid;place-items:center;font-size:14px;flex:none}
 .insightTitle{font-size:12.5px;font-weight:800;font-family:'Manrope',sans-serif;color:var(--txt)}
 .insightSection table{margin-top:10px}
+/* Call Recording Library - each recording gets its own bordered card so the list reads as
+   distinct entries instead of running together (an earlier version used an undefined "item"
+   class copied from Sales Panel's code and had no visible separation at all). */
+.recLibCard{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:12px}
+.recLibCard:first-child{margin-top:0}
+.recLibHead{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px}
+.recLibMeta{font-size:12px;color:var(--muted);margin-top:3px}
+.recLibActions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -94,25 +115,29 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
     <button class="btn hidden" id="logoutBtn" onclick="doLogout()">Logout</button>
   </div>
 </div></header>
-
-<div class="navBar"><div class="navInner">
-  <button class="navBtn on" data-page="log" onclick="goPage('log')">📞 Call Log</button>
-  <button class="navBtn" data-page="pipeline" onclick="goPage('pipeline')">📈 Pipeline</button>
-  <button class="navBtn" data-page="myperf" onclick="goPage('myperf')">📊 My Performance</button>
-  <button class="navBtn hidden" id="directorsNavBtn" data-page="analysis" onclick="goPage('analysis')">👑 Directors</button>
-</div></div>
 </div>
 
 <div class="shell">
+  <nav id="pageNav">
+    <div class="grouplabel">Operations</div>
+    <button class="on" data-page="log" onclick="goPage('log')">📞 Call Log</button>
+    <button data-page="pipeline" onclick="goPage('pipeline')">📈 Pipeline</button>
+    <button data-page="followups" onclick="goPage('followups')">⏰ Follow-ups</button>
+    <div class="grouplabel">Insights</div>
+    <button data-page="myperf" onclick="goPage('myperf')">📊 My Performance</button>
+    <button class="hidden directorsNavBtn" data-page="analysis" onclick="goPage('analysis')">👑 Directors</button>
+    <button class="hidden directorsNavBtn" data-page="recordings" onclick="goPage('recordings')">🎙 Recordings</button>
+  </nav>
+  <main>
   <div class="panel" id="callFilterBarPanel">
     <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <span>🔎 Filter (Call Log aur Directors dono pe lagta hai)</span>
+      <span>🔎 Filter (Call Log, Directors aur Recordings pe lagta hai)</span>
       <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview();renderPipelineOverview()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
-        <input type="date" id="callFilterFrom" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+        <select id="callFilterSalesPerson" onchange="renderCallHistory();renderCallAnalysisOverview();renderPipelineOverview();renderFollowupsOverview();renderRecordingLibrary()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option value="">Sab Sales Persons</option></select>
+        <input type="date" id="callFilterFrom" onchange="renderCallHistory();renderCallAnalysisOverview();renderRecordingLibrary()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
         <span style="font-size:12px;color:var(--muted)">se</span>
-        <input type="date" id="callFilterTo" onchange="renderCallHistory();renderCallAnalysisOverview()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
-        <button type="button" class="btn small" onclick="$('callFilterFrom').value='';$('callFilterTo').value='';renderCallHistory();renderCallAnalysisOverview()">✕ Date Clear</button>
+        <input type="date" id="callFilterTo" onchange="renderCallHistory();renderCallAnalysisOverview();renderRecordingLibrary()" style="padding:6px;border:1px solid var(--line);border-radius:7px;font-size:12px">
+        <button type="button" class="btn small" onclick="$('callFilterFrom').value='';$('callFilterTo').value='';renderCallHistory();renderCallAnalysisOverview();renderRecordingLibrary()">✕ Date Clear</button>
       </span>
     </div>
   </div>
@@ -124,7 +149,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
         <div class="note" style="margin-bottom:12px">Recording log karne ke saath ek free Call Analysis card bhi milega (note ke keywords + call duration se) - asli AI transcript/understanding ke liye paid speech-to-text API chahiye hoga, jo abhi approve nahi hai.</div>
         <div class="grid">
           <div class="field"><label>Sales Person</label><select id="callSalesPerson"></select></div>
-          <div class="field"><label>Client/Party (optional)</label><input id="callClientName" type="text" autocomplete="off" oninput="sclFilterClientSuggestions(this)" onfocus="sclFilterClientSuggestions(this)" onblur="sclHideClientSuggestions(this)"></div>
+          <div class="field"><label>Client/Party *</label><input id="callClientName" type="text" autocomplete="off" oninput="sclFilterClientSuggestions(this)" onfocus="sclFilterClientSuggestions(this)" onblur="sclHideClientSuggestions(this)"></div>
         </div>
         <div class="grid" style="margin-top:10px">
           <div class="field"><label>Call Outcome</label><select id="callOutcome">
@@ -137,7 +162,7 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
           <div class="field"><label>Estimated Deal Value (₹, optional)</label><input type="number" id="callDealValue" placeholder="e.g. 50000"></div>
         </div>
         <div class="grid" style="margin-top:10px">
-          <div class="field"><label>Recording File (optional, chhoti file)</label><input type="file" id="callFileInput" accept="audio/*"></div>
+          <div class="field"><label>Recording File * (chhoti file)</label><input type="file" id="callFileInput" accept="audio/*"></div>
           <div class="field"><label>Note (optional)</label><input id="callNote" type="text"></div>
         </div>
         <button type="button" class="btn primary" style="margin-top:14px" onclick="logCallRecording()">⬆ Call Log Karein</button>
@@ -166,6 +191,13 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
     </div>
   </div>
 
+  <div id="page-followups" class="sclPage">
+    <div class="panel">
+      <div class="ph">⏰ Follow-up Reminders</div>
+      <div class="pb" id="followupsOverview"></div>
+    </div>
+  </div>
+
   <div id="page-myperf" class="sclPage">
     <div class="panel">
       <div class="ph">📊 My Performance</div>
@@ -182,6 +214,26 @@ td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
       <div class="pb" id="callAnalysisOverview"></div>
     </div>
   </div>
+
+  <div id="page-recordings" class="sclPage">
+    <div class="panel">
+      <div class="ph" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <span>🎙 Call Recording Library</span>
+        <input type="text" id="recLibSearch" placeholder="🔎 Client ya Sales Person se search karein" oninput="renderRecordingLibrary()" style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px;min-width:220px">
+      </div>
+      <div class="pb" id="recordingLibraryWrap"></div>
+    </div>
+  </div>
+  </main>
+</div>
+
+<div class="bottomNav" id="bottomNav">
+  <button class="on" data-page="log" onclick="goPage('log')"><span>📞</span>Call Log</button>
+  <button data-page="pipeline" onclick="goPage('pipeline')"><span>📈</span>Pipeline</button>
+  <button data-page="followups" onclick="goPage('followups')"><span>⏰</span>Follow-ups</button>
+  <button data-page="myperf" onclick="goPage('myperf')"><span>📊</span>My Perf.</button>
+  <button class="hidden directorsNavBtn" data-page="analysis" onclick="goPage('analysis')"><span>👑</span>Directors</button>
+  <button class="hidden directorsNavBtn" data-page="recordings" onclick="goPage('recordings')"><span>🎙</span>Recordings</button>
 </div>
 </div>
 
@@ -310,7 +362,7 @@ function renderSalesPersonOptions(){
 
 function goPage(id){
   document.querySelectorAll('.sclPage').forEach(p=>p.classList.toggle('on',p.id==='page-'+id));
-  document.querySelectorAll('.navBtn[data-page]').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
+  document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
   // The shared Sales Person/date filter only drives Call Log + Directors - My Performance
   // always shows the viewer's own data regardless of it, so hide the filter bar there to
   // avoid confusing a Sales Person into thinking it affects their own performance view.
@@ -323,22 +375,26 @@ function renderAll(){
   renderSalesPersonOptions();
   renderCallHistory();
   renderPipelineOverview();
+  renderFollowupsOverview();
   renderMyPerformance();
   renderCallAnalysisOverview();
+  renderRecordingLibrary();
   renderDemoDataActions();
   renderPreviewToggle();
   refreshDirectorsTabVisibility();
 }
-// The 3rd nav tab ("👑 Directors") is only for Admin/Director (real role or the Preview
-// toggle) - everyone else only ever sees Call Log + My Performance. If the toggle/role
-// is lost while that tab happens to be open (e.g. turning Preview off), bounce back to
-// My Performance instead of leaving an empty/inaccessible tab open.
+// The Directors-only nav tabs ("👑 Directors", "🎙 Recordings") are only for Admin/Director
+// (real role or the Preview toggle) - everyone else only ever sees Call Log + My Performance.
+// If the toggle/role is lost while one of those tabs happens to be open (e.g. turning Preview
+// off), bounce back to My Performance instead of leaving an empty/inaccessible tab open.
 function refreshDirectorsTabVisibility(){
-  const btn=$('directorsNavBtn');
-  if(!btn)return;
+  const btns=document.querySelectorAll('.directorsNavBtn');
+  if(!btns.length)return;
   const can=canViewAllSales();
-  btn.classList.toggle('hidden',!can);
-  if(!can&&$('page-analysis')&&$('page-analysis').classList.contains('on'))goPage('myperf');
+  btns.forEach(b=>b.classList.toggle('hidden',!can));
+  if(!can){
+    ['page-analysis','page-recordings'].forEach(id=>{ if($(id)&&$(id).classList.contains('on'))goPage('myperf'); });
+  }
 }
 // "My Performance" tab - always locked to the logged-in user's OWN calls regardless of
 // role or the shared Sales Person filter (that filter only drives Call Log + the Directors
@@ -437,7 +493,8 @@ function sclClearDemoData(){
 
 // Stored in localStorage, not Firestore: a brand new Firestore collection for this would
 // hit the same "Missing or insufficient permissions" wall already found and worked around
-// in the AI Business Assistant app - this project's Firestore rules only cover
+// in the Directors Assistant app (formerly "AI Business Assistant") - this project's
+// Firestore rules only cover
 // collections that already existed before these new apps, and adding one needs a Firebase
 // Console change this app can't make itself. The trade-off: this log is per-device, not
 // synced across everyone's browsers, until that rule is added.
@@ -528,6 +585,8 @@ async function logCallRecording(){
   const file=fileInput.files[0]||null;
   const status=$('callLogStatus');
   if(!salesPerson){status.style.color='var(--red)';status.textContent='Sales Person select karein.';return}
+  if(!clientName){status.style.color='var(--red)';status.textContent='Party/Client name select ya likhein - zaroori hai.';return}
+  if(!file){status.style.color='var(--red)';status.textContent='Recording file upload karein - zaroori hai.';return}
   try{
     let recordingUrl=null,fileNote='',durationSeconds=null;
     if(file){
@@ -551,6 +610,7 @@ async function logCallRecording(){
     renderCallHistory();
     renderCallAnalysisOverview();
     renderPipelineOverview();
+    renderFollowupsOverview();
   }catch(e){
     console.error('logCallRecording failed:',e);
     status.style.color='var(--red)';
@@ -617,15 +677,33 @@ function computePipelineLeads(){
     return {client,stage,latest,callCount:calls.length,salesPerson:latest.salesPerson,isOverridden:!!overrides[client]};
   }).sort((a,b)=>new Date(b.latest.loggedAt)-new Date(a.latest.loggedAt));
 }
+// A lead's own "next follow-up" date - separate from the Pipeline stage above, since a
+// lead can sit in the same stage for a while but still need a reminder of WHEN to call
+// next. Stored the same simple way (per-device localStorage, same constraint as the rest
+// of this app's data).
+const FOLLOWUP_KEY='scl_followup_reminders';
+function getFollowupReminders(){ try{const raw=localStorage.getItem(FOLLOWUP_KEY);return raw?JSON.parse(raw):{};}catch(e){return {};} }
+function setFollowupReminder(clientName,dateStr){
+  const m=getFollowupReminders();
+  if(dateStr)m[clientName]=dateStr;else delete m[clientName];
+  try{localStorage.setItem(FOLLOWUP_KEY,JSON.stringify(m));}catch(e){console.error('setFollowupReminder failed:',e);}
+  renderPipelineOverview();
+  renderFollowupsOverview();
+}
 function pipelineCardHtml(lead){
   const nSafe=esc(lead.client).replace(/'/g,"\\'");
   const stageOptions=PIPELINE_STAGES.map(s=>`<option value="${s.key}"${s.key===lead.stage?' selected':''}>${s.icon} ${s.label}</option>`).join('');
+  const reminders=getFollowupReminders();
+  const reminderDate=reminders[lead.client]||'';
   return `<div style="background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <div>
       <b style="font-size:13px">${esc(lead.client)}</b>
       <div class="note" style="margin-top:2px">${esc(lead.salesPerson)} • ${lead.callCount} call${lead.callCount===1?'':'s'} • Last: ${esc(new Date(lead.latest.loggedAt).toLocaleDateString('en-IN'))}${lead.latest.dealValue?' • '+fmtCallMoney(lead.latest.dealValue):''}</div>
     </div>
-    <select onchange="setPipelineStage('${nSafe}',this.value)" style="padding:6px;border:1px solid var(--line);border-radius:6px;font-size:12px">${stageOptions}</select>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <span style="display:flex;align-items:center;gap:4px" title="Follow-up Reminder">⏰<input type="date" value="${esc(reminderDate)}" onchange="setFollowupReminder('${nSafe}',this.value)" style="padding:5px;border:1px solid var(--line);border-radius:6px;font-size:11px"></span>
+      <select onchange="setPipelineStage('${nSafe}',this.value)" style="padding:6px;border:1px solid var(--line);border-radius:6px;font-size:12px">${stageOptions}</select>
+    </div>
   </div>`;
 }
 function renderPipelineOverview(){
@@ -635,13 +713,56 @@ function renderPipelineOverview(){
   if(!leads.length){wrap.innerHTML=`<div class="emptystate">📈<p>Abhi koi lead nahi hai — call log karein to yahan pipeline dikhega.</p></div>`;return}
   const byStage={};
   leads.forEach(l=>{ (byStage[l.stage]=byStage[l.stage]||[]).push(l); });
-  wrap.innerHTML=`<div class="note" style="margin-bottom:12px">Har stage automatically aapke latest Call Outcome se set hota hai (Converted→Won, Not Interested→Lost, Interested→Qualified, Follow-up→Contacted) - aap kabhi bhi dropdown se manually move kar sakte hain (jaise "Proposal" bhej diya hai).</div>`
+  wrap.innerHTML=`<div class="note" style="margin-bottom:12px">Har stage automatically aapke latest Call Outcome se set hota hai (Converted→Won, Not Interested→Lost, Interested→Qualified, Follow-up→Contacted) - aap kabhi bhi dropdown se manually move kar sakte hain (jaise "Proposal" bhej diya hai). ⏰ se ek follow-up reminder date bhi set kar sakte hain.</div>`
     +PIPELINE_STAGES.map(s=>{
       const stageLeads=byStage[s.key]||[];
       if(!stageLeads.length)return '';
       return insightSectionHtml(s.icon,s.accent,s.accentbg,`${s.label} (${stageLeads.length})`,
         `<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">${stageLeads.map(pipelineCardHtml).join('')}</div>`);
     }).join('');
+}
+// Follow-ups tab - only leads that have a reminder date set (skips the rest, no noise),
+// and skips Won/Lost leads since there's nothing left to follow up on there even if an
+// old reminder date is still sitting on them. Overdue/Today/Upcoming grouping is a live
+// "now" comparison, same reasoning as the Pipeline tab's live-snapshot stages.
+function computeFollowups(){
+  const reminders=getFollowupReminders();
+  const todayStr=new Date().toISOString().slice(0,10);
+  return computePipelineLeads()
+    .filter(l=>reminders[l.client]&&l.stage!=='Won'&&l.stage!=='Lost')
+    .map(l=>{
+      const date=reminders[l.client];
+      const bucket=date<todayStr?'Overdue':(date===todayStr?'Today':'Upcoming');
+      return {...l,reminderDate:date,bucket};
+    })
+    .sort((a,b)=>a.reminderDate.localeCompare(b.reminderDate));
+}
+function followupCardHtml(lead){
+  const nSafe=esc(lead.client).replace(/'/g,"\\'");
+  return `<div style="background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <div>
+      <b style="font-size:13px">${esc(lead.client)}</b>
+      <div class="note" style="margin-top:2px">${esc(lead.salesPerson)} • ${esc(new Date(lead.reminderDate).toLocaleDateString('en-IN'))} ko follow-up • Stage: ${esc(lead.stage)}</div>
+    </div>
+    <button type="button" class="btn small" onclick="setFollowupReminder('${nSafe}','')">✓ Done</button>
+  </div>`;
+}
+function renderFollowupsOverview(){
+  const wrap=$('followupsOverview');
+  if(!wrap)return;
+  const followups=computeFollowups();
+  if(!followups.length){wrap.innerHTML=`<div class="emptystate">⏰<p>Koi follow-up reminder set nahi hai — Pipeline tab mein ⏰ se kisi lead pe reminder date laga sakte hain.</p></div>`;return}
+  const buckets=[
+    {key:'Overdue',label:'Overdue',icon:'⚠',accent:'#b43a35',accentbg:'#fff0ef'},
+    {key:'Today',label:'Aaj',icon:'📅',accent:'#a66b08',accentbg:'#fff6df'},
+    {key:'Upcoming',label:'Upcoming',icon:'🔜',accent:'#2A6DB0',accentbg:'#E9F2FB'}
+  ];
+  wrap.innerHTML=buckets.map(b=>{
+    const rows=followups.filter(f=>f.bucket===b.key);
+    if(!rows.length)return '';
+    return insightSectionHtml(b.icon,b.accent,b.accentbg,`${b.label} (${rows.length})`,
+      `<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">${rows.map(followupCardHtml).join('')}</div>`);
+  }).join('');
 }
 /* ===== Free, rule-based Call Analysis (no paid speech-to-text) =====
    There's no API to turn the audio into a real transcript for free, so this analyzes the
@@ -698,7 +819,7 @@ function fmtDuration(sec){
   return m+'m '+String(s).padStart(2,'0')+'s';
 }
 function sentimentPillHtmlDark(sentiment){
-  const map={positive:{label:'🙂 Positive',color:'#8FE388',bg:'#2E3A21'},neutral:{label:'😐 Neutral',color:'#A8B4E8',bg:'#262F4A'},negative:{label:'🙁 Negative',color:'#F2A8B8',bg:'#3A2130'}};
+  const map={positive:{label:'🙂 Positive',color:'#8FE388',bg:'#163A2E'},neutral:{label:'😐 Neutral',color:'#8FE3C9',bg:'#1C4A40'},negative:{label:'🙁 Negative',color:'#F2A8B8',bg:'#3A2430'}};
   const s=map[sentiment]||map.neutral;
   return `<span style="font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:99px;background:${s.bg};color:${s.color}">${s.label}</span>`;
 }
@@ -710,15 +831,15 @@ function callSummarySentence(row,a){
 function callAnalysisCardHtml(row){
   const a=analyzeCallNote(row.note);
   const dur=fmtDuration(row.durationSeconds);
-  return `<div style="background:linear-gradient(160deg,#151B2E,#1E2640);border-radius:14px;padding:16px 18px;margin-top:4px;color:#fff;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 26px rgba(10,14,30,.25)">
+  return `<div style="background:linear-gradient(160deg,#0F2E2A,#14453D);border-radius:14px;padding:16px 18px;margin-top:4px;color:#fff;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 26px rgba(10,30,25,.3)">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
       <b style="font-size:13px">🧠 Call Analysis (Note-Based)</b>
       ${sentimentPillHtmlDark(a.sentiment)}
     </div>
-    ${dur?`<div style="font-size:12px;color:#8891B5">⏱ Call Duration: ${dur}</div>`:''}
-    <div style="font-size:12.5px;color:#C9D0E8;line-height:1.6">${esc(callSummarySentence(row,a))}</div>
-    ${row.note?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#2A3356;display:grid;place-items:center;font-size:12px;flex:none">🔑</div><div style="font-size:12px;color:#C9D0E8;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Note</b>${esc(row.note)}</div></div>`:''}
-    ${a.negativeHits.length?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#2A3356;display:grid;place-items:center;font-size:12px;flex:none">⚠</div><div style="font-size:12px;color:#C9D0E8;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Objections/Signals</b>${a.negativeHits.map(esc).join(', ')}</div></div>`:''}
+    ${dur?`<div style="font-size:12px;color:#9FC9BD">⏱ Call Duration: ${dur}</div>`:''}
+    <div style="font-size:12.5px;color:#D4EEE6;line-height:1.6">${esc(callSummarySentence(row,a))}</div>
+    ${row.note?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#1E4A3F;display:grid;place-items:center;font-size:12px;flex:none">🔑</div><div style="font-size:12px;color:#D4EEE6;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Note</b>${esc(row.note)}</div></div>`:''}
+    ${a.negativeHits.length?`<div style="display:flex;gap:8px"><div style="width:22px;height:22px;border-radius:7px;background:#1E4A3F;display:grid;place-items:center;font-size:12px;flex:none">⚠</div><div style="font-size:12px;color:#D4EEE6;line-height:1.5"><b style="color:#fff;display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Objections/Signals</b>${a.negativeHits.map(esc).join(', ')}</div></div>`:''}
     ${a.coachingTips.length?`<div style="background:linear-gradient(135deg,#3A2E10,#2A2108);border:1px solid #5C4A1A;border-radius:10px;padding:10px 12px;font-size:12px;color:#E8C97A"><b style="display:block;margin-bottom:5px">🎯 Sales Person ke liye Guidance</b><ul style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:4px">${a.coachingTips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`:''}
     <div style="background:linear-gradient(135deg,#1F3B2E,#15291F);border:1px solid #2E5940;border-radius:10px;padding:10px 12px;font-size:12px;color:#8FE388">💡 Next Step: ${esc(a.suggestion)}</div>
   </div>`;
@@ -931,7 +1052,68 @@ function insightSectionHtml(icon,accent,accentbg,title,bodyHtml){
     ${bodyHtml}
   </div>`;
 }
+// Smart per-Sales-Person coaching flags for Directors: aggregates each person's negative-call
+// ratio, win-rate trend, top recurring objection and weekly-target shortfall into a short,
+// actionable "what to discuss with this person" list - built in direct response to "Directors
+// ko pata chale kisse kya baat karni hai, kaise guide karna hai". Still rule-based (same free
+// keyword-analysis approach as the rest of this app, no paid AI), not a real recommendation
+// engine - it just turns numbers the Leaderboard/breakdown tables already compute into plain
+// Hindi sentences instead of making a Director read the tables themselves.
+function computeSalesPersonCoachingFlags(scopeRows,analyses){
+  const byPerson=callAnalysisBySalesPerson(scopeRows,analyses);
+  const leaderboard=computeOutcomeLeaderboard(scopeRows);
+  const targets=getCallTargets();
+  const now=Date.now();
+  // Topic counts per person (what the call was actually ABOUT - Pricing/Quality/Delivery/...),
+  // kept separate from byPerson[name].objCounts above (which counts literal matched negative
+  // WORDS like "nahi"/"mehenga", not topics) - a topic name reads far more actionable to a
+  // Director than a raw keyword would.
+  const topicsByPerson={};
+  scopeRows.forEach((r,i)=>{
+    const name=r.salesPerson||'Unknown';
+    const a=analyses[i];
+    // Only count topics from calls that actually showed resistance (negativeHits present) -
+    // otherwise a topic like "Decision" discussed on a successful, friction-free close would
+    // wrongly surface as something needing attention, when it's actually a good sign.
+    if(!a.negativeHits.length)return;
+    if(!topicsByPerson[name])topicsByPerson[name]={};
+    a.topics.forEach(t=>{topicsByPerson[name][t]=(topicsByPerson[name][t]||0)+1;});
+  });
+  const names=Object.keys(byPerson).sort((a,b)=>a.localeCompare(b));
+  return names.map(name=>{
+    const d=byPerson[name];
+    const lb=leaderboard[name]||{trend:'flat'};
+    const flags=[];
+    const negPct=d.total?Math.round(d.negative/d.total*100):0;
+    if(d.total>=2&&negPct>=30){
+      flags.push({level:'red',text:`🔴 ${negPct}% calls negative aa rahe hain (${d.negative}/${d.total}) — inki approach discuss karein`});
+    }
+    if(lb.trend==='down'){
+      flags.push({level:'red',text:'📉 Win rate pichle hafte se gir raha hai — ek coaching/review call karein'});
+    }
+    const topics=topicsByPerson[name]||{};
+    const topTopic=Object.keys(topics).sort((a,b)=>topics[b]-topics[a])[0];
+    if(topTopic&&topics[topTopic]>=2){
+      flags.push({level:'amber',text:`🎯 Sabse zyada "${esc(topTopic)}" discuss hota hai (${topics[topTopic]} calls) — iske liye pitch/training dein`});
+    }
+    const callsThisWeek=scopeRows.filter(r=>(r.salesPerson||'Unknown')===name&&(now-new Date(r.loggedAt).getTime())/86400000<=7).length;
+    const target=targets[name]||0;
+    if(target&&callsThisWeek<target){
+      flags.push({level:'amber',text:`⏰ Weekly target se peeche hain (${callsThisWeek}/${target} calls) — follow-up frequency badhayein`});
+    }
+    if(!flags.length)flags.push({level:'green',text:'✅ Sab normal chal raha hai — abhi koi urgent baat nahi'});
+    return {name,flags};
+  });
+}
+function coachingFlagsSectionHtml(scopeRows,analyses){
+  const list=computeSalesPersonCoachingFlags(scopeRows,analyses);
+  if(!list.length)return '';
+  const colorMap={red:'#b43a35',amber:'#a66b08',green:'#268F76'};
+  const bodyHtml=list.map(p=>`<div style="margin-top:10px"><b style="font-size:12.5px">${esc(p.name)}</b><div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">${p.flags.map(f=>`<div style="font-size:12px;color:${colorMap[f.level]}">${f.text}</div>`).join('')}</div></div>`).join('');
+  return insightSectionHtml('🧭','#4C5FD5','#EDEFFC','Smart Coaching Flags — Kisse Kya Baat Karni Hai',bodyHtml);
+}
 function renderSalesInsightsHtml(scopeRows,analyses){
+  const coachingFlagsHtml=coachingFlagsSectionHtml(scopeRows,analyses);
   const leaderboard=computeOutcomeLeaderboard(scopeRows);
   const names=Object.keys(leaderboard).sort((a,b)=>leaderboard[b].total-leaderboard[a].total);
   const targets=getCallTargets();
@@ -1015,7 +1197,7 @@ function renderSalesInsightsHtml(scopeRows,analyses){
       <tbody>${topPartiesRows}</tbody>
     </table>`):'';
 
-  return leaderboardHtml+dealTrendHtml+turnaroundHtml+monthlyHtml+objectionHtml+stuckLeadsHtml+lostTrendHtml+fsiHtml+topPartiesHtml;
+  return coachingFlagsHtml+leaderboardHtml+dealTrendHtml+turnaroundHtml+monthlyHtml+objectionHtml+stuckLeadsHtml+lostTrendHtml+fsiHtml+topPartiesHtml;
 }
 function fmtCallMoney(n){ return '₹'+Math.round(n).toLocaleString('en-IN'); }
 // Shared by the history table, the analysis overview and the CSV export, so all three
@@ -1132,7 +1314,38 @@ function exportCallLogCSV(){
   downloadCSV('sales-call-log'+(filter?'-'+filter.replace(/\W+/g,'-'):'')+'.csv',out);
 }
 let callsExpanded={};
-function toggleCallExpand(id){callsExpanded[id]=!callsExpanded[id];renderCallHistory();}
+function toggleCallExpand(id){callsExpanded[id]=!callsExpanded[id];renderCallHistory();renderRecordingLibrary();}
+// Directors-only (same canViewAllSales() gate as the Directors tab, see directorsNavBtn):
+// a searchable/browsable list of every call that has a recording, across whichever Sales
+// Persons the shared filter bar currently scopes to - built in direct response to "team-wide
+// Call Recording Library" being raised as a gap vs. a multinational-company CRM. Shares the
+// same per-device-only data constraint as the rest of this app (see CALL_LOG_KEY above) and
+// reuses the existing playRecording() modal + callAnalysisCardHtml()/callsExpanded state
+// instead of duplicating that UI.
+function renderRecordingLibrary(){
+  const wrap=$('recordingLibraryWrap');
+  if(!wrap)return;
+  const q=($('recLibSearch')?.value||'').trim().toLowerCase();
+  let rows=callLogRowsInScope({onlyWithRecording:true});
+  if(q)rows=rows.filter(r=>(r.clientName||'').toLowerCase().includes(q)||(r.salesPerson||'').toLowerCase().includes(q));
+  rows=rows.sort((a,b)=>String(b.loggedAt).localeCompare(String(a.loggedAt)));
+  if(!rows.length){wrap.innerHTML=`<div class="emptystate">🎙<p>Is filter/search ke liye koi recording nahi mili.</p></div>`;return}
+  const listHtml=rows.map(r=>{
+    const open=!!callsExpanded[r.id];
+    const clientLabel=r.clientName?esc(r.clientName):'<span style="color:var(--muted);font-style:italic">Client naam nahi diya</span>';
+    return `<div class="recLibCard">
+    <div class="recLibHead">
+      <div><b>${clientLabel}</b> — ${esc(r.salesPerson)}
+        <div class="recLibMeta">${esc(new Date(r.loggedAt).toLocaleString('en-IN'))}${r.durationSeconds?' • '+esc(fmtDuration(r.durationSeconds)):''}</div>
+      </div>
+      <div class="recLibActions">${outcomeLabelHtml(r.outcome)}<button type="button" class="btn small" onclick="playRecording('${esc(r.id)}')">▶ Play</button><button type="button" class="btn small" onclick="toggleCallExpand('${esc(r.id)}')">${open?'🔽':'🧠'} Analysis</button></div>
+    </div>
+    ${r.note?`<div class="note" style="margin-top:8px">📝 ${esc(r.note)}</div>`:''}
+    ${open?`<div style="margin-top:10px">${callAnalysisCardHtml(r)}</div>`:''}
+  </div>`;
+  }).join('');
+  wrap.innerHTML=`<div class="note" style="margin-bottom:10px">📱 Ye data sirf is device se hai — dusre device pe log hui recordings yahan abhi nahi dikhengi (Firestore sync hone tak). 🎙 Total ${rows.length} recording${rows.length===1?'':'s'}.</div>${listHtml}`;
+}
 function renderCallHistory(){
   const tbody=$('callHistoryTable');
   if(!tbody)return;
