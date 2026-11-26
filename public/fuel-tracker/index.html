@@ -1123,14 +1123,26 @@ function renderCleaningReminders(){
     return `<div class="item" style="flex-direction:column;align-items:stretch;gap:4px">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
         <span><b>${esc(d.vehicle)}</b> — ${reason}</span>
-        <span style="display:flex;gap:6px;flex-wrap:wrap">${sendBtn}${superAdminUnlocked?`<button class="btn small primary" onclick="markVehicleCleaned('${vSafe}')">✓ Mark Cleaned</button>`:'<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ Due</span>'}</span>
+        <span style="display:flex;gap:6px;flex-wrap:wrap">${sendBtn}${canMarkVehicleCleaned(d.vehicle)?`<button class="btn small primary" onclick="markVehicleCleaned('${vSafe}')">✓ Mark Cleaned</button>`:'<span class="pill" style="background:var(--amberbg);color:var(--amber)">⚠ Due</span>'}</span>
       </div>
       <small class="note">📲 WhatsApp jayega: ${esc(recipientNames)}${sentThisWeek?' • is hafte bheja ja chuka hai':''}</small>
     </div>`;
   }).join('')}</div></div>`;
 }
+// The WhatsApp reminder tells the vehicle's own Responsible Doer to "Mark Cleaned" in the app,
+// but that button was Super-Admin-only - the exact person the message is addressed to had no
+// way to actually do what it asked. Now also allows the vehicle's Responsible Doer themselves,
+// on top of Super Admin and the Admin/Director/Accountant fuel-tracker role.
+function canMarkVehicleCleaned(vehicle){
+  if(superAdminUnlocked)return true;
+  const u=loggedUser();
+  if(!u)return false;
+  if(u.appRoles&&['admin','director','accountant'].includes(u.appRoles['fuel-tracker']))return true;
+  const meta=(masters.vehicleMeta&&masters.vehicleMeta[vehicle])||{};
+  return !!meta.responsibleDoer&&meta.responsibleDoer===u.id;
+}
 async function markVehicleCleaned(vehicle){
-  if(!superAdminUnlocked){alert('Sirf Super Admin cleaning mark kar sakta hai.');return}
+  if(!canMarkVehicleCleaned(vehicle)){alert('Sirf Super Admin, Admin/Director/Accountant, ya is vehicle ka Responsible Doer cleaning mark kar sakta hai.');return}
   if(!confirm(vehicle+' ko abhi clean kiya gaya mark karna hai?'))return;
   if(!masters.vehicleCleaning)masters.vehicleCleaning={};
   masters.vehicleCleaning[vehicle]=todayISO();
