@@ -1502,7 +1502,9 @@ async function saveVehicleDoc(){
   const costVal=$('editDocCost').value;
   const note=$('editDocNote').value.trim();
   const photoFile=$('editDocPhoto')?($('editDocPhoto').files[0]||null):null;
-  const renewed=await saveDocRecord(editDocTarget.vehicle,editDocTarget.docKey,startDate,expiryDate,costVal,note,photoFile);
+  let renewed;
+  try{ renewed=await saveDocRecord(editDocTarget.vehicle,editDocTarget.docKey,startDate,expiryDate,costVal,note,photoFile); }
+  catch(e){ console.error('saveVehicleDoc failed:',e); alert('Save fail ho gaya — agar photo attach ki thi, shayad wo format (jaise HEIC) photo field se open nahi ho payi. JPEG/PNG photo try karein ya date/cost bina photo ke pehle save karein.'); return; }
   closeEditDocModal();
   toast('Document update ho gaya'+(renewed?' — purana record history mein save ho gaya':''));
   renderVehicleDocuments();
@@ -1527,7 +1529,9 @@ async function addDocumentEntry(){
   const costVal=$('ndCost').value;
   const note=$('ndNote').value.trim();
   const photoFile=$('ndPhoto')?($('ndPhoto').files[0]||null):null;
-  const renewed=await saveDocRecord(vehicle,docKey,startDate,expiryDate,costVal,note,photoFile);
+  let renewed;
+  try{ renewed=await saveDocRecord(vehicle,docKey,startDate,expiryDate,costVal,note,photoFile); }
+  catch(e){ console.error('addDocumentEntry failed:',e); alert('Save fail ho gaya — agar photo attach ki thi, shayad wo format (jaise HEIC) photo field se open nahi ho payi. JPEG/PNG photo try karein ya date/cost bina photo ke pehle save karein.'); return; }
   closeNewDocumentModal();
   toast('Document entry save ho gayi'+(renewed?' — purana record history mein chala gaya':''));
   renderVehicleDocuments();
