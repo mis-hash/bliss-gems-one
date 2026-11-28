@@ -8,8 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "no secrets step"
-      - name: multiline run, no bash if, nonexistent secret
+      - name: secret piped into env first, bash if checks env var not secrets context
+        env:
+          MY_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          echo "line1"
-          echo "key is ${{ secrets.ANTHROPIC_API_KEY }}"
-          echo "line3"
+          if [ -z "$MY_KEY" ]; then
+            echo "not set, skipping"
+            exit 0
+          fi
+          echo "set, would proceed"
