@@ -181,6 +181,7 @@ header::before{content:'';display:block;height:3px;flex-shrink:0;background:line
   </div>
 
   <div class="chatPanel">
+    <div id="realAiToggleWrap"></div>
     <div class="msgs" id="msgsWrap">
       <div class="emptyMsgs" id="emptyMsgs">💬<div style="max-width:320px">Niche type karein, ya "Sources" tab ke "Try Asking" suggestions use karein — Hindi ya English dono chalega.</div></div>
     </div>
@@ -302,10 +303,38 @@ function renderGate(){
   gateWrap.style.display='none';appWrap.style.display='block';
   $('loginBadge').textContent='👤 '+(u.name||u.username||'User');
   $('logoutBtn').classList.remove('hidden');
+  renderRealAiToggle();
 }
 
 function renderAll(){
   renderGate();
+}
+
+/* ===== Real AI (Claude) toggle =====
+   Per-device only, stored in localStorage - a brand-new Firestore collection for this one
+   flag would hit the same rules-not-covering-it wall documented for busy_import above, so
+   this follows the same fallback. Means each Super Admin's own device remembers its own
+   on/off state, not a single switch for the whole team - acceptable for an internal toggle
+   that only Admin/Director can see or flip in the first place. */
+const REAL_AI_KEY='ai_real_ai_enabled';
+const REAL_AI_ENDPOINT='https://us-central1-bliss-gems-one.cloudfunctions.net/directorsAssistantChat';
+function realAiEnabled(){ try{ return localStorage.getItem(REAL_AI_KEY)==='1'; }catch(e){ return false; } }
+function toggleRealAi(){
+  try{ localStorage.setItem(REAL_AI_KEY, realAiEnabled()?'0':'1'); }catch(e){ console.error('toggleRealAi failed:',e); }
+  renderRealAiToggle();
+}
+function renderRealAiToggle(){
+  const wrap=$('realAiToggleWrap');if(!wrap)return;
+  const u=loggedUser();
+  if(!isAiAdmin(u)){ wrap.innerHTML=''; return; }
+  wrap.innerHTML=`<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer;padding:6px 10px;border-bottom:1px solid var(--line)">
+    <input type="checkbox" style="width:auto" ${realAiEnabled()?'checked':''} onchange="toggleRealAi()"> 🤖 Real AI (Claude) - abhi sirf keyword-matching ki jagah asli samajh kar jawab dega</label>`;
+}
+async function askRealAi(question){
+  const resp=await fetch(REAL_AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question,userId:currentUser})});
+  const json=await resp.json();
+  if(!resp.ok||json.error)throw new Error(json.error||'Real AI backend error');
+  return {text:json.answer,sources:['Real AI (Claude) + live data']};
 }
 
 /* ===== Cross-app read-only queries (same Firestore project, different collections) ===== */
@@ -754,7 +783,7 @@ async function sendChat(){
   appendMsg('user',text);
   const thinkingId=appendMsg('ai','Soch raha hoon...');
   try{
-    const res=await answerQuestion(text);
+    const res=realAiEnabled()?await askRealAi(text):await answerQuestion(text);
     updateMsg(thinkingId,res.text,res.sources);
   }catch(e){
     console.error('answerQuestion failed:',e);

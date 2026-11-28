@@ -267,7 +267,7 @@ tbody tr:hover td{background:#f7faf8}
       </div>
     </div>
     <div class="panel">
-      <div class="ph"><span>All Items</span><input id="itemSearchBox" placeholder="🔍 Item ya category search karein..." oninput="renderItems()" style="max-width:240px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;background:#fff;color:var(--txt)"></div>
+      <div class="ph"><span>All Items</span><span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn small" onclick="forceNotifyMarketPerson()">📦 Market Alert Bhejein</button><input id="itemSearchBox" placeholder="🔍 Item ya category search karein..." oninput="renderItems()" style="max-width:240px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;background:#fff;color:var(--txt)"></span></div>
       <div class="pb" id="itemList"></div>
     </div>
   </section>
@@ -549,7 +549,8 @@ const DEFAULT_SI_TEMPLATES={
   request_submitted:{name:'New Stationery Request (to Admin)',text:'🙋 New Stationery Request\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nRequested By: {RequestedBy}\nPurpose: {Purpose}\n\nPlease review and issue.\n{Link}'},
   request_issued:{name:'Request Issued (to Requester)',text:'✅ Your Stationery Request Approved\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nIssued By: {IssuedBy}\n\nPlease collect it.'},
   request_rejected:{name:'Request Rejected (to Requester)',text:'❌ Your Stationery Request Rejected\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nReason: {Reason}'},
-  request_pending_collect:{name:'Please Collect From Admin (to Requester)',text:'📦 Aapki Stationery Request\n\nItem: {ItemName}\nQty: {Qty} {Unit}\n\nPlease Admin ke paas jaakar collect karein.'}
+  request_pending_collect:{name:'Please Collect From Admin (to Requester)',text:'📦 Aapki Stationery Request\n\nItem: {ItemName}\nQty: {Qty} {Unit}\n\nPlease Admin ke paas jaakar collect karein.'},
+  low_stock_market:{name:'Market Se Laane Wale Ko (Anil Saini)',text:'⚠️ Low Stock Alert — Stationery Requirement\n\n{ItemsList}\n\nKripya Admin se requirement match karke arrange karein as soon as possible.'}
 };
 function fillTemplate(text,vars){
   return text.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m);
@@ -564,6 +565,51 @@ function notifyLowStock(item){
     : users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
   const msg=fillTemplate(templateText('low_stock'),{ItemName:item.name,InHand:item.stock,Unit:item.unit||'',MinLevel:item.min});
   admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('low stock WA failed:',e)));
+}
+// Separate alert to whoever actually goes to market and buys stationery (Anil Saini, by
+// exact name, same pattern as "Amit Sharma" above) - a different message than the admin one:
+// this one tells him to go get it, after confirming with Admin first. Sent once a day for as
+// long as ANY item stays low (see the auto-reminder block below) - unlike the admin alert,
+// which fires per stock-out event. One combined message listing every low item, never one
+// message per item - several items going low the same day must not turn into a flood of
+// separate WhatsApp messages.
+function buildMarketAlertMessage(dueItems){
+  const list=dueItems.map(x=>`- ${x.name}: ${x.stock||0} ${x.unit||''} (min ${x.min||0})`).join('\n');
+  return fillTemplate(templateText('low_stock_market'),{ItemsList:list});
+}
+function notifyMarketPerson(dueItems){
+  if(!dueItems.length)return;
+  const normName=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  const u=users.find(x=>x.active!==false && x.phone && normName(x.name)==='anil saini');
+  if(!u)return;
+  sendRawWA(u.phone,buildMarketAlertMessage(dueItems)).catch(e=>console.error('low stock market WA failed:',e));
+}
+// Daily auto-repeat for as long as an item stays low-stock - same opt-in/best-effort pattern
+// as the Requests page's auto-resend (Super Admin toggle, in-tab guard, per-item last-sent
+// date in masters so it fires at most once/day per item even across page reloads).
+let _marketReminderSent=false;
+function computeLowStockMarketReminders(){
+  return items.filter(x=>(x.stock||0)<=(x.min||0)).map(x=>{
+    const lastSent=(masters.marketReminders||{})[x.id]||null;
+    const due=lastSent!==todayISO();
+    return {...x,due};
+  });
+}
+function maybeAutoSendMarketReminders(all){
+  if(masters.marketReminderEnabled===false)return; // defaults to ON - opt-out, not opt-in, since this was asked for directly
+  const due=all.filter(x=>x.due);
+  if(!due.length||_marketReminderSent)return;
+  _marketReminderSent=true;
+  notifyMarketPerson(due);
+  if(!masters.marketReminders)masters.marketReminders={};
+  due.forEach(x=>{ masters.marketReminders[x.id]=todayISO(); });
+  saveMasters();
+}
+function toggleMarketReminder(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin ye setting badal sakta hai.');return}
+  masters.marketReminderEnabled=masters.marketReminderEnabled===false?true:false;
+  saveMasters();
+  renderItems();
 }
 function notifyIssue(item,qty,toUserId,byUserId){
   const admins=users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
@@ -804,12 +850,25 @@ function renderLogs(){
   $('outHistory').innerHTML=outRows.map(x=>`<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td>${esc(itemName(x.item))}</td><td class="num">-${x.qty}</td><td>${esc(nameOfUserId(x.to))}</td><td>${esc(nameOfUserId(x.by))}</td><td class="superAdminOnly${actionTh}">${logAction(x,'deleteStockOut','restoreStockOut')}</td></tr>`).join('')||`<tr><td colspan="6"><div class="emptystate">⬆<p>Koi Stock Out entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
 }
 function renderItems(){
+  maybeAutoSendMarketReminders(computeLowStockMarketReminders());
   const q=(($('itemSearchBox')&&$('itemSearchBox').value)||'').trim().toLowerCase();
   const list=q?items.filter(x=>(x.name||'').toLowerCase().includes(q)||(x.category||'').toLowerCase().includes(q)):items;
   $('itemList').innerHTML=list.map(x=>{
     const isLow=x.stock<=x.min;
     return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span><button class="btn small" onclick="openEditItem('${x.id}')">✎ Edit</button></div>`;
   }).join('')||(q?`<div class="emptystate">🔍<p>Koi matching item nahi mila.</p><small>Dusra naam ya category try karein.</small></div>`:`<div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Upar se pehla item add karein.</small></div>`);
+}
+// One combined message for every currently low-stock item at once - not one button/message
+// per item, so several items going low together never becomes a flood of separate WhatsApp
+// messages to Anil Saini.
+function forceNotifyMarketPerson(){
+  const low=items.filter(x=>(x.stock||0)<=(x.min||0));
+  if(!low.length){alert('Abhi koi item low-stock mein nahi hai.');return}
+  notifyMarketPerson(low);
+  if(!masters.marketReminders)masters.marketReminders={};
+  low.forEach(x=>{ masters.marketReminders[x.id]=todayISO(); });
+  saveMasters();
+  toast('Market alert bhej diya gaya ('+low.length+' item(s)).');
 }
 let editItemTarget=null;
 function openEditItem(id){
