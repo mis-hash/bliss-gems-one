@@ -7,4 +7,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "step1 only, no conditional at all"
+      - run: echo "step1"
+      - name: single secret check
+        if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: echo "step2"
