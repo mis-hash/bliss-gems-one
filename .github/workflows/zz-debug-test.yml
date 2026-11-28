@@ -8,14 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "step1"
-      - name: check secret via shell, not if:
+      - name: step with id and output, no secrets at all
         id: check
         run: |
-          if [ -n "${{ secrets.GCP_SERVICE_ACCOUNT }}" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: conditional on step output, not secrets context
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: conditional on step output
         if: steps.check.outputs.ready == 'true'
-        run: echo "step2 - this should run since secret exists"
+        run: echo "step2"
