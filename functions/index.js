@@ -136,6 +136,36 @@ async function runTool(name, input) {
   }
 }
 
+/* ===== Safety gates =====
+   This is the one thing standing between the deployed function's public URL and anyone who
+   finds it: no gate here means no auth check at all (the toggle/admin-only visibility is
+   client-side UI only, not enforced server-side). Both checks below use the Admin SDK, which
+   bypasses Firestore security rules entirely - so a brand-new collection for the rate-limit
+   counter works fine here even though a brand-new collection is 403 for client-side reads
+   (see CLAUDE.md's Firestore-rules note); only the client side has that limitation. */
+const DAILY_REQUEST_LIMIT = 150; // hard ceiling on how many questions this function will answer per day, company-wide
+const MAX_TOOL_LOOP_TURNS = 5; // hard ceiling on Claude API calls spent answering any ONE question
+
+async function verifyCaller(userId) {
+  if (!userId) return false;
+  const doc = await db.collection('universal_users').doc(userId).get();
+  if (!doc.exists) return false;
+  const role = (doc.data().appRoles || {})['ai-assistant'];
+  return role === 'admin' || role === 'director';
+}
+async function checkAndIncrementDailyLimit() {
+  const today = new Date().toISOString().slice(0, 10);
+  const ref = db.collection('ai_settings').doc('rateLimit');
+  return db.runTransaction(async tx => {
+    const doc = await tx.get(ref);
+    const data = doc.exists ? doc.data() : {};
+    const count = data.date === today ? (data.count || 0) : 0;
+    if (count >= DAILY_REQUEST_LIMIT) return false;
+    tx.set(ref, {date: today, count: count + 1});
+    return true;
+  });
+}
+
 const SYSTEM_PROMPT = `Aap Bliss One ke Directors Assistant hain - ek gems/minerals trading business ka
 internal tool. Aapke paas Firestore (Trip Expense, Stationery, Petty Cash, Fuel Tracker) aur MIDAP
 (Tasks, FMS) ka live data padhne ke tools hain. Sawaal ka jawab seedha, Hindi/Hinglish mein, bina
@@ -147,13 +177,20 @@ exports.directorsAssistantChat = onRequest(
   async (req, res) => {
     if (req.method !== 'POST') { res.status(405).json({error: 'POST only'}); return; }
     const question = String((req.body && req.body.question) || '').trim();
+    const userId = String((req.body && req.body.userId) || '').trim();
     if (!question) { res.status(400).json({error: 'question is required'}); return; }
+
+    const authorized = await verifyCaller(userId).catch(e => { console.error('verifyCaller failed:', e); return false; });
+    if (!authorized) { res.status(403).json({error: 'Not authorized - Admin/Director role required.'}); return; }
+
+    const underLimit = await checkAndIncrementDailyLimit().catch(e => { console.error('checkAndIncrementDailyLimit failed:', e); return false; });
+    if (!underLimit) { res.status(429).json({error: `Aaj ki AI limit poori ho gayi hai (${DAILY_REQUEST_LIMIT}/day) - kal phir try karein.`}); return; }
 
     const client = new Anthropic({apiKey: anthropicApiKey.value()});
     let messages = [{role: 'user', content: question}];
 
     try {
-      for (let turn = 0; turn < 5; turn++) {
+      for (let turn = 0; turn < MAX_TOOL_LOOP_TURNS; turn++) {
         const response = await client.messages.create({
           model: 'claude-haiku-5-5',
           max_tokens: 1024,
