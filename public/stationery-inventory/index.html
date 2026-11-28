@@ -172,13 +172,6 @@ tbody tr:hover td{background:#f7faf8}
       <div class="ph"><span>My Request History</span></div>
       <div class="pb" id="myRequestsList"></div>
     </div>
-    <div class="panel hidden" id="marketAlertSelfPanel">
-      <div class="ph"><span>🧾 Market Se Laane Wali Jimmedari</span></div>
-      <div class="pb">
-        <p class="note">Aap is waqt "Market Se Laane Wala" set hain - jo bhi item abhi low-stock hai, uski list ek WhatsApp message mein khud ko bhej sakte hain.</p>
-        <button class="btn primary" onclick="forceNotifyMarketPerson()">📦 Market Alert Bhejein</button>
-      </div>
-    </div>
   </section>
 
   <section class="page" id="page-requests">
@@ -261,7 +254,7 @@ tbody tr:hover td{background:#f7faf8}
   </section>
 
   <section class="page" id="page-items">
-    <div class="panel">
+    <div class="panel itemsAdminOnly hidden">
       <div class="ph"><span>Add New Item</span></div>
       <div class="pb">
         <div class="grid">
@@ -396,7 +389,7 @@ let users=[],items=[],inLog=[],outLog=[],requests=[];
 let requestsFilter='PENDING';
 let masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{}};
 let currentUser=null,currentTab='category';
-let usersStarted=false,itemsStarted=false,inStarted=false,outStarted=false,mastersStarted=false;
+let usersStarted=false,itemsStarted=false,inStarted=false,outStarted=false,mastersStarted=false,mastersLoaded=false;
 
 function loggedUser(){return users.find(x=>x.id===currentUser)||null}
 function myRole(){const u=loggedUser();return (u&&u.appRoles&&u.appRoles[APP_SLUG])||''}
@@ -497,7 +490,7 @@ function seedStarterMastersIfEmpty(){
 function startMastersSync(){
   if(mastersStarted||!db)return;mastersStarted=true;
   seedStarterMastersIfEmpty();
-  db.collection('si_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{},...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  db.collection('si_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{},...doc.data()};mastersLoaded=true;renderAll();},err=>console.error('masters sync error',err));
 }
 function saveMasters(){ if(db) db.collection('si_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
 
@@ -621,6 +614,14 @@ function computeLowStockMarketReminders(){
   });
 }
 function maybeAutoSendMarketReminders(all){
+  // Real bug found and fixed here: this used to run off whatever `masters` happened to be in
+  // memory - if items' Firestore listener fired before masters' own listener had loaded the
+  // REAL saved doc (a genuine race, both start together with no ordering guarantee), this ran
+  // against the default empty `masters` object, then saveMasters() below did a full .set()
+  // overwrite - silently wiping out the real saved categories/units/vendors/lowStockRecipients/
+  // marketPersonId/templates with that default, not just failing to read them once. Same
+  // usersLoaded/ledgerLoaded race-guard pattern as Trip Expense's autoSendOverdueReminders.
+  if(!mastersLoaded)return;
   if(masters.marketReminderEnabled===false)return; // defaults to ON - opt-out, not opt-in, since this was asked for directly
   const due=all.filter(x=>x.due);
   if(!due.length||_marketReminderSent)return;
@@ -731,6 +732,9 @@ async function autoResendRequestNotification(r){
   saveMasters();
 }
 function maybeAutoResendRequests(all){
+  // Same mastersLoaded race-guard as maybeAutoSendMarketReminders above - without it, this can
+  // fire (and its saveMasters() overwrite the real doc) before masters has actually synced.
+  if(!mastersLoaded)return;
   if(!masters.autoResendRequestsEnabled)return;
   all.filter(r=>r.due).forEach(r=>{
     if(_autoResendSent.has(r.id))return;
@@ -803,8 +807,12 @@ function canSendMarketAlertSelf(){
 }
 function applyFeatureVisibility(){
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.toggle('hidden',!isAdminRole()));
-  const marketPanel=$('marketAlertSelfPanel');
-  if(marketPanel)marketPanel.classList.toggle('hidden',!canSendMarketAlertSelf());
+  // The Item Master nav button is reachable by Admin/Director as before, OR by the
+  // configured Market Person - but only the item list + Market Alert button are theirs;
+  // Add New Item and each item's Edit button stay Admin/Director-only (.itemsAdminOnly).
+  const itemsAllowed=isAdminRole()||canSendMarketAlertSelf();
+  document.querySelectorAll('[data-page="items"]').forEach(b=>b.classList.toggle('hidden',!itemsAllowed));
+  document.querySelectorAll('.itemsAdminOnly').forEach(el=>el.classList.toggle('hidden',!isAdminRole()));
   // Message Templates / Low Stock Alerts need the actual Super Admin unlock, not just any
   // Admin/Director role - stricter than the rest of this modal, which isAdminRole() already
   // gates (via the "⚙ Manage" button itself being superAdminOnly).
@@ -815,7 +823,10 @@ function applyFeatureVisibility(){
   // user keeps.
   if(!isAdminRole()){
     const activePage=document.querySelector('.page.on');
-    if(activePage && ADMIN_ONLY_PAGES.includes(activePage.id.replace('page-',''))){
+    const activeId=activePage&&activePage.id.replace('page-','');
+    // "items" is a deliberate exception - the configured Market Person is allowed to stay
+    // there (item list + Market Alert button only, Add/Edit stay hidden via .itemsAdminOnly).
+    if(activePage && ADMIN_ONLY_PAGES.includes(activeId) && !(activeId==='items'&&canSendMarketAlertSelf())){
       go('myrequests');
     }
   }
@@ -890,7 +901,7 @@ function renderItems(){
   const list=q?items.filter(x=>(x.name||'').toLowerCase().includes(q)||(x.category||'').toLowerCase().includes(q)):items;
   $('itemList').innerHTML=list.map(x=>{
     const isLow=x.stock<=x.min;
-    return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span><button class="btn small" onclick="openEditItem('${x.id}')">✎ Edit</button></div>`;
+    return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span>${isAdminRole()?`<button class="btn small" onclick="openEditItem('${x.id}')">✎ Edit</button>`:''}</div>`;
   }).join('')||(q?`<div class="emptystate">🔍<p>Koi matching item nahi mila.</p><small>Dusra naam ya category try karein.</small></div>`:`<div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Upar se pehla item add karein.</small></div>`);
 }
 // One combined message for every currently low-stock item at once - not one button/message
