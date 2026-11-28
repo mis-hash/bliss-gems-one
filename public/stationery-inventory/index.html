@@ -254,7 +254,7 @@ tbody tr:hover td{background:#f7faf8}
   </section>
 
   <section class="page" id="page-items">
-    <div class="panel">
+    <div class="panel itemsAdminOnly hidden">
       <div class="ph"><span>Add New Item</span></div>
       <div class="pb">
         <div class="grid">
@@ -389,7 +389,7 @@ let users=[],items=[],inLog=[],outLog=[],requests=[];
 let requestsFilter='PENDING';
 let masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{}};
 let currentUser=null,currentTab='category';
-let usersStarted=false,itemsStarted=false,inStarted=false,outStarted=false,mastersStarted=false;
+let usersStarted=false,itemsStarted=false,inStarted=false,outStarted=false,mastersStarted=false,mastersLoaded=false;
 
 function loggedUser(){return users.find(x=>x.id===currentUser)||null}
 function myRole(){const u=loggedUser();return (u&&u.appRoles&&u.appRoles[APP_SLUG])||''}
@@ -490,7 +490,7 @@ function seedStarterMastersIfEmpty(){
 function startMastersSync(){
   if(mastersStarted||!db)return;mastersStarted=true;
   seedStarterMastersIfEmpty();
-  db.collection('si_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{},...doc.data()};renderAll();},err=>console.error('masters sync error',err));
+  db.collection('si_settings').doc('masters').onSnapshot(doc=>{if(doc.exists)masters={categories:[],units:[],vendors:[],lowStockRecipients:[],templates:{},...doc.data()};mastersLoaded=true;renderAll();},err=>console.error('masters sync error',err));
 }
 function saveMasters(){ if(db) db.collection('si_settings').doc('masters').set(masters).catch(e=>console.error('masters save failed',e)); }
 
@@ -577,12 +577,30 @@ function buildMarketAlertMessage(dueItems){
   const list=dueItems.map(x=>`- ${x.name}: ${x.stock||0} ${x.unit||''} (min ${x.min||0})`).join('\n');
   return fillTemplate(templateText('low_stock_market'),{ItemsList:list});
 }
+// The exact-name "anil saini" lookup below silently sends nothing if that name is spelled even
+// slightly differently, has no phone, or is inactive - no error anywhere. A configurable
+// masters.marketPersonId (Manage > Low Stock Alerts tab) is tried first so this no longer
+// depends on an exact name match; the old name-based lookup stays as a fallback for anyone who
+// hasn't set the dropdown yet, so existing setups that happen to already work keep working.
+function resolveMarketPerson(){
+  if(masters.marketPersonId){
+    const byId=users.find(x=>x.id===masters.marketPersonId && x.active!==false && x.phone);
+    if(byId)return byId;
+  }
+  const normName=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  return users.find(x=>x.active!==false && x.phone && normName(x.name)==='anil saini')||null;
+}
 function notifyMarketPerson(dueItems){
   if(!dueItems.length)return;
-  const normName=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
-  const u=users.find(x=>x.active!==false && x.phone && normName(x.name)==='anil saini');
-  if(!u)return;
+  const u=resolveMarketPerson();
+  if(!u){console.warn('Market Alert: koi recipient nahi mila - Manage > Low Stock Alerts se "Market Se Laane Wala" set karein.');return}
   sendRawWA(u.phone,buildMarketAlertMessage(dueItems)).catch(e=>console.error('low stock market WA failed:',e));
+}
+function setMarketPerson(userId){
+  if(!superAdminUnlocked){alert('Sirf Super Admin ye setting badal sakta hai.');return}
+  masters.marketPersonId=userId||'';
+  saveMasters();
+  toast('Market Alert recipient update ho gaya');
 }
 // Daily auto-repeat for as long as an item stays low-stock - same opt-in/best-effort pattern
 // as the Requests page's auto-resend (Super Admin toggle, in-tab guard, per-item last-sent
@@ -596,6 +614,14 @@ function computeLowStockMarketReminders(){
   });
 }
 function maybeAutoSendMarketReminders(all){
+  // Real bug found and fixed here: this used to run off whatever `masters` happened to be in
+  // memory - if items' Firestore listener fired before masters' own listener had loaded the
+  // REAL saved doc (a genuine race, both start together with no ordering guarantee), this ran
+  // against the default empty `masters` object, then saveMasters() below did a full .set()
+  // overwrite - silently wiping out the real saved categories/units/vendors/lowStockRecipients/
+  // marketPersonId/templates with that default, not just failing to read them once. Same
+  // usersLoaded/ledgerLoaded race-guard pattern as Trip Expense's autoSendOverdueReminders.
+  if(!mastersLoaded)return;
   if(masters.marketReminderEnabled===false)return; // defaults to ON - opt-out, not opt-in, since this was asked for directly
   const due=all.filter(x=>x.due);
   if(!due.length||_marketReminderSent)return;
@@ -706,6 +732,9 @@ async function autoResendRequestNotification(r){
   saveMasters();
 }
 function maybeAutoResendRequests(all){
+  // Same mastersLoaded race-guard as maybeAutoSendMarketReminders above - without it, this can
+  // fire (and its saveMasters() overwrite the real doc) before masters has actually synced.
+  if(!mastersLoaded)return;
   if(!masters.autoResendRequestsEnabled)return;
   all.filter(r=>r.due).forEach(r=>{
     if(_autoResendSent.has(r.id))return;
@@ -768,8 +797,22 @@ function refreshLoginBadge(){
   $('logoutBtn').classList.toggle('hidden',!u);
 }
 const ADMIN_ONLY_PAGES=['dash','in','out','items','reports','requests'];
+// The configured Market Person (Manage > Low Stock Alerts > "Market Se Laane Wala") can send
+// the Market Alert themselves without needing an Admin/Director role or Super Admin - this is
+// the one person the message is addressed to, same reasoning as Fuel Tracker letting a
+// vehicle's own Responsible Doer mark it cleaned.
+function canSendMarketAlertSelf(){
+  const u=loggedUser();
+  return !!(u&&masters.marketPersonId&&u.id===masters.marketPersonId);
+}
 function applyFeatureVisibility(){
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.toggle('hidden',!isAdminRole()));
+  // The Item Master nav button is reachable by Admin/Director as before, OR by the
+  // configured Market Person - but only the item list + Market Alert button are theirs;
+  // Add New Item and each item's Edit button stay Admin/Director-only (.itemsAdminOnly).
+  const itemsAllowed=isAdminRole()||canSendMarketAlertSelf();
+  document.querySelectorAll('[data-page="items"]').forEach(b=>b.classList.toggle('hidden',!itemsAllowed));
+  document.querySelectorAll('.itemsAdminOnly').forEach(el=>el.classList.toggle('hidden',!isAdminRole()));
   // Message Templates / Low Stock Alerts need the actual Super Admin unlock, not just any
   // Admin/Director role - stricter than the rest of this modal, which isAdminRole() already
   // gates (via the "⚙ Manage" button itself being superAdminOnly).
@@ -780,7 +823,10 @@ function applyFeatureVisibility(){
   // user keeps.
   if(!isAdminRole()){
     const activePage=document.querySelector('.page.on');
-    if(activePage && ADMIN_ONLY_PAGES.includes(activePage.id.replace('page-',''))){
+    const activeId=activePage&&activePage.id.replace('page-','');
+    // "items" is a deliberate exception - the configured Market Person is allowed to stay
+    // there (item list + Market Alert button only, Add/Edit stay hidden via .itemsAdminOnly).
+    if(activePage && ADMIN_ONLY_PAGES.includes(activeId) && !(activeId==='items'&&canSendMarketAlertSelf())){
       go('myrequests');
     }
   }
@@ -855,13 +901,14 @@ function renderItems(){
   const list=q?items.filter(x=>(x.name||'').toLowerCase().includes(q)||(x.category||'').toLowerCase().includes(q)):items;
   $('itemList').innerHTML=list.map(x=>{
     const isLow=x.stock<=x.min;
-    return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span><button class="btn small" onclick="openEditItem('${x.id}')">✎ Edit</button></div>`;
+    return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span>${isAdminRole()?`<button class="btn small" onclick="openEditItem('${x.id}')">✎ Edit</button>`:''}</div>`;
   }).join('')||(q?`<div class="emptystate">🔍<p>Koi matching item nahi mila.</p><small>Dusra naam ya category try karein.</small></div>`:`<div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Upar se pehla item add karein.</small></div>`);
 }
 // One combined message for every currently low-stock item at once - not one button/message
 // per item, so several items going low together never becomes a flood of separate WhatsApp
 // messages to Anil Saini.
 function forceNotifyMarketPerson(){
+  if(!(isAdminRole()||canSendMarketAlertSelf())){alert('Sirf Admin/Director, ya configured Market Se Laane Wala ye bhej sakta hai.');return}
   const low=items.filter(x=>(x.stock||0)<=(x.min||0));
   if(!low.length){alert('Abhi koi item low-stock mein nahi hai.');return}
   notifyMarketPerson(low);
@@ -1167,8 +1214,11 @@ function renderManage(){
   else if(currentTab==='notify'){
     const withPhone=users.filter(u=>u.active!==false && u.phone);
     const selected=masters.lowStockRecipients||[];
+    const marketPersonId=masters.marketPersonId||'';
     c.innerHTML=`<p class="note">Low Stock Alert WhatsApp message kisko jaye, yahan se select karein. Kuch bhi select na karein to default Admin/Director (jinke paas phone number hai) ko jayega.</p>`+
-      (withPhone.map(u=>`<div class="item"><span>${esc(u.name)}</span><input type="checkbox" ${selected.includes(u.id)?'checked':''} onchange="toggleLowStockRecipient('${esc(u.id)}')"></div>`).join('')||'<div class="note" style="padding:8px 0">Koi active user ka phone number save nahi hai.</div>');
+      (withPhone.map(u=>`<div class="item"><span>${esc(u.name)}</span><input type="checkbox" ${selected.includes(u.id)?'checked':''} onchange="toggleLowStockRecipient('${esc(u.id)}')"></div>`).join('')||'<div class="note" style="padding:8px 0">Koi active user ka phone number save nahi hai.</div>')
+      +`<div class="field" style="margin-top:16px"><label>Market Se Laane Wala (Market Alert kisko jaye)</label><select id="siMarketPerson" onchange="setMarketPerson(this.value)"><option value=""${marketPersonId===''?' selected':''}>-- Naam se dhundein (Anil Saini) --</option>${withPhone.map(u=>`<option value="${esc(u.id)}"${marketPersonId===u.id?' selected':''}>${esc(u.name)}</option>`).join('')}</select>
+      <p class="note" style="margin-top:6px">Yahan se select karne par us user ko hi Market Alert jayega - koi naam match karne ki zaroorat nahi. Kuch bhi select na karein to purana tareeka (exact naam "Anil Saini") try hoga.</p></div>`;
   }
   else if(currentTab==='templates'){
     c.innerHTML=`<p class="note">In messages ki wording customize kar sakte hain. {CurlyBraces} wale words ko chhoda na chhedein — inki jagah actual data automatically bharta hai.</p>`+
