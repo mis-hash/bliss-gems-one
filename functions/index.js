@@ -58,10 +58,13 @@ async function getTodayFuelExpense() {
    exactly as MIDAP's docs require (an omitted field is not the same as an accepted default
    on this API). ===== */
 async function callMidap(path, data) {
+  // 15s timeout so a hung MIDAP server fails fast instead of running up this function's own
+  // billed execution time waiting forever.
   const resp = await fetch(MIDAP_BASE + path, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({licenseKey: midapLicenseKey.value(), data}),
+    signal: AbortSignal.timeout(15000),
   });
   const json = await resp.json();
   if (json.status !== 'success') throw new Error(json.message || 'MIDAP API error');
@@ -173,7 +176,7 @@ zaroorat ke lamba kiye dein. Agar koi tool error de, use user ko saaf bata dein 
 Agar sawaal in tools se answer nahi ho sakta, saaf kahein ki abhi ye data available nahi hai.`;
 
 exports.directorsAssistantChat = onRequest(
-  {secrets: [anthropicApiKey, midapLicenseKey], cors: true, region: 'us-central1'},
+  {secrets: [anthropicApiKey, midapLicenseKey], cors: ['https://bliss-gems-one.web.app', 'https://bliss-gems-one.firebaseapp.com'], region: 'us-central1'},
   async (req, res) => {
     if (req.method !== 'POST') { res.status(405).json({error: 'POST only'}); return; }
     const question = String((req.body && req.body.question) || '').trim();
@@ -186,7 +189,12 @@ exports.directorsAssistantChat = onRequest(
     const underLimit = await checkAndIncrementDailyLimit().catch(e => { console.error('checkAndIncrementDailyLimit failed:', e); return false; });
     if (!underLimit) { res.status(429).json({error: `Aaj ki AI limit poori ho gayi hai (${DAILY_REQUEST_LIMIT}/day) - kal phir try karein.`}); return; }
 
-    const client = new Anthropic({apiKey: anthropicApiKey.value()});
+    // maxRetries pinned explicitly (not left at the SDK default) so the 5-turn x N-retries
+    // worst-case bound used for the cost ceiling is an exact, documented number, not "whatever
+    // the SDK's default happens to be". Retries only fire on 408/409/429/5xx/network errors,
+    // which normally fail before any output tokens are generated, so this barely moves the
+    // ceiling in practice - but it's accounted for rather than ignored.
+    const client = new Anthropic({apiKey: anthropicApiKey.value(), maxRetries: 2});
     let messages = [{role: 'user', content: question}];
 
     try {
