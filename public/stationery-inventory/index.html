@@ -172,6 +172,13 @@ tbody tr:hover td{background:#f7faf8}
       <div class="ph"><span>My Request History</span></div>
       <div class="pb" id="myRequestsList"></div>
     </div>
+    <div class="panel hidden" id="marketAlertSelfPanel">
+      <div class="ph"><span>🧾 Market Se Laane Wali Jimmedari</span></div>
+      <div class="pb">
+        <p class="note">Aap is waqt "Market Se Laane Wala" set hain - jo bhi item abhi low-stock hai, uski list ek WhatsApp message mein khud ko bhej sakte hain.</p>
+        <button class="btn primary" onclick="forceNotifyMarketPerson()">📦 Market Alert Bhejein</button>
+      </div>
+    </div>
   </section>
 
   <section class="page" id="page-requests">
@@ -786,8 +793,18 @@ function refreshLoginBadge(){
   $('logoutBtn').classList.toggle('hidden',!u);
 }
 const ADMIN_ONLY_PAGES=['dash','in','out','items','reports','requests'];
+// The configured Market Person (Manage > Low Stock Alerts > "Market Se Laane Wala") can send
+// the Market Alert themselves without needing an Admin/Director role or Super Admin - this is
+// the one person the message is addressed to, same reasoning as Fuel Tracker letting a
+// vehicle's own Responsible Doer mark it cleaned.
+function canSendMarketAlertSelf(){
+  const u=loggedUser();
+  return !!(u&&masters.marketPersonId&&u.id===masters.marketPersonId);
+}
 function applyFeatureVisibility(){
   document.querySelectorAll('.superAdminOnly').forEach(el=>el.classList.toggle('hidden',!isAdminRole()));
+  const marketPanel=$('marketAlertSelfPanel');
+  if(marketPanel)marketPanel.classList.toggle('hidden',!canSendMarketAlertSelf());
   // Message Templates / Low Stock Alerts need the actual Super Admin unlock, not just any
   // Admin/Director role - stricter than the rest of this modal, which isAdminRole() already
   // gates (via the "⚙ Manage" button itself being superAdminOnly).
@@ -880,6 +897,7 @@ function renderItems(){
 // per item, so several items going low together never becomes a flood of separate WhatsApp
 // messages to Anil Saini.
 function forceNotifyMarketPerson(){
+  if(!(isAdminRole()||canSendMarketAlertSelf())){alert('Sirf Admin/Director, ya configured Market Se Laane Wala ye bhej sakta hai.');return}
   const low=items.filter(x=>(x.stock||0)<=(x.min||0));
   if(!low.length){alert('Abhi koi item low-stock mein nahi hai.');return}
   notifyMarketPerson(low);
