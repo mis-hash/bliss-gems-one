@@ -577,12 +577,30 @@ function buildMarketAlertMessage(dueItems){
   const list=dueItems.map(x=>`- ${x.name}: ${x.stock||0} ${x.unit||''} (min ${x.min||0})`).join('\n');
   return fillTemplate(templateText('low_stock_market'),{ItemsList:list});
 }
+// The exact-name "anil saini" lookup below silently sends nothing if that name is spelled even
+// slightly differently, has no phone, or is inactive - no error anywhere. A configurable
+// masters.marketPersonId (Manage > Low Stock Alerts tab) is tried first so this no longer
+// depends on an exact name match; the old name-based lookup stays as a fallback for anyone who
+// hasn't set the dropdown yet, so existing setups that happen to already work keep working.
+function resolveMarketPerson(){
+  if(masters.marketPersonId){
+    const byId=users.find(x=>x.id===masters.marketPersonId && x.active!==false && x.phone);
+    if(byId)return byId;
+  }
+  const normName=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  return users.find(x=>x.active!==false && x.phone && normName(x.name)==='anil saini')||null;
+}
 function notifyMarketPerson(dueItems){
   if(!dueItems.length)return;
-  const normName=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
-  const u=users.find(x=>x.active!==false && x.phone && normName(x.name)==='anil saini');
-  if(!u)return;
+  const u=resolveMarketPerson();
+  if(!u){console.warn('Market Alert: koi recipient nahi mila - Manage > Low Stock Alerts se "Market Se Laane Wala" set karein.');return}
   sendRawWA(u.phone,buildMarketAlertMessage(dueItems)).catch(e=>console.error('low stock market WA failed:',e));
+}
+function setMarketPerson(userId){
+  if(!superAdminUnlocked){alert('Sirf Super Admin ye setting badal sakta hai.');return}
+  masters.marketPersonId=userId||'';
+  saveMasters();
+  toast('Market Alert recipient update ho gaya');
 }
 // Daily auto-repeat for as long as an item stays low-stock - same opt-in/best-effort pattern
 // as the Requests page's auto-resend (Super Admin toggle, in-tab guard, per-item last-sent
@@ -1167,8 +1185,11 @@ function renderManage(){
   else if(currentTab==='notify'){
     const withPhone=users.filter(u=>u.active!==false && u.phone);
     const selected=masters.lowStockRecipients||[];
+    const marketPersonId=masters.marketPersonId||'';
     c.innerHTML=`<p class="note">Low Stock Alert WhatsApp message kisko jaye, yahan se select karein. Kuch bhi select na karein to default Admin/Director (jinke paas phone number hai) ko jayega.</p>`+
-      (withPhone.map(u=>`<div class="item"><span>${esc(u.name)}</span><input type="checkbox" ${selected.includes(u.id)?'checked':''} onchange="toggleLowStockRecipient('${esc(u.id)}')"></div>`).join('')||'<div class="note" style="padding:8px 0">Koi active user ka phone number save nahi hai.</div>');
+      (withPhone.map(u=>`<div class="item"><span>${esc(u.name)}</span><input type="checkbox" ${selected.includes(u.id)?'checked':''} onchange="toggleLowStockRecipient('${esc(u.id)}')"></div>`).join('')||'<div class="note" style="padding:8px 0">Koi active user ka phone number save nahi hai.</div>')
+      +`<div class="field" style="margin-top:16px"><label>Market Se Laane Wala (Market Alert kisko jaye)</label><select id="siMarketPerson" onchange="setMarketPerson(this.value)"><option value=""${marketPersonId===''?' selected':''}>-- Naam se dhundein (Anil Saini) --</option>${withPhone.map(u=>`<option value="${esc(u.id)}"${marketPersonId===u.id?' selected':''}>${esc(u.name)}</option>`).join('')}</select>
+      <p class="note" style="margin-top:6px">Yahan se select karne par us user ko hi Market Alert jayega - koi naam match karne ki zaroorat nahi. Kuch bhi select na karein to purana tareeka (exact naam "Anil Saini") try hoga.</p></div>`;
   }
   else if(currentTab==='templates'){
     c.innerHTML=`<p class="note">In messages ki wording customize kar sakte hain. {CurlyBraces} wale words ko chhoda na chhedein — inki jagah actual data automatically bharta hai.</p>`+
