@@ -382,6 +382,8 @@ const SESSION_KEY='pd_logged_user_v1'; // same key as Bliss One hub / Parcel Dis
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const todayISO=()=>new Date().toISOString().slice(0,10);
+const REQUEST_REMINDER_GAP_HOURS=24; // "1 din se zyada pending" → auto-resend eligible
+const REQUEST_REMINDER_REPEAT_HOURS=24; // don't re-send more than once a day for the same request
 
 let users=[],items=[],inLog=[],outLog=[],requests=[];
 let requestsFilter='PENDING';
@@ -546,7 +548,8 @@ const DEFAULT_SI_TEMPLATES={
   stock_issued:{name:'Stock Issued',text:'📦 Stock Issued\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nIssued To: {IssuedTo}\nIssued By: {IssuedBy}'},
   request_submitted:{name:'New Stationery Request (to Admin)',text:'🙋 New Stationery Request\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nRequested By: {RequestedBy}\nPurpose: {Purpose}\n\nPlease review and issue.\n{Link}'},
   request_issued:{name:'Request Issued (to Requester)',text:'✅ Your Stationery Request Approved\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nIssued By: {IssuedBy}\n\nPlease collect it.'},
-  request_rejected:{name:'Request Rejected (to Requester)',text:'❌ Your Stationery Request Rejected\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nReason: {Reason}'}
+  request_rejected:{name:'Request Rejected (to Requester)',text:'❌ Your Stationery Request Rejected\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nReason: {Reason}'},
+  request_pending_collect:{name:'Please Collect From Admin (to Requester)',text:'📦 Aapki Stationery Request\n\nItem: {ItemName}\nQty: {Qty} {Unit}\n\nPlease Admin ke paas jaakar collect karein.'}
 };
 function fillTemplate(text,vars){
   return text.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m);
@@ -597,6 +600,15 @@ async function notifyRequestSubmitted(item,qty,requesterId,purpose){
   }
   return {sent,failed,noRecipients:false};
 }
+// Reminds the REQUESTER (not the admin) that collecting the item is their own job - this
+// app's process has no delivery step, the requester has to go find Admin and ask for it,
+// so they're told this at submission time and again if it's still sitting PENDING.
+function notifyRequesterToCollect(item,qty,requesterId){
+  const u=users.find(x=>x.id===requesterId);
+  if(!u||!u.phone)return;
+  const msg=fillTemplate(templateText('request_pending_collect'),{ItemName:item.name,Qty:qty,Unit:item.unit||''});
+  sendRawWA(u.phone,msg).catch(e=>console.error('request-pending-collect WA failed:',e));
+}
 // Admin-triggered manual resend for a request whose original notification may have been
 // silently dropped (e.g. the GREEN-API-credentials boot-time race that sendRawWA/
 // getGreenApiCreds no longer have, but older requests may still have missed it).
@@ -607,9 +619,59 @@ async function resendRequestNotification(id){
   if(!it){alert('Item nahi mila is request ke liye.');return}
   toast('Notification bhej rahe hain...');
   const result=await notifyRequestSubmitted(it,r.qty,r.requestedBy,r.purpose);
+  notifyRequesterToCollect(it,r.qty,r.requestedBy);
   if(result.noRecipients)alert('Koi recipient nahi mila - "Amit Sharma" active nahi hai ya kisi ke paas Stationery admin/director role nahi hai. Universal Users check karein.');
   else if(result.sent>0)alert('Notification bhej diya gaya ('+result.sent+' log ko).'+(result.failed?' '+result.failed+' ko nahi ja paya.':''));
   else alert('Notification bhejne mein error aaya - GREEN-API settings check karein.');
+}
+// Separate manual trigger just for the requester-side "please collect" reminder, so an
+// admin can ping the requester alone without also re-sending the admin-facing notification.
+function manualNotifyRequesterToCollect(id){
+  if(!isAdminRole()){alert('Sirf Admin/Director ye reminder bhej sakte hain.');return}
+  const r=requests.find(x=>x.id===id);if(!r)return;
+  const it=items.find(x=>x.id===r.item);
+  if(!it){alert('Item nahi mila is request ke liye.');return}
+  const u=users.find(x=>x.id===r.requestedBy);
+  if(!u||!u.phone){alert('Requester ka phone number nahi mila.');return}
+  notifyRequesterToCollect(it,r.qty,r.requestedBy);
+  toast('Collect reminder '+nameOfUserId(r.requestedBy)+' ko bhej diya gaya.');
+}
+// Auto-resend for requests stuck PENDING too long, same opt-in/best-effort pattern as
+// Petty Cash's pending-hisaab reminders: Super Admin toggle, in-tab guard only (Spark free
+// plan has no background job, so this only fires while someone has the app open), and a
+// per-request last-sent timestamp in masters so it doesn't repeat more than once a day.
+let _autoResendSent=new Set();
+function computePendingRequestReminders(){
+  return requests.filter(r=>r.status==='PENDING').map(r=>{
+    const hoursPending=r.requestedAt?(Date.now()-new Date(r.requestedAt).getTime())/3600000:0;
+    const lastResend=(masters.requestReminders||{})[r.id]||null;
+    const hoursSinceResend=lastResend?(Date.now()-new Date(lastResend).getTime())/3600000:Infinity;
+    const due=hoursPending>=REQUEST_REMINDER_GAP_HOURS && hoursSinceResend>=REQUEST_REMINDER_REPEAT_HOURS;
+    return {...r,hoursPending,due};
+  });
+}
+async function autoResendRequestNotification(r){
+  const it=items.find(x=>x.id===r.item);
+  if(!it)return;
+  await notifyRequestSubmitted(it,r.qty,r.requestedBy,r.purpose).catch(e=>console.error('auto-resend failed:',e));
+  notifyRequesterToCollect(it,r.qty,r.requestedBy);
+  if(!masters.requestReminders)masters.requestReminders={};
+  masters.requestReminders[r.id]=new Date().toISOString();
+  saveMasters();
+}
+function maybeAutoResendRequests(all){
+  if(!masters.autoResendRequestsEnabled)return;
+  all.filter(r=>r.due).forEach(r=>{
+    if(_autoResendSent.has(r.id))return;
+    _autoResendSent.add(r.id);
+    autoResendRequestNotification(r);
+  });
+}
+function toggleAutoResendRequests(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin ye setting badal sakta hai.');return}
+  masters.autoResendRequestsEnabled=!masters.autoResendRequestsEnabled;
+  saveMasters();
+  renderRequestsAdmin();
 }
 function notifyRequestIssued(item,qty,requesterId,issuedByUserId){
   const u=users.find(x=>x.id===requesterId);
@@ -842,7 +904,7 @@ async function submitStationeryRequest(){
     await db.collection('si_requests').add({item,qty,purpose,status:'PENDING',requestedBy:actor.id,requestedAt:new Date().toISOString()});
     $('reqItemSearch').value='';$('reqItem').value='';$('reqQty').value='';$('reqPurpose').value='';
     toast('Request bhej diya gaya');
-    if(it)notifyRequestSubmitted(it,qty,actor.id,purpose);
+    if(it){notifyRequestSubmitted(it,qty,actor.id,purpose);notifyRequesterToCollect(it,qty,actor.id);}
   }finally{
     _reqSubmitting=false;
     if(btn)btn.disabled=false;
@@ -881,17 +943,20 @@ function renderRequestsAdmin(){
     if(pend){ if(!dot){dot=document.createElement('span');dot.className='reqCountBadge';dot.style.cssText='margin-left:auto;background:var(--amber);color:#fff;border-radius:99px;padding:1px 7px;font-size:11px';badge.appendChild(dot);} dot.textContent=pend; }
     else if(dot)dot.remove();
   }
+  const reminders=computePendingRequestReminders();
+  maybeAutoResendRequests(reminders);
+  const toggleHtml=superAdminUnlocked?`<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:10px"><input type="checkbox" style="width:auto" ${masters.autoResendRequestsEnabled?'checked':''} onchange="toggleAutoResendRequests()"> 🔔 1 din se pending request par Auto-Resend WhatsApp</label>`:'';
   let list=requestsFilter==='ALL'?requests.slice():requests.filter(r=>r.status===requestsFilter);
   list=list.sort((a,b)=>String(b.requestedAt||'').localeCompare(String(a.requestedAt||'')));
-  wrap.innerHTML=list.length?list.map(r=>{
+  wrap.innerHTML=toggleHtml+(list.length?list.map(r=>{
     const it=items.find(x=>x.id===r.item);
     const name=it?it.name:(r.itemName||r.item);
     const when=r.requestedAt?new Date(r.requestedAt).toLocaleString('en-IN'):'-';
     const actions=r.status==='PENDING'
-      ?`<button class="btn small primary" onclick="issueRequest('${r.id}')">✓ Issue</button> <button class="btn small danger" onclick="rejectRequest('${r.id}')">✕ Reject</button> <button class="btn small" onclick="resendRequestNotification('${r.id}')">🔔 Resend Notification</button>`
+      ?`<button class="btn small primary" onclick="issueRequest('${r.id}')">✓ Issue</button> <button class="btn small danger" onclick="rejectRequest('${r.id}')">✕ Reject</button> <button class="btn small" onclick="resendRequestNotification('${r.id}')">🔔 Resend Notification</button> <button class="btn small" onclick="manualNotifyRequesterToCollect('${r.id}')">📦 Collect Reminder Bhejein</button>`
       :(r.status==='ISSUED'?`<small style="color:var(--muted)">by ${esc(nameOfUserId(r.issuedBy))}</small>`:`<small style="color:var(--muted)">by ${esc(nameOfUserId(r.rejectedBy))}</small>`);
     return `<div class="itemrow"><div><b>${esc(name)}</b><small>Qty ${r.qty}${r.purpose?' • '+esc(r.purpose):''} • By ${esc(nameOfUserId(r.requestedBy))} • ${esc(when)}</small></div><span style="display:flex;gap:8px;align-items:center">${requestStatusPill(r.status)}${actions}</span></div>`;
-  }).join(''):`<div class="emptystate">📋<p>Is filter mein koi request nahi hai.</p></div>`;
+  }).join(''):`<div class="emptystate">📋<p>Is filter mein koi request nahi hai.</p></div>`);
 }
 async function issueRequest(id){
   if(!isAdminRole()){alert('Sirf Admin/Director requests issue kar sakte hain.');return}
