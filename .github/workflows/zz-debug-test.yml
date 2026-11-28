@@ -7,11 +7,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "step1"
-      - name: step with id and output, no secrets at all
-        id: check
-        run: |
-          echo "ready=true" >> "$GITHUB_OUTPUT"
-      - name: conditional on step output
-        if: steps.check.outputs.ready == 'true'
-        run: echo "step2"
+      - run: echo "no secrets step"
+      - name: uses an existing secret in run, single line like the original file
+        run: echo "project is ${{ secrets.FIREBASE_PROJECT_ID }}"
