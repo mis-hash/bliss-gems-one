@@ -8,6 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "step1"
-      - name: single secret check
-        if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
-        run: echo "step2"
+      - name: existing secret check
+        if: ${{ secrets.GCP_SERVICE_ACCOUNT != '' }}
+        run: echo "step2 - uses a secret that DOES exist"
