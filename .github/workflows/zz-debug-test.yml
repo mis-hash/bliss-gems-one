@@ -7,7 +7,4 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "step1"
-      - name: conditional step
-        if: ${{ secrets.ANTHROPIC_API_KEY != '' && secrets.MIDAP_LICENSE_KEY != '' }}
-        run: echo "step2"
+      - run: echo "step1 only, no conditional at all"
