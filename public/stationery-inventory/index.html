@@ -624,6 +624,18 @@ async function resendRequestNotification(id){
   else if(result.sent>0)alert('Notification bhej diya gaya ('+result.sent+' log ko).'+(result.failed?' '+result.failed+' ko nahi ja paya.':''));
   else alert('Notification bhejne mein error aaya - GREEN-API settings check karein.');
 }
+// Separate manual trigger just for the requester-side "please collect" reminder, so an
+// admin can ping the requester alone without also re-sending the admin-facing notification.
+function manualNotifyRequesterToCollect(id){
+  if(!isAdminRole()){alert('Sirf Admin/Director ye reminder bhej sakte hain.');return}
+  const r=requests.find(x=>x.id===id);if(!r)return;
+  const it=items.find(x=>x.id===r.item);
+  if(!it){alert('Item nahi mila is request ke liye.');return}
+  const u=users.find(x=>x.id===r.requestedBy);
+  if(!u||!u.phone){alert('Requester ka phone number nahi mila.');return}
+  notifyRequesterToCollect(it,r.qty,r.requestedBy);
+  toast('Collect reminder '+nameOfUserId(r.requestedBy)+' ko bhej diya gaya.');
+}
 // Auto-resend for requests stuck PENDING too long, same opt-in/best-effort pattern as
 // Petty Cash's pending-hisaab reminders: Super Admin toggle, in-tab guard only (Spark free
 // plan has no background job, so this only fires while someone has the app open), and a
@@ -941,7 +953,7 @@ function renderRequestsAdmin(){
     const name=it?it.name:(r.itemName||r.item);
     const when=r.requestedAt?new Date(r.requestedAt).toLocaleString('en-IN'):'-';
     const actions=r.status==='PENDING'
-      ?`<button class="btn small primary" onclick="issueRequest('${r.id}')">✓ Issue</button> <button class="btn small danger" onclick="rejectRequest('${r.id}')">✕ Reject</button> <button class="btn small" onclick="resendRequestNotification('${r.id}')">🔔 Resend Notification</button>`
+      ?`<button class="btn small primary" onclick="issueRequest('${r.id}')">✓ Issue</button> <button class="btn small danger" onclick="rejectRequest('${r.id}')">✕ Reject</button> <button class="btn small" onclick="resendRequestNotification('${r.id}')">🔔 Resend Notification</button> <button class="btn small" onclick="manualNotifyRequesterToCollect('${r.id}')">📦 Collect Reminder Bhejein</button>`
       :(r.status==='ISSUED'?`<small style="color:var(--muted)">by ${esc(nameOfUserId(r.issuedBy))}</small>`:`<small style="color:var(--muted)">by ${esc(nameOfUserId(r.rejectedBy))}</small>`);
     return `<div class="itemrow"><div><b>${esc(name)}</b><small>Qty ${r.qty}${r.purpose?' • '+esc(r.purpose):''} • By ${esc(nameOfUserId(r.requestedBy))} • ${esc(when)}</small></div><span style="display:flex;gap:8px;align-items:center">${requestStatusPill(r.status)}${actions}</span></div>`;
   }).join(''):`<div class="emptystate">📋<p>Is filter mein koi request nahi hai.</p></div>`);
