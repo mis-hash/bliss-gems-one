@@ -21,17 +21,34 @@ jobs:
       - run: npm install -g firebase-tools
       - run: firebase deploy --only hosting --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
       # Functions (Directors Assistant backend) only deploy once both secrets below are set as
-      # GitHub repo secrets (Settings -> Secrets and variables -> Actions) - until then this
-      # step is skipped, Hosting above still deploys every time as before. Also requires the
-      # Firebase project to be on the Blaze plan (Cloud Functions needs it); if it isn't yet,
-      # this step just fails in the log with that error, nothing else is affected.
+      # GitHub repo secrets (Settings -> Secrets and variables -> Actions) - until then this is
+      # skipped, Hosting above still deploys every time as before. Also requires the Firebase
+      # project to be on the Blaze plan (Cloud Functions needs it); if it isn't yet, the deploy
+      # step just fails in the log with that error, nothing else is affected.
+      #
+      # IMPORTANT: this repo's workflows reject any step whose condition (YAML `if:`, or a bash
+      # `if` inside `run:`) branches directly on `secrets.*` - the whole workflow file fails to
+      # even schedule a job (shows "0 jobs", not a step failure) if it does. Route any secret
+      # through `env:` first and branch on that env var / a step output instead - never on
+      # `secrets.*` itself inside a condition.
+      - name: Check function secrets configured
+        id: fn_secrets
+        env:
+          ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MIDAP_KEY: ${{ secrets.MIDAP_LICENSE_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_KEY" ] && [ -n "$MIDAP_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Set function secrets
-        if: ${{ secrets.ANTHROPIC_API_KEY != '' && secrets.MIDAP_LICENSE_KEY != '' }}
+        if: steps.fn_secrets.outputs.ready == 'true'
         run: |
           printf '%s' "${{ secrets.ANTHROPIC_API_KEY }}" | firebase functions:secrets:set ANTHROPIC_API_KEY --project "${{ secrets.FIREBASE_PROJECT_ID }}" --data-file=- --force
           printf '%s' "${{ secrets.MIDAP_LICENSE_KEY }}" | firebase functions:secrets:set MIDAP_LICENSE_KEY --project "${{ secrets.FIREBASE_PROJECT_ID }}" --data-file=- --force
       - name: Deploy functions
-        if: ${{ secrets.ANTHROPIC_API_KEY != '' && secrets.MIDAP_LICENSE_KEY != '' }}
+        if: steps.fn_secrets.outputs.ready == 'true'
         run: |
           npm --prefix functions install --omit=dev
           firebase deploy --only functions --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
