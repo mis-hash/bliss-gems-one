@@ -549,7 +549,8 @@ const DEFAULT_SI_TEMPLATES={
   request_submitted:{name:'New Stationery Request (to Admin)',text:'🙋 New Stationery Request\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nRequested By: {RequestedBy}\nPurpose: {Purpose}\n\nPlease review and issue.\n{Link}'},
   request_issued:{name:'Request Issued (to Requester)',text:'✅ Your Stationery Request Approved\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nIssued By: {IssuedBy}\n\nPlease collect it.'},
   request_rejected:{name:'Request Rejected (to Requester)',text:'❌ Your Stationery Request Rejected\n\nItem: {ItemName}\nQty: {Qty} {Unit}\nReason: {Reason}'},
-  request_pending_collect:{name:'Please Collect From Admin (to Requester)',text:'📦 Aapki Stationery Request\n\nItem: {ItemName}\nQty: {Qty} {Unit}\n\nPlease Admin ke paas jaakar collect karein.'}
+  request_pending_collect:{name:'Please Collect From Admin (to Requester)',text:'📦 Aapki Stationery Request\n\nItem: {ItemName}\nQty: {Qty} {Unit}\n\nPlease Admin ke paas jaakar collect karein.'},
+  low_stock_market:{name:'Market Se Laane Wale Ko (Anil Saini)',text:'⚠️ Low Stock Alert — Stationery Requirement\n\nItem: {ItemName}\nIn Hand: {InHand} {Unit}\nMinimum Level: {MinLevel}\n\nKripya Admin se requirement match karke arrange karein as soon as possible.'}
 };
 function fillTemplate(text,vars){
   return text.replace(/\{(\w+)\}/g,(m,k)=>vars[k]!==undefined?vars[k]:m);
@@ -564,6 +565,49 @@ function notifyLowStock(item){
     : users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
   const msg=fillTemplate(templateText('low_stock'),{ItemName:item.name,InHand:item.stock,Unit:item.unit||'',MinLevel:item.min});
   admins.forEach(u=>sendRawWA(u.phone,msg).catch(e=>console.error('low stock WA failed:',e)));
+  notifyMarketPersonLowStock(item);
+}
+// Separate alert to whoever actually goes to market and buys stationery (Anil Saini, by
+// exact name, same pattern as "Amit Sharma" above) - a different message than the admin one:
+// this one tells him to go get it, after confirming with Amit ji first. Fires both right when
+// stock first drops low (from notifyLowStock above) AND once a day after that for as long as
+// the item stays low (see the auto-reminder block below) - unlike the admin alert, which only
+// fires on a stock-out event and could otherwise go days without a repeat.
+function notifyMarketPerson(item){
+  const normName=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  const u=users.find(x=>x.active!==false && x.phone && normName(x.name)==='anil saini');
+  if(!u)return;
+  const msg=fillTemplate(templateText('low_stock_market'),{ItemName:item.name,InHand:item.stock,Unit:item.unit||'',MinLevel:item.min});
+  sendRawWA(u.phone,msg).catch(e=>console.error('low stock market WA failed:',e));
+}
+function notifyMarketPersonLowStock(item){ notifyMarketPerson(item); }
+// Daily auto-repeat for as long as an item stays low-stock - same opt-in/best-effort pattern
+// as the Requests page's auto-resend (Super Admin toggle, in-tab guard, per-item last-sent
+// date in masters so it fires at most once/day per item even across page reloads).
+let _marketReminderSent=new Set();
+function computeLowStockMarketReminders(){
+  return items.filter(x=>(x.stock||0)<=(x.min||0)).map(x=>{
+    const lastSent=(masters.marketReminders||{})[x.id]||null;
+    const due=lastSent!==todayISO();
+    return {...x,due};
+  });
+}
+function maybeAutoSendMarketReminders(due){
+  if(masters.marketReminderEnabled===false)return; // defaults to ON - opt-out, not opt-in, since this was asked for directly
+  due.filter(x=>x.due).forEach(x=>{
+    if(_marketReminderSent.has(x.id))return;
+    _marketReminderSent.add(x.id);
+    notifyMarketPerson(x);
+    if(!masters.marketReminders)masters.marketReminders={};
+    masters.marketReminders[x.id]=todayISO();
+    saveMasters();
+  });
+}
+function toggleMarketReminder(){
+  if(!superAdminUnlocked){alert('Sirf Super Admin ye setting badal sakta hai.');return}
+  masters.marketReminderEnabled=masters.marketReminderEnabled===false?true:false;
+  saveMasters();
+  renderItems();
 }
 function notifyIssue(item,qty,toUserId,byUserId){
   const admins=users.filter(u=>u.active!==false && u.appRoles && (u.appRoles[APP_SLUG]==='admin'||u.appRoles[APP_SLUG]==='director') && u.phone);
@@ -804,12 +848,22 @@ function renderLogs(){
   $('outHistory').innerHTML=outRows.map(x=>`<tr><td>${esc(x.date)}${deletedInfo(x)}</td><td>${esc(itemName(x.item))}</td><td class="num">-${x.qty}</td><td>${esc(nameOfUserId(x.to))}</td><td>${esc(nameOfUserId(x.by))}</td><td class="superAdminOnly${actionTh}">${logAction(x,'deleteStockOut','restoreStockOut')}</td></tr>`).join('')||`<tr><td colspan="6"><div class="emptystate">⬆<p>Koi Stock Out entry nahi hai.</p><small>Upar se pehli entry add karein.</small></div></td></tr>`;
 }
 function renderItems(){
+  maybeAutoSendMarketReminders(computeLowStockMarketReminders());
   const q=(($('itemSearchBox')&&$('itemSearchBox').value)||'').trim().toLowerCase();
   const list=q?items.filter(x=>(x.name||'').toLowerCase().includes(q)||(x.category||'').toLowerCase().includes(q)):items;
   $('itemList').innerHTML=list.map(x=>{
     const isLow=x.stock<=x.min;
-    return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span><button class="btn small" onclick="openEditItem('${x.id}')">✎ Edit</button></div>`;
+    const marketBtn=isLow?`<button class="btn small" onclick="forceNotifyMarketPerson('${x.id}')">📦 Market Alert Bhejein</button>`:'';
+    return `<div class="itemrow"><div><b>${esc(x.name)}</b><small>${esc(x.category||'-')} • Unit: ${esc(x.unit||'-')} • Min level: ${x.min||0}</small></div><span class="pill ${isLow?'low':'ok'}">${x.stock||0} ${esc(x.unit||'')}</span>${marketBtn}<button class="btn small" onclick="openEditItem('${x.id}')">✎ Edit</button></div>`;
   }).join('')||(q?`<div class="emptystate">🔍<p>Koi matching item nahi mila.</p><small>Dusra naam ya category try karein.</small></div>`:`<div class="emptystate">🗂<p>Koi item nahi hai.</p><small>Upar se pehla item add karein.</small></div>`);
+}
+function forceNotifyMarketPerson(id){
+  const it=items.find(x=>x.id===id);if(!it)return;
+  notifyMarketPerson(it);
+  if(!masters.marketReminders)masters.marketReminders={};
+  masters.marketReminders[id]=todayISO();
+  saveMasters();
+  toast('Market alert bhej diya gaya.');
 }
 let editItemTarget=null;
 function openEditItem(id){
