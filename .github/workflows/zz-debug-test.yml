@@ -8,12 +8,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "no secrets step"
-      - name: secret piped into env first, bash if checks env var not secrets context
+      - name: check via env, set step output
+        id: check
         env:
-          MY_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          KEY1: ${{ secrets.ANTHROPIC_API_KEY }}
+          KEY2: ${{ secrets.MIDAP_LICENSE_KEY }}
         run: |
-          if [ -z "$MY_KEY" ]; then
-            echo "not set, skipping"
-            exit 0
+          if [ -n "$KEY1" ] && [ -n "$KEY2" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "set, would proceed"
+      - name: gated on step output (YAML if:, but reading steps.*.outputs, not secrets)
+        if: steps.check.outputs.ready == 'true'
+        run: echo "would deploy functions now"
