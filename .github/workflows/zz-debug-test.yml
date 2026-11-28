@@ -8,5 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "no secrets step"
-      - name: references a secret that has NEVER been created on this repo
-        run: echo "key is ${{ secrets.ANTHROPIC_API_KEY }}"
+      - name: multiline run, no bash if, nonexistent secret
+        run: |
+          echo "line1"
+          echo "key is ${{ secrets.ANTHROPIC_API_KEY }}"
+          echo "line3"
