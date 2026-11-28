@@ -7,6 +7,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "no secrets step"
-      - name: uses an existing secret in run, single line like the original file
-        run: echo "project is ${{ secrets.FIREBASE_PROJECT_ID }}"
+      - run: echo "step1"
+      - name: bash-level conditional only, zero YAML if: keys in this file
+        run: |
+          if [ -z "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
+            echo "secret not set, skipping"
+            exit 0
+          fi
+          echo "secret is set, would proceed"
